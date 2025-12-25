@@ -29,7 +29,7 @@ twine upload dist/*
 pip install -e .
 
 # Or install the built package locally
-pip install dist/siglent-0.1.0-py3-none-any.whl
+pip install dist/siglent_oscilloscope-0.1.0-py3-none-any.whl
 ```
 
 ## Expected Output
@@ -37,18 +37,20 @@ pip install dist/siglent-0.1.0-py3-none-any.whl
 After `python -m build`, you should see:
 ```
 dist/
-├── siglent-0.1.0.tar.gz
-└── siglent-0.1.0-py3-none-any.whl
+├── siglent_oscilloscope-0.1.0.tar.gz
+└── siglent_oscilloscope-0.1.0-py3-none-any.whl
 ```
+
+Note: PyPI normalizes "Siglent-Oscilloscope" to "siglent_oscilloscope" in filenames.
 
 ## Verify Package Contents
 
 ```bash
 # View wheel contents
-unzip -l dist/siglent-0.1.0-py3-none-any.whl
+unzip -l dist/siglent_oscilloscope-0.1.0-py3-none-any.whl
 
 # Or use tar for source distribution
-tar -tzf dist/siglent-0.1.0.tar.gz
+tar -tzf dist/siglent_oscilloscope-0.1.0.tar.gz
 ```
 
 ## Quick Test

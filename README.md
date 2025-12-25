@@ -1,7 +1,7 @@
 # Siglent Oscilloscope Control
 
-[![PyPI version](https://img.shields.io/pypi/v/siglent.svg)](https://pypi.org/project/siglent/)
-[![Python Version](https://img.shields.io/pypi/pyversions/siglent)](https://pypi.org/project/siglent/)
+[![PyPI version](https://img.shields.io/pypi/v/Siglent-Oscilloscope.svg)](https://pypi.org/project/Siglent-Oscilloscope/)
+[![Python Version](https://img.shields.io/pypi/pyversions/Siglent-Oscilloscope)](https://pypi.org/project/Siglent-Oscilloscope/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
@@ -22,13 +22,13 @@ A professional Python package for controlling Siglent SD824x HD oscilloscopes vi
 ### From PyPI (recommended)
 
 ```bash
-pip install siglent
+pip install Siglent-Oscilloscope
 ```
 
 ### From source
 
 ```bash
-git clone https://github.com/siglent-control/siglent.git
+git clone git@github.com:little-did-I-know/Siglent-Oscilloscope.git
 cd siglent
 pip install -e .
 ```
