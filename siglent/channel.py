@@ -99,7 +99,14 @@ class Channel:
             Voltage scale in volts/division
         """
         response = self._scope.query(f"{self._prefix}:VDIV?")
-        # Response typically in format like "1.0E+00V" or "1.0V"
+        # Response may include echo like "C1:VDIV 1.0E+00V" or just "1.0E+00V"
+        # Remove the echo prefix if present
+        if ':' in response:
+            response = response.split(':', 1)[1]  # Get everything after first ':'
+        # Remove command part if present (e.g., "VDIV 1.0E+00")
+        if ' ' in response:
+            response = response.split(' ', 1)[1]  # Get everything after first space
+        # Remove unit
         value = response.replace('V', '').strip()
         return float(value)
 
@@ -128,6 +135,11 @@ class Channel:
             Offset voltage in volts
         """
         response = self._scope.query(f"{self._prefix}:OFST?")
+        # Response may include echo like "C1:OFST 1.0E+00V"
+        if ':' in response:
+            response = response.split(':', 1)[1]
+        if ' ' in response:
+            response = response.split(' ', 1)[1]
         value = response.replace('V', '').strip()
         return float(value)
 
@@ -149,6 +161,11 @@ class Channel:
             Probe ratio (e.g., 1.0 for 1X, 10.0 for 10X)
         """
         response = self._scope.query(f"{self._prefix}:ATTN?")
+        # Response may include echo like "C1:ATTN 10"
+        if ':' in response:
+            response = response.split(':', 1)[1]
+        if ' ' in response:
+            response = response.split(' ', 1)[1]
         return float(response.strip())
 
     @probe_ratio.setter

@@ -180,6 +180,11 @@ class Trigger:
         if source.startswith('C'):
             # Channel trigger - query channel trigger level
             response = self._scope.query(f"{source}:TRLV?")
+            # Response may include echo like "C1:TRLV 0.0E+00V"
+            if ':' in response:
+                response = response.split(':', 1)[1]
+            if ' ' in response:
+                response = response.split(' ', 1)[1]
             value = response.replace('V', '').strip()
             return float(value)
         return 0.0
@@ -259,6 +264,9 @@ class Trigger:
             Holdoff time in seconds
         """
         response = self._scope.query("TRIG_DELAY?")
+        # Response may include echo like "TRIG_DELAY 0.0E+00S"
+        if ' ' in response:
+            response = response.split(' ', 1)[1]
         value = response.replace('S', '').strip()
         return float(value)
 

@@ -107,7 +107,11 @@ class SocketConnection(BaseConnection):
                 if data.endswith(b'\n'):
                     break
 
-            return data.decode('ascii').strip()
+            # Decode and strip whitespace and null bytes
+            response = data.decode('ascii').strip()
+            # Remove null bytes that some oscilloscopes prepend to responses
+            response = response.lstrip('\x00')
+            return response
         except socket.timeout:
             raise exceptions.TimeoutError("Read timeout")
         except socket.error as e:
