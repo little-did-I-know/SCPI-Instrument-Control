@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "Siglent-Oscilloscope"
 version = "0.1.0"
-description = "Python package for controlling Siglent SD824x HD oscilloscopes via Ethernet"
+description = "Python package for controlling Siglent oscilloscopes (SDS800XHD, SDS1000X, SDS2000X Plus, SDS5000X series) via Ethernet"
 readme = "README.md"
 requires-python = ">=3.8"
 license = "MIT"
@@ -38,6 +38,7 @@ dependencies = [
     "PyQt6-WebEngine>=6.6.0",
     "numpy>=1.24.0",
     "matplotlib>=3.7.0",
+    "scipy>=1.10.0",
 ]
 
 [project.urls]
@@ -54,6 +55,12 @@ dev = [
     "flake8>=6.0",
     "build>=0.10.0",
     "twine>=4.0.0",
+]
+hdf5 = [
+    "h5py>=3.8.0",
+]
+all = [
+    "h5py>=3.8.0",
 ]
 
 [project.scripts]

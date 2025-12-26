@@ -47,7 +47,20 @@ class WaveformDisplay(QWidget):
         super().__init__(parent)
 
         self.waveforms: Dict[int, WaveformData] = {}  # Store waveforms by channel
+        self.current_waveforms: List[WaveformData] = []  # Store most recently displayed waveforms
         self.show_grid = True
+
+        # Cursor state
+        self.cursor_mode = 'off'  # 'off', 'vertical', 'horizontal', 'both'
+        self.cursor_lines = {'v1': None, 'v2': None, 'h1': None, 'h2': None}
+        self.cursor_positions = {'v1': None, 'v2': None, 'h1': None, 'h2': None}
+        self.dragging_cursor = None
+
+        # Reference waveform state
+        self.reference_data = None  # Reference waveform data
+        self.reference_line = None  # Matplotlib line for reference
+        self.show_reference = False  # Whether to show reference overlay
+        self.show_difference = False  # Whether to show difference instead of overlay
 
         self._init_ui()
         logger.info("Waveform display widget initialized")
@@ -75,6 +88,13 @@ class WaveformDisplay(QWidget):
         layout.addWidget(self.toolbar)
         layout.addWidget(self.canvas, stretch=1)
         layout.addWidget(control_panel)
+
+        # Connect mouse events
+        self.canvas.mpl_connect('scroll_event', self._on_scroll)
+        self.canvas.mpl_connect('button_press_event', self._on_mouse_press)
+        self.canvas.mpl_connect('button_release_event', self._on_mouse_release)
+        self.canvas.mpl_connect('motion_notify_event', self._on_mouse_move)
+        self.canvas.mpl_connect('key_press_event', self._on_key_press)
 
     def _configure_axes(self):
         """Configure matplotlib axes appearance."""
@@ -164,6 +184,9 @@ class WaveformDisplay(QWidget):
         for waveform in waveforms:
             self.waveforms[waveform.channel] = waveform
 
+        # Store current waveforms for saving
+        self.current_waveforms = waveforms
+
         self._replot()
 
         logger.info(f"Plotted {len(waveforms)} waveforms")
@@ -230,6 +253,9 @@ class WaveformDisplay(QWidget):
             num_channels = len(self.waveforms)
             total_samples = sum(len(w) for w in self.waveforms.values())
             self.info_label.setText(f"{num_channels} channel(s) | {total_samples} total samples")
+
+        # Plot reference waveform overlay if loaded
+        self._plot_reference_overlay()
 
         # Apply grid setting
         self.ax.grid(self.show_grid, alpha=0.3, color="#444444", linestyle="--", linewidth=0.5)
@@ -331,3 +357,404 @@ class WaveformDisplay(QWidget):
 
         self.canvas.draw()
         logger.info(f"Theme set to {'dark' if dark else 'light'}")
+
+    def toggle_grid(self):
+        """Toggle grid display (callable from external sources like keyboard shortcuts)."""
+        self.show_grid = not self.show_grid
+        self.ax.grid(self.show_grid, alpha=0.3, color="#444444", linestyle="--", linewidth=0.5)
+        self.canvas.draw()
+        logger.info(f"Grid {'enabled' if self.show_grid else 'disabled'}")
+
+    def reset_zoom(self):
+        """Reset zoom to default view (callable from external sources)."""
+        self.ax.autoscale(enable=True, axis="both", tight=False)
+        self.ax.relim()
+        self.ax.autoscale_view()
+        self.canvas.draw()
+        logger.info("Zoom reset")
+
+    def _on_scroll(self, event):
+        """Handle mouse wheel scroll for zooming.
+
+        Args:
+            event: Matplotlib scroll event
+        """
+        if event.inaxes != self.ax:
+            return
+
+        # Zoom factor
+        if event.button == 'up':
+            scale_factor = 1.1  # Zoom in
+        elif event.button == 'down':
+            scale_factor = 0.9  # Zoom out
+        else:
+            return
+
+        # Get current axis limits
+        xlim = self.ax.get_xlim()
+        ylim = self.ax.get_ylim()
+
+        # Get mouse position in data coordinates
+        xdata = event.xdata
+        ydata = event.ydata
+
+        if xdata is None or ydata is None:
+            return
+
+        # Determine zoom behavior based on modifier keys
+        # Ctrl: X-axis only
+        # Shift: Y-axis only
+        # No modifier: Both axes
+        if event.key == 'control':
+            # Zoom X-axis only
+            new_xlim = self._zoom_axis(xlim, xdata, scale_factor)
+            self.ax.set_xlim(new_xlim)
+        elif event.key == 'shift':
+            # Zoom Y-axis only
+            new_ylim = self._zoom_axis(ylim, ydata, scale_factor)
+            self.ax.set_ylim(new_ylim)
+        else:
+            # Zoom both axes
+            new_xlim = self._zoom_axis(xlim, xdata, scale_factor)
+            new_ylim = self._zoom_axis(ylim, ydata, scale_factor)
+            self.ax.set_xlim(new_xlim)
+            self.ax.set_ylim(new_ylim)
+
+        self.canvas.draw()
+
+    def _zoom_axis(self, limits, center, scale_factor):
+        """Calculate new axis limits for zooming.
+
+        Args:
+            limits: Current axis limits (min, max)
+            center: Center point for zoom in data coordinates
+            scale_factor: Zoom factor (>1 for zoom in, <1 for zoom out)
+
+        Returns:
+            Tuple of (new_min, new_max)
+        """
+        min_val, max_val = limits
+        range_val = max_val - min_val
+
+        # Calculate new range
+        new_range = range_val / scale_factor
+
+        # Calculate offset from center
+        center_offset = center - min_val
+        center_fraction = center_offset / range_val if range_val != 0 else 0.5
+
+        # Calculate new limits centered on mouse position
+        new_min = center - (new_range * center_fraction)
+        new_max = new_min + new_range
+
+        return (new_min, new_max)
+
+    def set_cursor_mode(self, mode: str):
+        """Set cursor mode.
+
+        Args:
+            mode: Cursor mode ('off', 'vertical', 'horizontal', 'both')
+        """
+        self.cursor_mode = mode.lower()
+        logger.info(f"Cursor mode set to: {self.cursor_mode}")
+
+        # Clear existing cursors when changing modes
+        if self.cursor_mode == 'off':
+            self._clear_all_cursors()
+
+    def _clear_all_cursors(self):
+        """Clear all cursor lines."""
+        for key in self.cursor_lines:
+            if self.cursor_lines[key] is not None:
+                self.cursor_lines[key].remove()
+                self.cursor_lines[key] = None
+                self.cursor_positions[key] = None
+
+        self.canvas.draw()
+        logger.debug("All cursors cleared")
+
+    def _on_mouse_press(self, event):
+        """Handle mouse button press for cursor placement/dragging.
+
+        Args:
+            event: Matplotlib mouse event
+        """
+        if event.inaxes != self.ax or self.cursor_mode == 'off':
+            return
+
+        if event.button == 1:  # Left click
+            # Check if clicking on existing cursor
+            cursor = self._find_cursor_near_point(event.xdata, event.ydata)
+            if cursor:
+                self.dragging_cursor = cursor
+            else:
+                # Place new cursor
+                self._place_cursor(event.xdata, event.ydata)
+
+        elif event.button == 3:  # Right click
+            # Remove cursor near click
+            cursor = self._find_cursor_near_point(event.xdata, event.ydata)
+            if cursor:
+                self._remove_cursor(cursor)
+
+    def _on_mouse_release(self, event):
+        """Handle mouse button release.
+
+        Args:
+            event: Matplotlib mouse event
+        """
+        self.dragging_cursor = None
+
+    def _on_mouse_move(self, event):
+        """Handle mouse motion for cursor dragging.
+
+        Args:
+            event: Matplotlib mouse event
+        """
+        if self.dragging_cursor and event.inaxes == self.ax:
+            self._move_cursor(self.dragging_cursor, event.xdata, event.ydata)
+
+    def _on_key_press(self, event):
+        """Handle key press events.
+
+        Args:
+            event: Matplotlib key event
+        """
+        if event.key == 'escape':
+            self._clear_all_cursors()
+
+    def _place_cursor(self, x: float, y: float):
+        """Place cursor at specified position.
+
+        Args:
+            x: X coordinate (time)
+            y: Y coordinate (voltage)
+        """
+        if self.cursor_mode in ['vertical', 'both']:
+            # Place vertical cursor
+            if self.cursor_positions['v1'] is None:
+                self._create_vertical_cursor('v1', x)
+            elif self.cursor_positions['v2'] is None:
+                self._create_vertical_cursor('v2', x)
+
+        if self.cursor_mode in ['horizontal', 'both']:
+            # Place horizontal cursor
+            if self.cursor_positions['h1'] is None:
+                self._create_horizontal_cursor('h1', y)
+            elif self.cursor_positions['h2'] is None:
+                self._create_horizontal_cursor('h2', y)
+
+    def _create_vertical_cursor(self, cursor_id: str, x: float):
+        """Create a vertical cursor line.
+
+        Args:
+            cursor_id: Cursor identifier ('v1' or 'v2')
+            x: X position
+        """
+        color = '#FFD700' if cursor_id == 'v1' else '#00CED1'  # Yellow or Cyan
+        line = self.ax.axvline(x, color=color, linestyle='--', linewidth=2, alpha=0.8, picker=5)
+        self.cursor_lines[cursor_id] = line
+        self.cursor_positions[cursor_id] = x
+        self.canvas.draw()
+        logger.debug(f"Created vertical cursor {cursor_id} at x={x}")
+
+    def _create_horizontal_cursor(self, cursor_id: str, y: float):
+        """Create a horizontal cursor line.
+
+        Args:
+            cursor_id: Cursor identifier ('h1' or 'h2')
+            y: Y position
+        """
+        color = '#FFD700' if cursor_id == 'h1' else '#00CED1'  # Yellow or Cyan
+        line = self.ax.axhline(y, color=color, linestyle='--', linewidth=2, alpha=0.8, picker=5)
+        self.cursor_lines[cursor_id] = line
+        self.cursor_positions[cursor_id] = y
+        self.canvas.draw()
+        logger.debug(f"Created horizontal cursor {cursor_id} at y={y}")
+
+    def _move_cursor(self, cursor_id: str, x: float, y: float):
+        """Move an existing cursor.
+
+        Args:
+            cursor_id: Cursor identifier
+            x: New X position
+            y: New Y position
+        """
+        if cursor_id in ['v1', 'v2']:
+            # Move vertical cursor
+            if self.cursor_lines[cursor_id]:
+                self.cursor_lines[cursor_id].set_xdata([x, x])
+                self.cursor_positions[cursor_id] = x
+                self.canvas.draw()
+        elif cursor_id in ['h1', 'h2']:
+            # Move horizontal cursor
+            if self.cursor_lines[cursor_id]:
+                self.cursor_lines[cursor_id].set_ydata([y, y])
+                self.cursor_positions[cursor_id] = y
+                self.canvas.draw()
+
+    def _remove_cursor(self, cursor_id: str):
+        """Remove a cursor.
+
+        Args:
+            cursor_id: Cursor identifier
+        """
+        if self.cursor_lines[cursor_id]:
+            self.cursor_lines[cursor_id].remove()
+            self.cursor_lines[cursor_id] = None
+            self.cursor_positions[cursor_id] = None
+            self.canvas.draw()
+            logger.debug(f"Removed cursor {cursor_id}")
+
+    def _find_cursor_near_point(self, x: float, y: float, threshold: float = None) -> Optional[str]:
+        """Find cursor near a given point.
+
+        Args:
+            x: X coordinate
+            y: Y coordinate
+            threshold: Distance threshold (auto-calculated if None)
+
+        Returns:
+            Cursor identifier if found, None otherwise
+        """
+        if x is None or y is None:
+            return None
+
+        # Auto-calculate threshold based on axis ranges
+        if threshold is None:
+            xlim = self.ax.get_xlim()
+            ylim = self.ax.get_ylim()
+            x_threshold = (xlim[1] - xlim[0]) * 0.02  # 2% of X range
+            y_threshold = (ylim[1] - ylim[0]) * 0.02  # 2% of Y range
+        else:
+            x_threshold = threshold
+            y_threshold = threshold
+
+        # Check vertical cursors
+        for cursor_id in ['v1', 'v2']:
+            pos = self.cursor_positions[cursor_id]
+            if pos is not None and abs(x - pos) < x_threshold:
+                return cursor_id
+
+        # Check horizontal cursors
+        for cursor_id in ['h1', 'h2']:
+            pos = self.cursor_positions[cursor_id]
+            if pos is not None and abs(y - pos) < y_threshold:
+                return cursor_id
+
+        return None
+
+    def get_cursor_values(self) -> dict:
+        """Get current cursor position values.
+
+        Returns:
+            Dictionary with cursor positions
+        """
+        return {
+            'x1': self.cursor_positions.get('v1'),
+            'y1': self.cursor_positions.get('h1'),
+            'x2': self.cursor_positions.get('v2'),
+            'y2': self.cursor_positions.get('h2'),
+        }
+
+    # Reference waveform methods
+
+    def set_reference(self, reference_data: dict):
+        """Set reference waveform for overlay.
+
+        Args:
+            reference_data: Reference data dictionary with 'time' and 'voltage' keys
+        """
+        self.reference_data = reference_data
+        self.show_reference = True
+        self._replot()
+        logger.info("Reference waveform set")
+
+    def clear_reference(self):
+        """Clear reference waveform."""
+        self.reference_data = None
+        self.show_reference = False
+        self.show_difference = False
+        self._replot()
+        logger.info("Reference waveform cleared")
+
+    def toggle_reference_visibility(self, visible: bool):
+        """Toggle reference waveform visibility.
+
+        Args:
+            visible: Whether reference should be visible
+        """
+        self.show_reference = visible
+        self._replot()
+
+    def toggle_difference_mode(self, enabled: bool):
+        """Toggle difference mode (show waveform - reference).
+
+        Args:
+            enabled: Whether to show difference
+        """
+        self.show_difference = enabled
+        self._replot()
+
+    def _plot_reference_overlay(self):
+        """Plot reference waveform overlay if loaded."""
+        if not self.reference_data or not self.show_reference:
+            return
+
+        if not self.waveforms:
+            # No live waveforms to compare against
+            return
+
+        try:
+            ref_time = self.reference_data['time']
+            ref_voltage = self.reference_data['voltage']
+
+            # Convert time to appropriate units (same as live waveforms)
+            time_data, time_unit = self._convert_time_units(ref_time)
+
+            if self.show_difference and len(self.waveforms) > 0:
+                # Show difference between first waveform and reference
+                first_waveform = next(iter(self.waveforms.values()))
+
+                # Interpolate reference to match live waveform time base
+                if len(first_waveform.time) != len(ref_time):
+                    ref_voltage_interp = np.interp(first_waveform.time, ref_time, ref_voltage)
+                    live_time_data, _ = self._convert_time_units(first_waveform.time)
+                    difference = first_waveform.voltage - ref_voltage_interp
+
+                    # Plot difference
+                    self.ax.plot(live_time_data, difference, color='#FF1493',
+                                linewidth=1.5, label='Difference', linestyle='-', alpha=0.8)
+                else:
+                    live_time_data, _ = self._convert_time_units(first_waveform.time)
+                    difference = first_waveform.voltage - ref_voltage
+
+                    # Plot difference
+                    self.ax.plot(live_time_data, difference, color='#FF1493',
+                                linewidth=1.5, label='Difference', linestyle='-', alpha=0.8)
+
+                # Add zero reference line
+                self.ax.axhline(y=0, color='#888888', linestyle=':', linewidth=1, alpha=0.5)
+
+            else:
+                # Show reference as overlay
+                self.ax.plot(time_data, ref_voltage, color='#FFA500',
+                            linewidth=1.5, label='Reference', linestyle='--', alpha=0.7)
+
+            # Update legend
+            legend = self.ax.legend(loc="upper right", framealpha=0.8,
+                                  facecolor="#1a1a1a", edgecolor="#444444")
+            for text in legend.get_texts():
+                text.set_color("#cccccc")
+
+        except Exception as e:
+            logger.error(f"Failed to plot reference overlay: {e}")
+
+    def get_reference_data(self):
+        """Get current reference data.
+
+        Returns:
+            Reference data dictionary or None
+        """
+        return self.reference_data
+

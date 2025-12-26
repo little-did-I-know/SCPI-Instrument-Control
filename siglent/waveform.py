@@ -278,38 +278,202 @@ class Waveform:
             "sample_rate": self._get_sample_rate(),
         }
 
-    def save_waveform(self, waveform: WaveformData, filename: str, format: str = "CSV") -> None:
+    def save_waveform(self, waveform: WaveformData, filename: str, format: Optional[str] = None, metadata: Optional[dict] = None) -> None:
         """Save waveform data to file.
 
         Args:
             waveform: WaveformData object to save
             filename: Output filename
-            format: File format - 'CSV' or 'NPY' (default: 'CSV')
+            format: File format - 'CSV', 'CSV_ENHANCED', 'NPY', 'MAT', 'HDF5'
+                   If None, auto-detect from file extension
+            metadata: Optional metadata dictionary to include in file
+
+        Supported formats:
+            - CSV: Simple CSV with time and voltage columns
+            - CSV_ENHANCED: CSV with metadata header
+            - NPY: NumPy compressed archive (.npz)
+            - MAT: MATLAB format (.mat) - requires scipy
+            - HDF5: HDF5 format (.h5, .hdf5) - requires h5py
         """
-        if format.upper() == "CSV":
-            # Save as CSV
-            import csv
+        # Auto-detect format from extension if not specified
+        if format is None:
+            import os
+            ext = os.path.splitext(filename)[1].lower()
+            format_map = {
+                '.csv': 'CSV',
+                '.npz': 'NPY',
+                '.npy': 'NPY',
+                '.mat': 'MAT',
+                '.h5': 'HDF5',
+                '.hdf5': 'HDF5',
+            }
+            format = format_map.get(ext, 'CSV')
+            logger.debug(f"Auto-detected format: {format} from extension {ext}")
 
-            with open(filename, "w", newline="") as f:
-                writer = csv.writer(f)
-                writer.writerow(["Time (s)", "Voltage (V)"])
-                for t, v in zip(waveform.time, waveform.voltage):
-                    writer.writerow([t, v])
-            logger.info(f"Waveform saved to {filename} (CSV format)")
+        format = format.upper()
 
-        elif format.upper() == "NPY":
-            # Save as NumPy binary
-            np.savez(
-                filename,
-                time=waveform.time,
-                voltage=waveform.voltage,
-                channel=waveform.channel,
-                sample_rate=waveform.sample_rate,
-            )
-            logger.info(f"Waveform saved to {filename} (NPY format)")
+        if format == "CSV":
+            self._save_csv(waveform, filename, include_metadata=False, metadata=metadata)
+
+        elif format == "CSV_ENHANCED":
+            self._save_csv(waveform, filename, include_metadata=True, metadata=metadata)
+
+        elif format == "NPY":
+            self._save_npy(waveform, filename, metadata=metadata)
+
+        elif format == "MAT":
+            self._save_mat(waveform, filename, metadata=metadata)
+
+        elif format == "HDF5":
+            self._save_hdf5(waveform, filename, metadata=metadata)
 
         else:
-            raise exceptions.InvalidParameterError(f"Invalid format: {format}")
+            raise exceptions.InvalidParameterError(f"Invalid format: {format}. Supported: CSV, CSV_ENHANCED, NPY, MAT, HDF5")
+
+    def _save_csv(self, waveform: WaveformData, filename: str, include_metadata: bool = False, metadata: Optional[dict] = None) -> None:
+        """Save waveform as CSV file.
+
+        Args:
+            waveform: WaveformData object
+            filename: Output filename
+            include_metadata: Whether to include metadata header
+            metadata: Optional additional metadata
+        """
+        import csv
+        from datetime import datetime
+
+        with open(filename, "w", newline="") as f:
+            if include_metadata:
+                # Write metadata header as comments
+                f.write("# Siglent Oscilloscope Waveform Data\n")
+                f.write(f"# Captured: {datetime.now().isoformat()}\n")
+                f.write(f"# Channel: {waveform.channel}\n")
+                f.write(f"# Sample Rate: {waveform.sample_rate} Sa/s\n")
+                f.write(f"# Samples: {len(waveform.time)}\n")
+
+                if metadata:
+                    f.write("#\n# Additional Metadata:\n")
+                    for key, value in metadata.items():
+                        f.write(f"# {key}: {value}\n")
+
+                f.write("#\n")
+
+            # Write data
+            writer = csv.writer(f)
+            writer.writerow(["Time (s)", "Voltage (V)"])
+            for t, v in zip(waveform.time, waveform.voltage):
+                writer.writerow([t, v])
+
+        logger.info(f"Waveform saved to {filename} (CSV format, metadata={'included' if include_metadata else 'excluded'})")
+
+    def _save_npy(self, waveform: WaveformData, filename: str, metadata: Optional[dict] = None) -> None:
+        """Save waveform as NumPy compressed archive.
+
+        Args:
+            waveform: WaveformData object
+            filename: Output filename
+            metadata: Optional additional metadata
+        """
+        from datetime import datetime
+
+        # Build data dictionary
+        data = {
+            'time': waveform.time,
+            'voltage': waveform.voltage,
+            'channel': waveform.channel,
+            'sample_rate': waveform.sample_rate,
+            'timestamp': datetime.now().isoformat(),
+        }
+
+        # Add optional metadata
+        if metadata:
+            for key, value in metadata.items():
+                # Convert to numpy-compatible types
+                if isinstance(value, (str, int, float)):
+                    data[f'meta_{key}'] = value
+
+        np.savez(filename, **data)
+        logger.info(f"Waveform saved to {filename} (NPY format)")
+
+    def _save_mat(self, waveform: WaveformData, filename: str, metadata: Optional[dict] = None) -> None:
+        """Save waveform as MATLAB format.
+
+        Args:
+            waveform: WaveformData object
+            filename: Output filename
+            metadata: Optional additional metadata
+
+        Raises:
+            ImportError: If scipy is not installed
+        """
+        try:
+            from scipy.io import savemat
+        except ImportError:
+            raise ImportError("scipy is required for MAT file export. Install with: pip install scipy")
+
+        from datetime import datetime
+
+        # Build data dictionary for MATLAB
+        data = {
+            'time': waveform.time,
+            'voltage': waveform.voltage,
+            'channel': waveform.channel,
+            'sample_rate': waveform.sample_rate,
+            'timestamp': datetime.now().isoformat(),
+        }
+
+        # Add metadata
+        if metadata:
+            meta_dict = {}
+            for key, value in metadata.items():
+                # MATLAB doesn't like some characters in field names
+                safe_key = key.replace(' ', '_').replace('-', '_')
+                if isinstance(value, (int, float, str)):
+                    meta_dict[safe_key] = value
+            data['metadata'] = meta_dict
+
+        savemat(filename, data)
+        logger.info(f"Waveform saved to {filename} (MAT format)")
+
+    def _save_hdf5(self, waveform: WaveformData, filename: str, metadata: Optional[dict] = None) -> None:
+        """Save waveform as HDF5 format.
+
+        Args:
+            waveform: WaveformData object
+            filename: Output filename
+            metadata: Optional additional metadata
+
+        Raises:
+            ImportError: If h5py is not installed
+        """
+        try:
+            import h5py
+        except ImportError:
+            raise ImportError("h5py is required for HDF5 file export. Install with: pip install h5py")
+
+        from datetime import datetime
+
+        with h5py.File(filename, 'w') as f:
+            # Create datasets
+            f.create_dataset('time', data=waveform.time, compression='gzip')
+            f.create_dataset('voltage', data=waveform.voltage, compression='gzip')
+
+            # Store metadata as attributes
+            f.attrs['channel'] = waveform.channel
+            f.attrs['sample_rate'] = waveform.sample_rate
+            f.attrs['num_samples'] = len(waveform.time)
+            f.attrs['timestamp'] = datetime.now().isoformat()
+
+            # Add optional metadata
+            if metadata:
+                meta_group = f.create_group('metadata')
+                for key, value in metadata.items():
+                    if isinstance(value, (int, float, str, bool)):
+                        meta_group.attrs[key] = value
+                    elif isinstance(value, (list, tuple)):
+                        meta_group.attrs[key] = str(value)
+
+        logger.info(f"Waveform saved to {filename} (HDF5 format)")
 
     def __repr__(self) -> str:
         """String representation."""

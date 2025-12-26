@@ -33,6 +33,7 @@ class ChannelControl(QWidget):
         super().__init__(parent)
         self.scope: Optional[Oscilloscope] = None
         self.channel_widgets = {}
+        self.channel_groups = {}  # Store group boxes for show/hide
         self._init_ui()
 
     def _init_ui(self):
@@ -40,10 +41,12 @@ class ChannelControl(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(5, 5, 5, 5)
 
-        # Create controls for each channel
+        # Create controls for all possible channels (1-4)
+        # Visibility will be adjusted based on model capability
         for ch_num in range(1, 5):  # Channels 1-4
             channel_group = self._create_channel_group(ch_num)
             layout.addWidget(channel_group)
+            self.channel_groups[ch_num] = channel_group
 
         layout.addStretch()
 
@@ -136,22 +139,61 @@ class ChannelControl(QWidget):
     def set_scope(self, scope: Optional[Oscilloscope]):
         """Set the oscilloscope instance.
 
+        Updates channel visibility based on model capability and refreshes controls.
+
         Args:
             scope: Oscilloscope instance
         """
         self.scope = scope
-        if scope:
+        if scope and scope.model_capability:
+            # Show/hide channels based on model capability
+            num_channels = scope.model_capability.num_channels
+            logger.info(f"Configuring GUI for {num_channels} channels")
+
+            for ch_num in range(1, 5):
+                group = self.channel_groups.get(ch_num)
+                if group:
+                    if ch_num <= num_channels:
+                        group.setVisible(True)
+                        group.setEnabled(True)
+                    else:
+                        group.setVisible(False)
+                        group.setEnabled(False)
+
             self._refresh_all_channels()
+        elif scope:
+            # Scope connected but no capability info - show all channels
+            logger.warning("Scope connected but model capability not available, showing all channels")
+            for ch_num in range(1, 5):
+                group = self.channel_groups.get(ch_num)
+                if group:
+                    group.setVisible(True)
+                    group.setEnabled(True)
+            self._refresh_all_channels()
+        else:
+            # No scope - hide all channels
+            for ch_num in range(1, 5):
+                group = self.channel_groups.get(ch_num)
+                if group:
+                    group.setVisible(False)
+                    group.setEnabled(False)
 
     def _refresh_all_channels(self):
-        """Refresh all channel controls from oscilloscope."""
+        """Refresh all channel controls from oscilloscope.
+
+        Only refreshes channels that are available on the connected model.
+        """
         if not self.scope:
             return
 
-        for ch_num in range(1, 5):
+        # Get supported channels from oscilloscope
+        supported_channels = self.scope.supported_channels if hasattr(self.scope, 'supported_channels') else range(1, 5)
+
+        for ch_num in supported_channels:
             try:
-                channel = getattr(self.scope, f"channel{ch_num}")
-                self._refresh_channel(ch_num, channel)
+                channel = getattr(self.scope, f"channel{ch_num}", None)
+                if channel:
+                    self._refresh_channel(ch_num, channel)
             except Exception as e:
                 logger.warning(f"Could not refresh channel {ch_num}: {e}")
 
