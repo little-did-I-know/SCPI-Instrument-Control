@@ -18,6 +18,7 @@ from siglent.gui.widgets.channel_control import ChannelControl
 from siglent.gui.widgets.trigger_control import TriggerControl
 from siglent.gui.widgets.measurement_panel import MeasurementPanel
 from siglent.gui.widgets.timebase_control import TimebaseControl
+from siglent.gui.widgets.scope_web_view import ScopeWebView
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +40,7 @@ class MainWindow(QMainWindow):
         self.trigger_control: Optional[TriggerControl] = None
         self.measurement_panel: Optional[MeasurementPanel] = None
         self.timebase_control: Optional[TimebaseControl] = None
+        self.scope_web_view: Optional[ScopeWebView] = None
 
         self._init_ui()
         self._create_menus()
@@ -115,17 +117,20 @@ class MainWindow(QMainWindow):
         """
         panel = QWidget()
         layout = QVBoxLayout(panel)
+        layout.setContentsMargins(0, 0, 0, 0)
 
-        # Waveform display group
-        display_group = QGroupBox("Waveform Display")
-        display_layout = QVBoxLayout(display_group)
-        display_layout.setContentsMargins(0, 0, 0, 0)
+        # Create tab widget for display views
+        display_tabs = QTabWidget()
 
-        # Create waveform display widget
+        # Waveform display tab
         self.waveform_display = WaveformDisplay()
-        display_layout.addWidget(self.waveform_display)
+        display_tabs.addTab(self.waveform_display, "Waveform Plot")
 
-        layout.addWidget(display_group)
+        # Web interface tab
+        self.scope_web_view = ScopeWebView()
+        display_tabs.addTab(self.scope_web_view, "Scope Display (VNC)")
+
+        layout.addWidget(display_tabs)
 
         return panel
 
@@ -256,6 +261,9 @@ class MainWindow(QMainWindow):
                 self.trigger_control.set_scope(self.scope)
                 self.measurement_panel.set_scope(self.scope)
                 self.timebase_control.set_scope(self.scope)
+
+                # Set IP address for web view
+                self.scope_web_view.set_scope_ip(ip)
 
                 self.statusBar().showMessage(f"Connected to {model} at {ip}")
                 QMessageBox.information(
