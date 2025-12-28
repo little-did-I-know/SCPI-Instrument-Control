@@ -66,7 +66,7 @@ class FFTAnalyzer:
         'hamming': np.hamming,
         'blackman': np.blackman,
         'bartlett': np.bartlett,
-        'flattop': signal.flattop,
+        'flattop': signal.windows.flattop,
     }
 
     def __init__(self):

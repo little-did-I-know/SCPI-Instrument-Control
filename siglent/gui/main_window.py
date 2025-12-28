@@ -1,8 +1,11 @@
 """Main window for Siglent oscilloscope control GUI."""
 
 import logging
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 import numpy as np
+
+if TYPE_CHECKING:
+    from siglent.gui.vnc_window import VNCWindow
 
 from PyQt6.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QSplitter, QStatusBar, QMessageBox, QInputDialog, QGroupBox, QTabWidget, QFileDialog
 from PyQt6.QtCore import Qt, QTimer
@@ -20,7 +23,6 @@ from siglent.gui.widgets.math_panel import MathPanel
 from siglent.gui.widgets.fft_display import FFTDisplay
 from siglent.gui.widgets.reference_panel import ReferencePanel
 from siglent.gui.widgets.protocol_decode_panel import ProtocolDecodePanel
-from siglent.gui.vnc_window import VNCWindow
 from siglent.gui.connection_manager import ConnectionManager
 from siglent.reference_waveform import ReferenceWaveform
 from siglent.protocol_decoders import I2CDecoder, SPIDecoder, UARTDecoder
@@ -85,6 +87,10 @@ class MainWindow(QMainWindow):
 
         # Create splitter for resizable panels
         splitter = QSplitter(Qt.Orientation.Horizontal)
+
+        # IMPORTANT: Create waveform display first, before control panel
+        # because control panel needs to connect signals to it
+        self.waveform_display = WaveformDisplay()
 
         # Left panel - Controls
         left_panel = self._create_control_panel()
@@ -192,12 +198,12 @@ class MainWindow(QMainWindow):
         layout = QVBoxLayout(panel)
         layout.setContentsMargins(0, 0, 0, 0)
 
-        # Waveform display
+        # Waveform display (already created in _init_ui)
         waveform_group = QGroupBox("Waveform Display")
         waveform_layout = QVBoxLayout(waveform_group)
         waveform_layout.setContentsMargins(0, 0, 0, 0)
 
-        self.waveform_display = WaveformDisplay()
+        # Use the waveform_display already created in _init_ui
         waveform_layout.addWidget(self.waveform_display)
 
         layout.addWidget(waveform_group)
@@ -558,19 +564,51 @@ class MainWindow(QMainWindow):
 
     def _on_open_vnc_window(self):
         """Handle opening VNC window."""
-        # Create VNC window if not already created
-        if self.vnc_window is None:
-            self.vnc_window = VNCWindow(self)
+        # Lazy import to avoid QtWebEngineWidgets initialization issues
+        try:
+            from siglent.gui.vnc_window import VNCWindow
+        except ImportError as e:
+            QMessageBox.critical(
+                self,
+                "Missing Dependency",
+                "The VNC viewer requires PyQt6-WebEngine to be installed.\n\n"
+                "Please install it using:\n"
+                "pip install PyQt6-WebEngine\n\n"
+                f"Error: {str(e)}"
+            )
+            logger.error(f"Failed to import VNCWindow: {e}")
+            return
 
-        # Set IP if we have a connected scope
-        if self.scope and self.scope.host:
-            self.vnc_window.set_scope_ip(self.scope.host)
+        try:
+            # Create VNC window if not already created
+            if self.vnc_window is None:
+                self.vnc_window = VNCWindow(self)
 
-        # Show the window
-        self.vnc_window.show()
-        self.vnc_window.raise_()
-        self.vnc_window.activateWindow()
-        logger.info("Opened VNC window")
+            # Set IP if we have a connected scope
+            if self.scope and self.scope.host:
+                self.vnc_window.set_scope_ip(self.scope.host)
+            elif not self.vnc_window.scope_ip:
+                # No scope connected and no IP previously set, show info
+                QMessageBox.information(
+                    self,
+                    "VNC Viewer",
+                    "Enter your oscilloscope's IP address in the toolbar to connect.\n\n"
+                    "The VNC viewer will display your oscilloscope's screen interface."
+                )
+
+            # Show the window
+            self.vnc_window.show()
+            self.vnc_window.raise_()
+            self.vnc_window.activateWindow()
+            logger.info("Opened VNC window")
+
+        except Exception as e:
+            QMessageBox.critical(
+                self,
+                "VNC Window Error",
+                f"Failed to open VNC window:\n{str(e)}"
+            )
+            logger.error(f"Failed to open VNC window: {e}")
 
     def _on_save_screenshot(self):
         """Handle save screenshot action."""
@@ -629,61 +667,90 @@ class MainWindow(QMainWindow):
             return
 
         try:
-            # Check if at least one channel is enabled
-            any_enabled = False
-            for ch_num in range(1, 5):
-                try:
-                    channel = getattr(self.scope, f"channel{ch_num}")
-                    if channel.enabled:
-                        any_enabled = True
-                        break
-                except Exception:
-                    pass
+            logger.info("=== Capture Waveform Started ===")
 
-            if not any_enabled:
+            # Get list of enabled channels
+            enabled_channels = []
+            supported_channels = self.scope.supported_channels if hasattr(self.scope, 'supported_channels') else range(1, 5)
+
+            for ch_num in supported_channels:
+                try:
+                    channel = getattr(self.scope, f"channel{ch_num}", None)
+                    if channel:
+                        is_enabled = channel.enabled
+                        logger.info(f"Channel {ch_num} enabled: {is_enabled}")
+                        if is_enabled:
+                            enabled_channels.append(ch_num)
+                except Exception as e:
+                    logger.warning(f"Could not check channel {ch_num} status: {e}")
+
+            logger.info(f"Enabled channels: {enabled_channels}")
+
+            if not enabled_channels:
                 # Ask user if they want to enable channel 1
                 reply = QMessageBox.question(self, "No Channels Enabled", "No channels are currently enabled.\n\nWould you like to enable Channel 1?", QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
                 if reply == QMessageBox.StandardButton.Yes:
                     try:
                         self.scope.channel1.enable()
+                        # Wait a bit for scope to process
+                        from PyQt6.QtCore import QThread
+                        QThread.msleep(100)
+                        enabled_channels = [1]
                         logger.info("Enabled channel 1 for capture")
                     except Exception as e:
                         QMessageBox.critical(self, "Error", f"Could not enable channel 1:\n{str(e)}")
+                        logger.error(f"Failed to enable channel 1: {e}")
                         return
                 else:
+                    logger.info("User cancelled capture")
                     return
 
             self.statusBar().showMessage("Capturing waveforms...")
+            logger.info(f"Capturing from channels: {enabled_channels}")
 
-            # Capture waveforms from all enabled channels
+            # Capture waveforms from enabled channels
             waveforms = []
             errors = []
-            for ch_num in range(1, 5):  # Channels 1-4
+
+            for ch_num in enabled_channels:
                 try:
-                    channel = getattr(self.scope, f"channel{ch_num}")
-                    if channel.enabled:
-                        waveform = self.scope.get_waveform(ch_num)
+                    logger.info(f"Capturing waveform from channel {ch_num}...")
+                    waveform = self.scope.get_waveform(ch_num)
+                    if waveform:
+                        logger.info(f"  Got waveform: {len(waveform.voltage)} samples, voltage range: {waveform.voltage.min():.3f} to {waveform.voltage.max():.3f} V")
                         waveforms.append(waveform)
-                        logger.info(f"Captured waveform from channel {ch_num}")
+                    else:
+                        logger.warning(f"  No waveform data returned for channel {ch_num}")
+                        errors.append(f"CH{ch_num}: No data returned")
                 except Exception as e:
                     errors.append(f"CH{ch_num}: {str(e)}")
-                    logger.warning(f"Could not capture from channel {ch_num}: {e}")
+                    logger.error(f"Failed to capture from channel {ch_num}: {e}", exc_info=True)
+
+            logger.info(f"Captured {len(waveforms)} waveform(s)")
 
             if waveforms:
                 # Display waveforms
+                logger.info(f"Displaying {len(waveforms)} waveform(s)...")
                 self.waveform_display.plot_multiple_waveforms(waveforms)
+
+                # Force GUI update
+                from PyQt6.QtWidgets import QApplication
+                QApplication.processEvents()
+
                 self.statusBar().showMessage(f"Captured {len(waveforms)} waveform(s)")
+                logger.info("=== Capture Complete ===")
             else:
                 self.statusBar().showMessage("Capture failed - no data")
                 error_msg = "Could not capture waveforms."
                 if errors:
                     error_msg += "\n\nErrors:\n" + "\n".join(errors[:3])  # Show first 3 errors
                 QMessageBox.warning(self, "Capture Failed", error_msg)
+                logger.error(f"Capture failed with errors: {errors}")
 
         except SiglentError as e:
             self.statusBar().showMessage("Capture failed")
             QMessageBox.critical(self, "Capture Error", f"Failed to capture waveforms:\n{str(e)}")
-            logger.error(f"Waveform capture failed: {e}")
+            logger.error(f"Waveform capture failed: {e}", exc_info=True)
 
     def _on_toggle_live_view(self, checked: bool):
         """Handle live view toggle.
@@ -750,12 +817,15 @@ class MainWindow(QMainWindow):
             waveforms = []
             errors = []
 
-            for ch_num in range(1, 5):  # Channels 1-4
+            supported_channels = self.scope.supported_channels if hasattr(self.scope, 'supported_channels') else range(1, 5)
+
+            for ch_num in supported_channels:
                 try:
-                    channel = getattr(self.scope, f"channel{ch_num}")
-                    if channel.enabled:
+                    channel = getattr(self.scope, f"channel{ch_num}", None)
+                    if channel and channel.enabled:
                         waveform = self.scope.get_waveform(ch_num)
-                        waveforms.append(waveform)
+                        if waveform:
+                            waveforms.append(waveform)
                 except Exception as e:
                     errors.append(f"CH{ch_num}: {str(e)}")
                     logger.debug(f"Could not acquire waveform from channel {ch_num}: {e}")
@@ -763,6 +833,11 @@ class MainWindow(QMainWindow):
             # Update display
             if waveforms:
                 self.waveform_display.plot_multiple_waveforms(waveforms)
+
+                # Force GUI update
+                from PyQt6.QtWidgets import QApplication
+                QApplication.processEvents()
+
                 # Update status with success info
                 num_channels = len(waveforms)
                 self.statusBar().showMessage(f"Live view: {num_channels} channel(s) updating")

@@ -3,7 +3,7 @@
 import logging
 from typing import Optional
 
-from PyQt6.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLineEdit, QLabel, QToolBar
+from PyQt6.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLineEdit, QLabel, QToolBar, QMessageBox
 from PyQt6.QtWebEngineWidgets import QWebEngineView
 from PyQt6.QtWebEngineCore import QWebEngineSettings
 from PyQt6.QtCore import QUrl, Qt
@@ -37,11 +37,7 @@ class VNCWindow(QMainWindow):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
 
-        # Create toolbar
-        toolbar = self._create_toolbar()
-        self.addToolBar(toolbar)
-
-        # Web view
+        # Create web view first (needed by toolbar)
         self.web_view = QWebEngineView()
 
         # Configure web engine settings
@@ -54,6 +50,10 @@ class VNCWindow(QMainWindow):
         # Connect signals
         self.web_view.loadStarted.connect(self._on_load_started)
         self.web_view.loadFinished.connect(self._on_load_finished)
+
+        # Create toolbar (after web_view is created)
+        toolbar = self._create_toolbar()
+        self.addToolBar(toolbar)
 
         layout.addWidget(self.web_view)
 
@@ -107,6 +107,13 @@ class VNCWindow(QMainWindow):
         fullscreen_action.setCheckable(True)
         fullscreen_action.toggled.connect(self._on_fullscreen_toggled)
         toolbar.addAction(fullscreen_action)
+
+        toolbar.addSeparator()
+
+        # Help button
+        help_action = QAction("Help", self)
+        help_action.triggered.connect(self._show_help)
+        toolbar.addAction(help_action)
 
         return toolbar
 
@@ -178,7 +185,58 @@ class VNCWindow(QMainWindow):
             self.statusBar().showMessage("Connected to oscilloscope")
         else:
             logger.error("Failed to load VNC interface")
-            self.statusBar().showMessage("Failed to load VNC interface")
+            self.statusBar().showMessage("Failed to load VNC interface - Check IP address and network connection")
+
+            # Show helpful error message
+            QMessageBox.warning(
+                self,
+                "Connection Failed",
+                f"Failed to load the oscilloscope VNC interface.\n\n"
+                f"Troubleshooting:\n"
+                f"1. Verify the oscilloscope IP address is correct\n"
+                f"2. Ensure the oscilloscope is powered on and connected to the network\n"
+                f"3. Check that VNC/web interface is enabled on the oscilloscope\n"
+                f"4. Verify your computer can ping the oscilloscope\n\n"
+                f"Current URL: http://{self.scope_ip}/Instrument/novnc/vnc_auto.php"
+            )
+
+    def _show_help(self):
+        """Show help dialog for VNC viewer."""
+        help_text = """
+        <h3>VNC Viewer Help</h3>
+
+        <p>This window displays the oscilloscope's built-in screen interface using VNC.</p>
+
+        <h4>How to Use:</h4>
+        <ol>
+        <li>Enter your oscilloscope's IP address in the toolbar</li>
+        <li>Click "Connect" to load the interface</li>
+        <li>Use the mouse and keyboard to interact with the oscilloscope display</li>
+        </ol>
+
+        <h4>Toolbar Buttons:</h4>
+        <ul>
+        <li><b>Connect</b> - Connect to the oscilloscope at the specified IP</li>
+        <li><b>Reload</b> - Reload the current page</li>
+        <li><b>Back/Forward</b> - Navigate browser history</li>
+        <li><b>Fullscreen</b> - Toggle fullscreen mode (or press ESC to exit)</li>
+        </ul>
+
+        <h4>Requirements:</h4>
+        <ul>
+        <li>Oscilloscope must be connected to the network</li>
+        <li>VNC/web interface must be enabled on the oscilloscope</li>
+        <li>Firewall must allow HTTP connections to the oscilloscope</li>
+        </ul>
+
+        <h4>Keyboard Shortcuts:</h4>
+        <ul>
+        <li><b>ESC</b> - Exit fullscreen mode</li>
+        <li><b>Enter</b> - Connect (when IP field is focused)</li>
+        </ul>
+        """
+
+        QMessageBox.about(self, "VNC Viewer Help", help_text)
 
     def keyPressEvent(self, event):
         """Handle key press events.

@@ -127,8 +127,25 @@ class Waveform:
             Voltage scale in V/div
         """
         response = self._scope.query(f"{channel}:VDIV?")
-        value = response.replace("V", "").strip()
-        return float(value)
+        logger.debug(f"Voltage scale response: '{response}'")
+
+        try:
+            # Response may include echo like "C1:VDIV 2.00E+00V" or just "2.00E+00V"
+            # Remove the echo prefix if present
+            if ":" in response:
+                response = response.split(":", 1)[1]  # Get everything after first ':'
+
+            # Remove command part if present (e.g., "VDIV 2.00E+00V")
+            if " " in response:
+                response = response.split(" ", 1)[1]  # Get everything after first space
+
+            # Remove unit
+            value = response.replace("V", "").strip()
+            logger.debug(f"Parsed voltage scale: {value}")
+            return float(value)
+        except (ValueError, IndexError) as e:
+            logger.error(f"Failed to parse voltage scale from response: '{response}'")
+            raise exceptions.CommandError(f"Invalid voltage scale response: '{response}'") from e
 
     def _get_voltage_offset(self, channel: str) -> float:
         """Get voltage offset for channel.
@@ -140,8 +157,21 @@ class Waveform:
             Voltage offset in volts
         """
         response = self._scope.query(f"{channel}:OFST?")
-        value = response.replace("V", "").strip()
-        return float(value)
+        logger.debug(f"Voltage offset response: '{response}'")
+
+        try:
+            # Response may include echo like "C1:OFST 1.0E+00V"
+            if ":" in response:
+                response = response.split(":", 1)[1]
+            if " " in response:
+                response = response.split(" ", 1)[1]
+
+            value = response.replace("V", "").strip()
+            logger.debug(f"Parsed voltage offset: {value}")
+            return float(value)
+        except (ValueError, IndexError) as e:
+            logger.error(f"Failed to parse voltage offset from response: '{response}'")
+            raise exceptions.CommandError(f"Invalid voltage offset response: '{response}'") from e
 
     def _get_timebase(self) -> float:
         """Get timebase setting.
@@ -150,8 +180,21 @@ class Waveform:
             Timebase in seconds/division
         """
         response = self._scope.query("TDIV?")
-        value = response.replace("S", "").strip()
-        return float(value)
+        logger.debug(f"Timebase response: '{response}'")
+
+        try:
+            # Response may include echo like "TDIV 1.00E-03S"
+            if ":" in response:
+                response = response.split(":", 1)[1]
+            if " " in response:
+                response = response.split(" ", 1)[1]
+
+            value = response.replace("S", "").strip()
+            logger.debug(f"Parsed timebase: {value}")
+            return float(value)
+        except (ValueError, IndexError) as e:
+            logger.error(f"Failed to parse timebase from response: '{response}'")
+            raise exceptions.CommandError(f"Invalid timebase response: '{response}'") from e
 
     def _get_sample_rate(self) -> float:
         """Get sample rate.
@@ -160,9 +203,24 @@ class Waveform:
             Sample rate in samples/second
         """
         response = self._scope.query("SARA?")
-        # Response format may vary: "1.00E+09Sa/s" or similar
-        value = response.replace("Sa/s", "").replace("SA/S", "").strip()
-        return float(value)
+        logger.debug(f"Sample rate response: '{response}'")
+
+        try:
+            # Response may include echo like "SARA 1.00E+09Sa/s"
+            if ":" in response:
+                response = response.split(":", 1)[1]
+            if " " in response:
+                response = response.split(" ", 1)[1]
+
+            # Response format may vary: "1.00E+09Sa/s" or similar
+            # Remove units - order matters! Do longer strings first
+            value = response.upper()  # Convert to uppercase for consistent handling
+            value = value.replace("SA/S", "").replace("SPS", "").strip()
+            logger.debug(f"Parsed sample rate: {value}")
+            return float(value)
+        except (ValueError, IndexError) as e:
+            logger.error(f"Failed to parse sample rate from response: '{response}'")
+            raise exceptions.CommandError(f"Invalid sample rate response: '{response}'") from e
 
     def _parse_waveform(self, raw_data: bytes, format: str = "BYTE") -> np.ndarray:
         """Parse waveform data from oscilloscope.

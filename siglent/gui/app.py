@@ -15,6 +15,9 @@ logger = logging.getLogger(__name__)
 
 def main():
     """Main entry point for the GUI application."""
+    # Enable OpenGL context sharing for QtWebEngine (required for VNC window)
+    QApplication.setAttribute(Qt.ApplicationAttribute.AA_ShareOpenGLContexts)
+
     # Enable High DPI scaling
     QApplication.setHighDpiScaleFactorRoundingPolicy(Qt.HighDpiScaleFactorRoundingPolicy.PassThrough)
 

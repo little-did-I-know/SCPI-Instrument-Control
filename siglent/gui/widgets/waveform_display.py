@@ -7,6 +7,10 @@ import numpy as np
 import matplotlib
 
 matplotlib.use("QtAgg")
+# Enable interactive mode for matplotlib
+import matplotlib.pyplot as plt
+plt.ion()
+
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qtagg import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.figure import Figure
@@ -179,17 +183,21 @@ class WaveformDisplay(QWidget):
         Args:
             waveforms: List of WaveformData objects to plot
         """
+        logger.info(f"plot_multiple_waveforms called with {len(waveforms)} waveform(s)")
+
         self.waveforms.clear()
 
         for waveform in waveforms:
+            logger.debug(f"Adding waveform from channel {waveform.channel}, {len(waveform.voltage)} samples")
             self.waveforms[waveform.channel] = waveform
 
         # Store current waveforms for saving
         self.current_waveforms = waveforms
 
+        logger.debug("Calling _replot()...")
         self._replot()
 
-        logger.info(f"Plotted {len(waveforms)} waveforms")
+        logger.info(f"Plotted {len(waveforms)} waveforms successfully")
 
     def update_waveform(self, waveform: WaveformData):
         """Update existing waveform or add new one.
@@ -219,6 +227,8 @@ class WaveformDisplay(QWidget):
 
     def _replot(self):
         """Replot all stored waveforms."""
+        logger.debug(f"_replot called, have {len(self.waveforms)} waveform(s)")
+
         # Clear axes
         self.ax.clear()
 
@@ -227,16 +237,20 @@ class WaveformDisplay(QWidget):
 
         if not self.waveforms:
             # No data to plot
+            logger.debug("No waveforms to plot, showing placeholder text")
             self.ax.text(0.5, 0.5, "No waveform data", horizontalalignment="center", verticalalignment="center", transform=self.ax.transAxes, color="#888888", fontsize=14)
             self.info_label.setText("No data")
         else:
             # Plot each channel
+            logger.debug(f"Plotting {len(self.waveforms)} channel(s)")
             for channel, waveform in sorted(self.waveforms.items()):
                 color = self.CHANNEL_COLORS.get(channel, "#FFFFFF")
                 label = f"CH{channel}"
 
                 # Convert time to appropriate units
                 time_data, time_unit = self._convert_time_units(waveform.time)
+
+                logger.debug(f"Plotting CH{channel}: {len(time_data)} points, time range: {time_data[0]:.3e} to {time_data[-1]:.3e} {time_unit}, voltage range: {waveform.voltage.min():.3f} to {waveform.voltage.max():.3f} V")
 
                 # Plot waveform
                 self.ax.plot(time_data, waveform.voltage, color=color, linewidth=1.0, label=label, alpha=0.9)
@@ -260,8 +274,22 @@ class WaveformDisplay(QWidget):
         # Apply grid setting
         self.ax.grid(self.show_grid, alpha=0.3, color="#444444", linestyle="--", linewidth=0.5)
 
-        # Redraw canvas
+        # Redraw canvas - force immediate update
+        logger.debug("Drawing canvas...")
         self.canvas.draw()
+        try:
+            self.canvas.flush_events()
+        except AttributeError:
+            # flush_events might not be available in all backends
+            pass
+
+        # Force Qt widget update - multiple methods to ensure repaint
+        self.canvas.update()
+        self.canvas.repaint()
+        self.update()
+        self.repaint()
+
+        logger.debug("Canvas draw complete")
 
     def _convert_time_units(self, time: np.ndarray) -> tuple:
         """Convert time array to appropriate units.

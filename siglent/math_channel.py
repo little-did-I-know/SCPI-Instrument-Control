@@ -12,6 +12,29 @@ class MathOperations:
     """Static methods for mathematical operations on waveforms."""
 
     @staticmethod
+    def _create_result_waveform(source_waveform, voltage, channel="MATH"):
+        """Helper to create result waveform with all metadata from source.
+
+        Args:
+            source_waveform: Source waveform to copy metadata from
+            voltage: New voltage array for result
+            channel: Channel identifier (default: "MATH")
+
+        Returns:
+            New WaveformData with calculated voltage and source metadata
+        """
+        return type(source_waveform)(
+            time=source_waveform.time,
+            voltage=voltage,
+            channel=channel,
+            sample_rate=source_waveform.sample_rate,
+            record_length=len(voltage),
+            timebase=source_waveform.timebase,
+            voltage_scale=source_waveform.voltage_scale,
+            voltage_offset=0.0  # Math results typically have no offset
+        )
+
+    @staticmethod
     def add(waveform1, waveform2):
         """Add two waveforms.
 
@@ -25,13 +48,10 @@ class MathOperations:
         if waveform1 is None or waveform2 is None:
             return None
 
-        # Use the time base from the first waveform
-        result = type(waveform1)(
-            time=waveform1.time,
-            voltage=waveform1.voltage + waveform2.voltage,
-            channel="MATH"
+        return MathOperations._create_result_waveform(
+            waveform1,
+            waveform1.voltage + waveform2.voltage
         )
-        return result
 
     @staticmethod
     def subtract(waveform1, waveform2):
@@ -47,12 +67,10 @@ class MathOperations:
         if waveform1 is None or waveform2 is None:
             return None
 
-        result = type(waveform1)(
-            time=waveform1.time,
-            voltage=waveform1.voltage - waveform2.voltage,
-            channel="MATH"
+        return MathOperations._create_result_waveform(
+            waveform1,
+            waveform1.voltage - waveform2.voltage
         )
-        return result
 
     @staticmethod
     def multiply(waveform1, waveform2):
@@ -68,12 +86,10 @@ class MathOperations:
         if waveform1 is None or waveform2 is None:
             return None
 
-        result = type(waveform1)(
-            time=waveform1.time,
-            voltage=waveform1.voltage * waveform2.voltage,
-            channel="MATH"
+        return MathOperations._create_result_waveform(
+            waveform1,
+            waveform1.voltage * waveform2.voltage
         )
-        return result
 
     @staticmethod
     def divide(waveform1, waveform2, epsilon=1e-12):
@@ -93,12 +109,10 @@ class MathOperations:
         # Prevent division by zero
         denominator = np.where(np.abs(waveform2.voltage) < epsilon, epsilon, waveform2.voltage)
 
-        result = type(waveform1)(
-            time=waveform1.time,
-            voltage=waveform1.voltage / denominator,
-            channel="MATH"
+        return MathOperations._create_result_waveform(
+            waveform1,
+            waveform1.voltage / denominator
         )
-        return result
 
     @staticmethod
     def integrate(waveform):
@@ -119,12 +133,10 @@ class MathOperations:
         # Cumulative integration using trapezoidal rule
         integrated = np.cumsum(waveform.voltage) * dt
 
-        result = type(waveform)(
-            time=waveform.time,
-            voltage=integrated,
-            channel="MATH"
+        return MathOperations._create_result_waveform(
+            waveform,
+            integrated
         )
-        return result
 
     @staticmethod
     def differentiate(waveform):
@@ -143,12 +155,10 @@ class MathOperations:
         dt = np.mean(np.diff(waveform.time)) if len(waveform.time) > 1 else 1.0
         differentiated = np.gradient(waveform.voltage, dt)
 
-        result = type(waveform)(
-            time=waveform.time,
-            voltage=differentiated,
-            channel="MATH"
+        return MathOperations._create_result_waveform(
+            waveform,
+            differentiated
         )
-        return result
 
     @staticmethod
     def scale(waveform, factor):
@@ -164,12 +174,10 @@ class MathOperations:
         if waveform is None:
             return None
 
-        result = type(waveform)(
-            time=waveform.time,
-            voltage=waveform.voltage * factor,
-            channel="MATH"
+        return MathOperations._create_result_waveform(
+            waveform,
+            waveform.voltage * factor
         )
-        return result
 
     @staticmethod
     def offset(waveform, offset_value):
@@ -185,12 +193,10 @@ class MathOperations:
         if waveform is None:
             return None
 
-        result = type(waveform)(
-            time=waveform.time,
-            voltage=waveform.voltage + offset_value,
-            channel="MATH"
+        return MathOperations._create_result_waveform(
+            waveform,
+            waveform.voltage + offset_value
         )
-        return result
 
     @staticmethod
     def abs_value(waveform):
@@ -205,12 +211,10 @@ class MathOperations:
         if waveform is None:
             return None
 
-        result = type(waveform)(
-            time=waveform.time,
-            voltage=np.abs(waveform.voltage),
-            channel="MATH"
+        return MathOperations._create_result_waveform(
+            waveform,
+            np.abs(waveform.voltage)
         )
-        return result
 
     @staticmethod
     def invert(waveform):
@@ -225,12 +229,10 @@ class MathOperations:
         if waveform is None:
             return None
 
-        result = type(waveform)(
-            time=waveform.time,
-            voltage=-waveform.voltage,
-            channel="MATH"
+        return MathOperations._create_result_waveform(
+            waveform,
+            -waveform.voltage
         )
-        return result
 
 
 class MathChannel:
