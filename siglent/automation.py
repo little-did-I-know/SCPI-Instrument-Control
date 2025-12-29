@@ -44,6 +44,7 @@ from datetime import datetime
 import numpy as np
 
 from siglent import Oscilloscope
+from siglent.connection import BaseConnection
 from siglent.waveform import WaveformData
 from siglent.exceptions import SiglentError
 
@@ -58,15 +59,16 @@ class DataCollector:
     measurements.
     """
 
-    def __init__(self, host: str, port: int = 5024, timeout: float = 5.0):
+    def __init__(self, host: str, port: int = 5024, timeout: float = 5.0, connection: Optional[BaseConnection] = None):
         """Initialize data collector.
 
         Args:
             host: IP address or hostname of the oscilloscope
             port: TCP port for SCPI communication (default: 5024)
             timeout: Command timeout in seconds (default: 5.0)
+            connection: Optional connection implementation (e.g., MockConnection for offline tests)
         """
-        self.scope = Oscilloscope(host, port, timeout)
+        self.scope = Oscilloscope(host, port, timeout, connection=connection)
         self._connected = False
 
     def connect(self) -> None:
@@ -406,15 +408,16 @@ class TriggerWaitCollector:
     specific signal conditions.
     """
 
-    def __init__(self, host: str, port: int = 5024, timeout: float = 5.0):
+    def __init__(self, host: str, port: int = 5024, timeout: float = 5.0, connection: Optional[BaseConnection] = None):
         """Initialize trigger wait collector.
 
         Args:
             host: IP address or hostname of the oscilloscope
             port: TCP port for SCPI communication
             timeout: Command timeout in seconds
+            connection: Optional connection implementation (e.g., MockConnection for offline tests)
         """
-        self.collector = DataCollector(host, port, timeout)
+        self.collector = DataCollector(host, port, timeout, connection=connection)
 
     def __enter__(self):
         """Context manager entry."""

@@ -4,22 +4,9 @@ import numpy as np
 import pytest
 
 from siglent import exceptions
+from siglent.connection.mock import MockConnection
+from siglent.oscilloscope import Oscilloscope
 from siglent.waveform import Waveform
-
-
-class FakeScope:
-    def __init__(self, responses=None):
-        self.responses = responses or {}
-        self.written = []
-
-    def query(self, command: str) -> str:
-        return self.responses.get(command, "")
-
-    def write(self, command: str) -> None:
-        self.written.append(command)
-
-    def read_raw(self) -> bytes:
-        return self.responses.get("raw", b"")
 
 
 @pytest.mark.parametrize(
@@ -40,17 +27,18 @@ class FakeScope:
     ],
 )
 def test_value_parsing_accepts_prefixes_and_units(query, response, expected):
-    scope = FakeScope({query: response})
-    waveform = Waveform(scope)
+    connection = MockConnection(custom_responses={query: response})
+    with Oscilloscope("mock", connection=connection) as scope:
+        waveform = scope.waveform
 
-    parser = {
-        "C1:VDIV?": lambda: waveform._get_voltage_scale("C1"),
-        "C1:OFST?": lambda: waveform._get_voltage_offset("C1"),
-        "TDIV?": waveform._get_timebase,
-        "SARA?": waveform._get_sample_rate,
-    }[query]
+        parser = {
+            "C1:VDIV?": lambda: waveform._get_voltage_scale("C1"),
+            "C1:OFST?": lambda: waveform._get_voltage_offset("C1"),
+            "TDIV?": waveform._get_timebase,
+            "SARA?": waveform._get_sample_rate,
+        }[query]
 
-    assert parser() == pytest.approx(expected)
+        assert parser() == pytest.approx(expected)
 
 
 @pytest.mark.parametrize(
@@ -63,10 +51,11 @@ def test_value_parsing_accepts_prefixes_and_units(query, response, expected):
     ],
 )
 def test_voltage_scale_parsing_accepts_units(response):
-    scope = FakeScope({"C1:VDIV?": response})
-    waveform = Waveform(scope)
+    connection = MockConnection(custom_responses={"C1:VDIV?": response})
+    with Oscilloscope("mock", connection=connection) as scope:
+        waveform = scope.waveform
 
-    assert waveform._get_voltage_scale("C1") == pytest.approx(2.0)
+        assert waveform._get_voltage_scale("C1") == pytest.approx(2.0)
 
 
 @pytest.mark.parametrize(
@@ -79,40 +68,43 @@ def test_voltage_scale_parsing_accepts_units(response):
     ],
 )
 def test_value_parsing_requires_units(query, expected_exception):
-    scope = FakeScope({query: "1.00E+00"})
-    waveform = Waveform(scope)
+    connection = MockConnection(custom_responses={query: "1.00E+00"})
+    with Oscilloscope("mock", connection=connection) as scope:
+        waveform = scope.waveform
 
-    parser = {
-        "C1:VDIV?": lambda: waveform._get_voltage_scale("C1"),
-        "C1:OFST?": lambda: waveform._get_voltage_offset("C1"),
-        "TDIV?": waveform._get_timebase,
-        "SARA?": waveform._get_sample_rate,
-    }[query]
+        parser = {
+            "C1:VDIV?": lambda: waveform._get_voltage_scale("C1"),
+            "C1:OFST?": lambda: waveform._get_voltage_offset("C1"),
+            "TDIV?": waveform._get_timebase,
+            "SARA?": waveform._get_sample_rate,
+        }[query]
 
-    with pytest.raises(exceptions.CommandError) as excinfo:
-        parser()
+        with pytest.raises(exceptions.CommandError) as excinfo:
+            parser()
 
-    assert expected_exception in str(excinfo.value)
+        assert expected_exception in str(excinfo.value)
 
 
 def test_parse_waveform_valid_byte_block():
     payload = bytes([1, 2, 3, 4])
     raw = b"DESC,#14" + payload
-    scope = FakeScope({"raw": raw})
-    waveform = Waveform(scope)
+    connection = MockConnection()
+    with Oscilloscope("mock", connection=connection) as scope:
+        waveform = scope.waveform
 
-    result = waveform._parse_waveform(raw, format="BYTE")
-    assert np.array_equal(result, np.array([1, 2, 3, 4], dtype=np.int8))
+        result = waveform._parse_waveform(raw, format="BYTE")
+        assert np.array_equal(result, np.array([1, 2, 3, 4], dtype=np.int8))
 
 
 def test_parse_waveform_valid_word_block():
     payload = struct.pack("<hh", 1, -1)
     raw = b"DESC,#14" + payload
-    scope = FakeScope({"raw": raw})
-    waveform = Waveform(scope)
+    connection = MockConnection()
+    with Oscilloscope("mock", connection=connection) as scope:
+        waveform = scope.waveform
 
-    result = waveform._parse_waveform(raw, format="WORD")
-    assert np.array_equal(result, np.array([1, -1], dtype=np.int16))
+        result = waveform._parse_waveform(raw, format="WORD")
+        assert np.array_equal(result, np.array([1, -1], dtype=np.int16))
 
 
 @pytest.mark.parametrize(
@@ -128,19 +120,43 @@ def test_parse_waveform_valid_word_block():
     ],
 )
 def test_parse_waveform_rejects_invalid_blocks(raw, expected_message):
-    waveform = Waveform(FakeScope({"raw": raw}))
+    connection = MockConnection()
+    with Oscilloscope("mock", connection=connection) as scope:
+        waveform = scope.waveform
 
-    with pytest.raises(exceptions.CommandError) as excinfo:
-        waveform._parse_waveform(raw, format="BYTE")
+        with pytest.raises(exceptions.CommandError) as excinfo:
+            waveform._parse_waveform(raw, format="BYTE")
 
-    assert expected_message in str(excinfo.value)
+        assert expected_message in str(excinfo.value)
 
 
 def test_parse_waveform_rejects_word_with_odd_length():
     raw = b"DESC,#13abc"
-    waveform = Waveform(FakeScope({"raw": raw}))
+    connection = MockConnection()
+    with Oscilloscope("mock", connection=connection) as scope:
+        waveform = scope.waveform
 
-    with pytest.raises(exceptions.CommandError) as excinfo:
-        waveform._parse_waveform(raw, format="WORD")
+        with pytest.raises(exceptions.CommandError) as excinfo:
+            waveform._parse_waveform(raw, format="WORD")
 
-    assert "WORD data length must be even" in str(excinfo.value)
+        assert "WORD data length must be even" in str(excinfo.value)
+
+
+def test_acquire_uses_mock_connection_defaults():
+    connection = MockConnection(
+        channel_states={1: True},
+        voltage_scales={1: 1.0},
+        voltage_offsets={1: 0.0},
+        waveform_payloads={1: bytes([0, 25, 50, 75])},
+        sample_rate=1_000.0,
+        timebase=1e-3,
+    )
+
+    with Oscilloscope("mock", connection=connection) as scope:
+        waveform = scope.waveform.acquire(1)
+
+    assert waveform.sample_rate == pytest.approx(1_000.0)
+    assert waveform.timebase == pytest.approx(1e-3)
+    assert waveform.record_length == 4
+    assert waveform.voltage.tolist() == [0.0, 1.0, 2.0, 3.0]
+    assert waveform.time.tolist() == [-0.002, -0.001, 0.0, 0.001]
