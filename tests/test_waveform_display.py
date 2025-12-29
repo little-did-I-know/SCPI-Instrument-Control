@@ -1,16 +1,16 @@
 """Test script for waveform display widget."""
 
-import sys
 import numpy as np
 import pytest
+
+pytest.skip("Interactive GUI demo; skipped in automated CI runs", allow_module_level=True)
+
+import sys
 
 pytest.importorskip("PyQt6")
 
 from PyQt6.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QWidget, QPushButton
 from PyQt6.QtCore import Qt
-
-# Add parent directory to path
-sys.path.insert(0, r"C:\Users\robin\Documents\Siglent")
 
 from siglent.gui.widgets.waveform_display import WaveformDisplay
 from siglent.waveform import WaveformData

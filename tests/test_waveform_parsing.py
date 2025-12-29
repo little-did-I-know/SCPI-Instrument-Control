@@ -23,6 +23,37 @@ class FakeScope:
 
 
 @pytest.mark.parametrize(
+    "query,response,expected",
+    [
+        ("C1:VDIV?", "C1:VDIV 2.00E+00V", 2.0),
+        ("C1:VDIV?", "VDIV 2.00E+00V", 2.0),
+        ("C1:VDIV?", "2.00E+00V", 2.0),
+        ("C1:VDIV?", "2.00e+00v", 2.0),
+        ("C1:OFST?", "C1:OFST 0.00E+00V", 0.0),
+        ("C1:OFST?", "OFST 0.00E+00V", 0.0),
+        ("C1:OFST?", "0.00E+00V", 0.0),
+        ("TDIV?", "TDIV 1.00E-03S", 1e-3),
+        ("TDIV?", "1.00E-03S", 1e-3),
+        ("SARA?", "SARA 1.00E+09Sa/s", 1e9),
+        ("SARA?", "1.00E+09Sa/s", 1e9),
+        ("SARA?", "1.00E+09SA/S", 1e9),
+    ],
+)
+def test_value_parsing_accepts_prefixes_and_units(query, response, expected):
+    scope = FakeScope({query: response})
+    waveform = Waveform(scope)
+
+    parser = {
+        "C1:VDIV?": lambda: waveform._get_voltage_scale("C1"),
+        "C1:OFST?": lambda: waveform._get_voltage_offset("C1"),
+        "TDIV?": waveform._get_timebase,
+        "SARA?": waveform._get_sample_rate,
+    }[query]
+
+    assert parser() == pytest.approx(expected)
+
+
+@pytest.mark.parametrize(
     "response",
     [
         "C1:VDIV 2.00E+00V",

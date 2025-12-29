@@ -1,15 +1,16 @@
 """Debug script to test channel state and capture functionality."""
 
-import sys
 import logging
+import pytest
+
+pytest.skip("Interactive debug helper; skipped in automated CI runs", allow_module_level=True)
+
+import sys
 
 # Configure detailed logging
 logging.basicConfig(level=logging.DEBUG, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 
 logger = logging.getLogger(__name__)
-
-# Add parent directory to path
-sys.path.insert(0, r"C:\Users\robin\Documents\Siglent")
 
 from siglent import Oscilloscope
 
