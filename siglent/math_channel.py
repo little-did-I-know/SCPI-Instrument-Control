@@ -23,14 +23,30 @@ class MathOperations:
         Returns:
             New WaveformData with calculated voltage and source metadata
         """
+        # Safely propagate optional metadata and estimate missing values
+        sample_rate = getattr(source_waveform, "sample_rate", None)
+        if sample_rate is None and len(source_waveform.time) > 1:
+            dt = float(np.mean(np.diff(source_waveform.time)))
+            if dt > 0:
+                sample_rate = 1.0 / dt
+
+        voltage_scale = getattr(source_waveform, "voltage_scale", None)
+        if voltage_scale is None:
+            span = float(np.max(voltage) - np.min(voltage)) if len(voltage) > 0 else 0.0
+            voltage_scale = span / 8.0 if span > 0 else 1.0
+
+        timebase = getattr(source_waveform, "timebase", None)
+        if timebase is None and sample_rate:
+            timebase = len(voltage) / sample_rate / 14.0
+
         return type(source_waveform)(
             time=source_waveform.time,
             voltage=voltage,
             channel=channel,
-            sample_rate=source_waveform.sample_rate,
+            sample_rate=sample_rate,
             record_length=len(voltage),
-            timebase=source_waveform.timebase,
-            voltage_scale=source_waveform.voltage_scale,
+            timebase=timebase,
+            voltage_scale=voltage_scale,
             voltage_offset=0.0  # Math results typically have no offset
         )
 

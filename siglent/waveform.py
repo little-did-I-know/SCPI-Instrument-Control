@@ -1,6 +1,6 @@
 """Waveform acquisition and data processing for Siglent oscilloscopes."""
 
-from typing import TYPE_CHECKING, Optional, Tuple
+from typing import TYPE_CHECKING, Optional, Tuple, Union
 from dataclasses import dataclass
 import struct
 import logging
@@ -32,16 +32,47 @@ class WaveformData:
 
     time: np.ndarray
     voltage: np.ndarray
-    channel: int
-    sample_rate: float
-    record_length: int
-    timebase: float
-    voltage_scale: float
-    voltage_offset: float
+    channel: Union[int, str]
+    sample_rate: Optional[float] = None
+    record_length: Optional[int] = None
+    timebase: Optional[float] = None
+    voltage_scale: Optional[float] = None
+    voltage_offset: float = 0.0
+    source: Optional[str] = None
+    description: Optional[str] = None
 
     def __len__(self) -> int:
         """Get number of samples."""
         return len(self.voltage)
+
+    def __post_init__(self) -> None:
+        """Validate and populate optional metadata."""
+        if self.time.shape != self.voltage.shape:
+            raise ValueError("Time and voltage arrays must have the same shape")
+
+        # Ensure record length is always populated
+        if self.record_length is None:
+            self.record_length = len(self.voltage)
+
+        # Estimate sample rate from time axis if not provided
+        if self.sample_rate is None and len(self.time) > 1:
+            dt = float(np.mean(np.diff(self.time)))
+            if dt > 0:
+                self.sample_rate = 1.0 / dt
+
+        # Estimate timebase using standard 14 horizontal divisions if possible
+        if self.timebase is None and self.sample_rate:
+            total_time = self.record_length / self.sample_rate
+            self.timebase = total_time / 14.0
+
+        # Infer a reasonable voltage scale when none is supplied
+        if self.voltage_scale is None:
+            if len(self.voltage) > 0:
+                span = float(np.max(self.voltage) - np.min(self.voltage))
+                # Standard 8 vertical divisions on most scopes
+                self.voltage_scale = span / 8.0 if span > 0 else 1.0
+            else:
+                self.voltage_scale = 1.0
 
 
 class Waveform:
