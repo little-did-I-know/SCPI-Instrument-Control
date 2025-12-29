@@ -7,7 +7,7 @@ import numpy as np
 if TYPE_CHECKING:
     from siglent.gui.vnc_window import VNCWindow
 
-from PyQt6.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QSplitter, QStatusBar, QMessageBox, QInputDialog, QGroupBox, QTabWidget, QFileDialog
+from PyQt6.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QSplitter, QStatusBar, QMessageBox, QInputDialog, QGroupBox, QTabWidget, QFileDialog, QPushButton
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QAction
 
@@ -23,6 +23,7 @@ from siglent.gui.widgets.math_panel import MathPanel
 from siglent.gui.widgets.fft_display import FFTDisplay
 from siglent.gui.widgets.reference_panel import ReferencePanel
 from siglent.gui.widgets.protocol_decode_panel import ProtocolDecodePanel
+from siglent.gui.widgets.terminal_widget import TerminalWidget
 from siglent.gui.connection_manager import ConnectionManager
 from siglent.reference_waveform import ReferenceWaveform
 from siglent.protocol_decoders import I2CDecoder, SPIDecoder, UARTDecoder
@@ -62,6 +63,7 @@ class MainWindow(QMainWindow):
         self.fft_display: Optional[FFTDisplay] = None
         self.reference_panel: Optional[ReferencePanel] = None
         self.protocol_decode_panel: Optional[ProtocolDecodePanel] = None
+        self.terminal_widget: Optional[TerminalWidget] = None
 
         # VNC window (separate window)
         self.vnc_window: Optional[VNCWindow] = None
@@ -76,7 +78,8 @@ class MainWindow(QMainWindow):
     def _init_ui(self):
         """Initialize user interface."""
         self.setWindowTitle("Siglent Oscilloscope Control")
-        self.setGeometry(100, 100, 1400, 800)
+        # Set wider rectangular window (1600x850) for better waveform display
+        self.setGeometry(100, 100, 1600, 850)
 
         # Create central widget
         central_widget = QWidget()
@@ -100,8 +103,9 @@ class MainWindow(QMainWindow):
         right_panel = self._create_display_panel()
         splitter.addWidget(right_panel)
 
-        # Set initial sizes (30% controls, 70% display)
-        splitter.setSizes([400, 1000])
+        # Set initial sizes (25% controls, 75% display)
+        # With 1600px width: ~400px controls, ~1200px display
+        splitter.setSizes([400, 1200])
 
         main_layout.addWidget(splitter)
 
@@ -183,6 +187,10 @@ class MainWindow(QMainWindow):
         # Connect protocol decode panel signals
         self.protocol_decode_panel.decode_requested.connect(self._on_protocol_decode_requested)
         self.protocol_decode_panel.export_requested.connect(self._on_protocol_export_requested)
+
+        # Terminal tab
+        self.terminal_widget = TerminalWidget()
+        tabs.addTab(self.terminal_widget, "Terminal")
 
         layout.addWidget(tabs)
 
@@ -332,14 +340,48 @@ class MainWindow(QMainWindow):
         """Create toolbar."""
         toolbar = self.addToolBar("Main Toolbar")
 
-        # Add actions to toolbar
-        connect_action = QAction("Connect", self)
-        connect_action.triggered.connect(self._on_connect)
-        toolbar.addAction(connect_action)
+        # Add styled connect/disconnect buttons that stand out
+        connect_btn = QPushButton("Connect")
+        connect_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #4CAF50;
+                color: white;
+                font-weight: bold;
+                font-size: 12pt;
+                padding: 8px 16px;
+                border-radius: 4px;
+                border: none;
+            }
+            QPushButton:hover {
+                background-color: #45a049;
+            }
+            QPushButton:pressed {
+                background-color: #3d8b40;
+            }
+        """)
+        connect_btn.clicked.connect(self._on_connect)
+        toolbar.addWidget(connect_btn)
 
-        disconnect_action = QAction("Disconnect", self)
-        disconnect_action.triggered.connect(self._on_disconnect)
-        toolbar.addAction(disconnect_action)
+        disconnect_btn = QPushButton("Disconnect")
+        disconnect_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #f44336;
+                color: white;
+                font-weight: bold;
+                font-size: 12pt;
+                padding: 8px 16px;
+                border-radius: 4px;
+                border: none;
+            }
+            QPushButton:hover {
+                background-color: #da190b;
+            }
+            QPushButton:pressed {
+                background-color: #c1170a;
+            }
+        """)
+        disconnect_btn.clicked.connect(self._on_disconnect)
+        toolbar.addWidget(disconnect_btn)
 
         toolbar.addSeparator()
 
@@ -457,6 +499,7 @@ class MainWindow(QMainWindow):
             self.trigger_control.set_scope(self.scope)
             self.measurement_panel.set_scope(self.scope)
             self.timebase_control.set_scope(self.scope)
+            self.terminal_widget.set_oscilloscope(self.scope)
 
             # Update math panel and FFT display with available channels
             if self.scope.model_capability:
@@ -507,6 +550,7 @@ class MainWindow(QMainWindow):
             self.trigger_control.set_scope(None)
             self.measurement_panel.set_scope(None)
             self.timebase_control.set_scope(None)
+            self.terminal_widget.set_oscilloscope(None)
 
             self.statusBar().showMessage("Disconnected")
             logger.info("Disconnected from oscilloscope")
@@ -617,37 +661,29 @@ class MainWindow(QMainWindow):
             return
 
         try:
-            # Ask user for file location and format
-            file_filter = "PNG Image (*.png);;BMP Image (*.bmp);;JPEG Image (*.jpg *.jpeg);;All Files (*.*)"
+            # Ask user for file location
+            # Note: SCDP command returns BMP format regardless of extension
+            file_filter = "BMP Image (*.bmp);;All Files (*.*)"
             filename, selected_filter = QFileDialog.getSaveFileName(
                 self,
                 "Save Screenshot",
-                "screenshot.png",
+                "screenshot.bmp",
                 file_filter
             )
 
             if filename:
-                # Determine format from selected filter or filename
-                format_map = {
-                    "PNG Image (*.png)": "PNG",
-                    "BMP Image (*.bmp)": "BMP",
-                    "JPEG Image (*.jpg *.jpeg)": "JPEG"
-                }
-
-                # Get format from filter, or auto-detect from extension
-                image_format = format_map.get(selected_filter)
-
-                self.statusBar().showMessage("Capturing screenshot...")
+                self.statusBar().showMessage("Capturing screenshot using SCDP...")
                 logger.info(f"Saving screenshot to {filename}")
 
-                # Capture and save screenshot
-                self.scope.screen_capture.save_screenshot(filename, image_format)
+                # Capture and save screenshot (SCDP returns BMP format)
+                self.scope.screen_capture.save_screenshot(filename)
 
                 self.statusBar().showMessage(f"Screenshot saved to {filename}")
                 QMessageBox.information(
                     self,
                     "Screenshot Saved",
-                    f"Screenshot successfully saved to:\n{filename}"
+                    f"Screenshot successfully saved to:\n{filename}\n\n"
+                    f"Note: Image is in BMP format (from SCDP command)."
                 )
                 logger.info(f"Screenshot saved successfully to {filename}")
 
@@ -656,7 +692,9 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(
                 self,
                 "Screenshot Error",
-                f"Failed to capture screenshot:\n{str(e)}\n\nNote: Screenshot capture requires the oscilloscope to support SCPI screen dump commands."
+                f"Failed to capture screenshot:\n{str(e)}\n\n"
+                f"The SCDP command is used per Siglent manual.\n"
+                f"Ensure your oscilloscope supports this command."
             )
             logger.error(f"Screenshot capture failed: {e}")
 
@@ -760,45 +798,68 @@ class MainWindow(QMainWindow):
         """
         if not self.scope:
             QMessageBox.warning(self, "Not Connected", "No oscilloscope connected")
+            # Uncheck the action since we can't enable live view
+            self.live_view_action.blockSignals(True)
+            self.live_view_action.setChecked(False)
+            self.live_view_action.blockSignals(False)
             return
 
         self.is_live_view = checked
 
         if checked:
             try:
+                logger.info("Starting live view...")
+
                 # Ensure scope is running in AUTO mode for continuous acquisition
+                logger.debug("Setting trigger mode to AUTO")
                 self.scope.trigger.mode = "AUTO"
                 self.scope.run()
 
                 # Check if at least one channel is enabled
                 any_enabled = False
+                logger.debug("Checking for enabled channels...")
+
                 for ch_num in range(1, 5):
                     try:
-                        channel = getattr(self.scope, f"channel{ch_num}")
-                        if channel.enabled:
-                            any_enabled = True
-                            break
-                    except Exception:
+                        channel = getattr(self.scope, f"channel{ch_num}", None)
+                        if channel is not None:
+                            is_enabled = channel.enabled
+                            logger.debug(f"Channel {ch_num} enabled: {is_enabled}")
+                            if is_enabled:
+                                any_enabled = True
+                                break
+                    except Exception as e:
+                        logger.debug(f"Error checking channel {ch_num}: {e}")
                         pass
 
                 if not any_enabled:
                     # Enable channel 1 by default if none are enabled
+                    logger.warning("No channels enabled, attempting to enable channel 1")
                     try:
                         self.scope.channel1.enable()
                         logger.info("Auto-enabled channel 1 for live view")
-                        QMessageBox.information(self, "Channel Enabled", "Channel 1 has been automatically enabled for live view.")
+                        QMessageBox.information(self, "Channel Enabled",
+                            "Channel 1 has been automatically enabled for live view.")
                     except Exception as e:
                         logger.error(f"Could not enable channel 1: {e}")
+                        raise RuntimeError(f"No channels are enabled and could not enable channel 1: {e}")
 
-                # Start live view
+                # Start live view timer
                 self.live_timer.start(200)  # Update every 200ms
                 self.statusBar().showMessage("Live view enabled (AUTO mode)")
-                logger.info("Live view enabled")
+                logger.info("Live view enabled - timer started")
 
             except Exception as e:
                 logger.error(f"Failed to start live view: {e}")
-                QMessageBox.warning(self, "Live View Error", f"Could not start live view:\n{str(e)}\n\nMake sure the oscilloscope is connected.")
+                QMessageBox.warning(self, "Live View Error",
+                    f"Could not start live view:\n{str(e)}\n\n"
+                    f"Make sure the oscilloscope is connected and at least one channel is enabled.")
+
+                # Disable live view flag and uncheck the menu action
                 self.is_live_view = False
+                self.live_view_action.blockSignals(True)
+                self.live_view_action.setChecked(False)
+                self.live_view_action.blockSignals(False)
         else:
             # Stop live view
             self.live_timer.stop()
@@ -808,8 +869,12 @@ class MainWindow(QMainWindow):
     def _update_live_view(self):
         """Update waveform display for live view."""
         if not self.scope or not self.scope.is_connected:
+            logger.warning("Live view update: scope not connected, stopping")
             self.live_timer.stop()
             self.is_live_view = False
+            self.live_view_action.blockSignals(True)
+            self.live_view_action.setChecked(False)
+            self.live_view_action.blockSignals(False)
             return
 
         try:
@@ -817,21 +882,34 @@ class MainWindow(QMainWindow):
             waveforms = []
             errors = []
 
+            # Get supported channels (1-4 for most models)
             supported_channels = self.scope.supported_channels if hasattr(self.scope, 'supported_channels') else range(1, 5)
+            logger.debug(f"Live view update: checking channels {list(supported_channels)}")
 
             for ch_num in supported_channels:
                 try:
                     channel = getattr(self.scope, f"channel{ch_num}", None)
-                    if channel and channel.enabled:
+                    if channel is None:
+                        continue
+
+                    # Check if channel is enabled
+                    is_enabled = channel.enabled
+                    if is_enabled:
+                        logger.debug(f"Acquiring waveform from channel {ch_num}")
                         waveform = self.scope.get_waveform(ch_num)
                         if waveform:
                             waveforms.append(waveform)
+                            logger.debug(f"Got {len(waveform.voltage)} samples from channel {ch_num}")
+                        else:
+                            logger.debug(f"Channel {ch_num} returned no waveform data")
                 except Exception as e:
-                    errors.append(f"CH{ch_num}: {str(e)}")
+                    error_msg = f"CH{ch_num}: {str(e)}"
+                    errors.append(error_msg)
                     logger.debug(f"Could not acquire waveform from channel {ch_num}: {e}")
 
             # Update display
             if waveforms:
+                logger.debug(f"Plotting {len(waveforms)} waveforms")
                 self.waveform_display.plot_multiple_waveforms(waveforms)
 
                 # Force GUI update
@@ -845,13 +923,13 @@ class MainWindow(QMainWindow):
                 # No waveforms acquired
                 if errors:
                     logger.warning(f"Live view errors: {'; '.join(errors)}")
-                    self.statusBar().showMessage(f"Live view: No data (check signal and trigger)")
+                    self.statusBar().showMessage(f"Live view: Errors acquiring data - {errors[0][:30]}")
                 else:
                     logger.debug("No enabled channels for live view")
                     self.statusBar().showMessage("Live view: No enabled channels")
 
         except Exception as e:
-            logger.error(f"Error updating live view: {e}")
+            logger.error(f"Error updating live view: {e}", exc_info=True)
             self.statusBar().showMessage(f"Live view error: {str(e)[:50]}")
             # Don't stop live view on error, just skip this update
 

@@ -27,70 +27,42 @@ class ScreenCapture:
         """
         self._scope = oscilloscope
 
-    def capture_screenshot(self, image_format: str = "PNG") -> bytes:
-        """Capture screenshot from oscilloscope display.
+    def capture_screenshot(self, image_format: str = "BMP") -> bytes:
+        """Capture screenshot from oscilloscope display using SCDP command.
+
+        Note: The SCDP command returns the screen image in the oscilloscope's
+        native format (typically BMP). The image_format parameter is ignored
+        for Siglent scopes using SCDP. To convert to other formats, use PIL/Pillow
+        after capture.
 
         Args:
-            image_format: Image format ("PNG", "BMP", "JPEG")
+            image_format: Desired format (currently ignored, SCDP returns BMP)
 
         Returns:
-            Binary image data
+            Binary image data (typically BMP format)
 
         Raises:
-            ValueError: If format is not supported
             RuntimeError: If capture fails
 
         Example:
             >>> scope = Oscilloscope('192.168.1.100')
             >>> scope.connect()
-            >>> image_data = scope.screen_capture.capture_screenshot("PNG")
-            >>> with open("screenshot.png", "wb") as f:
+            >>> image_data = scope.screen_capture.capture_screenshot()
+            >>> with open("screenshot.bmp", "wb") as f:
             ...     f.write(image_data)
         """
-        # Validate format
-        image_format = image_format.upper()
-        if image_format not in self.SUPPORTED_FORMATS:
-            raise ValueError(f"Unsupported format: {image_format}. Supported: {', '.join(self.SUPPORTED_FORMATS)}")
-
-        # Normalize JPEG format
-        if image_format == "JPG":
-            image_format = "JPEG"
-
-        logger.info(f"Capturing screenshot in {image_format} format")
+        logger.info(f"Capturing screenshot using SCDP command")
 
         try:
-            # Set the hardcopy format
-            # Note: Different models may use different commands
-            # HCSU DEV,FORMAT,<format> - Set format
-            self._scope.write(f"HCSU DEV,FORMAT,{image_format}")
-
-            # Some models may need a small delay
-            import time
-            time.sleep(0.1)
-
-            # Trigger screen capture and get data
-            # Method 1: Try SCDP command (used by HD series and some others)
-            try:
-                logger.debug("Attempting SCDP command")
-                image_data = self._capture_with_scdp()
-                if image_data:
-                    logger.info(f"Screenshot captured successfully ({len(image_data)} bytes)")
-                    return image_data
-            except Exception as e:
-                logger.debug(f"SCDP method failed: {e}")
-
-            # Method 2: Try HCSU? command (used by some X series)
-            try:
-                logger.debug("Attempting HCSU? command")
-                image_data = self._capture_with_hcsu()
-                if image_data:
-                    logger.info(f"Screenshot captured successfully ({len(image_data)} bytes)")
-                    return image_data
-            except Exception as e:
-                logger.debug(f"HCSU? method failed: {e}")
-
-            # If both methods fail
-            raise RuntimeError("Failed to capture screenshot with available methods")
+            # For Siglent oscilloscopes, use SCDP command (Screen Dump)
+            # This is the standard command per Siglent programming manual
+            logger.debug("Using SCDP command for screenshot capture")
+            image_data = self._capture_with_scdp()
+            if image_data:
+                logger.info(f"Screenshot captured successfully ({len(image_data)} bytes)")
+                return image_data
+            else:
+                raise RuntimeError("SCDP returned empty data")
 
         except Exception as e:
             logger.error(f"Screenshot capture failed: {e}")
@@ -105,33 +77,93 @@ class ScreenCapture:
         Raises:
             Exception: If capture fails
         """
-        # Send SCDP command to get screen dump
-        self._scope.write("SCDP")
+        import time
 
-        # Read the response - should be binary image data
-        # The response format is typically IEEE 488.2 definite-length block
-        # Format: #<N><length><data>
-        # where N is the number of digits in <length>
+        # Try method 1: SCDP as a query command
+        try:
+            logger.debug("Attempting SCDP? query")
 
-        # Read the header
-        header = self._scope._connection.read_raw(2)  # Read '#N'
-        if not header or header[0:1] != b'#':
-            raise Exception("Invalid response header")
+            # Query using SCDP?
+            self._scope.write("SCDP?")
+            time.sleep(0.2)  # Wait for scope to prepare data
 
-        # Get number of length digits
-        num_digits = int(chr(header[1]))
+            # Read response as raw bytes (up to 10MB)
+            response = self._scope._connection.read_raw(10000000)
+
+            if response and len(response) > 0:
+                logger.debug(f"SCDP? returned {len(response)} bytes, first bytes: {response[:20]}")
+                # Check if it starts with IEEE 488.2 format
+                if response[0:1] == b'#':
+                    logger.debug("Response is in IEEE 488.2 format")
+                    return self._parse_ieee488_response(response)
+                else:
+                    # Might be raw BMP data
+                    logger.debug("Response appears to be raw image data")
+                    return response
+        except Exception as e:
+            logger.debug(f"SCDP? query failed: {e}")
+
+        # Try method 2: SCDP as write then read
+        try:
+            logger.debug("Attempting SCDP write then read")
+            self._scope.write("SCDP")
+            time.sleep(0.2)  # Wait for scope to prepare data
+
+            # Try to read response
+            response = self._scope._connection.read_raw(2)  # Read first 2 bytes
+
+            if not response:
+                raise Exception("No response from SCDP command")
+
+            logger.debug(f"Read header: {response}")
+
+            # Check if it's IEEE 488.2 format
+            if response[0:1] == b'#':
+                # Put the header back and read the full response
+                logger.debug("Detected IEEE 488.2 format, reading full response")
+                num_digits = int(chr(response[1]))
+                length_bytes = self._scope._connection.read_raw(num_digits)
+                data_length = int(length_bytes.decode('ascii'))
+                image_data = self._scope._connection.read_raw(data_length)
+
+                if len(image_data) != data_length:
+                    raise Exception(f"Data length mismatch: expected {data_length}, got {len(image_data)}")
+
+                return image_data
+            else:
+                # Not IEEE format, might be raw data - read everything available
+                logger.debug("Not IEEE 488.2 format, reading raw data")
+                remaining = self._scope._connection.read_raw(10000000)  # Read up to 10MB
+                return response + remaining
+
+        except Exception as e:
+            logger.error(f"SCDP command failed: {e}")
+            raise Exception(f"SCDP screenshot capture failed: {e}")
+
+    def _parse_ieee488_response(self, response: bytes) -> bytes:
+        """Parse IEEE 488.2 definite-length block format.
+
+        Args:
+            response: Full response including header
+
+        Returns:
+            Extracted data
+        """
+        if response[0:1] != b'#':
+            raise Exception("Not IEEE 488.2 format")
+
+        num_digits = int(chr(response[1]))
         if num_digits == 0:
             raise Exception("Invalid length format")
 
-        # Read the length
-        length_bytes = self._scope._connection.read_raw(num_digits)
+        length_bytes = response[2:2+num_digits]
         data_length = int(length_bytes.decode('ascii'))
 
-        # Read the actual image data
-        image_data = self._scope._connection.read_raw(data_length)
+        data_start = 2 + num_digits
+        image_data = response[data_start:data_start+data_length]
 
         if len(image_data) != data_length:
-            raise Exception(f"Data length mismatch: expected {data_length}, got {len(image_data)}")
+            logger.warning(f"Data length mismatch: expected {data_length}, got {len(image_data)}")
 
         return image_data
 
@@ -165,61 +197,62 @@ class ScreenCapture:
     def save_screenshot(self, filename: str, image_format: Optional[str] = None) -> None:
         """Capture and save screenshot to file.
 
+        Note: The SCDP command returns images in BMP format. If you specify
+        a different extension (e.g., .png), the file will still contain BMP
+        data. Use get_screenshot_pil() and PIL to convert formats if needed.
+
         Args:
-            filename: Output file path
-            image_format: Image format (default: auto-detect from filename extension)
+            filename: Output file path (recommend using .bmp extension)
+            image_format: Ignored (SCDP always returns BMP)
 
         Example:
-            >>> scope.screen_capture.save_screenshot("capture.png")
-            >>> scope.screen_capture.save_screenshot("capture.bmp", "BMP")
+            >>> scope.screen_capture.save_screenshot("capture.bmp")
+
+            To save as PNG (requires PIL/Pillow):
+            >>> img = scope.screen_capture.get_screenshot_pil()
+            >>> img.save("capture.png", "PNG")
         """
-        # Auto-detect format from filename if not specified
-        if image_format is None:
-            import os
-            ext = os.path.splitext(filename)[1].upper()
-            format_map = {
-                '.PNG': 'PNG',
-                '.BMP': 'BMP',
-                '.JPG': 'JPEG',
-                '.JPEG': 'JPEG',
-            }
-            image_format = format_map.get(ext, 'PNG')
-            logger.debug(f"Auto-detected format: {image_format} from extension {ext}")
+        # Capture screenshot using SCDP (returns BMP format)
+        image_data = self.capture_screenshot()
 
-        # Capture screenshot
-        image_data = self.capture_screenshot(image_format)
-
-        # Save to file
+        # Save to file (data will be in BMP format regardless of filename)
         with open(filename, 'wb') as f:
             f.write(image_data)
 
-        logger.info(f"Screenshot saved to {filename}")
+        logger.info(f"Screenshot saved to {filename} (BMP format)")
 
-    def get_screenshot_pil(self, image_format: str = "PNG"):
+    def get_screenshot_pil(self):
         """Capture screenshot and return as PIL Image object.
 
         Requires PIL/Pillow to be installed.
-
-        Args:
-            image_format: Image format ("PNG", "BMP", "JPEG")
+        Use this method to convert the BMP screenshot to other formats.
 
         Returns:
-            PIL.Image object
+            PIL.Image object (loaded from BMP data)
 
         Raises:
             ImportError: If PIL is not installed
 
         Example:
-            >>> from PIL import Image
+            >>> # Capture and display
             >>> img = scope.screen_capture.get_screenshot_pil()
             >>> img.show()
+
+            >>> # Capture and save as PNG
+            >>> img = scope.screen_capture.get_screenshot_pil()
+            >>> img.save("screenshot.png", "PNG")
+
+            >>> # Capture and save as JPEG with quality
+            >>> img = scope.screen_capture.get_screenshot_pil()
+            >>> img.save("screenshot.jpg", "JPEG", quality=95)
         """
         try:
             from PIL import Image
         except ImportError:
             raise ImportError("PIL/Pillow is required for this function. Install with: pip install Pillow")
 
-        image_data = self.capture_screenshot(image_format)
+        # Capture screenshot (returns BMP format from SCDP)
+        image_data = self.capture_screenshot()
         return Image.open(BytesIO(image_data))
 
     def __repr__(self) -> str:

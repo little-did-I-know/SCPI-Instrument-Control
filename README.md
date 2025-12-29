@@ -10,12 +10,14 @@ A professional Python package for controlling Siglent SD824x HD oscilloscopes vi
 ## Features
 
 - **Programmatic API**: Control your oscilloscope from Python scripts
-- **GUI Application**: PyQt6-based graphical interface for interactive control
-- **Waveform Acquisition**: Capture and download waveform data
+- **Automation & Data Collection**: High-level API for batch capture, continuous monitoring, and analysis
+- **GUI Application**: PyQt6-based graphical interface with styled connect/disconnect buttons
+- **Waveform Acquisition**: Capture and download waveform data in multiple formats (NPZ, CSV, MAT, HDF5)
 - **Channel Configuration**: Control voltage scale, coupling, offset, bandwidth
 - **Trigger Settings**: Configure trigger modes, levels, edge detection
 - **Measurements**: Automated measurements, cursors, and statistics
 - **Live View**: Real-time waveform display
+- **Advanced Analysis**: Built-in FFT, SNR, THD, and statistical analysis tools
 
 ## Installation
 
@@ -175,6 +177,83 @@ period = scope.measurement.measure_period(1)
 # All measurements at once
 measurements = scope.measurement.measure_all(1)
 ```
+
+### Programmatic Data Collection & Automation
+
+For advanced data collection workflows, use the high-level automation API:
+
+```python
+from siglent.automation import DataCollector
+
+# Simple capture with automatic analysis
+with DataCollector('192.168.1.100') as collector:
+    # Capture waveforms
+    data = collector.capture_single([1, 2])
+
+    # Analyze waveform
+    stats = collector.analyze_waveform(data[1])
+    print(f"Vpp: {stats['vpp']:.3f}V, Freq: {stats['frequency']/1e3:.2f}kHz")
+
+    # Save to file (supports NPZ, CSV, MAT, HDF5)
+    collector.save_data(data, 'measurement.npz')
+```
+
+**Batch capture with configuration sweeps:**
+
+```python
+# Capture with different timebase and voltage settings
+results = collector.batch_capture(
+    channels=[1],
+    timebase_scales=['1us', '10us', '100us'],
+    voltage_scales={1: ['500mV', '1V', '2V']},
+    triggers_per_config=5
+)
+collector.save_batch(results, 'batch_output')
+```
+
+**Continuous time-series collection:**
+
+```python
+# Collect data over time with automated file saving
+collector.start_continuous_capture(
+    channels=[1, 2],
+    duration=300,          # 5 minutes
+    interval=1.0,          # 1 capture per second
+    output_dir='time_series_data',
+    file_format='npz'
+)
+```
+
+**Event-based trigger capture:**
+
+```python
+from siglent.automation import TriggerWaitCollector
+
+with TriggerWaitCollector('192.168.1.100') as tc:
+    # Configure trigger
+    tc.collector.scope.trigger.set_source(1)
+    tc.collector.scope.trigger.set_slope('POS')
+    tc.collector.scope.trigger.set_level(1, 1.0)
+
+    # Wait for trigger event
+    data = tc.wait_for_trigger(channels=[1, 2], max_wait=30.0)
+```
+
+**Advanced analysis:**
+
+```python
+# Built-in analysis includes: Vpp, RMS, frequency, SNR, THD, etc.
+analysis = collector.analyze_waveform(waveform)
+print(f"SNR: {analysis['snr_db']:.2f} dB")
+print(f"THD: {analysis['thd_percent']:.2f}%")
+```
+
+See `examples/` directory for complete automation examples including:
+- Simple capture (`simple_capture.py`)
+- Batch processing (`batch_capture.py`)
+- Continuous monitoring (`continuous_capture.py`)
+- Trigger-based capture (`trigger_based_capture.py`)
+- Advanced analysis with visualization (`advanced_analysis.py`)
 
 ## Examples
 
