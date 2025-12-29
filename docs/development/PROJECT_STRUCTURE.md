@@ -190,7 +190,10 @@ Controls what files are included in source distributions:
 5. **Update `CHANGELOG.md`** with changes
 6. **Build package:** `python -m build`
 7. **Check package:** `twine check dist/*`
-8. **Test install:** `pip install dist/*.whl`
+8. **Test install:**
+   - Bash/WSL: `pip install dist/*.whl`
+   - PowerShell: run `python -m pip install --upgrade pip` first, then `python -m pip install (Get-ChildItem dist\*.whl)` so globbing resolves the wheel path
+   - cmd.exe: `for %f in (dist\*.whl) do python -m pip install --upgrade pip "%f"`
 9. **Deploy to PyPI:** `twine upload dist/*`
 
 See `docs/development/BUILD.md` and `docs/development/PYPI_DEPLOYMENT.md` for detailed instructions.

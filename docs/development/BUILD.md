@@ -32,8 +32,12 @@ pip install -e .
 # Bash / WSL
 pip install dist/*.whl
 
-# PowerShell (globbing is different, so use Get-ChildItem)
-pip install (Get-ChildItem dist\*.whl)
+# Windows PowerShell (keep the pip upgrade separate so globbing works)
+python -m pip install --upgrade pip
+python -m pip install (Get-ChildItem dist\*.whl)
+
+# Windows Command Prompt (cmd.exe)
+for %f in (dist\*.whl) do python -m pip install --upgrade pip "%f"
 ```
 
 ## Expected Output
