@@ -385,18 +385,32 @@ class DataCollector:
         analysis = {"vpp": np.max(voltage) - np.min(voltage), "amplitude": (np.max(voltage) - np.min(voltage)) / 2, "max": np.max(voltage), "min": np.min(voltage), "mean": np.mean(voltage), "rms": np.sqrt(np.mean(voltage**2)), "std_dev": np.std(voltage), "median": np.median(voltage)}
 
         # Try to detect frequency (simple zero-crossing method)
+        frequency = 0.0
+        period = 0.0
+
         try:
             mean_val = analysis["mean"]
             crossings = np.where(np.diff(np.sign(voltage - mean_val)))[0]
-            if len(crossings) > 2:
+
+            # Estimate sample interval from the time axis, falling back to sample_rate
+            dt = float(np.mean(np.diff(waveform.time))) if len(waveform.time) > 1 else None
+            if (dt is None or dt <= 0) and getattr(waveform, "sample_rate", None):
+                if waveform.sample_rate > 0:
+                    dt = 1.0 / float(waveform.sample_rate)
+
+            if len(crossings) > 2 and dt and dt > 0:
                 # Average time between positive-going zero crossings
-                periods = np.diff(crossings[::2]) * waveform.time_interval
-                avg_period = np.mean(periods)
-                analysis["frequency"] = 1.0 / avg_period if avg_period > 0 else 0
-                analysis["period"] = avg_period
-        except:
-            analysis["frequency"] = 0
-            analysis["period"] = 0
+                periods = np.diff(crossings[::2]) * dt
+                avg_period = float(np.mean(periods))
+                if avg_period > 0:
+                    period = avg_period
+                    frequency = 1.0 / avg_period
+        except Exception:
+            # Keep zero defaults on parsing errors
+            pass
+
+        analysis["frequency"] = frequency
+        analysis["period"] = period
 
         return analysis
 
