@@ -34,8 +34,6 @@ classifiers = [
 ]
 
 dependencies = [
-    "PyQt6>=6.6.0",
-    "PyQt6-WebEngine>=6.6.0",
     "numpy>=1.24.0",
     "matplotlib>=3.7.0",
     "scipy>=1.10.0",
@@ -59,8 +57,14 @@ dev = [
 hdf5 = [
     "h5py>=3.8.0",
 ]
+gui = [
+    "PyQt6>=6.6.0",
+    "PyQt6-WebEngine>=6.6.0",
+]
 all = [
     "h5py>=3.8.0",
+    "PyQt6>=6.6.0",
+    "PyQt6-WebEngine>=6.6.0",
 ]
 
 [project.scripts]

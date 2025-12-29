@@ -2,6 +2,10 @@
 
 import sys
 import numpy as np
+import pytest
+
+pytest.importorskip("PyQt6")
+
 from PyQt6.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QWidget, QPushButton
 from PyQt6.QtCore import Qt
 

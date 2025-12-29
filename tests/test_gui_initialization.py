@@ -1,8 +1,10 @@
 """Test GUI initialization and widget creation."""
 
 import pytest
-from PyQt6.QtWidgets import QApplication
 import sys
+
+pytest.importorskip("PyQt6")
+from PyQt6.QtWidgets import QApplication
 
 
 @pytest.fixture(scope="module")

@@ -27,12 +27,24 @@ A professional Python package for controlling Siglent SD824x HD oscilloscopes vi
 pip install Siglent-Oscilloscope
 ```
 
+To include the optional GUI dependencies, install with the `gui` extra:
+
+```bash
+pip install "Siglent-Oscilloscope[gui]"
+```
+
 ### From source
 
 ```bash
 git clone git@github.com:little-did-I-know/Siglent-Oscilloscope.git
 cd siglent
 pip install -e .
+```
+
+Install with GUI support from source:
+
+```bash
+pip install -e ".[gui]"
 ```
 
 ### Development installation
@@ -82,9 +94,10 @@ main()
 ## Requirements
 
 - Python 3.8+
-- PyQt6
 - NumPy
 - Matplotlib
+
+For the GUI application, install the `gui` extra to add PyQt6 and PyQt6-WebEngine.
 
 ## Connection
 
