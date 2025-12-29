@@ -34,12 +34,12 @@ class VoltageMarker(MeasurementMarker):
             canvas: Qt canvas
             color: Marker color (defaults to yellow/gold)
         """
-        super().__init__(marker_id, measurement_type, channel, ax, canvas, color or '#FFD700')
+        super().__init__(marker_id, measurement_type, channel, ax, canvas, color or "#FFD700")
 
-        self.unit = 'V'
+        self.unit = "V"
 
         # Initialize gates
-        self.gates = {'start_x': 0.0, 'end_x': 0.0}
+        self.gates = {"start_x": 0.0, "end_x": 0.0}
 
         # Store intermediate values for display
         self.max_value: Optional[float] = None
@@ -55,87 +55,40 @@ class VoltageMarker(MeasurementMarker):
                 pass
         self.artists.clear()
 
-        if not self.gates.get('start_x') or not self.gates.get('end_x'):
+        if not self.gates.get("start_x") or not self.gates.get("end_x"):
             return
 
-        start_x = self.gates['start_x']
-        end_x = self.gates['end_x']
+        start_x = self.gates["start_x"]
+        end_x = self.gates["end_x"]
 
         alpha = self.DEFAULT_SELECTED_ALPHA if self.selected else self.DEFAULT_ALPHA
 
         # Draw vertical gates
         ylim = self.ax.get_ylim()
 
-        line1 = self.ax.axvline(
-            start_x,
-            color=self.color,
-            linestyle=self.DEFAULT_LINE_STYLE,
-            linewidth=self.DEFAULT_LINE_WIDTH,
-            alpha=alpha,
-            picker=5
-        )
+        line1 = self.ax.axvline(start_x, color=self.color, linestyle=self.DEFAULT_LINE_STYLE, linewidth=self.DEFAULT_LINE_WIDTH, alpha=alpha, picker=5)
         self.artists.append(line1)
 
-        line2 = self.ax.axvline(
-            end_x,
-            color=self.color,
-            linestyle=self.DEFAULT_LINE_STYLE,
-            linewidth=self.DEFAULT_LINE_WIDTH,
-            alpha=alpha,
-            picker=5
-        )
+        line2 = self.ax.axvline(end_x, color=self.color, linestyle=self.DEFAULT_LINE_STYLE, linewidth=self.DEFAULT_LINE_WIDTH, alpha=alpha, picker=5)
         self.artists.append(line2)
 
         # Draw horizontal lines and brackets based on measurement type
-        if self.measurement_type in ['PKPK', 'AMPL'] and self.max_value is not None and self.min_value is not None:
+        if self.measurement_type in ["PKPK", "AMPL"] and self.max_value is not None and self.min_value is not None:
             # Draw lines at max and min
-            max_line = self.ax.axhline(
-                self.max_value,
-                xmin=(start_x - self.ax.get_xlim()[0]) / (self.ax.get_xlim()[1] - self.ax.get_xlim()[0]),
-                xmax=(end_x - self.ax.get_xlim()[0]) / (self.ax.get_xlim()[1] - self.ax.get_xlim()[0]),
-                color=self.color,
-                linestyle='-',
-                linewidth=1.5,
-                alpha=alpha
-            )
+            max_line = self.ax.axhline(self.max_value, xmin=(start_x - self.ax.get_xlim()[0]) / (self.ax.get_xlim()[1] - self.ax.get_xlim()[0]), xmax=(end_x - self.ax.get_xlim()[0]) / (self.ax.get_xlim()[1] - self.ax.get_xlim()[0]), color=self.color, linestyle="-", linewidth=1.5, alpha=alpha)
             self.artists.append(max_line)
 
-            min_line = self.ax.axhline(
-                self.min_value,
-                xmin=(start_x - self.ax.get_xlim()[0]) / (self.ax.get_xlim()[1] - self.ax.get_xlim()[0]),
-                xmax=(end_x - self.ax.get_xlim()[0]) / (self.ax.get_xlim()[1] - self.ax.get_xlim()[0]),
-                color=self.color,
-                linestyle='-',
-                linewidth=1.5,
-                alpha=alpha
-            )
+            min_line = self.ax.axhline(self.min_value, xmin=(start_x - self.ax.get_xlim()[0]) / (self.ax.get_xlim()[1] - self.ax.get_xlim()[0]), xmax=(end_x - self.ax.get_xlim()[0]) / (self.ax.get_xlim()[1] - self.ax.get_xlim()[0]), color=self.color, linestyle="-", linewidth=1.5, alpha=alpha)
             self.artists.append(min_line)
 
             # Draw vertical bracket on left side
             bracket_x = start_x - (end_x - start_x) * 0.05
-            bracket = self.ax.plot(
-                [bracket_x, bracket_x],
-                [self.min_value, self.max_value],
-                color=self.color,
-                linestyle='-',
-                linewidth=2,
-                alpha=alpha,
-                marker='|',
-                markersize=8
-            )[0]
+            bracket = self.ax.plot([bracket_x, bracket_x], [self.min_value, self.max_value], color=self.color, linestyle="-", linewidth=2, alpha=alpha, marker="|", markersize=8)[0]
             self.artists.append(bracket)
 
         elif self.result is not None:
             # Single horizontal line for other voltage measurements
-            h_line = self.ax.axhline(
-                self.result,
-                xmin=(start_x - self.ax.get_xlim()[0]) / (self.ax.get_xlim()[1] - self.ax.get_xlim()[0]),
-                xmax=(end_x - self.ax.get_xlim()[0]) / (self.ax.get_xlim()[1] - self.ax.get_xlim()[0]),
-                color=self.color,
-                linestyle='-',
-                linewidth=2,
-                alpha=alpha
-            )
+            h_line = self.ax.axhline(self.result, xmin=(start_x - self.ax.get_xlim()[0]) / (self.ax.get_xlim()[1] - self.ax.get_xlim()[0]), xmax=(end_x - self.ax.get_xlim()[0]) / (self.ax.get_xlim()[1] - self.ax.get_xlim()[0]), color=self.color, linestyle="-", linewidth=2, alpha=alpha)
             self.artists.append(h_line)
 
         # Draw label
@@ -153,16 +106,16 @@ class VoltageMarker(MeasurementMarker):
         Args:
             **kwargs: Can include 'start_x', 'end_x', or 'center_x' with 'width'
         """
-        if 'start_x' in kwargs:
-            self.gates['start_x'] = kwargs['start_x']
-        if 'end_x' in kwargs:
-            self.gates['end_x'] = kwargs['end_x']
+        if "start_x" in kwargs:
+            self.gates["start_x"] = kwargs["start_x"]
+        if "end_x" in kwargs:
+            self.gates["end_x"] = kwargs["end_x"]
 
-        if 'center_x' in kwargs and 'width' in kwargs:
-            center = kwargs['center_x']
-            width = kwargs['width']
-            self.gates['start_x'] = center - width / 2
-            self.gates['end_x'] = center + width / 2
+        if "center_x" in kwargs and "width" in kwargs:
+            center = kwargs["center_x"]
+            width = kwargs["width"]
+            self.gates["start_x"] = center - width / 2
+            self.gates["end_x"] = center + width / 2
 
         self.is_dirty = True
         self.last_waveform_hash = None
@@ -184,45 +137,45 @@ class VoltageMarker(MeasurementMarker):
                 return None
 
             # Calculate based on measurement type
-            if self.measurement_type == 'PKPK':
+            if self.measurement_type == "PKPK":
                 self.max_value = float(np.max(gate_voltage))
                 self.min_value = float(np.min(gate_voltage))
                 return self.max_value - self.min_value
 
-            elif self.measurement_type == 'AMPL':
+            elif self.measurement_type == "AMPL":
                 self.max_value = float(np.max(gate_voltage))
                 self.min_value = float(np.min(gate_voltage))
                 return (self.max_value - self.min_value) / 2
 
-            elif self.measurement_type == 'MAX':
+            elif self.measurement_type == "MAX":
                 return float(np.max(gate_voltage))
 
-            elif self.measurement_type == 'MIN':
+            elif self.measurement_type == "MIN":
                 return float(np.min(gate_voltage))
 
-            elif self.measurement_type == 'TOP':
+            elif self.measurement_type == "TOP":
                 # Top value (typically 90% percentile)
                 return float(np.percentile(gate_voltage, 90))
 
-            elif self.measurement_type == 'BASE':
+            elif self.measurement_type == "BASE":
                 # Base value (typically 10% percentile)
                 return float(np.percentile(gate_voltage, 10))
 
-            elif self.measurement_type == 'MEAN':
+            elif self.measurement_type == "MEAN":
                 return float(np.mean(gate_voltage))
 
-            elif self.measurement_type == 'CMEAN':
+            elif self.measurement_type == "CMEAN":
                 # Cycle mean - same as mean for our purposes
                 return float(np.mean(gate_voltage))
 
-            elif self.measurement_type == 'RMS':
-                return float(np.sqrt(np.mean(gate_voltage ** 2)))
+            elif self.measurement_type == "RMS":
+                return float(np.sqrt(np.mean(gate_voltage**2)))
 
-            elif self.measurement_type == 'CRMS':
+            elif self.measurement_type == "CRMS":
                 # Cycle RMS
                 # Remove DC component for true AC RMS
                 ac_voltage = gate_voltage - np.mean(gate_voltage)
-                return float(np.sqrt(np.mean(ac_voltage ** 2)))
+                return float(np.sqrt(np.mean(ac_voltage**2)))
 
             else:
                 logger.warning(f"Unknown voltage measurement type: {self.measurement_type}")
@@ -253,8 +206,8 @@ class VoltageMarker(MeasurementMarker):
             # Default gate width: 20% of visible timespan
             width = time_span * 0.2
 
-            self.gates['start_x'] = center - width / 2
-            self.gates['end_x'] = center + width / 2
+            self.gates["start_x"] = center - width / 2
+            self.gates["end_x"] = center + width / 2
 
             logger.debug(f"Auto-placed voltage marker at center={center:.6e}, width={width:.6e}")
             self.is_dirty = True

@@ -29,4 +29,4 @@ from .frequency_marker import FrequencyMarker
 from .voltage_marker import VoltageMarker
 from .timing_marker import TimingMarker
 
-__all__ = ['FrequencyMarker', 'VoltageMarker', 'TimingMarker']
+__all__ = ["FrequencyMarker", "VoltageMarker", "TimingMarker"]

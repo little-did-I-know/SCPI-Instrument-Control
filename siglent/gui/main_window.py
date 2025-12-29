@@ -17,11 +17,13 @@ from siglent.exceptions import ConnectionError, SiglentError
 # Try to use PyQtGraph for high-performance plotting, fallback to matplotlib
 try:
     from siglent.gui.widgets.waveform_display_pg import WaveformDisplayPG as WaveformDisplay
+
     USING_PYQTGRAPH = True
     logger = logging.getLogger(__name__)
     logger.info("Using PyQtGraph for waveform display (high performance mode)")
 except ImportError:
     from siglent.gui.widgets.waveform_display import WaveformDisplay
+
     USING_PYQTGRAPH = False
     logger = logging.getLogger(__name__)
     logger.warning("PyQtGraph not available, using matplotlib (install with: pip install 'Siglent-Oscilloscope[gui]')")

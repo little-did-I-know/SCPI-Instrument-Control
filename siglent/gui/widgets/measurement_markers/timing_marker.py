@@ -35,20 +35,20 @@ class TimingMarker(MeasurementMarker):
         """
         # Determine default color based on type
         if color is None:
-            if measurement_type in ['RISE', 'FALL']:
-                color = '#FF1493'  # Magenta
+            if measurement_type in ["RISE", "FALL"]:
+                color = "#FF1493"  # Magenta
             else:  # WID, NWID, DUTY
-                color = '#00FF00'  # Green
+                color = "#00FF00"  # Green
 
         super().__init__(marker_id, measurement_type, channel, ax, canvas, color)
 
-        self.unit = 's' if measurement_type != 'DUTY' else '%'
+        self.unit = "s" if measurement_type != "DUTY" else "%"
 
         # Initialize gates
-        if measurement_type in ['RISE', 'FALL']:
-            self.gates = {'start_x': 0.0, 'end_x': 0.0}
+        if measurement_type in ["RISE", "FALL"]:
+            self.gates = {"start_x": 0.0, "end_x": 0.0}
         else:  # WID, NWID, DUTY
-            self.gates = {'start_x': 0.0, 'end_x': 0.0}
+            self.gates = {"start_x": 0.0, "end_x": 0.0}
 
         # Store threshold levels for rise/fall
         self.threshold_10: Optional[float] = None
@@ -64,74 +64,38 @@ class TimingMarker(MeasurementMarker):
                 pass
         self.artists.clear()
 
-        if not self.gates.get('start_x') or not self.gates.get('end_x'):
+        if not self.gates.get("start_x") or not self.gates.get("end_x"):
             return
 
-        start_x = self.gates['start_x']
-        end_x = self.gates['end_x']
+        start_x = self.gates["start_x"]
+        end_x = self.gates["end_x"]
 
         alpha = self.DEFAULT_SELECTED_ALPHA if self.selected else self.DEFAULT_ALPHA
 
         # Draw vertical gates
-        line1 = self.ax.axvline(
-            start_x,
-            color=self.color,
-            linestyle=self.DEFAULT_LINE_STYLE,
-            linewidth=self.DEFAULT_LINE_WIDTH,
-            alpha=alpha,
-            picker=5
-        )
+        line1 = self.ax.axvline(start_x, color=self.color, linestyle=self.DEFAULT_LINE_STYLE, linewidth=self.DEFAULT_LINE_WIDTH, alpha=alpha, picker=5)
         self.artists.append(line1)
 
-        line2 = self.ax.axvline(
-            end_x,
-            color=self.color,
-            linestyle=self.DEFAULT_LINE_STYLE,
-            linewidth=self.DEFAULT_LINE_WIDTH,
-            alpha=alpha,
-            picker=5
-        )
+        line2 = self.ax.axvline(end_x, color=self.color, linestyle=self.DEFAULT_LINE_STYLE, linewidth=self.DEFAULT_LINE_WIDTH, alpha=alpha, picker=5)
         self.artists.append(line2)
 
         # Type-specific rendering
-        if self.measurement_type in ['RISE', 'FALL'] and self.threshold_10 is not None and self.threshold_90 is not None:
+        if self.measurement_type in ["RISE", "FALL"] and self.threshold_10 is not None and self.threshold_90 is not None:
             # Draw horizontal threshold lines
             xlim = self.ax.get_xlim()
             x_start_norm = (start_x - xlim[0]) / (xlim[1] - xlim[0])
             x_end_norm = (end_x - xlim[0]) / (xlim[1] - xlim[0])
 
-            thresh_10_line = self.ax.axhline(
-                self.threshold_10,
-                xmin=x_start_norm,
-                xmax=x_end_norm,
-                color=self.color,
-                linestyle=':',
-                linewidth=1.5,
-                alpha=alpha * 0.7
-            )
+            thresh_10_line = self.ax.axhline(self.threshold_10, xmin=x_start_norm, xmax=x_end_norm, color=self.color, linestyle=":", linewidth=1.5, alpha=alpha * 0.7)
             self.artists.append(thresh_10_line)
 
-            thresh_90_line = self.ax.axhline(
-                self.threshold_90,
-                xmin=x_start_norm,
-                xmax=x_end_norm,
-                color=self.color,
-                linestyle=':',
-                linewidth=1.5,
-                alpha=alpha * 0.7
-            )
+            thresh_90_line = self.ax.axhline(self.threshold_90, xmin=x_start_norm, xmax=x_end_norm, color=self.color, linestyle=":", linewidth=1.5, alpha=alpha * 0.7)
             self.artists.append(thresh_90_line)
 
-        elif self.measurement_type in ['WID', 'NWID', 'DUTY']:
+        elif self.measurement_type in ["WID", "NWID", "DUTY"]:
             # Draw shaded region between gates
             ylim = self.ax.get_ylim()
-            fill = self.ax.fill_between(
-                [start_x, end_x],
-                ylim[0],
-                ylim[1],
-                color=self.color,
-                alpha=0.15
-            )
+            fill = self.ax.fill_between([start_x, end_x], ylim[0], ylim[1], color=self.color, alpha=0.15)
             self.artists.append(fill)
 
         # Draw label
@@ -150,16 +114,16 @@ class TimingMarker(MeasurementMarker):
         Args:
             **kwargs: Can include 'start_x', 'end_x', or 'center_x' with 'width'
         """
-        if 'start_x' in kwargs:
-            self.gates['start_x'] = kwargs['start_x']
-        if 'end_x' in kwargs:
-            self.gates['end_x'] = kwargs['end_x']
+        if "start_x" in kwargs:
+            self.gates["start_x"] = kwargs["start_x"]
+        if "end_x" in kwargs:
+            self.gates["end_x"] = kwargs["end_x"]
 
-        if 'center_x' in kwargs and 'width' in kwargs:
-            center = kwargs['center_x']
-            width = kwargs['width']
-            self.gates['start_x'] = center - width / 2
-            self.gates['end_x'] = center + width / 2
+        if "center_x" in kwargs and "width" in kwargs:
+            center = kwargs["center_x"]
+            width = kwargs["width"]
+            self.gates["start_x"] = center - width / 2
+            self.gates["end_x"] = center + width / 2
 
         self.is_dirty = True
         self.last_waveform_hash = None
@@ -179,19 +143,19 @@ class TimingMarker(MeasurementMarker):
             if len(gate_time) < 5:
                 return None
 
-            if self.measurement_type == 'RISE':
+            if self.measurement_type == "RISE":
                 return self._calculate_rise_time(gate_time, gate_voltage)
 
-            elif self.measurement_type == 'FALL':
+            elif self.measurement_type == "FALL":
                 return self._calculate_fall_time(gate_time, gate_voltage)
 
-            elif self.measurement_type == 'WID':
+            elif self.measurement_type == "WID":
                 return self._calculate_positive_width(gate_time, gate_voltage)
 
-            elif self.measurement_type == 'NWID':
+            elif self.measurement_type == "NWID":
                 return self._calculate_negative_width(gate_time, gate_voltage)
 
-            elif self.measurement_type == 'DUTY':
+            elif self.measurement_type == "DUTY":
                 return self._calculate_duty_cycle(gate_time, gate_voltage)
 
             else:
@@ -302,9 +266,7 @@ class TimingMarker(MeasurementMarker):
 
         # Find falling and rising edges
         t_falling = self._find_threshold_crossing(time, voltage, threshold, rising=False)
-        t_rising_next = self._find_threshold_crossing(time[time > t_falling] if t_falling else time,
-                                                       voltage[time > t_falling] if t_falling else voltage,
-                                                       threshold, rising=True)
+        t_rising_next = self._find_threshold_crossing(time[time > t_falling] if t_falling else time, voltage[time > t_falling] if t_falling else voltage, threshold, rising=True)
 
         if t_falling is None or t_rising_next is None or t_rising_next <= t_falling:
             return None
@@ -337,8 +299,7 @@ class TimingMarker(MeasurementMarker):
 
         return float(duty_cycle)
 
-    def _find_threshold_crossing(self, time: np.ndarray, voltage: np.ndarray,
-                                  threshold: float, rising: bool = True) -> Optional[float]:
+    def _find_threshold_crossing(self, time: np.ndarray, voltage: np.ndarray, threshold: float, rising: bool = True) -> Optional[float]:
         """Find time when waveform crosses threshold.
 
         Args:
@@ -372,7 +333,7 @@ class TimingMarker(MeasurementMarker):
             x_hint: Optional X position hint
         """
         try:
-            if self.measurement_type in ['RISE', 'FALL']:
+            if self.measurement_type in ["RISE", "FALL"]:
                 # Find edge near hint or in middle
                 if x_hint is not None:
                     center = x_hint
@@ -383,8 +344,8 @@ class TimingMarker(MeasurementMarker):
                 time_span = waveform.time[-1] - waveform.time[0]
                 margin = time_span * 0.05  # 5% margin
 
-                self.gates['start_x'] = center - margin
-                self.gates['end_x'] = center + margin
+                self.gates["start_x"] = center - margin
+                self.gates["end_x"] = center + margin
 
             else:  # WID, NWID, DUTY
                 # Use a reasonable portion of waveform
@@ -397,8 +358,8 @@ class TimingMarker(MeasurementMarker):
 
                 width = time_span * 0.3  # 30% of visible timespan
 
-                self.gates['start_x'] = center - width / 2
-                self.gates['end_x'] = center + width / 2
+                self.gates["start_x"] = center - width / 2
+                self.gates["end_x"] = center + width / 2
 
             logger.debug(f"Auto-placed timing marker")
             self.is_dirty = True

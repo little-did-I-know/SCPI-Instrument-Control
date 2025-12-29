@@ -261,8 +261,7 @@ class WaveformDisplay(QWidget):
 
             if not line_found:
                 # Create new line
-                self.ax.plot(time_data, waveform.voltage, color=color, linewidth=1.0,
-                           label=f"CH{channel}", alpha=0.9)
+                self.ax.plot(time_data, waveform.voltage, color=color, linewidth=1.0, label=f"CH{channel}", alpha=0.9)
 
         # Update axis limits
         self.ax.relim()
@@ -963,16 +962,7 @@ class WaveformDisplay(QWidget):
         Returns:
             Dictionary mapping marker IDs to results
         """
-        return {
-            marker.marker_id: {
-                'type': marker.measurement_type,
-                'channel': marker.channel,
-                'result': marker.result,
-                'unit': marker.unit,
-                'enabled': marker.enabled
-            }
-            for marker in self.measurement_markers
-        }
+        return {marker.marker_id: {"type": marker.measurement_type, "channel": marker.channel, "result": marker.result, "unit": marker.unit, "enabled": marker.enabled} for marker in self.measurement_markers}
 
     def update_all_markers(self) -> None:
         """Update all enabled markers with current waveform data."""
@@ -982,10 +972,7 @@ class WaveformDisplay(QWidget):
         for marker in self.measurement_markers:
             if marker.enabled:
                 # Find waveform for marker's channel
-                waveform = next(
-                    (w for w in self.current_waveforms if w.channel == marker.channel),
-                    None
-                )
+                waveform = next((w for w in self.current_waveforms if w.channel == marker.channel), None)
 
                 if waveform:
                     marker.update_measurement(waveform)

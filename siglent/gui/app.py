@@ -70,6 +70,7 @@ def _check_gui_dependencies():
 
         # Give user a moment to read the warning
         import time
+
         time.sleep(2)
 
 

@@ -33,11 +33,7 @@ import logging
 from typing import Optional, TYPE_CHECKING
 from pathlib import Path
 
-from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QGroupBox, QPushButton,
-    QComboBox, QLabel, QListWidget, QListWidgetItem, QCheckBox,
-    QFileDialog, QMessageBox
-)
+from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QGroupBox, QPushButton, QComboBox, QLabel, QListWidget, QListWidgetItem, QCheckBox, QFileDialog, QMessageBox
 from PyQt6.QtCore import Qt, pyqtSignal, QTimer
 
 from siglent.gui.widgets.measurement_markers import FrequencyMarker, VoltageMarker, TimingMarker
@@ -72,24 +68,24 @@ class VisualMeasurementPanel(QWidget):
 
     # Measurement type options
     MEASUREMENT_TYPES = {
-        'Frequency': ('FREQ', FrequencyMarker),
-        'Period': ('PER', FrequencyMarker),
-        'Peak-to-Peak': ('PKPK', VoltageMarker),
-        'Amplitude': ('AMPL', VoltageMarker),
-        'Maximum': ('MAX', VoltageMarker),
-        'Minimum': ('MIN', VoltageMarker),
-        'RMS': ('RMS', VoltageMarker),
-        'Mean': ('MEAN', VoltageMarker),
-        'Top': ('TOP', VoltageMarker),
-        'Base': ('BASE', VoltageMarker),
-        'Rise Time': ('RISE', TimingMarker),
-        'Fall Time': ('FALL', TimingMarker),
-        'Positive Width': ('WID', TimingMarker),
-        'Negative Width': ('NWID', TimingMarker),
-        'Duty Cycle': ('DUTY', TimingMarker),
+        "Frequency": ("FREQ", FrequencyMarker),
+        "Period": ("PER", FrequencyMarker),
+        "Peak-to-Peak": ("PKPK", VoltageMarker),
+        "Amplitude": ("AMPL", VoltageMarker),
+        "Maximum": ("MAX", VoltageMarker),
+        "Minimum": ("MIN", VoltageMarker),
+        "RMS": ("RMS", VoltageMarker),
+        "Mean": ("MEAN", VoltageMarker),
+        "Top": ("TOP", VoltageMarker),
+        "Base": ("BASE", VoltageMarker),
+        "Rise Time": ("RISE", TimingMarker),
+        "Fall Time": ("FALL", TimingMarker),
+        "Positive Width": ("WID", TimingMarker),
+        "Negative Width": ("NWID", TimingMarker),
+        "Duty Cycle": ("DUTY", TimingMarker),
     }
 
-    def __init__(self, waveform_display: 'WaveformDisplay', parent: Optional[QWidget] = None):
+    def __init__(self, waveform_display: "WaveformDisplay", parent: Optional[QWidget] = None):
         """Initialize visual measurement panel.
 
         Args:
@@ -157,7 +153,7 @@ class VisualMeasurementPanel(QWidget):
         channel_layout.addWidget(QLabel("Channel:"))
 
         self.channel_combo = QComboBox()
-        self.channel_combo.addItems(['CH1', 'CH2', 'CH3', 'CH4'])
+        self.channel_combo.addItems(["CH1", "CH2", "CH3", "CH4"])
         channel_layout.addWidget(self.channel_combo, stretch=1)
 
         layout.addLayout(channel_layout)
@@ -260,20 +256,11 @@ class VisualMeasurementPanel(QWidget):
             marker_id = f"M{self.marker_counter}"
 
             # Create marker
-            marker = marker_class(
-                marker_id=marker_id,
-                measurement_type=mtype,
-                channel=channel,
-                ax=self.waveform_display.ax,
-                canvas=self.waveform_display.canvas
-            )
+            marker = marker_class(marker_id=marker_id, measurement_type=mtype, channel=channel, ax=self.waveform_display.ax, canvas=self.waveform_display.canvas)
 
             # Auto-place marker if waveform data available
             if self.waveform_display.current_waveforms:
-                waveform = next(
-                    (w for w in self.waveform_display.current_waveforms if w.channel == channel),
-                    None
-                )
+                waveform = next((w for w in self.waveform_display.current_waveforms if w.channel == channel), None)
                 if waveform:
                     marker.auto_place(waveform)
                     marker.update_measurement(waveform)
@@ -285,7 +272,7 @@ class VisualMeasurementPanel(QWidget):
             self._add_marker_to_list(marker)
 
             # Enable edit mode
-            self.waveform_display.set_marker_mode('edit')
+            self.waveform_display.set_marker_mode("edit")
 
             # Emit signal
             self.marker_added.emit(marker)
@@ -340,7 +327,7 @@ class VisualMeasurementPanel(QWidget):
         marker = item.data(Qt.ItemDataRole.UserRole)
         if marker:
             # Update marker enabled state
-            marker.enabled = (item.checkState() == Qt.CheckState.Checked)
+            marker.enabled = item.checkState() == Qt.CheckState.Checked
             marker.set_visible(marker.enabled)
             self.waveform_display.canvas.draw()
 
@@ -402,13 +389,7 @@ class VisualMeasurementPanel(QWidget):
     def _on_clear_all(self):
         """Handle clear all markers button click."""
         # Confirm with user
-        reply = QMessageBox.question(
-            self,
-            'Clear All Markers',
-            'Are you sure you want to remove all markers?',
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.No
-        )
+        reply = QMessageBox.question(self, "Clear All Markers", "Are you sure you want to remove all markers?", QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No, QMessageBox.StandardButton.No)
 
         if reply == QMessageBox.StandardButton.Yes:
             self.waveform_display.clear_all_markers()
@@ -423,19 +404,14 @@ class VisualMeasurementPanel(QWidget):
             default_dir = str(config_set.get_default_config_dir())
 
             # Show file dialog
-            filename, _ = QFileDialog.getSaveFileName(
-                self,
-                "Save Measurement Configuration",
-                default_dir,
-                "JSON Files (*.json)"
-            )
+            filename, _ = QFileDialog.getSaveFileName(self, "Save Measurement Configuration", default_dir, "JSON Files (*.json)")
 
             if not filename:
                 return
 
             # Ensure .json extension
-            if not filename.endswith('.json'):
-                filename += '.json'
+            if not filename.endswith(".json"):
+                filename += ".json"
 
             # Create configuration from current markers
             markers = []
@@ -444,24 +420,11 @@ class VisualMeasurementPanel(QWidget):
                 marker = item.data(Qt.ItemDataRole.UserRole)
                 if marker:
                     config = marker.get_config()
-                    markers.append(MeasurementMarkerConfig(
-                        id=config['id'],
-                        measurement_type=config['type'],
-                        channel=config['channel'],
-                        enabled=config['enabled'],
-                        gates=config['gates'],
-                        visual_style={'color': config['color']},
-                        result=config['result'],
-                        unit=config['unit']
-                    ))
+                    markers.append(MeasurementMarkerConfig(id=config["id"], measurement_type=config["type"], channel=config["channel"], enabled=config["enabled"], gates=config["gates"], visual_style={"color": config["color"]}, result=config["result"], unit=config["unit"]))
 
             # Create config set
             config_name = Path(filename).stem
-            config_set = MeasurementConfigSet(
-                name=config_name,
-                created_at=datetime.now(),
-                markers=markers
-            )
+            config_set = MeasurementConfigSet(name=config_name, created_at=datetime.now(), markers=markers)
 
             # Save to file
             config_set.save_to_file(filename)
@@ -481,12 +444,7 @@ class VisualMeasurementPanel(QWidget):
             default_dir = str(config_set.get_default_config_dir())
 
             # Show file dialog
-            filename, _ = QFileDialog.getOpenFileName(
-                self,
-                "Load Measurement Configuration",
-                default_dir,
-                "JSON Files (*.json)"
-            )
+            filename, _ = QFileDialog.getOpenFileName(self, "Load Measurement Configuration", default_dir, "JSON Files (*.json)")
 
             if not filename:
                 return
@@ -511,23 +469,10 @@ class VisualMeasurementPanel(QWidget):
                     continue
 
                 # Create marker
-                marker = marker_class(
-                    marker_id=marker_config.id,
-                    measurement_type=marker_config.measurement_type,
-                    channel=marker_config.channel,
-                    ax=self.waveform_display.ax,
-                    canvas=self.waveform_display.canvas,
-                    color=marker_config.visual_style.get('color')
-                )
+                marker = marker_class(marker_id=marker_config.id, measurement_type=marker_config.measurement_type, channel=marker_config.channel, ax=self.waveform_display.ax, canvas=self.waveform_display.canvas, color=marker_config.visual_style.get("color"))
 
                 # Set configuration
-                marker.set_config({
-                    'enabled': marker_config.enabled,
-                    'gates': marker_config.gates,
-                    'color': marker_config.visual_style.get('color'),
-                    'result': marker_config.result,
-                    'unit': marker_config.unit
-                })
+                marker.set_config({"enabled": marker_config.enabled, "gates": marker_config.gates, "color": marker_config.visual_style.get("color"), "result": marker_config.result, "unit": marker_config.unit})
 
                 # Add to display
                 self.waveform_display.add_measurement_marker(marker)
@@ -536,7 +481,7 @@ class VisualMeasurementPanel(QWidget):
                 self._add_marker_to_list(marker)
 
             # Update marker counter
-            max_id = max([int(m.id[1:]) for m in config_set.markers if m.id.startswith('M')], default=0)
+            max_id = max([int(m.id[1:]) for m in config_set.markers if m.id.startswith("M")], default=0)
             self.marker_counter = max_id
 
             QMessageBox.information(self, "Success", f"Loaded {len(config_set.markers)} markers from {filename}")
@@ -550,24 +495,19 @@ class VisualMeasurementPanel(QWidget):
         """Handle export results button click."""
         try:
             # Show file dialog
-            filename, _ = QFileDialog.getSaveFileName(
-                self,
-                "Export Measurement Results",
-                "",
-                "CSV Files (*.csv);;JSON Files (*.json)"
-            )
+            filename, _ = QFileDialog.getSaveFileName(self, "Export Measurement Results", "", "CSV Files (*.csv);;JSON Files (*.json)")
 
             if not filename:
                 return
 
             # Determine format from extension
-            if filename.endswith('.csv'):
+            if filename.endswith(".csv"):
                 self._export_csv(filename)
-            elif filename.endswith('.json'):
+            elif filename.endswith(".json"):
                 self._export_json(filename)
             else:
                 # Default to CSV
-                filename += '.csv'
+                filename += ".csv"
                 self._export_csv(filename)
 
             QMessageBox.information(self, "Success", f"Results exported to {filename}")
@@ -585,22 +525,15 @@ class VisualMeasurementPanel(QWidget):
         """
         import csv
 
-        with open(filename, 'w', newline='') as f:
+        with open(filename, "w", newline="") as f:
             writer = csv.writer(f)
-            writer.writerow(['Marker ID', 'Type', 'Channel', 'Value', 'Unit', 'Enabled'])
+            writer.writerow(["Marker ID", "Type", "Channel", "Value", "Unit", "Enabled"])
 
             for i in range(self.markers_list.count()):
                 item = self.markers_list.item(i)
                 marker = item.data(Qt.ItemDataRole.UserRole)
                 if marker:
-                    writer.writerow([
-                        marker.marker_id,
-                        marker.measurement_type,
-                        marker.channel,
-                        marker.result if marker.result is not None else '',
-                        marker.unit or '',
-                        'Yes' if marker.enabled else 'No'
-                    ])
+                    writer.writerow([marker.marker_id, marker.measurement_type, marker.channel, marker.result if marker.result is not None else "", marker.unit or "", "Yes" if marker.enabled else "No"])
 
     def _export_json(self, filename: str):
         """Export results to JSON file.
@@ -610,23 +543,13 @@ class VisualMeasurementPanel(QWidget):
         """
         import json
 
-        results = {
-            'timestamp': datetime.now().isoformat(),
-            'measurements': []
-        }
+        results = {"timestamp": datetime.now().isoformat(), "measurements": []}
 
         for i in range(self.markers_list.count()):
             item = self.markers_list.item(i)
             marker = item.data(Qt.ItemDataRole.UserRole)
             if marker:
-                results['measurements'].append({
-                    'marker_id': marker.marker_id,
-                    'type': marker.measurement_type,
-                    'channel': marker.channel,
-                    'value': marker.result,
-                    'unit': marker.unit,
-                    'enabled': marker.enabled
-                })
+                results["measurements"].append({"marker_id": marker.marker_id, "type": marker.measurement_type, "channel": marker.channel, "value": marker.result, "unit": marker.unit, "enabled": marker.enabled})
 
-        with open(filename, 'w') as f:
+        with open(filename, "w") as f:
             json.dump(results, f, indent=2)

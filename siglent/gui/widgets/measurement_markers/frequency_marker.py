@@ -33,13 +33,13 @@ class FrequencyMarker(MeasurementMarker):
             canvas: Qt canvas
             color: Marker color (defaults to cyan)
         """
-        super().__init__(marker_id, measurement_type, channel, ax, canvas, color or '#00CED1')
+        super().__init__(marker_id, measurement_type, channel, ax, canvas, color or "#00CED1")
 
         # Set unit based on measurement type
-        self.unit = 'Hz' if measurement_type == 'FREQ' else 's'
+        self.unit = "Hz" if measurement_type == "FREQ" else "s"
 
         # Initialize gates (will be set when placed)
-        self.gates = {'start_x': 0.0, 'end_x': 0.0}
+        self.gates = {"start_x": 0.0, "end_x": 0.0}
 
     def render(self) -> None:
         """Draw frequency marker on axes."""
@@ -51,11 +51,11 @@ class FrequencyMarker(MeasurementMarker):
                 pass
         self.artists.clear()
 
-        if not self.gates.get('start_x') or not self.gates.get('end_x'):
+        if not self.gates.get("start_x") or not self.gates.get("end_x"):
             return
 
-        start_x = self.gates['start_x']
-        end_x = self.gates['end_x']
+        start_x = self.gates["start_x"]
+        end_x = self.gates["end_x"]
 
         ylim = self.ax.get_ylim()
         y_range = ylim[1] - ylim[0]
@@ -63,24 +63,10 @@ class FrequencyMarker(MeasurementMarker):
         # Draw vertical gates
         alpha = self.DEFAULT_SELECTED_ALPHA if self.selected else self.DEFAULT_ALPHA
 
-        line1 = self.ax.axvline(
-            start_x,
-            color=self.color,
-            linestyle=self.DEFAULT_LINE_STYLE,
-            linewidth=self.DEFAULT_LINE_WIDTH,
-            alpha=alpha,
-            picker=5
-        )
+        line1 = self.ax.axvline(start_x, color=self.color, linestyle=self.DEFAULT_LINE_STYLE, linewidth=self.DEFAULT_LINE_WIDTH, alpha=alpha, picker=5)
         self.artists.append(line1)
 
-        line2 = self.ax.axvline(
-            end_x,
-            color=self.color,
-            linestyle=self.DEFAULT_LINE_STYLE,
-            linewidth=self.DEFAULT_LINE_WIDTH,
-            alpha=alpha,
-            picker=5
-        )
+        line2 = self.ax.axvline(end_x, color=self.color, linestyle=self.DEFAULT_LINE_STYLE, linewidth=self.DEFAULT_LINE_WIDTH, alpha=alpha, picker=5)
         self.artists.append(line2)
 
         # Draw arc connecting the gates at top
@@ -88,14 +74,7 @@ class FrequencyMarker(MeasurementMarker):
         mid_x = (start_x + end_x) / 2
 
         # Create arc using a simple line
-        arc_line = self.ax.plot(
-            [start_x, mid_x, end_x],
-            [arc_y, arc_y + y_range * 0.02, arc_y],
-            color=self.color,
-            linestyle='-',
-            linewidth=self.DEFAULT_LINE_WIDTH,
-            alpha=alpha
-        )[0]
+        arc_line = self.ax.plot([start_x, mid_x, end_x], [arc_y, arc_y + y_range * 0.02, arc_y], color=self.color, linestyle="-", linewidth=self.DEFAULT_LINE_WIDTH, alpha=alpha)[0]
         self.artists.append(arc_line)
 
         # Draw label at top center
@@ -112,17 +91,17 @@ class FrequencyMarker(MeasurementMarker):
         Args:
             **kwargs: Can include 'start_x', 'end_x', or 'center_x' with 'width'
         """
-        if 'start_x' in kwargs:
-            self.gates['start_x'] = kwargs['start_x']
-        if 'end_x' in kwargs:
-            self.gates['end_x'] = kwargs['end_x']
+        if "start_x" in kwargs:
+            self.gates["start_x"] = kwargs["start_x"]
+        if "end_x" in kwargs:
+            self.gates["end_x"] = kwargs["end_x"]
 
         # Alternative: specify center and width
-        if 'center_x' in kwargs and 'width' in kwargs:
-            center = kwargs['center_x']
-            width = kwargs['width']
-            self.gates['start_x'] = center - width / 2
-            self.gates['end_x'] = center + width / 2
+        if "center_x" in kwargs and "width" in kwargs:
+            center = kwargs["center_x"]
+            width = kwargs["width"]
+            self.gates["start_x"] = center - width / 2
+            self.gates["end_x"] = center + width / 2
 
         self.is_dirty = True
         self.last_waveform_hash = None  # Force recalculation
@@ -150,7 +129,7 @@ class FrequencyMarker(MeasurementMarker):
             if period is None or period <= 0:
                 return None
 
-            if self.measurement_type == 'FREQ':
+            if self.measurement_type == "FREQ":
                 return 1.0 / period
             else:  # PER
                 return period
@@ -224,8 +203,8 @@ class FrequencyMarker(MeasurementMarker):
                 # Use middle portion of waveform
                 mid_idx = len(waveform.time) // 2
                 quarter_len = len(waveform.time) // 4
-                search_time = waveform.time[mid_idx - quarter_len:mid_idx + quarter_len]
-                search_voltage = waveform.voltage[mid_idx - quarter_len:mid_idx + quarter_len]
+                search_time = waveform.time[mid_idx - quarter_len : mid_idx + quarter_len]
+                search_voltage = waveform.voltage[mid_idx - quarter_len : mid_idx + quarter_len]
 
             # Estimate period
             period = self._estimate_period(search_time, search_voltage)
@@ -233,8 +212,8 @@ class FrequencyMarker(MeasurementMarker):
             if period is not None and period > 0:
                 # Center gates on hint or middle
                 center = x_hint if x_hint is not None else np.mean(waveform.time)
-                self.gates['start_x'] = center - period / 2
-                self.gates['end_x'] = center + period / 2
+                self.gates["start_x"] = center - period / 2
+                self.gates["end_x"] = center + period / 2
 
                 logger.debug(f"Auto-placed frequency marker with period {period:.6e} s")
                 self.is_dirty = True

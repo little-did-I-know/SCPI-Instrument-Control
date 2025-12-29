@@ -59,10 +59,10 @@ class WaveformDisplayPG(QWidget):
 
     # Channel colors (matching oscilloscope colors)
     CHANNEL_COLORS = {
-        1: (255, 215, 0),    # Yellow/Gold
-        2: (0, 206, 209),    # Cyan
-        3: (255, 20, 147),   # Deep Pink/Magenta
-        4: (0, 255, 0),      # Green
+        1: (255, 215, 0),  # Yellow/Gold
+        2: (0, 206, 209),  # Cyan
+        3: (255, 20, 147),  # Deep Pink/Magenta
+        4: (0, 255, 0),  # Green
     }
 
     def __init__(self, parent=None):
@@ -111,7 +111,7 @@ class WaveformDisplayPG(QWidget):
         # Create PyQtGraph plot widget
         pg.setConfigOptions(antialias=True)  # Enable antialiasing for smoother lines
         self.plot_widget = pg.PlotWidget()
-        self.plot_widget.setBackground('#1a1a1a')
+        self.plot_widget.setBackground("#1a1a1a")
 
         # Get plot item
         self.plot_item = self.plot_widget.getPlotItem()
@@ -133,9 +133,9 @@ class WaveformDisplayPG(QWidget):
     def _configure_axes(self):
         """Configure plot axes appearance."""
         # Set labels
-        self.plot_item.setLabel('bottom', 'Time', units='s', color='#cccccc')
-        self.plot_item.setLabel('left', 'Voltage', units='V', color='#cccccc')
-        self.plot_item.setTitle('Waveform Display', color='#cccccc')
+        self.plot_item.setLabel("bottom", "Time", units="s", color="#cccccc")
+        self.plot_item.setLabel("left", "Voltage", units="V", color="#cccccc")
+        self.plot_item.setTitle("Waveform Display", color="#cccccc")
 
         # Configure grid
         self.plot_item.showGrid(x=self.show_grid, y=self.show_grid, alpha=0.3)
@@ -145,7 +145,7 @@ class WaveformDisplayPG(QWidget):
 
         # Set axis colors
         axis_color = (136, 136, 136)  # #888888
-        for axis in ['bottom', 'left', 'top', 'right']:
+        for axis in ["bottom", "left", "top", "right"]:
             ax = self.plot_item.getAxis(axis)
             ax.setPen(pg.mkPen(color=axis_color))
             ax.setTextPen(pg.mkPen(color=(204, 204, 204)))  # #cccccc
@@ -289,12 +289,7 @@ class WaveformDisplayPG(QWidget):
                 # Create new plot item
                 logger.info(f"    Creating NEW plot item for CH{channel}")
                 pen = pg.mkPen(color=color, width=1.5)
-                plot_item = self.plot_item.plot(
-                    waveform.time,
-                    waveform.voltage,
-                    pen=pen,
-                    name=f"CH{channel}"
-                )
+                plot_item = self.plot_item.plot(waveform.time, waveform.voltage, pen=pen, name=f"CH{channel}")
                 self.plot_items[channel] = plot_item
                 logger.info(f"    Plot item created successfully")
 
@@ -332,12 +327,7 @@ class WaveformDisplayPG(QWidget):
             return
 
         # Get filename from user
-        filename, _ = QFileDialog.getSaveFileName(
-            self,
-            "Export Waveform Image",
-            "waveform.png",
-            "PNG Image (*.png);;PDF Document (*.pdf);;SVG Image (*.svg)"
-        )
+        filename, _ = QFileDialog.getSaveFileName(self, "Export Waveform Image", "waveform.png", "PNG Image (*.png);;PDF Document (*.pdf);;SVG Image (*.svg)")
 
         if filename:
             try:
@@ -457,16 +447,7 @@ class WaveformDisplayPG(QWidget):
         Returns:
             Dictionary mapping marker IDs to results
         """
-        return {
-            marker.marker_id: {
-                'type': marker.measurement_type,
-                'channel': marker.channel,
-                'result': marker.result,
-                'unit': marker.unit,
-                'enabled': marker.enabled
-            }
-            for marker in self.measurement_markers
-        }
+        return {marker.marker_id: {"type": marker.measurement_type, "channel": marker.channel, "result": marker.result, "unit": marker.unit, "enabled": marker.enabled} for marker in self.measurement_markers}
 
     def update_all_markers(self) -> None:
         """Update all enabled markers with current waveform data."""
@@ -475,10 +456,7 @@ class WaveformDisplayPG(QWidget):
 
         for marker in self.measurement_markers:
             if marker.enabled:
-                waveform = next(
-                    (w for w in self.current_waveforms if w.channel == marker.channel),
-                    None
-                )
+                waveform = next((w for w in self.current_waveforms if w.channel == marker.channel), None)
 
                 if waveform:
                     marker.update_measurement(waveform)
@@ -575,24 +553,14 @@ class WaveformDisplayPG(QWidget):
                     self.plot_item.removeItem(self.reference_item)
 
                 pen = pg.mkPen(color=(255, 20, 147), width=1.5, style=Qt.PenStyle.SolidLine)
-                self.reference_item = self.plot_item.plot(
-                    first_waveform.time,
-                    difference,
-                    pen=pen,
-                    name="Difference"
-                )
+                self.reference_item = self.plot_item.plot(first_waveform.time, difference, pen=pen, name="Difference")
             else:
                 # Show reference as overlay
                 if self.reference_item:
                     self.plot_item.removeItem(self.reference_item)
 
                 pen = pg.mkPen(color=(255, 165, 0), width=1.5, style=Qt.PenStyle.DashLine)
-                self.reference_item = self.plot_item.plot(
-                    ref_time,
-                    ref_voltage,
-                    pen=pen,
-                    name="Reference"
-                )
+                self.reference_item = self.plot_item.plot(ref_time, ref_voltage, pen=pen, name="Reference")
 
         except Exception as e:
             logger.error(f"Failed to plot reference overlay: {e}")

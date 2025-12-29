@@ -78,22 +78,14 @@ class MeasurementMarker(ABC):
 
     # Default visual styling
     DEFAULT_LINE_WIDTH = 2
-    DEFAULT_LINE_STYLE = '--'
+    DEFAULT_LINE_STYLE = "--"
     DEFAULT_ALPHA = 0.8
     DEFAULT_SELECTED_ALPHA = 1.0
     HANDLE_SIZE = 8  # pixels
     LABEL_FONTSIZE = 9
     LABEL_PADDING = 4
 
-    def __init__(
-        self,
-        marker_id: str,
-        measurement_type: str,
-        channel: int,
-        ax: 'Axes',
-        canvas: 'FigureCanvasQTAgg',
-        color: Optional[str] = None
-    ):
+    def __init__(self, marker_id: str, measurement_type: str, channel: int, ax: "Axes", canvas: "FigureCanvasQTAgg", color: Optional[str] = None):
         """Initialize measurement marker.
 
         Args:
@@ -235,14 +227,14 @@ class MeasurementMarker(ABC):
         alpha = self.DEFAULT_SELECTED_ALPHA if selected else self.DEFAULT_ALPHA
 
         for artist in self.artists:
-            if hasattr(artist, 'set_alpha'):
+            if hasattr(artist, "set_alpha"):
                 artist.set_alpha(alpha)
 
         # Add white outline if selected
         if selected:
             for artist in self.artists:
                 if isinstance(artist, Line2D):
-                    artist.set_markeredgecolor('white')
+                    artist.set_markeredgecolor("white")
                     artist.set_markeredgewidth(2)
 
     def update_measurement(self, waveform: WaveformData) -> None:
@@ -359,23 +351,9 @@ class MeasurementMarker(ABC):
         label_text = self._create_label_text()
 
         # Create text with background box
-        bbox_props = dict(
-            boxstyle=f'round,pad={self.LABEL_PADDING}',
-            facecolor='#000000DD',
-            edgecolor=self.color if self.selected else '#444444',
-            linewidth=2 if self.selected else 1
-        )
+        bbox_props = dict(boxstyle=f"round,pad={self.LABEL_PADDING}", facecolor="#000000DD", edgecolor=self.color if self.selected else "#444444", linewidth=2 if self.selected else 1)
 
-        self.label_artist = self.ax.text(
-            x, y,
-            label_text,
-            fontsize=self.LABEL_FONTSIZE,
-            color=self.color,
-            bbox=bbox_props,
-            verticalalignment='top',
-            horizontalalignment='left',
-            zorder=100  # Draw on top
-        )
+        self.label_artist = self.ax.text(x, y, label_text, fontsize=self.LABEL_FONTSIZE, color=self.color, bbox=bbox_props, verticalalignment="top", horizontalalignment="left", zorder=100)  # Draw on top
 
     def _get_default_color(self) -> str:
         """Get default color based on measurement type.
@@ -385,22 +363,22 @@ class MeasurementMarker(ABC):
         """
         # Color scheme matching oscilloscope conventions
         color_map = {
-            'FREQ': '#00CED1',  # Cyan
-            'PER': '#00CED1',   # Cyan
-            'PKPK': '#FFD700',  # Yellow/Gold
-            'AMPL': '#FFD700',  # Yellow/Gold
-            'MAX': '#FFD700',   # Yellow/Gold
-            'MIN': '#FFD700',   # Yellow/Gold
-            'RMS': '#FFD700',   # Yellow/Gold
-            'MEAN': '#FFD700',  # Yellow/Gold
-            'RISE': '#FF1493',  # Magenta
-            'FALL': '#FF1493',  # Magenta
-            'WID': '#00FF00',   # Green
-            'NWID': '#00FF00',  # Green
-            'DUTY': '#00FF00',  # Green
+            "FREQ": "#00CED1",  # Cyan
+            "PER": "#00CED1",  # Cyan
+            "PKPK": "#FFD700",  # Yellow/Gold
+            "AMPL": "#FFD700",  # Yellow/Gold
+            "MAX": "#FFD700",  # Yellow/Gold
+            "MIN": "#FFD700",  # Yellow/Gold
+            "RMS": "#FFD700",  # Yellow/Gold
+            "MEAN": "#FFD700",  # Yellow/Gold
+            "RISE": "#FF1493",  # Magenta
+            "FALL": "#FF1493",  # Magenta
+            "WID": "#00FF00",  # Green
+            "NWID": "#00FF00",  # Green
+            "DUTY": "#00FF00",  # Green
         }
 
-        return color_map.get(self.measurement_type, '#FFFFFF')  # White default
+        return color_map.get(self.measurement_type, "#FFFFFF")  # White default
 
     def get_config(self) -> Dict[str, Any]:
         """Get marker configuration for saving.
@@ -408,16 +386,7 @@ class MeasurementMarker(ABC):
         Returns:
             Configuration dictionary
         """
-        return {
-            'id': self.marker_id,
-            'type': self.measurement_type,
-            'channel': self.channel,
-            'enabled': self.enabled,
-            'gates': self.gates.copy(),
-            'color': self.color,
-            'result': self.result,
-            'unit': self.unit
-        }
+        return {"id": self.marker_id, "type": self.measurement_type, "channel": self.channel, "enabled": self.enabled, "gates": self.gates.copy(), "color": self.color, "result": self.result, "unit": self.unit}
 
     def set_config(self, config: Dict[str, Any]) -> None:
         """Load marker configuration.
@@ -425,11 +394,11 @@ class MeasurementMarker(ABC):
         Args:
             config: Configuration dictionary
         """
-        self.enabled = config.get('enabled', True)
-        self.gates = config.get('gates', {}).copy()
-        self.color = config.get('color', self._get_default_color())
-        self.result = config.get('result')
-        self.unit = config.get('unit')
+        self.enabled = config.get("enabled", True)
+        self.gates = config.get("gates", {}).copy()
+        self.color = config.get("color", self._get_default_color())
+        self.result = config.get("result")
+        self.unit = config.get("unit")
         self.is_dirty = True
 
     def _extract_gate_data(self, waveform: WaveformData) -> Tuple[np.ndarray, np.ndarray]:
@@ -444,11 +413,11 @@ class MeasurementMarker(ABC):
         Raises:
             ValueError: If gates are not properly defined
         """
-        if 'start_x' not in self.gates or 'end_x' not in self.gates:
+        if "start_x" not in self.gates or "end_x" not in self.gates:
             raise ValueError("Gates not properly defined (missing start_x or end_x)")
 
-        start_x = self.gates['start_x']
-        end_x = self.gates['end_x']
+        start_x = self.gates["start_x"]
+        end_x = self.gates["end_x"]
 
         # Create mask for data within gates
         mask = (waveform.time >= start_x) & (waveform.time <= end_x)
