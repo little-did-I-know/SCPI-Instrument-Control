@@ -13,10 +13,14 @@ from PyQt6.QtGui import QAction
 
 from siglent import Oscilloscope
 from siglent.exceptions import ConnectionError, SiglentError
-from siglent.gui.widgets.waveform_display import WaveformDisplay
+# Use PyQtGraph for high-performance real-time plotting
+from siglent.gui.widgets.waveform_display_pg import WaveformDisplayPG as WaveformDisplay
+# Keep matplotlib version as backup:
+# from siglent.gui.widgets.waveform_display import WaveformDisplay
 from siglent.gui.widgets.channel_control import ChannelControl
 from siglent.gui.widgets.trigger_control import TriggerControl
 from siglent.gui.widgets.measurement_panel import MeasurementPanel
+from siglent.gui.widgets.visual_measurement_panel import VisualMeasurementPanel
 from siglent.gui.widgets.timebase_control import TimebaseControl
 from siglent.gui.widgets.cursor_panel import CursorPanel
 from siglent.gui.widgets.math_panel import MathPanel
@@ -25,6 +29,7 @@ from siglent.gui.widgets.reference_panel import ReferencePanel
 from siglent.gui.widgets.protocol_decode_panel import ProtocolDecodePanel
 from siglent.gui.widgets.terminal_widget import TerminalWidget
 from siglent.gui.connection_manager import ConnectionManager
+from siglent.gui.live_view_worker import LiveViewWorker
 from siglent.reference_waveform import ReferenceWaveform
 from siglent.protocol_decoders import I2CDecoder, SPIDecoder, UARTDecoder
 
@@ -40,8 +45,7 @@ class MainWindow(QMainWindow):
 
         self.scope: Optional[Oscilloscope] = None
         self.is_live_view = False
-        self.live_timer = QTimer()
-        self.live_timer.timeout.connect(self._update_live_view)
+        self.live_view_worker: Optional[LiveViewWorker] = None
 
         # Connection manager
         self.connection_manager = ConnectionManager()
@@ -136,6 +140,10 @@ class MainWindow(QMainWindow):
         # Measurements tab
         self.measurement_panel = MeasurementPanel()
         tabs.addTab(self.measurement_panel, "Measurements")
+
+        # Visual Measurements tab
+        self.visual_measurement_panel = VisualMeasurementPanel(self.waveform_display)
+        tabs.addTab(self.visual_measurement_panel, "Visual Measure")
 
         # Cursors tab
         self.cursor_panel = CursorPanel()
@@ -535,6 +543,10 @@ class MainWindow(QMainWindow):
             # Stop live view if running
             if self.is_live_view:
                 self._on_toggle_live_view(False)
+            elif self.live_view_worker:
+                # Ensure worker is stopped
+                self.live_view_worker.stop()
+                self.live_view_worker = None
 
             self.scope.disconnect()
             self.scope = None
@@ -807,10 +819,15 @@ class MainWindow(QMainWindow):
                         logger.error(f"Could not enable channel 1: {e}")
                         raise RuntimeError(f"No channels are enabled and could not enable channel 1: {e}")
 
-                # Start live view timer
-                self.live_timer.start(200)  # Update every 200ms
+                # Start live view worker thread
+                logger.info("Starting live view worker thread...")
+                self.live_view_worker = LiveViewWorker(self.scope, self)
+                self.live_view_worker.waveforms_ready.connect(self._on_waveforms_ready)
+                self.live_view_worker.error_occurred.connect(self._on_live_view_error)
+                self.live_view_worker.start()
+
                 self.statusBar().showMessage("Live view enabled (AUTO mode)")
-                logger.info("Live view enabled - timer started")
+                logger.info("Live view worker thread started")
 
             except Exception as e:
                 logger.error(f"Failed to start live view: {e}")
@@ -823,77 +840,42 @@ class MainWindow(QMainWindow):
                 self.live_view_action.blockSignals(False)
         else:
             # Stop live view
-            self.live_timer.stop()
+            if self.live_view_worker:
+                logger.info("Stopping live view worker thread...")
+                self.live_view_worker.stop()
+                self.live_view_worker = None
+
             self.statusBar().showMessage("Live view disabled")
             logger.info("Live view disabled")
 
-    def _update_live_view(self):
-        """Update waveform display for live view."""
-        if not self.scope or not self.scope.is_connected:
-            logger.warning("Live view update: scope not connected, stopping")
-            self.live_timer.stop()
-            self.is_live_view = False
-            self.live_view_action.blockSignals(True)
-            self.live_view_action.setChecked(False)
-            self.live_view_action.blockSignals(False)
-            return
+    def _on_waveforms_ready(self, waveforms):
+        """Handle waveforms received from background worker thread.
 
-        try:
-            # Acquire waveforms from enabled channels
-            waveforms = []
-            errors = []
+        This runs on the main GUI thread, so it's safe to update the display.
 
-            # Get supported channels (1-4 for most models)
-            supported_channels = self.scope.supported_channels if hasattr(self.scope, "supported_channels") else range(1, 5)
-            logger.debug(f"Live view update: checking channels {list(supported_channels)}")
+        Args:
+            waveforms: List of WaveformData objects
+        """
+        logger.info(f"Received {len(waveforms)} waveforms from worker thread")
 
-            for ch_num in supported_channels:
-                try:
-                    channel = getattr(self.scope, f"channel{ch_num}", None)
-                    if channel is None:
-                        continue
+        if waveforms:
+            # Update display (this is fast with PyQtGraph)
+            self.waveform_display.plot_multiple_waveforms(waveforms, fast_update=True)
 
-                    # Check if channel is enabled
-                    is_enabled = channel.enabled
-                    if is_enabled:
-                        logger.debug(f"Acquiring waveform from channel {ch_num}")
-                        waveform = self.scope.get_waveform(ch_num)
-                        if waveform:
-                            waveforms.append(waveform)
-                            logger.debug(f"Got {len(waveform.voltage)} samples from channel {ch_num}")
-                        else:
-                            logger.debug(f"Channel {ch_num} returned no waveform data")
-                except Exception as e:
-                    error_msg = f"CH{ch_num}: {str(e)}"
-                    errors.append(error_msg)
-                    logger.debug(f"Could not acquire waveform from channel {ch_num}: {e}")
+            # Update status
+            num_channels = len(waveforms)
+            self.statusBar().showMessage(f"Live view: {num_channels} channel(s) updating")
+        else:
+            self.statusBar().showMessage("Live view: No enabled channels")
 
-            # Update display
-            if waveforms:
-                logger.debug(f"Plotting {len(waveforms)} waveforms")
-                self.waveform_display.plot_multiple_waveforms(waveforms)
+    def _on_live_view_error(self, error_msg):
+        """Handle errors from background worker thread.
 
-                # Force GUI update
-                from PyQt6.QtWidgets import QApplication
-
-                QApplication.processEvents()
-
-                # Update status with success info
-                num_channels = len(waveforms)
-                self.statusBar().showMessage(f"Live view: {num_channels} channel(s) updating")
-            else:
-                # No waveforms acquired
-                if errors:
-                    logger.warning(f"Live view errors: {'; '.join(errors)}")
-                    self.statusBar().showMessage(f"Live view: Errors acquiring data - {errors[0][:30]}")
-                else:
-                    logger.debug("No enabled channels for live view")
-                    self.statusBar().showMessage("Live view: No enabled channels")
-
-        except Exception as e:
-            logger.error(f"Error updating live view: {e}", exc_info=True)
-            self.statusBar().showMessage(f"Live view error: {str(e)[:50]}")
-            # Don't stop live view on error, just skip this update
+        Args:
+            error_msg: Error message string
+        """
+        logger.error(f"Live view worker error: {error_msg}")
+        self.statusBar().showMessage(f"Live view error: {error_msg[:50]}")
 
     def _on_save_waveform(self):
         """Handle save waveform action."""
@@ -1366,8 +1348,10 @@ class MainWindow(QMainWindow):
     def closeEvent(self, event):
         """Handle window close event."""
         # Stop live view if running
-        if self.is_live_view:
-            self.live_timer.stop()
+        if self.is_live_view and self.live_view_worker:
+            logger.info("Stopping live view worker on close...")
+            self.live_view_worker.stop()
+            self.live_view_worker = None
 
         # Disconnect from scope
         if self.scope:

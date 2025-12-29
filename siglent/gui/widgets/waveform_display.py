@@ -1,7 +1,7 @@
 """Waveform display widget using matplotlib."""
 
 import logging
-from typing import Optional, Dict, List
+from typing import Optional, Dict, List, Any
 
 import numpy as np
 import matplotlib
@@ -66,6 +66,14 @@ class WaveformDisplay(QWidget):
         self.reference_line = None  # Matplotlib line for reference
         self.show_reference = False  # Whether to show reference overlay
         self.show_difference = False  # Whether to show difference instead of overlay
+
+        # Measurement marker state
+        self.measurement_markers = []  # List of MeasurementMarker objects
+        self.marker_mode = "off"  # 'off', 'add', 'edit'
+        self.selected_marker = None  # Currently selected marker
+        self.pending_marker_type = None  # Marker type to add in 'add' mode
+        self.pending_marker_channel = None  # Channel for pending marker
+        self.dragging_marker_handle = None  # (marker, handle_id) during drag
 
         self._init_ui()
         logger.info("Waveform display widget initialized")
@@ -178,13 +186,14 @@ class WaveformDisplay(QWidget):
 
         logger.info(f"Plotted waveform from channel {waveform.channel}")
 
-    def plot_multiple_waveforms(self, waveforms: List[WaveformData]):
+    def plot_multiple_waveforms(self, waveforms: List[WaveformData], fast_update: bool = False):
         """Plot multiple waveforms.
 
         Args:
             waveforms: List of WaveformData objects to plot
+            fast_update: If True, use fast update for live view (doesn't clear axes)
         """
-        logger.info(f"plot_multiple_waveforms called with {len(waveforms)} waveform(s)")
+        logger.info(f"plot_multiple_waveforms called with {len(waveforms)} waveform(s), fast_update={fast_update}")
 
         self.waveforms.clear()
 
@@ -196,7 +205,10 @@ class WaveformDisplay(QWidget):
         self.current_waveforms = waveforms
 
         logger.debug("Calling _replot()...")
-        self._replot()
+        if fast_update:
+            self._fast_replot()
+        else:
+            self._replot()
 
         logger.info(f"Plotted {len(waveforms)} waveforms successfully")
 
@@ -225,6 +237,40 @@ class WaveformDisplay(QWidget):
         self.waveforms.clear()
         self._replot()
         logger.info("Cleared all waveforms")
+
+    def _fast_replot(self):
+        """Fast replot for live view - updates data without clearing axes."""
+        logger.debug(f"_fast_replot called, have {len(self.waveforms)} waveform(s)")
+
+        if not self.waveforms:
+            return
+
+        # Update existing lines or create new ones
+        for channel, waveform in sorted(self.waveforms.items()):
+            color = self.CHANNEL_COLORS.get(channel, "#FFFFFF")
+            time_data, time_unit = self._convert_time_units(waveform.time)
+
+            # Find existing line for this channel
+            line_found = False
+            for line in self.ax.get_lines():
+                if line.get_label() == f"CH{channel}":
+                    # Update existing line
+                    line.set_data(time_data, waveform.voltage)
+                    line_found = True
+                    break
+
+            if not line_found:
+                # Create new line
+                self.ax.plot(time_data, waveform.voltage, color=color, linewidth=1.0,
+                           label=f"CH{channel}", alpha=0.9)
+
+        # Update axis limits
+        self.ax.relim()
+        self.ax.autoscale_view()
+
+        # Quick canvas update
+        self.canvas.draw_idle()  # Use draw_idle for better performance
+        logger.debug("Fast replot complete")
 
     def _replot(self):
         """Replot all stored waveforms."""
@@ -271,6 +317,11 @@ class WaveformDisplay(QWidget):
 
         # Plot reference waveform overlay if loaded
         self._plot_reference_overlay()
+
+        # Render measurement markers
+        for marker in self.measurement_markers:
+            if marker.visible:
+                marker.render()
 
         # Apply grid setting
         self.ax.grid(self.show_grid, alpha=0.3, color="#444444", linestyle="--", linewidth=0.5)
@@ -503,14 +554,77 @@ class WaveformDisplay(QWidget):
         logger.debug("All cursors cleared")
 
     def _on_mouse_press(self, event):
-        """Handle mouse button press for cursor placement/dragging.
+        """Handle mouse button press for marker/cursor placement/dragging.
+
+        Implements priority system:
+        1. Marker mode (if active)
+        2. Cursor mode (if active)
+        3. Default matplotlib pan/zoom
 
         Args:
             event: Matplotlib mouse event
         """
-        if event.inaxes != self.ax or self.cursor_mode == "off":
+        if event.inaxes != self.ax:
             return
 
+        # Priority 1: Handle marker mode
+        if self.marker_mode != "off":
+            handled = self._handle_marker_mouse_press(event)
+            if handled:
+                return
+
+        # Priority 2: Handle cursor mode
+        if self.cursor_mode != "off":
+            self._handle_cursor_mouse_press(event)
+            return
+
+        # Priority 3: Let matplotlib toolbar handle (pan/zoom)
+
+    def _handle_marker_mouse_press(self, event) -> bool:
+        """Handle mouse press in marker mode.
+
+        Args:
+            event: Matplotlib mouse event
+
+        Returns:
+            True if event was handled, False otherwise
+        """
+        if event.button == 1:  # Left click
+            if self.marker_mode == "add":
+                # Place new marker at click position
+                # This will be implemented by the panel when it creates specific marker types
+                logger.debug(f"Marker placement requested at ({event.xdata}, {event.ydata})")
+                return True
+
+            elif self.marker_mode == "edit":
+                # Check if clicking on existing marker
+                marker = self._find_marker_at_point(event.xdata, event.ydata)
+                if marker:
+                    # Select marker
+                    if self.selected_marker and self.selected_marker != marker:
+                        self.selected_marker.set_selected(False)
+
+                    marker.set_selected(True)
+                    self.selected_marker = marker
+                    self.canvas.draw()
+                    logger.debug(f"Selected marker {marker.marker_id}")
+                    return True
+
+        elif event.button == 3:  # Right click
+            # Remove marker near click
+            marker = self._find_marker_at_point(event.xdata, event.ydata)
+            if marker:
+                self.remove_measurement_marker(marker)
+                return True
+
+        return False
+
+    def _handle_cursor_mouse_press(self, event):
+        """Handle mouse press in cursor mode.
+
+        Args:
+            event: Matplotlib mouse event
+        """
         if event.button == 1:  # Left click
             # Check if clicking on existing cursor
             cursor = self._find_cursor_near_point(event.xdata, event.ydata)
@@ -782,3 +896,127 @@ class WaveformDisplay(QWidget):
             Reference data dictionary or None
         """
         return self.reference_data
+
+    # Measurement marker methods
+
+    def add_measurement_marker(self, marker) -> None:
+        """Add a measurement marker to display.
+
+        Args:
+            marker: MeasurementMarker object to add
+        """
+        self.measurement_markers.append(marker)
+        marker.render()
+        self.canvas.draw()
+        logger.info(f"Added measurement marker {marker.marker_id}")
+
+    def remove_measurement_marker(self, marker) -> None:
+        """Remove a measurement marker from display.
+
+        Args:
+            marker: MeasurementMarker object to remove
+        """
+        if marker in self.measurement_markers:
+            marker.remove()
+            self.measurement_markers.remove(marker)
+
+            if self.selected_marker == marker:
+                self.selected_marker = None
+
+            self.canvas.draw()
+            logger.info(f"Removed measurement marker {marker.marker_id}")
+
+    def clear_all_markers(self) -> None:
+        """Clear all measurement markers."""
+        for marker in self.measurement_markers[:]:
+            marker.remove()
+
+        self.measurement_markers.clear()
+        self.selected_marker = None
+        self.canvas.draw()
+        logger.info("Cleared all measurement markers")
+
+    def set_marker_mode(self, mode: str, marker_type: str = None, channel: int = None) -> None:
+        """Set interaction mode for markers.
+
+        Args:
+            mode: Marker mode ('off', 'add', 'edit')
+            marker_type: Type of marker to add (required if mode='add')
+            channel: Channel for marker (required if mode='add')
+        """
+        self.marker_mode = mode.lower()
+        self.pending_marker_type = marker_type
+        self.pending_marker_channel = channel
+
+        logger.info(f"Marker mode set to: {self.marker_mode}")
+
+        if mode == "off":
+            # Deselect all markers
+            for marker in self.measurement_markers:
+                marker.set_selected(False)
+            self.selected_marker = None
+            self.canvas.draw()
+
+    def get_marker_measurements(self) -> Dict:
+        """Get all measurement results from markers.
+
+        Returns:
+            Dictionary mapping marker IDs to results
+        """
+        return {
+            marker.marker_id: {
+                'type': marker.measurement_type,
+                'channel': marker.channel,
+                'result': marker.result,
+                'unit': marker.unit,
+                'enabled': marker.enabled
+            }
+            for marker in self.measurement_markers
+        }
+
+    def update_all_markers(self) -> None:
+        """Update all enabled markers with current waveform data."""
+        if not self.current_waveforms:
+            return
+
+        for marker in self.measurement_markers:
+            if marker.enabled:
+                # Find waveform for marker's channel
+                waveform = next(
+                    (w for w in self.current_waveforms if w.channel == marker.channel),
+                    None
+                )
+
+                if waveform:
+                    marker.update_measurement(waveform)
+
+        # Redraw markers with updated values
+        self._render_all_markers()
+
+    def _render_all_markers(self) -> None:
+        """Render all visible markers."""
+        for marker in self.measurement_markers:
+            if marker.visible and marker.is_dirty:
+                marker.render()
+
+        self.canvas.draw()
+
+    def _find_marker_at_point(self, x: float, y: float) -> Optional:
+        """Find marker near a given point.
+
+        Args:
+            x: X coordinate in data coordinates
+            y: Y coordinate in data coordinates
+
+        Returns:
+            Marker object if found, None otherwise
+        """
+        if x is None or y is None:
+            return None
+
+        # Check all markers in reverse order (top to bottom)
+        for marker in reversed(self.measurement_markers):
+            if marker.visible and marker.contains_point(x, y):
+                return marker
+
+        return None

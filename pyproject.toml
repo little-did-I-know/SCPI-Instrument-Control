@@ -64,11 +64,13 @@ hdf5 = [
 gui = [
     "PyQt6>=6.6.0",
     "PyQt6-WebEngine>=6.6.0",
+    "pyqtgraph>=0.13.0",
 ]
 all = [
     "h5py>=3.8.0",
     "PyQt6>=6.6.0",
     "PyQt6-WebEngine>=6.6.0",
+    "pyqtgraph>=0.13.0",
 ]
 
 [project.scripts]

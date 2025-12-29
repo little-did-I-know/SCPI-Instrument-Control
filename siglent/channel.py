@@ -43,7 +43,9 @@ class Channel:
             True if channel is displayed, False otherwise
         """
         response = self._scope.query(f"{self._prefix}:TRA?")
-        return response.upper() in ["ON", "1"]
+        # Response format: "C1:TRA ON" or "C1:TRA OFF"
+        # Extract the last word
+        return "ON" in response.upper()
 
     @enabled.setter
     def enabled(self, value: bool) -> None:
