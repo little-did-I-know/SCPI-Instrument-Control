@@ -53,6 +53,17 @@ pip install -e ".[gui]"
 pip install -e ".[dev]"
 ```
 
+### Build & Publish (PyPI)
+
+To create release artifacts that render correctly on PyPI:
+
+```bash
+python -m build
+twine check dist/*
+```
+
+The `twine check` command validates the built distributions, including the long description rendered from `README.md`, before upload.
+
 ## Quick Start
 
 ### Programmatic Usage

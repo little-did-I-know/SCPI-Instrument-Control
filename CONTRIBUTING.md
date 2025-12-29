@@ -68,6 +68,15 @@ This installs the package in editable mode with development dependencies.
 python -c "from siglent import Oscilloscope; print('Success!')"
 ```
 
+5. **Build and validate distributions (for releases)**
+
+```bash
+python -m build
+twine check dist/*
+```
+
+Running `twine check` confirms that the built wheel and sdist include all package data (such as type information) and that the README renders correctly on PyPI.
+
 ## How to Contribute
 
 ### Reporting Bugs

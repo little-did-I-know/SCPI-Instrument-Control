@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "Siglent-Oscilloscope"
 version = "0.1.0"
 description = "Python package for controlling Siglent oscilloscopes (SDS800XHD, SDS1000X, SDS2000X Plus, SDS5000X series) via Ethernet"
-readme = "README.md"
+readme = { file = "README.md", content-type = "text/markdown" }
 requires-python = ">=3.8"
 license = "MIT"
 keywords = ["siglent", "oscilloscope", "SDS", "SCPI", "test equipment", "instrumentation", "measurement"]
@@ -27,10 +27,14 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3 :: Only",
     "Topic :: Scientific/Engineering",
     "Topic :: Scientific/Engineering :: Interface Engine/Protocol Translator",
     "Topic :: System :: Hardware :: Hardware Drivers",
+    "Topic :: System :: Networking :: Monitoring",
+    "Topic :: Software Development :: Libraries :: Python Modules",
     "Environment :: X11 Applications :: Qt",
+    "Typing :: Typed",
 ]
 
 dependencies = [
@@ -69,6 +73,12 @@ all = [
 
 [project.scripts]
 siglent-gui = "siglent.gui.app:main"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.package-data]
+siglent = ["py.typed"]
 
 [tool.setuptools.packages.find]
 where = ["."]
