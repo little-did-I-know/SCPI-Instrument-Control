@@ -1,6 +1,6 @@
 """Trigger configuration and control for Siglent oscilloscopes."""
 
-from typing import TYPE_CHECKING, Literal, Optional
+from typing import TYPE_CHECKING, Literal, Optional, Union
 import logging
 
 from siglent import exceptions
@@ -30,6 +30,16 @@ class Trigger:
             oscilloscope: Parent Oscilloscope instance
         """
         self._scope = oscilloscope
+
+    def _normalize_source(self, channel: Union[int, str]) -> str:
+        """Normalize channel value to the expected SCPI string."""
+        if isinstance(channel, int):
+            channel = f"C{channel}"
+        elif not isinstance(channel, str):
+            raise exceptions.InvalidParameterError(f"Invalid trigger source type: {type(channel)}")
+
+        channel = channel.upper()
+        return channel
 
     @property
     def mode(self) -> str:
@@ -99,13 +109,13 @@ class Trigger:
         return "UNKNOWN"
 
     @source.setter
-    def source(self, channel: str) -> None:
+    def source(self, channel: Union[int, str]) -> None:
         """Set trigger source channel.
 
         Args:
-            channel: Source channel ('C1', 'C2', 'C3', 'C4', 'EX', 'EX5', 'LINE')
+            channel: Source channel ('C1', 'C2', 'C3', 'C4', 'EX', 'EX5', 'LINE') or channel number
         """
-        channel = channel.upper()
+        channel = self._normalize_source(channel)
         valid_sources = ["C1", "C2", "C3", "C4", "EX", "EX5", "LINE"]
 
         if channel not in valid_sources:
@@ -117,6 +127,10 @@ class Trigger:
         # Set trigger with new source
         self._scope.write(f"TRIG_SELECT {current_type},SR,{channel}")
         logger.info(f"Trigger source set to {channel}")
+
+    def set_source(self, channel: Union[int, str]) -> None:
+        """Convenience wrapper to set trigger source."""
+        self.source = channel
 
     @property
     def trigger_type(self) -> str:
@@ -202,6 +216,11 @@ class Trigger:
         else:
             logger.warning(f"Cannot set trigger level for source {source}")
 
+    def set_level(self, channel: Union[int, str], voltage: float) -> None:
+        """Convenience wrapper to set trigger level for a specific channel."""
+        self.source = channel
+        self.level = voltage
+
     @property
     def slope(self) -> str:
         """Get trigger slope.
@@ -225,6 +244,10 @@ class Trigger:
 
         self._scope.write(f"TRIG_SLOPE {slope}")
         logger.info(f"Trigger slope set to {slope}")
+
+    def set_slope(self, slope: TriggerSlopeType) -> None:
+        """Convenience wrapper to set trigger slope."""
+        self.slope = slope
 
     @property
     def coupling(self) -> str:
