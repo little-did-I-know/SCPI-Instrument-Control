@@ -62,7 +62,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: dist
-          path: dist/
+          path: dist/*
 
   test-install:
     name: Test Installation (Python ${{ matrix.python-version }})
@@ -88,10 +88,29 @@ jobs:
           name: dist
           path: dist/
 
-      - name: Install package from wheel
+      - name: Install package from wheel (cross-platform)
+        shell: bash
         run: |
+          set -euo pipefail
           python -m pip install --upgrade pip
-          pip install dist/*.whl
+
+          python - <<'PY'
+          import glob, os, subprocess, sys
+          wheels = sorted(glob.glob(os.path.join("dist", "**", "*.whl"), recursive=True))
+          if not wheels:
+              contents = []
+              if os.path.isdir("dist"):
+                  for root, _, files in os.walk("dist"):
+                      for f in files:
+                          contents.append(os.path.relpath(os.path.join(root, f), "dist"))
+              else:
+                  contents = "dist/ missing"
+              print(f"ERROR: No wheel found under dist/. Contents: {contents}")
+              sys.exit(1)
+          wheel = wheels[0]
+          print("Installing wheel:", wheel)
+          subprocess.check_call([sys.executable, "-m", "pip", "install", wheel])
+          PY
 
       - name: Test import
         run: |
