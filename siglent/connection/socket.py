@@ -22,6 +22,7 @@ class SocketConnection(BaseConnection):
         super().__init__(host, port, timeout)
         self._socket: Optional[socket.socket] = None
         self._buffer_size = 4096
+        self._last_command: Optional[str] = None
 
     def connect(self) -> None:
         """Establish TCP connection to the oscilloscope.
@@ -65,19 +66,26 @@ class SocketConnection(BaseConnection):
             CommandError: If command fails
         """
         if not self._connected or not self._socket:
-            raise exceptions.ConnectionError("Not connected to oscilloscope")
+            raise exceptions.ConnectionError(f"Not connected to oscilloscope at {self.host}:{self.port}")
 
         try:
             # Ensure command ends with newline
             if not command.endswith("\n"):
                 command += "\n"
 
+            # Track the most recent command for better error reporting
+            self._last_command = command.strip()
+
             self._socket.sendall(command.encode("ascii"))
         except socket.timeout:
-            raise exceptions.TimeoutError(f"Command timeout: {command}")
+            raise exceptions.TimeoutError(
+                f"Command timeout for '{self._last_command}' on {self.host}:{self.port}"
+            )
         except socket.error as e:
             self._connected = False
-            raise exceptions.ConnectionError(f"Write error: {e}")
+            raise exceptions.ConnectionError(
+                f"Write error to {self.host}:{self.port} for command '{self._last_command}': {e}"
+            )
 
     def read(self) -> str:
         """Read response from the oscilloscope.
@@ -90,7 +98,7 @@ class SocketConnection(BaseConnection):
             TimeoutError: If read times out
         """
         if not self._connected or not self._socket:
-            raise exceptions.ConnectionError("Not connected to oscilloscope")
+            raise exceptions.ConnectionError(f"Not connected to oscilloscope at {self.host}:{self.port}")
 
         try:
             data = b""
@@ -109,10 +117,16 @@ class SocketConnection(BaseConnection):
             response = response.lstrip("\x00")
             return response
         except socket.timeout:
-            raise exceptions.TimeoutError("Read timeout")
+            command_context = f"for '{self._last_command}' " if self._last_command else ""
+            raise exceptions.TimeoutError(
+                f"Read timeout {command_context}from {self.host}:{self.port}"
+            )
         except socket.error as e:
             self._connected = False
-            raise exceptions.ConnectionError(f"Read error: {e}")
+            command_context = f" while waiting for '{self._last_command}'" if self._last_command else ""
+            raise exceptions.ConnectionError(
+                f"Read error from {self.host}:{self.port}{command_context}: {e}"
+            )
 
     def query(self, command: str) -> str:
         """Send a command and read the response.
@@ -149,7 +163,7 @@ class SocketConnection(BaseConnection):
             TimeoutError: If read times out
         """
         if not self._connected or not self._socket:
-            raise exceptions.ConnectionError("Not connected to oscilloscope")
+            raise exceptions.ConnectionError(f"Not connected to oscilloscope at {self.host}:{self.port}")
 
         try:
             if size is not None:
@@ -180,7 +194,10 @@ class SocketConnection(BaseConnection):
                 return data
         except socket.error as e:
             self._connected = False
-            raise exceptions.ConnectionError(f"Read error: {e}")
+            command_context = f" after '{self._last_command}'" if self._last_command else ""
+            raise exceptions.ConnectionError(
+                f"Read error from {self.host}:{self.port}{command_context}: {e}"
+            )
 
     def __repr__(self) -> str:
         """String representation of connection."""

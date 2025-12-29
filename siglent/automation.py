@@ -108,7 +108,7 @@ class DataCollector:
             >>> print(f"Sample rate: {data[1].sample_rate} Hz")
         """
         if not self._connected:
-            raise SiglentError("Not connected to oscilloscope")
+            raise SiglentError(f"Not connected to oscilloscope at {self.scope.host}:{self.scope.port}")
 
         if auto_setup:
             self.scope.auto_setup()
@@ -156,7 +156,7 @@ class DataCollector:
             >>> print(f"Collected {len(results)} captures")
         """
         if not self._connected:
-            raise SiglentError("Not connected to oscilloscope")
+            raise SiglentError(f"Not connected to oscilloscope at {self.scope.host}:{self.scope.port}")
 
         results = []
 
@@ -242,7 +242,7 @@ class DataCollector:
             ... )
         """
         if not self._connected:
-            raise SiglentError("Not connected to oscilloscope")
+            raise SiglentError(f"Not connected to oscilloscope at {self.scope.host}:{self.scope.port}")
 
         if output_dir:
             output_path = Path(output_dir)
