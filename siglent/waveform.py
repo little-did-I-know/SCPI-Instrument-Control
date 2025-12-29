@@ -231,40 +231,26 @@ class Waveform:
         # Look for the # character indicating block data
         header_end = raw_data.find(b"#")
         if header_end == -1:
-            raise exceptions.CommandError(
-                self._format_scope_error("Invalid waveform format: no # found in block header", command)
-            )
+            raise exceptions.CommandError(self._format_scope_error("Invalid waveform format: no # found in block header", command))
 
         if header_end + 2 > len(raw_data):
-            raise exceptions.CommandError(
-                self._format_scope_error("Invalid waveform format: truncated block header", command)
-            )
+            raise exceptions.CommandError(self._format_scope_error("Invalid waveform format: truncated block header", command))
 
         # Parse IEEE 488.2 definite length block
         # Format: #<n><length><data>
         # where n is number of digits in length
         n_digit_char = chr(raw_data[header_end + 1])
         if not n_digit_char.isdigit():
-            raise exceptions.CommandError(
-                self._format_scope_error(
-                    f"Invalid waveform format: non-numeric length digit '{n_digit_char}'", command
-                )
-            )
+            raise exceptions.CommandError(self._format_scope_error(f"Invalid waveform format: non-numeric length digit '{n_digit_char}'", command))
 
         n_digits = int(n_digit_char)
         if n_digits <= 0:
-            raise exceptions.CommandError(
-                self._format_scope_error(
-                    f"Invalid waveform format: length digit must be positive (got {n_digits})", command
-                )
-            )
+            raise exceptions.CommandError(self._format_scope_error(f"Invalid waveform format: length digit must be positive (got {n_digits})", command))
 
         length_field_start = header_end + 2
         length_field_end = length_field_start + n_digits
         if length_field_end > len(raw_data):
-            raise exceptions.CommandError(
-                self._format_scope_error("Invalid waveform format: truncated length field", command)
-            )
+            raise exceptions.CommandError(self._format_scope_error("Invalid waveform format: truncated length field", command))
 
         length_field = raw_data[length_field_start:length_field_end]
         if not re.fullmatch(rb"\d+", length_field):
@@ -280,11 +266,7 @@ class Waveform:
         data_end = data_start + data_length
 
         if data_end > len(raw_data):
-            raise exceptions.CommandError(
-                self._format_scope_error(
-                    "Invalid waveform format: declared data length exceeds available data", command
-                )
-            )
+            raise exceptions.CommandError(self._format_scope_error("Invalid waveform format: declared data length exceeds available data", command))
 
         # Extract binary data
         binary_data = raw_data[data_start:data_end]
@@ -296,11 +278,7 @@ class Waveform:
         elif format == "WORD":
             # 16-bit signed data
             if data_length % 2:
-                raise exceptions.CommandError(
-                    self._format_scope_error(
-                        "Invalid waveform format: WORD data length must be even", command
-                    )
-                )
+                raise exceptions.CommandError(self._format_scope_error("Invalid waveform format: WORD data length must be even", command))
             data = np.frombuffer(binary_data, dtype=np.int16)
         else:
             raise exceptions.InvalidParameterError(f"Invalid format: {format}")
@@ -358,9 +336,7 @@ class Waveform:
 
         return time
 
-    def _parse_value_with_units(
-        self, response: str, expected_units: Tuple[str, ...], quantity: str, command: Optional[str] = None
-    ) -> float:
+    def _parse_value_with_units(self, response: str, expected_units: Tuple[str, ...], quantity: str, command: Optional[str] = None) -> float:
         """Parse numeric values with expected units from SCPI responses.
 
         Args:
@@ -398,16 +374,10 @@ class Waveform:
                     logger.debug(f"Parsed {quantity}: {value} {unit}")
                     return value
                 except ValueError as exc:
-                    raise exceptions.CommandError(
-                        self._format_scope_error(f"Invalid {quantity} response: '{response}'", command)
-                    ) from exc
+                    raise exceptions.CommandError(self._format_scope_error(f"Invalid {quantity} response: '{response}'", command)) from exc
 
         expected = " or ".join(expected_units)
-        raise exceptions.CommandError(
-            self._format_scope_error(
-                f"Invalid {quantity} response: '{response}' (expected units: {expected})", command
-            )
-        )
+        raise exceptions.CommandError(self._format_scope_error(f"Invalid {quantity} response: '{response}' (expected units: {expected})", command))
 
     def get_waveform_preamble(self, channel: int) -> dict:
         """Get waveform preamble information.

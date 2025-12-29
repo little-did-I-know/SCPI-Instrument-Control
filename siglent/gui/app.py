@@ -15,10 +15,7 @@ def _require_gui_dependencies():
         from PyQt6.QtWidgets import QApplication
         from PyQt6.QtCore import Qt
     except ModuleNotFoundError as exc:
-        raise ImportError(
-            "PyQt6 is required for the GUI. Install the GUI extras with:\n"
-            '  pip install "Siglent-Oscilloscope[gui]"'
-        ) from exc
+        raise ImportError("PyQt6 is required for the GUI. Install the GUI extras with:\n" '  pip install "Siglent-Oscilloscope[gui]"') from exc
 
     return QApplication, Qt
 

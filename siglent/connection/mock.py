@@ -45,10 +45,7 @@ class MockConnection(BaseConnection):
         self._channel_enabled: Dict[int, bool] = {ch: channel_states.get(ch, True) if channel_states else True for ch in channels}
         self._voltage_scales: Dict[int, float] = {ch: voltage_scales.get(ch, 1.0) if voltage_scales else 1.0 for ch in channels}
         self._voltage_offsets: Dict[int, float] = {ch: voltage_offsets.get(ch, 0.0) if voltage_offsets else 0.0 for ch in channels}
-        self._waveform_payloads: Dict[int, bytes] = {
-            ch: waveform_payloads.get(ch, bytes([0, 25, 50, 75])) if waveform_payloads else bytes([0, 25, 50, 75])
-            for ch in channels
-        }
+        self._waveform_payloads: Dict[int, bytes] = {ch: waveform_payloads.get(ch, bytes([0, 25, 50, 75])) if waveform_payloads else bytes([0, 25, 50, 75]) for ch in channels}
 
         self.sample_rate = sample_rate
         self.timebase = timebase
