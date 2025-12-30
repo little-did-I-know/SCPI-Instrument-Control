@@ -5,17 +5,14 @@ import logging
 import sys
 
 # Configure logging to show EVERYTHING
-logging.basicConfig(
-    level=logging.DEBUG,
-    format='%(asctime)s [%(levelname)8s] %(name)s - %(message)s',
-    datefmt='%H:%M:%S'
-)
+logging.basicConfig(level=logging.DEBUG, format="%(asctime)s [%(levelname)8s] %(name)s - %(message)s", datefmt="%H:%M:%S")
 
 # Reduce noise from some libraries
-logging.getLogger('matplotlib').setLevel(logging.WARNING)
-logging.getLogger('PIL').setLevel(logging.WARNING)
+logging.getLogger("matplotlib").setLevel(logging.WARNING)
+logging.getLogger("PIL").setLevel(logging.WARNING)
 
 logger = logging.getLogger(__name__)
+
 
 def main():
     """Run the GUI with debug logging."""
@@ -48,6 +45,7 @@ def main():
     window.show()
 
     sys.exit(app.exec())
+
 
 if __name__ == "__main__":
     main()

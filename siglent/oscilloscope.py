@@ -121,12 +121,10 @@ class Oscilloscope:
         if self._vector_display is None:
             try:
                 from siglent.vector_graphics import VectorDisplay
+
                 self._vector_display = VectorDisplay(self)
             except ImportError as e:
-                raise ImportError(
-                    "Vector graphics features require the 'fun' extras.\n"
-                    "Install with: pip install \"Siglent-Oscilloscope[fun]\""
-                ) from e
+                raise ImportError("Vector graphics features require the 'fun' extras.\n" 'Install with: pip install "Siglent-Oscilloscope[fun]"') from e
         return self._vector_display
 
     def connect(self) -> None:

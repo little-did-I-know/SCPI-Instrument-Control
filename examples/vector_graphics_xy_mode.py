@@ -60,6 +60,7 @@ def main():
 
     # Create output directory
     import os
+
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 
     # ==========================================
@@ -71,46 +72,29 @@ def main():
     # Circle
     print("  Generating circle...")
     circle = Shape.circle(radius=0.8, points=1000)
-    display.save_waveforms(
-        circle,
-        f"{OUTPUT_DIR}/01_circle",
-        sample_rate=SAMPLE_RATE,
-        duration=DURATION
-    )
+    display.save_waveforms(circle, f"{OUTPUT_DIR}/01_circle", sample_rate=SAMPLE_RATE, duration=DURATION)
 
     # Square
     print("  Generating square...")
     square = Shape.rectangle(width=1.6, height=1.6, points_per_side=250)
-    display.save_waveforms(
-        square,
-        f"{OUTPUT_DIR}/02_square",
-        sample_rate=SAMPLE_RATE,
-        duration=DURATION
-    )
+    display.save_waveforms(square, f"{OUTPUT_DIR}/02_square", sample_rate=SAMPLE_RATE, duration=DURATION)
 
     # Star
     print("  Generating star...")
     star = Shape.star(num_points=5, outer_radius=0.9, inner_radius=0.4)
-    display.save_waveforms(
-        star,
-        f"{OUTPUT_DIR}/03_star",
-        sample_rate=SAMPLE_RATE,
-        duration=DURATION
-    )
+    display.save_waveforms(star, f"{OUTPUT_DIR}/03_star", sample_rate=SAMPLE_RATE, duration=DURATION)
 
     # Triangle
     print("  Generating triangle...")
-    triangle = Shape.polygon([
-        (0, 0.8),    # Top
-        (-0.7, -0.4),  # Bottom left
-        (0.7, -0.4),   # Bottom right
-    ], points_per_side=300)
-    display.save_waveforms(
-        triangle,
-        f"{OUTPUT_DIR}/04_triangle",
-        sample_rate=SAMPLE_RATE,
-        duration=DURATION
+    triangle = Shape.polygon(
+        [
+            (0, 0.8),  # Top
+            (-0.7, -0.4),  # Bottom left
+            (0.7, -0.4),  # Bottom right
+        ],
+        points_per_side=300,
     )
+    display.save_waveforms(triangle, f"{OUTPUT_DIR}/04_triangle", sample_rate=SAMPLE_RATE, duration=DURATION)
 
     print("✓ Basic shapes generated\n")
 
@@ -121,20 +105,15 @@ def main():
     print("-" * 40)
 
     lissajous_patterns = [
-        (3, 2, np.pi/2, "3_2"),
+        (3, 2, np.pi / 2, "3_2"),
         (5, 4, 0, "5_4"),
-        (7, 5, np.pi/4, "7_5"),
+        (7, 5, np.pi / 4, "7_5"),
     ]
 
     for a, b, delta, name in lissajous_patterns:
         print(f"  Generating Lissajous {a}:{b}...")
         lissajous = Shape.lissajous(a=a, b=b, delta=delta, points=2000)
-        display.save_waveforms(
-            lissajous,
-            f"{OUTPUT_DIR}/lissajous_{name}",
-            sample_rate=SAMPLE_RATE,
-            duration=DURATION
-        )
+        display.save_waveforms(lissajous, f"{OUTPUT_DIR}/lissajous_{name}", sample_rate=SAMPLE_RATE, duration=DURATION)
 
     print("✓ Lissajous figures generated\n")
 
@@ -147,12 +126,7 @@ def main():
 
     try:
         text = Shape.text("HELLO", font_size=0.6)
-        display.save_waveforms(
-            text,
-            f"{OUTPUT_DIR}/text_hello",
-            sample_rate=SAMPLE_RATE,
-            duration=DURATION
-        )
+        display.save_waveforms(text, f"{OUTPUT_DIR}/text_hello", sample_rate=SAMPLE_RATE, duration=DURATION)
         print("✓ Text generated")
     except Exception as e:
         print(f"  ⚠ Text generation skipped: {e}")
@@ -169,12 +143,7 @@ def main():
 
     for i, angle in enumerate(range(0, 360, 15)):
         rotated_star = star_base.rotate(angle)
-        display.save_waveforms(
-            rotated_star,
-            f"{OUTPUT_DIR}/anim_star_frame_{i:02d}",
-            sample_rate=SAMPLE_RATE,
-            duration=DURATION / 10  # Faster frames
-        )
+        display.save_waveforms(rotated_star, f"{OUTPUT_DIR}/anim_star_frame_{i:02d}", sample_rate=SAMPLE_RATE, duration=DURATION / 10)  # Faster frames
         print(f"  Frame {i+1}/24 (angle={angle}°)")
 
     print("✓ Animation frames generated\n")
@@ -196,16 +165,12 @@ def main():
     mouth_x = 0.5 * np.cos(t)
     mouth_y = -0.2 + 0.3 * np.sin(t)
     from siglent.vector_graphics import VectorPath
+
     mouth = VectorPath(x=mouth_x, y=mouth_y, connected=False)
 
     # Combine all parts
     smiley = face_outer.combine(eye_left).combine(eye_right).combine(mouth)
-    display.save_waveforms(
-        smiley,
-        f"{OUTPUT_DIR}/composite_smiley",
-        sample_rate=SAMPLE_RATE,
-        duration=DURATION
-    )
+    display.save_waveforms(smiley, f"{OUTPUT_DIR}/composite_smiley", sample_rate=SAMPLE_RATE, duration=DURATION)
     print("✓ Smiley face generated\n")
 
     # ==========================================
@@ -249,7 +214,7 @@ if __name__ == "__main__":
             print("Vector graphics features require additional packages.")
             print()
             print("Install with:")
-            print("  pip install \"Siglent-Oscilloscope[fun]\"")
+            print('  pip install "Siglent-Oscilloscope[fun]"')
             print()
             print("This will install:")
             print("  - shapely (geometric operations)")

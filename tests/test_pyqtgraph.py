@@ -6,6 +6,7 @@ import numpy as np
 import pyqtgraph as pg
 from PyQt6.QtWidgets import QApplication
 
+
 def main():
     """Test PyQtGraph with simple waveform."""
     print("Testing PyQtGraph installation...")
@@ -14,10 +15,10 @@ def main():
 
     # Create plot window
     pw = pg.PlotWidget(title="PyQtGraph Test - You should see a sine wave")
-    pw.setBackground('#1a1a1a')
+    pw.setBackground("#1a1a1a")
     pw.showGrid(x=True, y=True, alpha=0.3)
-    pw.setLabel('bottom', 'Time', units='s')
-    pw.setLabel('left', 'Voltage', units='V')
+    pw.setLabel("bottom", "Time", units="s")
+    pw.setLabel("left", "Voltage", units="V")
 
     # Generate test waveform
     time = np.linspace(0, 1e-3, 1000)  # 1ms, 1000 points
@@ -44,6 +45,7 @@ def main():
     print("=" * 60)
 
     sys.exit(app.exec())
+
 
 if __name__ == "__main__":
     main()

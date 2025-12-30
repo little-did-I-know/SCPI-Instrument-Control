@@ -40,18 +40,21 @@ logger = logging.getLogger(__name__)
 try:
     from shapely.geometry import LineString, Point
     from shapely import affinity
+
     SHAPELY_AVAILABLE = True
 except ImportError:
     SHAPELY_AVAILABLE = False
 
 try:
     from PIL import Image, ImageDraw, ImageFont
+
     PIL_AVAILABLE = True
 except ImportError:
     PIL_AVAILABLE = False
 
 try:
     import svgpathtools
+
     SVG_AVAILABLE = True
 except ImportError:
     SVG_AVAILABLE = False
@@ -68,11 +71,7 @@ def _check_fun_dependencies():
         missing.append("svgpathtools>=1.6.0")
 
     if missing:
-        raise ImportError(
-            f"Vector graphics features require the 'fun' extras.\n"
-            f"Missing packages: {', '.join(missing)}\n\n"
-            f"Install with: pip install \"Siglent-Oscilloscope[fun]\""
-        )
+        raise ImportError(f"Vector graphics features require the 'fun' extras.\n" f"Missing packages: {', '.join(missing)}\n\n" f'Install with: pip install "Siglent-Oscilloscope[fun]"')
 
 
 @dataclass
@@ -84,27 +83,20 @@ class VectorPath:
         y: Y coordinates (normalized to -1.0 to 1.0)
         connected: Whether to connect end to start (closed path)
     """
+
     x: np.ndarray
     y: np.ndarray
     connected: bool = False
 
-    def scale(self, factor: float) -> 'VectorPath':
+    def scale(self, factor: float) -> "VectorPath":
         """Scale the path by a factor."""
-        return VectorPath(
-            x=self.x * factor,
-            y=self.y * factor,
-            connected=self.connected
-        )
+        return VectorPath(x=self.x * factor, y=self.y * factor, connected=self.connected)
 
-    def translate(self, dx: float, dy: float) -> 'VectorPath':
+    def translate(self, dx: float, dy: float) -> "VectorPath":
         """Translate the path by (dx, dy)."""
-        return VectorPath(
-            x=self.x + dx,
-            y=self.y + dy,
-            connected=self.connected
-        )
+        return VectorPath(x=self.x + dx, y=self.y + dy, connected=self.connected)
 
-    def rotate(self, angle_degrees: float, origin: Tuple[float, float] = (0, 0)) -> 'VectorPath':
+    def rotate(self, angle_degrees: float, origin: Tuple[float, float] = (0, 0)) -> "VectorPath":
         """Rotate the path around an origin point."""
         angle_rad = np.radians(angle_degrees)
         cos_a = np.cos(angle_rad)
@@ -119,27 +111,19 @@ class VectorPath:
         y_rotated = x_centered * sin_a + y_centered * cos_a
 
         # Translate back
-        return VectorPath(
-            x=x_rotated + origin[0],
-            y=y_rotated + origin[1],
-            connected=self.connected
-        )
+        return VectorPath(x=x_rotated + origin[0], y=y_rotated + origin[1], connected=self.connected)
 
-    def flip_x(self) -> 'VectorPath':
+    def flip_x(self) -> "VectorPath":
         """Flip horizontally."""
         return VectorPath(x=-self.x, y=self.y, connected=self.connected)
 
-    def flip_y(self) -> 'VectorPath':
+    def flip_y(self) -> "VectorPath":
         """Flip vertically."""
         return VectorPath(x=self.x, y=-self.y, connected=self.connected)
 
-    def combine(self, other: 'VectorPath') -> 'VectorPath':
+    def combine(self, other: "VectorPath") -> "VectorPath":
         """Combine two paths (concatenate points)."""
-        return VectorPath(
-            x=np.concatenate([self.x, other.x]),
-            y=np.concatenate([self.y, other.y]),
-            connected=False  # Combined paths are typically not closed
-        )
+        return VectorPath(x=np.concatenate([self.x, other.x]), y=np.concatenate([self.y, other.y]), connected=False)  # Combined paths are typically not closed
 
 
 class Shape:
@@ -242,8 +226,7 @@ class Shape:
         return VectorPath(x=np.array(x_points), y=np.array(y_points), connected=True)
 
     @staticmethod
-    def star(num_points: int = 5, outer_radius: float = 1.0, inner_radius: float = 0.4,
-             center: Tuple[float, float] = (0, 0), points_per_line: int = 50) -> VectorPath:
+    def star(num_points: int = 5, outer_radius: float = 1.0, inner_radius: float = 0.4, center: Tuple[float, float] = (0, 0), points_per_line: int = 50) -> VectorPath:
         """Generate a star shape.
 
         Args:
@@ -267,8 +250,7 @@ class Shape:
         return Shape.polygon(vertices, points_per_line)
 
     @staticmethod
-    def text(text: str, font_size: float = 0.5, position: Tuple[float, float] = (0, 0),
-             samples_per_unit: int = 200) -> VectorPath:
+    def text(text: str, font_size: float = 0.5, position: Tuple[float, float] = (0, 0), samples_per_unit: int = 200) -> VectorPath:
         """Generate text as vector paths.
 
         Note: Requires PIL (Pillow) to be installed.
@@ -287,7 +269,7 @@ class Shape:
 
         # Create image with text
         img_size = 512
-        img = Image.new('L', (img_size, img_size), 0)
+        img = Image.new("L", (img_size, img_size), 0)
         draw = ImageDraw.Draw(img)
 
         # Try to use a reasonable font, fall back to default
@@ -317,10 +299,7 @@ class Shape:
             for x in range(1, img_size - 1):
                 # Check if this is an edge pixel
                 if binary[y, x]:
-                    neighbors = [
-                        binary[y-1, x], binary[y+1, x],
-                        binary[y, x-1], binary[y, x+1]
-                    ]
+                    neighbors = [binary[y - 1, x], binary[y + 1, x], binary[y, x - 1], binary[y, x + 1]]
                     if not all(neighbors):  # Edge pixel
                         # Normalize to -1 to 1 range
                         x_norm = (x / img_size - 0.5) * 2
@@ -335,7 +314,7 @@ class Shape:
         return VectorPath(x=np.array(x_coords), y=np.array(y_coords), connected=False)
 
     @staticmethod
-    def lissajous(a: int = 3, b: int = 2, delta: float = np.pi/2, points: int = 2000) -> VectorPath:
+    def lissajous(a: int = 3, b: int = 2, delta: float = np.pi / 2, points: int = 2000) -> VectorPath:
         """Generate Lissajous curve.
 
         Args:
@@ -413,11 +392,7 @@ class VectorDisplay:
             try:
                 self._scope.write("XY_MODE ON")
             except:
-                logger.warning(
-                    "Could not enable XY mode automatically. "
-                    "Please manually enable XY mode on the oscilloscope:\n"
-                    "  Display → XY Mode → ON"
-                )
+                logger.warning("Could not enable XY mode automatically. " "Please manually enable XY mode on the oscilloscope:\n" "  Display → XY Mode → ON")
 
             self._xy_mode_enabled = True
             logger.info("XY mode enabled")
@@ -483,15 +458,11 @@ class VectorDisplay:
             x_waveform = x_resampled
             y_waveform = y_resampled
 
-        logger.info(
-            f"Generated waveforms: {len(x_waveform)} samples at {sample_rate/1e6:.1f} MHz, "
-            f"duration {duration*1000:.1f} ms"
-        )
+        logger.info(f"Generated waveforms: {len(x_waveform)} samples at {sample_rate/1e6:.1f} MHz, " f"duration {duration*1000:.1f} ms")
 
         return x_waveform, y_waveform
 
-    def save_waveforms(self, path: VectorPath, filename_prefix: str, sample_rate: float = 1e6,
-                       duration: float = 0.1, format: str = 'csv'):
+    def save_waveforms(self, path: VectorPath, filename_prefix: str, sample_rate: float = 1e6, duration: float = 0.1, format: str = "csv"):
         """Generate and save waveforms to files for AWG upload.
 
         Args:
@@ -503,19 +474,19 @@ class VectorDisplay:
         """
         x_wave, y_wave = self.draw(path, sample_rate, duration)
 
-        if format == 'csv':
+        if format == "csv":
             # Save as CSV
-            np.savetxt(f"{filename_prefix}_x.csv", x_wave, delimiter=',')
-            np.savetxt(f"{filename_prefix}_y.csv", y_wave, delimiter=',')
+            np.savetxt(f"{filename_prefix}_x.csv", x_wave, delimiter=",")
+            np.savetxt(f"{filename_prefix}_y.csv", y_wave, delimiter=",")
             logger.info(f"Saved CSV files: {filename_prefix}_x.csv, {filename_prefix}_y.csv")
 
-        elif format == 'npy':
+        elif format == "npy":
             # Save as NumPy binary
             np.save(f"{filename_prefix}_x.npy", x_wave)
             np.save(f"{filename_prefix}_y.npy", y_wave)
             logger.info(f"Saved NumPy files: {filename_prefix}_x.npy, {filename_prefix}_y.npy")
 
-        elif format == 'bin':
+        elif format == "bin":
             # Save as raw binary (float32)
             x_wave.astype(np.float32).tofile(f"{filename_prefix}_x.bin")
             y_wave.astype(np.float32).tofile(f"{filename_prefix}_y.bin")

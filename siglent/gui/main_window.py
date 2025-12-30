@@ -205,11 +205,13 @@ class MainWindow(QMainWindow):
         # Vector Graphics tab (optional - requires 'fun' extras)
         try:
             from siglent.gui.widgets.vector_graphics_panel import VectorGraphicsPanel
+
             self.vector_graphics_panel = VectorGraphicsPanel()
             self.tabs.addTab(self.vector_graphics_panel, "Vector Graphics")
         except ImportError:
             # 'fun' extras not installed - tab will show install message
             from siglent.gui.widgets.vector_graphics_panel import VectorGraphicsPanel
+
             self.vector_graphics_panel = VectorGraphicsPanel()
             self.tabs.addTab(self.vector_graphics_panel, "Vector Graphics 🎨")
 
@@ -528,7 +530,7 @@ class MainWindow(QMainWindow):
             self.measurement_panel.set_scope(self.scope)
             self.timebase_control.set_scope(self.scope)
             self.terminal_widget.set_oscilloscope(self.scope)
-            if hasattr(self, 'vector_graphics_panel'):
+            if hasattr(self, "vector_graphics_panel"):
                 self.vector_graphics_panel.set_scope(self.scope)
 
             # Update math panel and FFT display with available channels
@@ -580,7 +582,7 @@ class MainWindow(QMainWindow):
             self.measurement_panel.set_scope(None)
             self.timebase_control.set_scope(None)
             self.terminal_widget.set_oscilloscope(None)
-            if hasattr(self, 'vector_graphics_panel'):
+            if hasattr(self, "vector_graphics_panel"):
                 self.vector_graphics_panel.set_scope(None)
 
             self.statusBar().showMessage("Disconnected")

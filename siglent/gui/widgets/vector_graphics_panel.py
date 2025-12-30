@@ -18,11 +18,7 @@ import logging
 from typing import Optional
 from pathlib import Path
 
-from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QGroupBox, QPushButton,
-    QComboBox, QLabel, QSpinBox, QDoubleSpinBox, QFileDialog,
-    QMessageBox, QTextEdit, QFormLayout, QCheckBox
-)
+from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QGroupBox, QPushButton, QComboBox, QLabel, QSpinBox, QDoubleSpinBox, QFileDialog, QMessageBox, QTextEdit, QFormLayout, QCheckBox
 from PyQt6.QtCore import Qt
 
 logger = logging.getLogger(__name__)
@@ -31,6 +27,7 @@ logger = logging.getLogger(__name__)
 try:
     from siglent.vector_graphics import VectorDisplay, Shape, VectorPath
     import numpy as np
+
     VECTOR_GRAPHICS_AVAILABLE = True
 except ImportError as e:
     VECTOR_GRAPHICS_AVAILABLE = False
@@ -70,13 +67,7 @@ class VectorGraphicsPanel(QWidget):
         xy_group = QGroupBox("XY Mode Control")
         xy_layout = QVBoxLayout()
 
-        xy_info = QLabel(
-            "<b>Setup:</b><br>"
-            "1. Connect AWG outputs to scope inputs<br>"
-            "2. AWG CH1 → Scope CH1 (X axis)<br>"
-            "3. AWG CH2 → Scope CH2 (Y axis)<br>"
-            "4. Enable XY mode below"
-        )
+        xy_info = QLabel("<b>Setup:</b><br>" "1. Connect AWG outputs to scope inputs<br>" "2. AWG CH1 → Scope CH1 (X axis)<br>" "3. AWG CH2 → Scope CH2 (Y axis)<br>" "4. Enable XY mode below")
         xy_info.setWordWrap(True)
         xy_layout.addWidget(xy_info)
 
@@ -101,14 +92,7 @@ class VectorGraphicsPanel(QWidget):
         type_layout = QHBoxLayout()
         type_layout.addWidget(QLabel("Shape Type:"))
         self.shape_combo = QComboBox()
-        self.shape_combo.addItems([
-            "Circle",
-            "Rectangle",
-            "Star",
-            "Triangle",
-            "Lissajous",
-            "Line"
-        ])
+        self.shape_combo.addItems(["Circle", "Rectangle", "Star", "Triangle", "Lissajous", "Line"])
         self.shape_combo.currentTextChanged.connect(self._on_shape_changed)
         type_layout.addWidget(self.shape_combo)
         shape_layout.addLayout(type_layout)
@@ -174,11 +158,7 @@ class VectorGraphicsPanel(QWidget):
         self.info_text = QTextEdit()
         self.info_text.setReadOnly(True)
         self.info_text.setMaximumHeight(100)
-        self.info_text.setPlainText(
-            "Select a shape type and adjust parameters.\n"
-            "Click 'Generate Shape' to create the vector path.\n"
-            "Then 'Save Waveforms' to export for AWG upload."
-        )
+        self.info_text.setPlainText("Select a shape type and adjust parameters.\n" "Click 'Generate Shape' to create the vector path.\n" "Then 'Save Waveforms' to export for AWG upload.")
         info_layout.addWidget(self.info_text)
         info_group.setLayout(info_layout)
         layout.addWidget(info_group)
@@ -202,32 +182,17 @@ class VectorGraphicsPanel(QWidget):
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         msg_layout.addWidget(title)
 
-        info = QLabel(
-            "<p>This feature allows you to draw shapes, text, and animations<br>"
-            "on your oscilloscope screen using XY mode!</p>"
-            "<p><b>Installation Required:</b></p>"
-            "<p>The vector graphics feature requires additional packages.</p>"
-        )
+        info = QLabel("<p>This feature allows you to draw shapes, text, and animations<br>" "on your oscilloscope screen using XY mode!</p>" "<p><b>Installation Required:</b></p>" "<p>The vector graphics feature requires additional packages.</p>")
         info.setAlignment(Qt.AlignmentFlag.AlignCenter)
         info.setWordWrap(True)
         msg_layout.addWidget(info)
 
-        install_label = QLabel(
-            "<p><code>pip install \"Siglent-Oscilloscope[fun]\"</code></p>"
-        )
+        install_label = QLabel('<p><code>pip install "Siglent-Oscilloscope[fun]"</code></p>')
         install_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         install_label.setStyleSheet("background-color: #f0f0f0; padding: 10px; font-family: monospace;")
         msg_layout.addWidget(install_label)
 
-        features = QLabel(
-            "<p><b>What you can do:</b></p>"
-            "<ul>"
-            "<li>Draw circles, stars, rectangles, and more</li>"
-            "<li>Display text messages on screen</li>"
-            "<li>Create Lissajous figures</li>"
-            "<li>Generate animations</li>"
-            "</ul>"
-        )
+        features = QLabel("<p><b>What you can do:</b></p>" "<ul>" "<li>Draw circles, stars, rectangles, and more</li>" "<li>Display text messages on screen</li>" "<li>Create Lissajous figures</li>" "<li>Generate animations</li>" "</ul>")
         features.setWordWrap(True)
         msg_layout.addWidget(features)
 
@@ -378,20 +343,14 @@ class VectorGraphicsPanel(QWidget):
                 width = self.width_spin.value()
                 height = self.height_spin.value()
                 points = self.points_spin.value()
-                self._current_path = Shape.rectangle(
-                    width=width, height=height, points_per_side=points
-                )
+                self._current_path = Shape.rectangle(width=width, height=height, points_per_side=points)
                 info = f"Generated rectangle: {width}x{height}, {points} points/side"
 
             elif shape_type == "Star":
                 num_points = self.star_points_spin.value()
                 outer = self.outer_radius_spin.value()
                 inner = self.inner_radius_spin.value()
-                self._current_path = Shape.star(
-                    num_points=num_points,
-                    outer_radius=outer,
-                    inner_radius=inner
-                )
+                self._current_path = Shape.star(num_points=num_points, outer_radius=outer, inner_radius=inner)
                 info = f"Generated star: {num_points} points, outer={outer}, inner={inner}"
 
             elif shape_type == "Triangle":
@@ -420,11 +379,7 @@ class VectorGraphicsPanel(QWidget):
                 self._current_path = Shape.line(start=start, end=end, points=points)
                 info = f"Generated line: from {start} to {end}, {points} points"
 
-            self.info_text.setPlainText(
-                f"{info}\n\n"
-                f"Shape ready! Click 'Save Waveforms' to export.\n"
-                f"Total points: {len(self._current_path.x)}"
-            )
+            self.info_text.setPlainText(f"{info}\n\n" f"Shape ready! Click 'Save Waveforms' to export.\n" f"Total points: {len(self._current_path.x)}")
 
             self.export_btn.setEnabled(True)
             logger.info(info)
@@ -439,12 +394,7 @@ class VectorGraphicsPanel(QWidget):
             return
 
         # Get save location
-        filename, _ = QFileDialog.getSaveFileName(
-            self,
-            "Save Waveforms",
-            "",
-            "All Files (*)"
-        )
+        filename, _ = QFileDialog.getSaveFileName(self, "Save Waveforms", "", "All Files (*)")
 
         if not filename:
             return
@@ -460,37 +410,20 @@ class VectorGraphicsPanel(QWidget):
             file_format = format_map[self.format_combo.currentText()]
 
             # Check if we have a scope connection with vector display
-            if self._scope and hasattr(self._scope, 'vector_display'):
+            if self._scope and hasattr(self._scope, "vector_display"):
                 display = self._scope.vector_display
             else:
                 # Create temporary display for export (no scope needed)
                 from siglent.vector_graphics import VectorDisplay
+
                 display = VectorDisplay(None, ch_x=1, ch_y=2)
 
             # Save waveforms
-            display.save_waveforms(
-                self._current_path,
-                filename,
-                sample_rate=sample_rate,
-                duration=duration,
-                format=file_format
-            )
+            display.save_waveforms(self._current_path, filename, sample_rate=sample_rate, duration=duration, format=file_format)
 
-            QMessageBox.information(
-                self,
-                "Export Successful",
-                f"Waveforms saved:\n"
-                f"  {filename}_x.{file_format}\n"
-                f"  {filename}_y.{file_format}\n\n"
-                f"Sample rate: {sample_rate/1e6:.1f} MSa/s\n"
-                f"Duration: {duration*1000:.1f} ms\n\n"
-                f"Load these files into your AWG channels to display the shape!"
-            )
+            QMessageBox.information(self, "Export Successful", f"Waveforms saved:\n" f"  {filename}_x.{file_format}\n" f"  {filename}_y.{file_format}\n\n" f"Sample rate: {sample_rate/1e6:.1f} MSa/s\n" f"Duration: {duration*1000:.1f} ms\n\n" f"Load these files into your AWG channels to display the shape!")
 
-            self.info_text.append(
-                f"\nExported to {filename}_x/y.{file_format}\n"
-                f"Ready for AWG upload!"
-            )
+            self.info_text.append(f"\nExported to {filename}_x/y.{file_format}\n" f"Ready for AWG upload!")
 
         except Exception as e:
             QMessageBox.critical(self, "Export Error", f"Failed to export waveforms:\n{e}")
@@ -499,11 +432,7 @@ class VectorGraphicsPanel(QWidget):
     def _enable_xy_mode(self):
         """Enable XY mode on oscilloscope."""
         if not self._scope:
-            QMessageBox.warning(
-                self,
-                "Not Connected",
-                "Please connect to an oscilloscope first."
-            )
+            QMessageBox.warning(self, "Not Connected", "Please connect to an oscilloscope first.")
             return
 
         try:
@@ -516,14 +445,7 @@ class VectorGraphicsPanel(QWidget):
             self.enable_xy_btn.setEnabled(False)
             self.disable_xy_btn.setEnabled(True)
 
-            self.info_text.setPlainText(
-                "XY mode enabled!\n\n"
-                "Channels configured:\n"
-                f"  CH{self._vector_display.ch_x} = X axis\n"
-                f"  CH{self._vector_display.ch_y} = Y axis\n\n"
-                "You may need to manually enable XY mode on scope:\n"
-                "  Display → XY Mode → ON"
-            )
+            self.info_text.setPlainText("XY mode enabled!\n\n" "Channels configured:\n" f"  CH{self._vector_display.ch_x} = X axis\n" f"  CH{self._vector_display.ch_y} = Y axis\n\n" "You may need to manually enable XY mode on scope:\n" "  Display → XY Mode → ON")
 
             logger.info("XY mode enabled")
 
@@ -561,17 +483,11 @@ class VectorGraphicsPanel(QWidget):
         if VECTOR_GRAPHICS_AVAILABLE:
             if scope:
                 self.enable_xy_btn.setEnabled(True)
-                self.info_text.setPlainText(
-                    f"Connected to: {scope.model_capability.model_name}\n\n"
-                    "Ready to configure XY mode!"
-                )
+                self.info_text.setPlainText(f"Connected to: {scope.model_capability.model_name}\n\n" "Ready to configure XY mode!")
             else:
                 self.enable_xy_btn.setEnabled(False)
                 self.disable_xy_btn.setEnabled(False)
-                self.info_text.setPlainText(
-                    "Not connected.\n\n"
-                    "You can still generate and export waveforms!"
-                )
+                self.info_text.setPlainText("Not connected.\n\n" "You can still generate and export waveforms!")
 
     def __repr__(self) -> str:
         """String representation."""
