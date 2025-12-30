@@ -11,10 +11,10 @@ requires-python = ">=3.8"
 license = "MIT"
 keywords = ["siglent", "oscilloscope", "SDS", "SCPI", "test equipment", "instrumentation", "measurement"]
 authors = [
-    {name = "Siglent Control Contributors"}
+    {name = "Robin Mumm"}
 ]
 maintainers = [
-    {name = "Siglent Control Contributors"}
+    {name = "little-did-I-know"}
 ]
 classifiers = [
     "Development Status :: 4 - Beta",
