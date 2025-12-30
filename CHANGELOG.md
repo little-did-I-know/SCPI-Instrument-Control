@@ -23,6 +23,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Codecov Configuration**
   - Added `codecov.yml` with project-specific settings
   - Configured coverage thresholds and reporting
+- **Pytest Configuration**
+  - Added `[tool.pytest.ini_options]` to `pyproject.toml`
+  - Configured test markers for hardware and GUI tests
+  - Added strict pytest configuration for better test quality
+- **Contributing Guide**
+  - Comprehensive `CONTRIBUTING.md` with development guidelines
+  - Code style, testing, and PR submission instructions
+  - Development setup and best practices documentation
 
 ### Changed
 - **SEO and PyPI Metadata Improvements**
@@ -33,6 +41,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Enhanced CI workflow with dedicated test suite job
   - Added pytest-cov and pytest-xdist dependencies
   - Improved test execution with verbose output and coverage reporting
+- **Test Organization**
+  - Moved manual test scripts to `scripts/` directory
+  - Reorganized interactive GUI tests as manual scripts
+  - Ensured automated tests properly handle optional dependencies
+
+### Fixed
+- **Test Suite Issues**
+  - Fixed CI test failures due to missing PyQt6 dependencies
+  - Moved manual test scripts (`test_live_view.py`, `test_pyqtgraph.py`, `test_dependency_check.py`, `test_waveform_display.py`) to `scripts/` directory
+  - Prevented pytest from collecting non-test GUI demo scripts
+  - Ensured GUI tests skip gracefully when PyQt6 is not installed
 
 ## [0.2.4] - 2025-12-29
 
