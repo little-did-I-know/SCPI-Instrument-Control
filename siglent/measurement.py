@@ -60,9 +60,7 @@ class Measurement:
             InvalidParameterError: If parameters are invalid
         """
         if not 1 <= channel <= 4:
-            raise exceptions.InvalidParameterError(
-                f"Invalid channel number: {channel}. Must be 1-4."
-            )
+            raise exceptions.InvalidParameterError(f"Invalid channel number: {channel}. Must be 1-4.")
 
         mtype = mtype.upper()
         ch = f"C{channel}"
@@ -275,9 +273,7 @@ class Measurement:
             stat: Enable statistics for this measurement
         """
         if not 1 <= channel <= 4:
-            raise exceptions.InvalidParameterError(
-                f"Invalid channel number: {channel}. Must be 1-4."
-            )
+            raise exceptions.InvalidParameterError(f"Invalid channel number: {channel}. Must be 1-4.")
 
         ch = f"C{channel}"
         stat_flag = "ON" if stat else "OFF"
@@ -324,9 +320,7 @@ class Measurement:
         valid_types = ["OFF", "HREL", "VREL", "HREF", "VREF"]
 
         if cursor_type not in valid_types:
-            raise exceptions.InvalidParameterError(
-                f"Invalid cursor type: {cursor_type}. Must be one of {valid_types}."
-            )
+            raise exceptions.InvalidParameterError(f"Invalid cursor type: {cursor_type}. Must be one of {valid_types}.")
 
         self._scope.write(f"CRST {cursor_type}")
         logger.info(f"Cursor type set to {cursor_type}")

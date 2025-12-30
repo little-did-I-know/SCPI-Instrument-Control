@@ -64,9 +64,7 @@ class Trigger:
             mode = "NORM"
 
         if mode not in ["AUTO", "NORM", "SINGLE", "STOP"]:
-            raise exceptions.InvalidParameterError(
-                f"Invalid trigger mode: {mode}. Must be AUTO, NORM, SINGLE, or STOP."
-            )
+            raise exceptions.InvalidParameterError(f"Invalid trigger mode: {mode}. Must be AUTO, NORM, SINGLE, or STOP.")
 
         self._scope.write(f"TRIG_MODE {mode}")
         logger.info(f"Trigger mode set to {mode}")
@@ -121,9 +119,7 @@ class Trigger:
         valid_sources = ["C1", "C2", "C3", "C4", "EX", "EX5", "LINE"]
 
         if channel not in valid_sources:
-            raise exceptions.InvalidParameterError(
-                f"Invalid trigger source: {channel}. Must be one of {valid_sources}."
-            )
+            raise exceptions.InvalidParameterError(f"Invalid trigger source: {channel}. Must be one of {valid_sources}.")
 
         # Get current trigger type to preserve it
         current_type = self.trigger_type
@@ -161,9 +157,7 @@ class Trigger:
         valid_types = ["EDGE", "SLEW", "GLIT", "INTV", "RUNT", "PATTERN"]
 
         if trig_type not in valid_types:
-            raise exceptions.InvalidParameterError(
-                f"Invalid trigger type: {trig_type}. Must be one of {valid_types}."
-            )
+            raise exceptions.InvalidParameterError(f"Invalid trigger type: {trig_type}. Must be one of {valid_types}.")
 
         # Get current source to preserve it
         current_source = self.source
@@ -246,9 +240,7 @@ class Trigger:
         """
         slope = slope.upper()
         if slope not in ["POS", "NEG", "WINDOW"]:
-            raise exceptions.InvalidParameterError(
-                f"Invalid trigger slope: {slope}. Must be POS, NEG, or WINDOW."
-            )
+            raise exceptions.InvalidParameterError(f"Invalid trigger slope: {slope}. Must be POS, NEG, or WINDOW.")
 
         self._scope.write(f"TRIG_SLOPE {slope}")
         logger.info(f"Trigger slope set to {slope}")
@@ -276,9 +268,7 @@ class Trigger:
         """
         coupling = coupling.upper()
         if coupling not in ["DC", "AC", "HFREJ", "LFREJ"]:
-            raise exceptions.InvalidParameterError(
-                f"Invalid trigger coupling: {coupling}. Must be DC, AC, HFREJ, or LFREJ."
-            )
+            raise exceptions.InvalidParameterError(f"Invalid trigger coupling: {coupling}. Must be DC, AC, HFREJ, or LFREJ.")
 
         self._scope.write(f"TRIG_COUPLING {coupling}")
         logger.info(f"Trigger coupling set to {coupling}")
@@ -305,9 +295,7 @@ class Trigger:
             time_seconds: Holdoff time in seconds
         """
         if time_seconds < 0:
-            raise exceptions.InvalidParameterError(
-                f"Holdoff time must be non-negative: {time_seconds}"
-            )
+            raise exceptions.InvalidParameterError(f"Holdoff time must be non-negative: {time_seconds}")
 
         self._scope.write(f"TRIG_DELAY {time_seconds}")
         logger.info(f"Trigger holdoff set to {time_seconds}s")
@@ -332,9 +320,6 @@ class Trigger:
         """String representation."""
         try:
             config = self.get_configuration()
-            return (
-                f"Trigger(mode={config['mode']}, source={config['source']}, "
-                f"level={config['level']}V, slope={config['slope']})"
-            )
+            return f"Trigger(mode={config['mode']}, source={config['source']}, " f"level={config['level']}V, slope={config['slope']})"
         except Exception:
             return "Trigger()"

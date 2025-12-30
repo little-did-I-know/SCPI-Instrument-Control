@@ -187,9 +187,7 @@ class FrequencyMarker(MeasurementMarker):
             for i in range(len(voltage_ac) - 1):
                 if voltage_ac[i] <= 0 and voltage_ac[i + 1] > 0:
                     # Linear interpolation for more accurate crossing time
-                    t_cross = time[i] - voltage_ac[i] * (time[i + 1] - time[i]) / (
-                        voltage_ac[i + 1] - voltage_ac[i]
-                    )
+                    t_cross = time[i] - voltage_ac[i] * (time[i + 1] - time[i]) / (voltage_ac[i + 1] - voltage_ac[i])
                     zero_crossings.append(t_cross)
 
             if len(zero_crossings) >= 2:

@@ -73,9 +73,7 @@ class ProtocolDecodePanel(QWidget):
 
         # Decode button
         decode_btn = QPushButton("Decode Protocol")
-        decode_btn.setStyleSheet(
-            "background-color: #2196F3; color: white; font-weight: bold; padding: 8px;"
-        )
+        decode_btn.setStyleSheet("background-color: #2196F3; color: white; font-weight: bold; padding: 8px;")
         decode_btn.clicked.connect(self._on_decode)
         layout.addWidget(decode_btn)
 
@@ -155,9 +153,7 @@ class ProtocolDecodePanel(QWidget):
         # Events table
         self.events_table = QTableWidget()
         self.events_table.setColumnCount(5)
-        self.events_table.setHorizontalHeaderLabels(
-            ["Time (s)", "Type", "Data", "Description", "Status"]
-        )
+        self.events_table.setHorizontalHeaderLabels(["Time (s)", "Type", "Data", "Description", "Status"])
         self.events_table.setAlternatingRowColors(True)
         layout.addWidget(self.events_table)
 
@@ -285,9 +281,7 @@ class ProtocolDecodePanel(QWidget):
             # Baud rate
             self.params_layout.addWidget(QLabel("Baud rate:"), row, 0)
             baud_combo = QComboBox()
-            baud_combo.addItems(
-                ["1200", "2400", "4800", "9600", "19200", "38400", "57600", "115200"]
-            )
+            baud_combo.addItems(["1200", "2400", "4800", "9600", "19200", "38400", "57600", "115200"])
             baud_combo.setCurrentText("9600")
             self.params_layout.addWidget(baud_combo, row, 1)
             self.protocol_param_widgets["baud_rate"] = baud_combo
@@ -367,9 +361,7 @@ class ProtocolDecodePanel(QWidget):
             QMessageBox.warning(self, "No Data", "No events to export")
             return
 
-        filename, _ = QFileDialog.getSaveFileName(
-            self, "Export Events", "", "CSV Files (*.csv);;All Files (*)"
-        )
+        filename, _ = QFileDialog.getSaveFileName(self, "Export Events", "", "CSV Files (*.csv);;All Files (*)")
 
         if filename:
             self.export_requested.emit()

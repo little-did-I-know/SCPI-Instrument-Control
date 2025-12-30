@@ -42,23 +42,10 @@ class MockConnection(BaseConnection):
         channels = channel_states.keys() if channel_states else range(1, 3)
 
         self.idn = idn
-        self._channel_enabled: Dict[int, bool] = {
-            ch: channel_states.get(ch, True) if channel_states else True for ch in channels
-        }
-        self._voltage_scales: Dict[int, float] = {
-            ch: voltage_scales.get(ch, 1.0) if voltage_scales else 1.0 for ch in channels
-        }
-        self._voltage_offsets: Dict[int, float] = {
-            ch: voltage_offsets.get(ch, 0.0) if voltage_offsets else 0.0 for ch in channels
-        }
-        self._waveform_payloads: Dict[int, bytes] = {
-            ch: (
-                waveform_payloads.get(ch, bytes([0, 25, 50, 75]))
-                if waveform_payloads
-                else bytes([0, 25, 50, 75])
-            )
-            for ch in channels
-        }
+        self._channel_enabled: Dict[int, bool] = {ch: channel_states.get(ch, True) if channel_states else True for ch in channels}
+        self._voltage_scales: Dict[int, float] = {ch: voltage_scales.get(ch, 1.0) if voltage_scales else 1.0 for ch in channels}
+        self._voltage_offsets: Dict[int, float] = {ch: voltage_offsets.get(ch, 0.0) if voltage_offsets else 0.0 for ch in channels}
+        self._waveform_payloads: Dict[int, bytes] = {ch: (waveform_payloads.get(ch, bytes([0, 25, 50, 75])) if waveform_payloads else bytes([0, 25, 50, 75])) for ch in channels}
 
         self.sample_rate = sample_rate
         self.timebase = timebase
@@ -87,9 +74,7 @@ class MockConnection(BaseConnection):
     def write(self, command: str) -> None:
         """Record the command and update simple internal state."""
         if not self._connected:
-            raise exceptions.ConnectionError(
-                f"Not connected to oscilloscope at {self.host}:{self.port}"
-            )
+            raise exceptions.ConnectionError(f"Not connected to oscilloscope at {self.host}:{self.port}")
 
         command = command.strip()
         self.writes.append(command)
@@ -135,17 +120,13 @@ class MockConnection(BaseConnection):
     def read(self) -> str:
         """Return an empty response for completeness."""
         if not self._connected:
-            raise exceptions.ConnectionError(
-                f"Not connected to oscilloscope at {self.host}:{self.port}"
-            )
+            raise exceptions.ConnectionError(f"Not connected to oscilloscope at {self.host}:{self.port}")
         return ""
 
     def query(self, command: str) -> str:
         """Return deterministic responses for known SCPI queries."""
         if not self._connected:
-            raise exceptions.ConnectionError(
-                f"Not connected to oscilloscope at {self.host}:{self.port}"
-            )
+            raise exceptions.ConnectionError(f"Not connected to oscilloscope at {self.host}:{self.port}")
 
         command = command.strip()
         self.queries.append(command)
@@ -190,9 +171,7 @@ class MockConnection(BaseConnection):
 
         if match := re.match(r"C(\d+):TRLV\?", command, re.IGNORECASE):
             channel = int(match.group(1))
-            return (
-                f"C{channel}:TRLV {_format_scientific(self.trigger_level.get(channel, 0.0), 'V')}"
-            )
+            return f"C{channel}:TRLV {_format_scientific(self.trigger_level.get(channel, 0.0), 'V')}"
 
         if upper == "TDIV?":
             return f"TDIV {_format_scientific(self.timebase, 'S')}"
@@ -216,9 +195,7 @@ class MockConnection(BaseConnection):
     def read_raw(self, size: Optional[int] = None) -> bytes:
         """Return deterministic raw waveform data."""
         if not self._connected:
-            raise exceptions.ConnectionError(
-                f"Not connected to oscilloscope at {self.host}:{self.port}"
-            )
+            raise exceptions.ConnectionError(f"Not connected to oscilloscope at {self.host}:{self.port}")
 
         channel = self._last_waveform_channel or next(iter(self._waveform_payloads.keys()))
         payload = self._waveform_payloads.get(channel, bytes())

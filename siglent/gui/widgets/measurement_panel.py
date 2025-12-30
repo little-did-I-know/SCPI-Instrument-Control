@@ -94,16 +94,10 @@ class MeasurementPanel(QWidget):
         self.table = QTableWidget()
         self.table.setColumnCount(4)
         self.table.setHorizontalHeaderLabels(["Channel", "Measurement", "Value", ""])
-        self.table.horizontalHeader().setSectionResizeMode(
-            0, QHeaderView.ResizeMode.ResizeToContents
-        )
+        self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
         self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
-        self.table.horizontalHeader().setSectionResizeMode(
-            2, QHeaderView.ResizeMode.ResizeToContents
-        )
-        self.table.horizontalHeader().setSectionResizeMode(
-            3, QHeaderView.ResizeMode.ResizeToContents
-        )
+        self.table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
+        self.table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
         self.table.setAlternatingRowColors(True)
         results_layout.addWidget(self.table)
 
@@ -128,12 +122,7 @@ class MeasurementPanel(QWidget):
         layout.addLayout(controls_layout)
 
         # Info label
-        info_label = QLabel(
-            "<b>Tips:</b><br>"
-            "• Add measurements to track specific parameters<br>"
-            "• Enable Auto Update to continuously refresh values<br>"
-            "• Remove measurements by clicking the 'X' button"
-        )
+        info_label = QLabel("<b>Tips:</b><br>" "• Add measurements to track specific parameters<br>" "• Enable Auto Update to continuously refresh values<br>" "• Remove measurements by clicking the 'X' button")
         info_label.setWordWrap(True)
         info_label.setStyleSheet("QLabel { font-size: 9pt; color: #888; }")
         layout.addWidget(info_label)

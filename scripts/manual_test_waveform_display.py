@@ -63,9 +63,7 @@ class TestWindow(QMainWindow):
         v = np.sin(2 * np.pi * 1000 * t)  # 1kHz sine wave
 
         # Create waveform data
-        waveform = WaveformData(
-            time=t, voltage=v, channel=1, source="Test", description="1kHz Sine Wave"
-        )
+        waveform = WaveformData(time=t, voltage=v, channel=1, source="Test", description="1kHz Sine Wave")
 
         # Plot it
         self.display.plot_waveform(waveform, clear_others=True)
@@ -80,9 +78,7 @@ class TestWindow(QMainWindow):
         v = np.sign(np.sin(2 * np.pi * 1000 * t))  # 1kHz square wave
 
         # Create waveform data
-        waveform = WaveformData(
-            time=t, voltage=v, channel=2, source="Test", description="1kHz Square Wave"
-        )
+        waveform = WaveformData(time=t, voltage=v, channel=2, source="Test", description="1kHz Square Wave")
 
         # Plot it
         self.display.plot_waveform(waveform, clear_others=True)

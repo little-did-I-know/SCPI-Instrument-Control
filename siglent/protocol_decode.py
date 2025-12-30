@@ -144,9 +144,7 @@ class ProtocolDecoder(ABC):
 
         return summary
 
-    def _detect_edge(
-        self, signal: np.ndarray, time: np.ndarray, threshold: float, edge_type: str = "rising"
-    ) -> List[float]:
+    def _detect_edge(self, signal: np.ndarray, time: np.ndarray, threshold: float, edge_type: str = "rising") -> List[float]:
         """Detect edges in a digital signal.
 
         Args:
@@ -176,9 +174,7 @@ class ProtocolDecoder(ABC):
 
         return sorted(edge_times)
 
-    def _sample_at_time(
-        self, signal: np.ndarray, time: np.ndarray, sample_time: float, threshold: float
-    ) -> bool:
+    def _sample_at_time(self, signal: np.ndarray, time: np.ndarray, sample_time: float, threshold: float) -> bool:
         """Sample digital signal at a specific time.
 
         Args:
@@ -195,9 +191,7 @@ class ProtocolDecoder(ABC):
 
         return signal[idx] > threshold
 
-    def _get_bit_at_time(
-        self, signal: np.ndarray, time: np.ndarray, sample_time: float, threshold: float
-    ) -> int:
+    def _get_bit_at_time(self, signal: np.ndarray, time: np.ndarray, sample_time: float, threshold: float) -> int:
         """Get bit value at a specific time.
 
         Args:

@@ -40,9 +40,7 @@ except ImportError:
 
     USING_PYQTGRAPH = False
     logger = logging.getLogger(__name__)
-    logger.warning(
-        "PyQtGraph not available, using matplotlib (install with: pip install 'Siglent-Oscilloscope[gui]')"
-    )
+    logger.warning("PyQtGraph not available, using matplotlib (install with: pip install 'Siglent-Oscilloscope[gui]')")
 from siglent.gui.connection_manager import ConnectionManager
 from siglent.gui.live_view_worker import LiveViewWorker
 from siglent.gui.widgets.channel_control import ChannelControl
@@ -483,9 +481,7 @@ class MainWindow(QMainWindow):
             for connection in recent:
                 display_text = self.connection_manager.format_connection_display(connection)
                 action = QAction(display_text, self)
-                action.triggered.connect(
-                    lambda checked, conn=connection: self._connect_to_recent(conn)
-                )
+                action.triggered.connect(lambda checked, conn=connection: self._connect_to_recent(conn))
                 self.recent_connections_menu.addAction(action)
 
             self.recent_connections_menu.addSeparator()
@@ -524,14 +520,10 @@ class MainWindow(QMainWindow):
         """Handle connect action."""
         # Get default IP from last connection
         last_connection = self.connection_manager.get_last_connection()
-        default_ip = (
-            last_connection.get("host", "192.168.1.100") if last_connection else "192.168.1.100"
-        )
+        default_ip = last_connection.get("host", "192.168.1.100") if last_connection else "192.168.1.100"
 
         # Get IP address from user
-        ip, ok = QInputDialog.getText(
-            self, "Connect to Oscilloscope", "Enter oscilloscope IP address:", text=default_ip
-        )
+        ip, ok = QInputDialog.getText(self, "Connect to Oscilloscope", "Enter oscilloscope IP address:", text=default_ip)
 
         if ok and ip:
             self._connect_to_scope(ip)
@@ -570,14 +562,7 @@ class MainWindow(QMainWindow):
             if self.scope.model_capability:
                 cap = self.scope.model_capability
                 status_msg = f"Connected: {model} | {cap.series} | {cap.num_channels}ch | {cap.bandwidth_mhz}MHz | {ip}"
-                info_msg = (
-                    f"Successfully connected to:\n\n"
-                    f"Model: {model}\n"
-                    f"Series: {cap.series}\n"
-                    f"Channels: {cap.num_channels}\n"
-                    f"Bandwidth: {cap.bandwidth_mhz} MHz\n"
-                    f"IP Address: {ip}"
-                )
+                info_msg = f"Successfully connected to:\n\n" f"Model: {model}\n" f"Series: {cap.series}\n" f"Channels: {cap.num_channels}\n" f"Bandwidth: {cap.bandwidth_mhz} MHz\n" f"IP Address: {ip}"
             else:
                 status_msg = f"Connected to {model} at {ip}"
                 info_msg = f"Successfully connected to {model}\nIP: {ip}"
@@ -592,9 +577,7 @@ class MainWindow(QMainWindow):
 
         except (ConnectionError, SiglentError) as e:
             self.statusBar().showMessage("Connection failed")
-            QMessageBox.critical(
-                self, "Connection Error", f"Failed to connect to oscilloscope:\n{str(e)}"
-            )
+            QMessageBox.critical(self, "Connection Error", f"Failed to connect to oscilloscope:\n{str(e)}")
             logger.error(f"Connection failed: {e}")
             self.scope = None
 
@@ -684,10 +667,7 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(
                 self,
                 "Missing Dependency",
-                "The VNC viewer requires PyQt6-WebEngine to be installed.\n\n"
-                "Please install it using:\n"
-                "pip install PyQt6-WebEngine\n\n"
-                f"Error: {str(e)}",
+                "The VNC viewer requires PyQt6-WebEngine to be installed.\n\n" "Please install it using:\n" "pip install PyQt6-WebEngine\n\n" f"Error: {str(e)}",
             )
             logger.error(f"Failed to import VNCWindow: {e}")
             return
@@ -705,8 +685,7 @@ class MainWindow(QMainWindow):
                 QMessageBox.information(
                     self,
                     "VNC Viewer",
-                    "Enter your oscilloscope's IP address in the toolbar to connect.\n\n"
-                    "The VNC viewer will display your oscilloscope's screen interface.",
+                    "Enter your oscilloscope's IP address in the toolbar to connect.\n\n" "The VNC viewer will display your oscilloscope's screen interface.",
                 )
 
             # Show the window
@@ -729,9 +708,7 @@ class MainWindow(QMainWindow):
             # Ask user for file location
             # Note: SCDP command returns BMP format regardless of extension
             file_filter = "BMP Image (*.bmp);;All Files (*.*)"
-            filename, selected_filter = QFileDialog.getSaveFileName(
-                self, "Save Screenshot", "screenshot.bmp", file_filter
-            )
+            filename, selected_filter = QFileDialog.getSaveFileName(self, "Save Screenshot", "screenshot.bmp", file_filter)
 
             if filename:
                 self.statusBar().showMessage("Capturing screenshot using SCDP...")
@@ -744,8 +721,7 @@ class MainWindow(QMainWindow):
                 QMessageBox.information(
                     self,
                     "Screenshot Saved",
-                    f"Screenshot successfully saved to:\n{filename}\n\n"
-                    f"Note: Image is in BMP format (from SCDP command).",
+                    f"Screenshot successfully saved to:\n{filename}\n\n" f"Note: Image is in BMP format (from SCDP command).",
                 )
                 logger.info(f"Screenshot saved successfully to {filename}")
 
@@ -754,9 +730,7 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(
                 self,
                 "Screenshot Error",
-                f"Failed to capture screenshot:\n{str(e)}\n\n"
-                f"The SCDP command is used per Siglent manual.\n"
-                f"Ensure your oscilloscope supports this command.",
+                f"Failed to capture screenshot:\n{str(e)}\n\n" f"The SCDP command is used per Siglent manual.\n" f"Ensure your oscilloscope supports this command.",
             )
             logger.error(f"Screenshot capture failed: {e}")
 
@@ -771,11 +745,7 @@ class MainWindow(QMainWindow):
 
             # Get list of enabled channels
             enabled_channels = []
-            supported_channels = (
-                self.scope.supported_channels
-                if hasattr(self.scope, "supported_channels")
-                else range(1, 5)
-            )
+            supported_channels = self.scope.supported_channels if hasattr(self.scope, "supported_channels") else range(1, 5)
 
             for ch_num in supported_channels:
                 try:
@@ -808,9 +778,7 @@ class MainWindow(QMainWindow):
                         enabled_channels = [1]
                         logger.info("Enabled channel 1 for capture")
                     except Exception as e:
-                        QMessageBox.critical(
-                            self, "Error", f"Could not enable channel 1:\n{str(e)}"
-                        )
+                        QMessageBox.critical(self, "Error", f"Could not enable channel 1:\n{str(e)}")
                         logger.error(f"Failed to enable channel 1: {e}")
                         return
                 else:
@@ -829,9 +797,7 @@ class MainWindow(QMainWindow):
                     logger.info(f"Capturing waveform from channel {ch_num}...")
                     waveform = self.scope.get_waveform(ch_num)
                     if waveform:
-                        logger.info(
-                            f"  Got waveform: {len(waveform.voltage)} samples, voltage range: {waveform.voltage.min():.3f} to {waveform.voltage.max():.3f} V"
-                        )
+                        logger.info(f"  Got waveform: {len(waveform.voltage)} samples, voltage range: {waveform.voltage.min():.3f} to {waveform.voltage.max():.3f} V")
                         waveforms.append(waveform)
                     else:
                         logger.warning(f"  No waveform data returned for channel {ch_num}")
@@ -922,9 +888,7 @@ class MainWindow(QMainWindow):
                         )
                     except Exception as e:
                         logger.error(f"Could not enable channel 1: {e}")
-                        raise RuntimeError(
-                            f"No channels are enabled and could not enable channel 1: {e}"
-                        )
+                        raise RuntimeError(f"No channels are enabled and could not enable channel 1: {e}")
 
                 # Start live view worker thread
                 logger.info("Starting live view worker thread...")
@@ -941,8 +905,7 @@ class MainWindow(QMainWindow):
                 QMessageBox.warning(
                     self,
                     "Live View Error",
-                    f"Could not start live view:\n{str(e)}\n\n"
-                    f"Make sure the oscilloscope is connected and at least one channel is enabled.",
+                    f"Could not start live view:\n{str(e)}\n\n" f"Make sure the oscilloscope is connected and at least one channel is enabled.",
                 )
 
                 # Disable live view flag and uncheck the menu action
@@ -996,10 +959,7 @@ class MainWindow(QMainWindow):
             return
 
         # Check if waveform display has data
-        if (
-            not hasattr(self.waveform_display, "current_waveforms")
-            or not self.waveform_display.current_waveforms
-        ):
+        if not hasattr(self.waveform_display, "current_waveforms") or not self.waveform_display.current_waveforms:
             QMessageBox.information(
                 self,
                 "No Data",
@@ -1010,9 +970,7 @@ class MainWindow(QMainWindow):
         try:
             # Ask user for file location and format
             file_filter = "CSV File (*.csv);;Enhanced CSV (*.csv);;NumPy Archive (*.npz);;MATLAB File (*.mat);;HDF5 File (*.h5);;All Files (*.*)"
-            filename, selected_filter = QFileDialog.getSaveFileName(
-                self, "Save Waveform", "waveform.csv", file_filter
-            )
+            filename, selected_filter = QFileDialog.getSaveFileName(self, "Save Waveform", "waveform.csv", file_filter)
 
             if filename:
                 # Determine format from filter
@@ -1098,9 +1056,7 @@ class MainWindow(QMainWindow):
         values = self.waveform_display.get_cursor_values()
 
         # Update cursor panel
-        self.cursor_panel.update_cursor_values(
-            x1=values.get("x1"), y1=values.get("y1"), x2=values.get("x2"), y2=values.get("y2")
-        )
+        self.cursor_panel.update_cursor_values(x1=values.get("x1"), y1=values.get("y1"), x2=values.get("x2"), y2=values.get("y2"))
 
     def _on_math1_expression_changed(self, expression: str):
         """Handle Math1 expression change.
@@ -1179,9 +1135,7 @@ class MainWindow(QMainWindow):
                 return
 
             # Compute FFT
-            fft_result = self.scope.fft_analyzer.compute_fft(
-                waveform, window=window, output_db=True
-            )
+            fft_result = self.scope.fft_analyzer.compute_fft(waveform, window=window, output_db=True)
 
             if fft_result:
                 # Display FFT result
@@ -1237,9 +1191,7 @@ class MainWindow(QMainWindow):
                 # Create metadata
                 metadata = {
                     "source": "Live capture",
-                    "model": (
-                        self.scope.device_info.get("model", "Unknown") if self.scope else "Unknown"
-                    ),
+                    "model": (self.scope.device_info.get("model", "Unknown") if self.scope else "Unknown"),
                 }
 
                 # Save reference
@@ -1275,9 +1227,7 @@ class MainWindow(QMainWindow):
                 # Calculate and display correlation if live waveform exists
                 if self.waveform_display.current_waveforms:
                     waveform = self.waveform_display.current_waveforms[0]
-                    correlation = self.reference_manager.calculate_correlation(
-                        waveform, reference_data
-                    )
+                    correlation = self.reference_manager.calculate_correlation(waveform, reference_data)
 
                     # Calculate RMS difference
                     diff = self.reference_manager.calculate_difference(waveform, reference_data)
@@ -1366,9 +1316,7 @@ class MainWindow(QMainWindow):
                 if waveform:
                     waveforms[signal_name] = waveform
                 else:
-                    QMessageBox.warning(
-                        self, "No Data", f"No waveform data available for channel {channel_str}"
-                    )
+                    QMessageBox.warning(self, "No Data", f"No waveform data available for channel {channel_str}")
                     return
 
             # Select decoder
@@ -1406,9 +1354,7 @@ class MainWindow(QMainWindow):
             return
 
         # Ask for filename
-        filename, _ = QFileDialog.getSaveFileName(
-            self, "Export Protocol Events", "", "CSV Files (*.csv);;All Files (*)"
-        )
+        filename, _ = QFileDialog.getSaveFileName(self, "Export Protocol Events", "", "CSV Files (*.csv);;All Files (*)")
 
         if filename:
             try:
@@ -1426,9 +1372,7 @@ class MainWindow(QMainWindow):
 
                     with open(filename, "w", newline="") as f:
                         writer = csv.writer(f)
-                        writer.writerow(
-                            ["Timestamp", "Event Type", "Data", "Description", "Channel", "Valid"]
-                        )
+                        writer.writerow(["Timestamp", "Event Type", "Data", "Description", "Channel", "Valid"])
                         for event in events:
                             writer.writerow(
                                 [

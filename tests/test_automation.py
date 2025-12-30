@@ -56,9 +56,7 @@ def test_batch_capture_applies_timebase_and_scale(monkeypatch, collector):
         timebase_scales=["1e-3", "2e-3"],
         voltage_scales={1: [0.5, 1.0]},
         triggers_per_config=2,
-        progress_callback=lambda current, total, status: progress_updates.append(
-            (current, total, status)
-        ),
+        progress_callback=lambda current, total, status: progress_updates.append((current, total, status)),
     )
 
     connection = collector.scope._connection

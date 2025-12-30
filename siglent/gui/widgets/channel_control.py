@@ -96,9 +96,7 @@ class ChannelControl(QWidget):
         }
 
         group = QGroupBox(f"Channel {channel_num}")
-        group.setStyleSheet(
-            f"QGroupBox::title {{ color: {colors[channel_num]}; font-weight: bold; }}"
-        )
+        group.setStyleSheet(f"QGroupBox::title {{ color: {colors[channel_num]}; font-weight: bold; }}")
         layout = QGridLayout(group)
         layout.setColumnStretch(1, 1)
 
@@ -130,9 +128,7 @@ class ChannelControl(QWidget):
         layout.addWidget(QLabel("Coupling:"), 2, 0)
         coupling_combo = QComboBox()
         coupling_combo.addItems(self.COUPLING_MODES)
-        coupling_combo.currentTextChanged.connect(
-            lambda val: self._on_coupling_changed(channel_num, val)
-        )
+        coupling_combo.currentTextChanged.connect(lambda val: self._on_coupling_changed(channel_num, val))
         layout.addWidget(coupling_combo, 2, 1, 1, 2)
         widgets["coupling"] = coupling_combo
 
@@ -195,9 +191,7 @@ class ChannelControl(QWidget):
             self._refresh_all_channels()
         elif scope:
             # Scope connected but no capability info - show all channels
-            logger.warning(
-                "Scope connected but model capability not available, showing all channels"
-            )
+            logger.warning("Scope connected but model capability not available, showing all channels")
             for ch_num in range(1, 5):
                 group = self.channel_groups.get(ch_num)
                 if group:
@@ -221,11 +215,7 @@ class ChannelControl(QWidget):
             return
 
         # Get supported channels from oscilloscope
-        supported_channels = (
-            self.scope.supported_channels
-            if hasattr(self.scope, "supported_channels")
-            else range(1, 5)
-        )
+        supported_channels = self.scope.supported_channels if hasattr(self.scope, "supported_channels") else range(1, 5)
 
         for ch_num in supported_channels:
             try:

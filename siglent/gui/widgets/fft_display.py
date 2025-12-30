@@ -85,16 +85,12 @@ class FFTDisplay(QWidget):
         # Window function selector
         layout.addWidget(QLabel("Window:"), 0, 2)
         self.window_combo = QComboBox()
-        self.window_combo.addItems(
-            ["Hanning", "Hamming", "Blackman", "Bartlett", "Rectangular", "Flattop"]
-        )
+        self.window_combo.addItems(["Hanning", "Hamming", "Blackman", "Bartlett", "Rectangular", "Flattop"])
         layout.addWidget(self.window_combo, 0, 3)
 
         # Compute button
         self.compute_btn = QPushButton("Compute FFT")
-        self.compute_btn.setStyleSheet(
-            "background-color: #2196F3; color: white; font-weight: bold;"
-        )
+        self.compute_btn.setStyleSheet("background-color: #2196F3; color: white; font-weight: bold;")
         self.compute_btn.clicked.connect(self._on_compute_fft)
         layout.addWidget(self.compute_btn, 0, 4)
 
@@ -312,9 +308,7 @@ class FFTDisplay(QWidget):
 
                 # Plot marker
                 color = colors[i % len(colors)]
-                marker = self.ax.plot(
-                    freq, display_mag, "o", color=color, markersize=10, label=f"Peak {i+1}"
-                )[0]
+                marker = self.ax.plot(freq, display_mag, "o", color=color, markersize=10, label=f"Peak {i+1}")[0]
                 self.peak_markers.append(marker)
 
                 # Update label

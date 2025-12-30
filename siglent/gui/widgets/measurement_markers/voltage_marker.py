@@ -95,18 +95,12 @@ class VoltageMarker(MeasurementMarker):
         self.artists.append(line2)
 
         # Draw horizontal lines and brackets based on measurement type
-        if (
-            self.measurement_type in ["PKPK", "AMPL"]
-            and self.max_value is not None
-            and self.min_value is not None
-        ):
+        if self.measurement_type in ["PKPK", "AMPL"] and self.max_value is not None and self.min_value is not None:
             # Draw lines at max and min
             max_line = self.ax.axhline(
                 self.max_value,
-                xmin=(start_x - self.ax.get_xlim()[0])
-                / (self.ax.get_xlim()[1] - self.ax.get_xlim()[0]),
-                xmax=(end_x - self.ax.get_xlim()[0])
-                / (self.ax.get_xlim()[1] - self.ax.get_xlim()[0]),
+                xmin=(start_x - self.ax.get_xlim()[0]) / (self.ax.get_xlim()[1] - self.ax.get_xlim()[0]),
+                xmax=(end_x - self.ax.get_xlim()[0]) / (self.ax.get_xlim()[1] - self.ax.get_xlim()[0]),
                 color=self.color,
                 linestyle="-",
                 linewidth=1.5,
@@ -116,10 +110,8 @@ class VoltageMarker(MeasurementMarker):
 
             min_line = self.ax.axhline(
                 self.min_value,
-                xmin=(start_x - self.ax.get_xlim()[0])
-                / (self.ax.get_xlim()[1] - self.ax.get_xlim()[0]),
-                xmax=(end_x - self.ax.get_xlim()[0])
-                / (self.ax.get_xlim()[1] - self.ax.get_xlim()[0]),
+                xmin=(start_x - self.ax.get_xlim()[0]) / (self.ax.get_xlim()[1] - self.ax.get_xlim()[0]),
+                xmax=(end_x - self.ax.get_xlim()[0]) / (self.ax.get_xlim()[1] - self.ax.get_xlim()[0]),
                 color=self.color,
                 linestyle="-",
                 linewidth=1.5,
@@ -145,10 +137,8 @@ class VoltageMarker(MeasurementMarker):
             # Single horizontal line for other voltage measurements
             h_line = self.ax.axhline(
                 self.result,
-                xmin=(start_x - self.ax.get_xlim()[0])
-                / (self.ax.get_xlim()[1] - self.ax.get_xlim()[0]),
-                xmax=(end_x - self.ax.get_xlim()[0])
-                / (self.ax.get_xlim()[1] - self.ax.get_xlim()[0]),
+                xmin=(start_x - self.ax.get_xlim()[0]) / (self.ax.get_xlim()[1] - self.ax.get_xlim()[0]),
+                xmax=(end_x - self.ax.get_xlim()[0]) / (self.ax.get_xlim()[1] - self.ax.get_xlim()[0]),
                 color=self.color,
                 linestyle="-",
                 linewidth=2,

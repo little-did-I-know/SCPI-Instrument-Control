@@ -84,9 +84,7 @@ class ReferencePanel(QWidget):
         layout.addWidget(info_label)
 
         save_btn = QPushButton("Save as Reference...")
-        save_btn.setStyleSheet(
-            "background-color: #4CAF50; color: white; font-weight: bold; padding: 8px;"
-        )
+        save_btn.setStyleSheet("background-color: #4CAF50; color: white; font-weight: bold; padding: 8px;")
         save_btn.clicked.connect(self._on_save_reference)
         layout.addWidget(save_btn)
 
@@ -310,12 +308,7 @@ class ReferencePanel(QWidget):
         else:
             time_str = f"{time_span:.2f} s"
 
-        info_text = (
-            f"<b>Loaded:</b> {name}<br>"
-            f"<b>Channel:</b> {channel}<br>"
-            f"<b>Samples:</b> {num_samples}<br>"
-            f"<b>Time Span:</b> {time_str}"
-        )
+        info_text = f"<b>Loaded:</b> {name}<br>" f"<b>Channel:</b> {channel}<br>" f"<b>Samples:</b> {num_samples}<br>" f"<b>Time Span:</b> {time_str}"
 
         self.info_label.setText(info_text)
 
@@ -340,9 +333,7 @@ class ReferencePanel(QWidget):
             else:
                 color = "red"
 
-            self.correlation_label.setText(
-                f"Correlation: <span style='color: {color}; font-weight: bold;'>{correlation:.4f}</span>"
-            )
+            self.correlation_label.setText(f"Correlation: <span style='color: {color}; font-weight: bold;'>{correlation:.4f}</span>")
         else:
             self.correlation_label.setText("Correlation: --")
 

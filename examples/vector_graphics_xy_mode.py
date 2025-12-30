@@ -74,23 +74,17 @@ def main():
     # Circle
     print("  Generating circle...")
     circle = Shape.circle(radius=0.8, points=1000)
-    display.save_waveforms(
-        circle, f"{OUTPUT_DIR}/01_circle", sample_rate=SAMPLE_RATE, duration=DURATION
-    )
+    display.save_waveforms(circle, f"{OUTPUT_DIR}/01_circle", sample_rate=SAMPLE_RATE, duration=DURATION)
 
     # Square
     print("  Generating square...")
     square = Shape.rectangle(width=1.6, height=1.6, points_per_side=250)
-    display.save_waveforms(
-        square, f"{OUTPUT_DIR}/02_square", sample_rate=SAMPLE_RATE, duration=DURATION
-    )
+    display.save_waveforms(square, f"{OUTPUT_DIR}/02_square", sample_rate=SAMPLE_RATE, duration=DURATION)
 
     # Star
     print("  Generating star...")
     star = Shape.star(num_points=5, outer_radius=0.9, inner_radius=0.4)
-    display.save_waveforms(
-        star, f"{OUTPUT_DIR}/03_star", sample_rate=SAMPLE_RATE, duration=DURATION
-    )
+    display.save_waveforms(star, f"{OUTPUT_DIR}/03_star", sample_rate=SAMPLE_RATE, duration=DURATION)
 
     # Triangle
     print("  Generating triangle...")
@@ -102,9 +96,7 @@ def main():
         ],
         points_per_side=300,
     )
-    display.save_waveforms(
-        triangle, f"{OUTPUT_DIR}/04_triangle", sample_rate=SAMPLE_RATE, duration=DURATION
-    )
+    display.save_waveforms(triangle, f"{OUTPUT_DIR}/04_triangle", sample_rate=SAMPLE_RATE, duration=DURATION)
 
     print("✓ Basic shapes generated\n")
 
@@ -123,9 +115,7 @@ def main():
     for a, b, delta, name in lissajous_patterns:
         print(f"  Generating Lissajous {a}:{b}...")
         lissajous = Shape.lissajous(a=a, b=b, delta=delta, points=2000)
-        display.save_waveforms(
-            lissajous, f"{OUTPUT_DIR}/lissajous_{name}", sample_rate=SAMPLE_RATE, duration=DURATION
-        )
+        display.save_waveforms(lissajous, f"{OUTPUT_DIR}/lissajous_{name}", sample_rate=SAMPLE_RATE, duration=DURATION)
 
     print("✓ Lissajous figures generated\n")
 
@@ -138,9 +128,7 @@ def main():
 
     try:
         text = Shape.text("HELLO", font_size=0.6)
-        display.save_waveforms(
-            text, f"{OUTPUT_DIR}/text_hello", sample_rate=SAMPLE_RATE, duration=DURATION
-        )
+        display.save_waveforms(text, f"{OUTPUT_DIR}/text_hello", sample_rate=SAMPLE_RATE, duration=DURATION)
         print("✓ Text generated")
     except Exception as e:
         print(f"  ⚠ Text generation skipped: {e}")
@@ -189,9 +177,7 @@ def main():
 
     # Combine all parts
     smiley = face_outer.combine(eye_left).combine(eye_right).combine(mouth)
-    display.save_waveforms(
-        smiley, f"{OUTPUT_DIR}/composite_smiley", sample_rate=SAMPLE_RATE, duration=DURATION
-    )
+    display.save_waveforms(smiley, f"{OUTPUT_DIR}/composite_smiley", sample_rate=SAMPLE_RATE, duration=DURATION)
     print("✓ Smiley face generated\n")
 
     # ==========================================

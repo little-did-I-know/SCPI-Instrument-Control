@@ -191,9 +191,7 @@ class SPIDecoder(ProtocolDecoder):
 
         return self.events
 
-    def _find_cs_active_periods(
-        self, cs: np.ndarray, time: np.ndarray, threshold: float, cs_active_low: bool
-    ) -> List[tuple]:
+    def _find_cs_active_periods(self, cs: np.ndarray, time: np.ndarray, threshold: float, cs_active_low: bool) -> List[tuple]:
         """Find CS active periods (transactions).
 
         Args:

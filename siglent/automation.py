@@ -101,9 +101,7 @@ class DataCollector:
         self.disconnect()
         return False
 
-    def capture_single(
-        self, channels: List[int], auto_setup: bool = False
-    ) -> Dict[int, WaveformData]:
+    def capture_single(self, channels: List[int], auto_setup: bool = False) -> Dict[int, WaveformData]:
         """Capture waveforms from specified channels.
 
         Args:
@@ -119,9 +117,7 @@ class DataCollector:
             >>> print(f"Sample rate: {data[1].sample_rate} Hz")
         """
         if not self._connected:
-            raise SiglentError(
-                f"Not connected to oscilloscope at {self.scope.host}:{self.scope.port}"
-            )
+            raise SiglentError(f"Not connected to oscilloscope at {self.scope.host}:{self.scope.port}")
 
         if auto_setup:
             self.scope.auto_setup()
@@ -176,9 +172,7 @@ class DataCollector:
             >>> print(f"Collected {len(results)} captures")
         """
         if not self._connected:
-            raise SiglentError(
-                f"Not connected to oscilloscope at {self.scope.host}:{self.scope.port}"
-            )
+            raise SiglentError(f"Not connected to oscilloscope at {self.scope.host}:{self.scope.port}")
 
         results = []
 
@@ -214,11 +208,7 @@ class DataCollector:
                     self.scope.timebase = config["timebase"]
                 logger.info(f"Set timebase to {config['timebase']}")
 
-            for ch, scale in [
-                (int(k[2]), v)
-                for k, v in config.items()
-                if k.startswith("ch") and k.endswith("_vdiv")
-            ]:
+            for ch, scale in [(int(k[2]), v) for k, v in config.items() if k.startswith("ch") and k.endswith("_vdiv")]:
                 channel = getattr(self.scope, f"channel{ch}")
                 if hasattr(channel, "set_scale"):
                     channel.set_scale(scale)
@@ -283,9 +273,7 @@ class DataCollector:
             ... )
         """
         if not self._connected:
-            raise SiglentError(
-                f"Not connected to oscilloscope at {self.scope.host}:{self.scope.port}"
-            )
+            raise SiglentError(f"Not connected to oscilloscope at {self.scope.host}:{self.scope.port}")
 
         if output_dir:
             output_path = Path(output_dir)
@@ -328,9 +316,7 @@ class DataCollector:
                     timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
                     for ch, waveform in waveforms.items():
                         filename = output_path / f"ch{ch}_{timestamp_str}.{file_format}"
-                        self.scope.waveform.save_waveform(
-                            waveform, str(filename), format=file_format
-                        )
+                        self.scope.waveform.save_waveform(waveform, str(filename), format=file_format)
                     logger.debug(f"Saved capture {capture_count}")
                 else:
                     results.append(capture_data)
@@ -355,9 +341,7 @@ class DataCollector:
         logger.info(f"Continuous capture complete: {capture_count} captures over {duration}s")
         return results
 
-    def save_data(
-        self, waveforms: Dict[int, WaveformData], filename: str, format: str = "npz"
-    ) -> None:
+    def save_data(self, waveforms: Dict[int, WaveformData], filename: str, format: str = "npz") -> None:
         """Save captured waveform data to file.
 
         Args:
@@ -375,9 +359,7 @@ class DataCollector:
             self.scope.waveform.save_waveform(waveform, ch_filename, format=format)
             logger.info(f"Saved channel {ch} to {ch_filename}")
 
-    def save_batch(
-        self, batch_results: List[Dict[str, Any]], output_dir: str, format: str = "npz"
-    ) -> None:
+    def save_batch(self, batch_results: List[Dict[str, Any]], output_dir: str, format: str = "npz") -> None:
         """Save batch capture results to directory.
 
         Args:
@@ -411,9 +393,7 @@ class DataCollector:
 
         # Save waveforms
         for i, result in enumerate(batch_results):
-            config_str = "_".join([f"{k}={v}" for k, v in result["config"].items()]).replace(
-                "/", "-"
-            )
+            config_str = "_".join([f"{k}={v}" for k, v in result["config"].items()]).replace("/", "-")
             trigger_num = result["trigger_num"]
 
             for ch, waveform in result["waveforms"].items():

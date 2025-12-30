@@ -435,9 +435,7 @@ class VisualMeasurementPanel(QWidget):
             default_dir = str(config_set.get_default_config_dir())
 
             # Show file dialog
-            filename, _ = QFileDialog.getSaveFileName(
-                self, "Save Measurement Configuration", default_dir, "JSON Files (*.json)"
-            )
+            filename, _ = QFileDialog.getSaveFileName(self, "Save Measurement Configuration", default_dir, "JSON Files (*.json)")
 
             if not filename:
                 return
@@ -468,9 +466,7 @@ class VisualMeasurementPanel(QWidget):
 
             # Create config set
             config_name = Path(filename).stem
-            config_set = MeasurementConfigSet(
-                name=config_name, created_at=datetime.now(), markers=markers
-            )
+            config_set = MeasurementConfigSet(name=config_name, created_at=datetime.now(), markers=markers)
 
             # Save to file
             config_set.save_to_file(filename)
@@ -490,9 +486,7 @@ class VisualMeasurementPanel(QWidget):
             default_dir = str(config_set.get_default_config_dir())
 
             # Show file dialog
-            filename, _ = QFileDialog.getOpenFileName(
-                self, "Load Measurement Configuration", default_dir, "JSON Files (*.json)"
-            )
+            filename, _ = QFileDialog.getOpenFileName(self, "Load Measurement Configuration", default_dir, "JSON Files (*.json)")
 
             if not filename:
                 return
@@ -544,14 +538,10 @@ class VisualMeasurementPanel(QWidget):
                 self._add_marker_to_list(marker)
 
             # Update marker counter
-            max_id = max(
-                [int(m.id[1:]) for m in config_set.markers if m.id.startswith("M")], default=0
-            )
+            max_id = max([int(m.id[1:]) for m in config_set.markers if m.id.startswith("M")], default=0)
             self.marker_counter = max_id
 
-            QMessageBox.information(
-                self, "Success", f"Loaded {len(config_set.markers)} markers from {filename}"
-            )
+            QMessageBox.information(self, "Success", f"Loaded {len(config_set.markers)} markers from {filename}")
             logger.info(f"Loaded configuration from {filename}")
 
         except Exception as e:
@@ -562,9 +552,7 @@ class VisualMeasurementPanel(QWidget):
         """Handle export results button click."""
         try:
             # Show file dialog
-            filename, _ = QFileDialog.getSaveFileName(
-                self, "Export Measurement Results", "", "CSV Files (*.csv);;JSON Files (*.json)"
-            )
+            filename, _ = QFileDialog.getSaveFileName(self, "Export Measurement Results", "", "CSV Files (*.csv);;JSON Files (*.json)")
 
             if not filename:
                 return

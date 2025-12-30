@@ -166,9 +166,7 @@ class MeasurementConfigSet:
                 metadata=data.get("metadata", {}),
             )
 
-            logger.info(
-                f"Loaded measurement configuration from {filepath} ({len(markers)} markers)"
-            )
+            logger.info(f"Loaded measurement configuration from {filepath} ({len(markers)} markers)")
             return config_set
 
         except FileNotFoundError:
@@ -237,9 +235,7 @@ class MeasurementConfigSet:
         if system == "Windows":
             config_dir = Path.home() / "AppData" / "Local" / "siglent" / "measurement_configs"
         elif system == "Darwin":  # macOS
-            config_dir = (
-                Path.home() / "Library" / "Application Support" / "siglent" / "measurement_configs"
-            )
+            config_dir = Path.home() / "Library" / "Application Support" / "siglent" / "measurement_configs"
         else:  # Linux and others
             config_dir = Path.home() / ".config" / "siglent" / "measurement_configs"
 

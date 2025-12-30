@@ -127,9 +127,7 @@ class ScreenCapture:
                 image_data = self._scope._connection.read_raw(data_length)
 
                 if len(image_data) != data_length:
-                    raise Exception(
-                        f"Data length mismatch: expected {data_length}, got {len(image_data)}"
-                    )
+                    raise Exception(f"Data length mismatch: expected {data_length}, got {len(image_data)}")
 
                 return image_data
             else:
@@ -252,9 +250,7 @@ class ScreenCapture:
         try:
             from PIL import Image
         except ImportError:
-            raise ImportError(
-                "PIL/Pillow is required for this function. Install with: pip install Pillow"
-            )
+            raise ImportError("PIL/Pillow is required for this function. Install with: pip install Pillow")
 
         # Capture screenshot (returns BMP format from SCDP)
         image_data = self.capture_screenshot()

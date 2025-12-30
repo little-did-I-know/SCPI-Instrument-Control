@@ -102,11 +102,7 @@ class TimingMarker(MeasurementMarker):
         self.artists.append(line2)
 
         # Type-specific rendering
-        if (
-            self.measurement_type in ["RISE", "FALL"]
-            and self.threshold_10 is not None
-            and self.threshold_90 is not None
-        ):
+        if self.measurement_type in ["RISE", "FALL"] and self.threshold_10 is not None and self.threshold_90 is not None:
             # Draw horizontal threshold lines
             xlim = self.ax.get_xlim()
             x_start_norm = (start_x - xlim[0]) / (xlim[1] - xlim[0])
@@ -137,9 +133,7 @@ class TimingMarker(MeasurementMarker):
         elif self.measurement_type in ["WID", "NWID", "DUTY"]:
             # Draw shaded region between gates
             ylim = self.ax.get_ylim()
-            fill = self.ax.fill_between(
-                [start_x, end_x], ylim[0], ylim[1], color=self.color, alpha=0.15
-            )
+            fill = self.ax.fill_between([start_x, end_x], ylim[0], ylim[1], color=self.color, alpha=0.15)
             self.artists.append(fill)
 
         # Draw label
@@ -348,9 +342,7 @@ class TimingMarker(MeasurementMarker):
 
         return float(duty_cycle)
 
-    def _find_threshold_crossing(
-        self, time: np.ndarray, voltage: np.ndarray, threshold: float, rising: bool = True
-    ) -> Optional[float]:
+    def _find_threshold_crossing(self, time: np.ndarray, voltage: np.ndarray, threshold: float, rising: bool = True) -> Optional[float]:
         """Find time when waveform crosses threshold.
 
         Args:

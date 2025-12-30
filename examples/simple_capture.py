@@ -26,9 +26,7 @@ def main():
             print(f"  Samples: {len(waveform.voltage)}")
             print(f"  Sample rate: {waveform.sample_rate / 1e6:.2f} MSa/s")
             print(f"  Time interval: {waveform.time_interval * 1e9:.2f} ns")
-            print(
-                f"  Voltage range: {waveform.voltage.min():.3f}V to {waveform.voltage.max():.3f}V"
-            )
+            print(f"  Voltage range: {waveform.voltage.min():.3f}V to {waveform.voltage.max():.3f}V")
 
         # Analyze waveforms
         for ch, waveform in waveforms.items():

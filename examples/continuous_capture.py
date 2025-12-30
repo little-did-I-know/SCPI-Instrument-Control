@@ -22,9 +22,7 @@ def main():
 
         # Example 1: Collect to memory (good for short durations)
         print("Example 1: Collecting to memory for 10 seconds...")
-        results = collector.start_continuous_capture(
-            channels=[1, 2], duration=10, interval=0.5, progress_callback=progress_callback
-        )  # 10 seconds  # Capture every 0.5 seconds
+        results = collector.start_continuous_capture(channels=[1, 2], duration=10, interval=0.5, progress_callback=progress_callback)  # 10 seconds  # Capture every 0.5 seconds
 
         print(f"\nCollected {len(results)} captures to memory")
         print(f"First capture timestamp: {results[0]['timestamp']}")

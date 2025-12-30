@@ -74,16 +74,12 @@ class UARTDecoder(ProtocolDecoder):
 
         try:
             # Decode TX channel
-            tx_events = self._decode_channel(
-                tx_waveform, "TX", baud_rate, data_bits, parity, stop_bits, threshold, idle_high
-            )
+            tx_events = self._decode_channel(tx_waveform, "TX", baud_rate, data_bits, parity, stop_bits, threshold, idle_high)
             self.events.extend(tx_events)
 
             # Decode RX channel if available
             if rx_waveform is not None:
-                rx_events = self._decode_channel(
-                    rx_waveform, "RX", baud_rate, data_bits, parity, stop_bits, threshold, idle_high
-                )
+                rx_events = self._decode_channel(rx_waveform, "RX", baud_rate, data_bits, parity, stop_bits, threshold, idle_high)
                 self.events.extend(rx_events)
 
             # Sort events by timestamp
@@ -223,9 +219,7 @@ class UARTDecoder(ProtocolDecoder):
                     )
 
             except Exception as e:
-                logger.warning(
-                    f"UART {channel_name}: Failed to decode byte at {start_time:.6f}s: {e}"
-                )
+                logger.warning(f"UART {channel_name}: Failed to decode byte at {start_time:.6f}s: {e}")
                 continue
 
         return events

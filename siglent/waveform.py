@@ -106,9 +106,7 @@ class Waveform:
             CommandError: If acquisition fails
         """
         if not 1 <= channel <= 4:
-            raise exceptions.InvalidParameterError(
-                f"Invalid channel number: {channel}. Must be 1-4."
-            )
+            raise exceptions.InvalidParameterError(f"Invalid channel number: {channel}. Must be 1-4.")
 
         logger.info(f"Acquiring waveform from channel {channel}")
 
@@ -203,9 +201,7 @@ class Waveform:
         response = self._scope.query(command)
         logger.debug(f"Sample rate response: '{response}'")
 
-        return self._parse_value_with_units(
-            response, ("SA/S", "SPS"), "sample rate", command=command
-        )
+        return self._parse_value_with_units(response, ("SA/S", "SPS"), "sample rate", command=command)
 
     def _format_scope_error(self, message: str, command: Optional[str] = None) -> str:
         """Append host/command context to error messages for clarity."""
@@ -215,9 +211,7 @@ class Waveform:
             return f"{message} (host {context}, command '{command}')"
         return f"{message} (host {context})"
 
-    def _parse_waveform(
-        self, raw_data: bytes, format: str = "BYTE", command: Optional[str] = None
-    ) -> np.ndarray:
+    def _parse_waveform(self, raw_data: bytes, format: str = "BYTE", command: Optional[str] = None) -> np.ndarray:
         """Parse waveform data from oscilloscope.
 
         Args:
@@ -232,34 +226,22 @@ class Waveform:
         # Find the start of binary data (after header)
 
         if not raw_data:
-            raise exceptions.CommandError(
-                self._format_scope_error("Invalid waveform format: empty response", command)
-            )
+            raise exceptions.CommandError(self._format_scope_error("Invalid waveform format: empty response", command))
 
         # Look for the # character indicating block data
         header_end = raw_data.find(b"#")
         if header_end == -1:
-            raise exceptions.CommandError(
-                self._format_scope_error(
-                    "Invalid waveform format: no # found in block header", command
-                )
-            )
+            raise exceptions.CommandError(self._format_scope_error("Invalid waveform format: no # found in block header", command))
 
         if header_end + 2 > len(raw_data):
-            raise exceptions.CommandError(
-                self._format_scope_error("Invalid waveform format: truncated block header", command)
-            )
+            raise exceptions.CommandError(self._format_scope_error("Invalid waveform format: truncated block header", command))
 
         # Parse IEEE 488.2 definite length block
         # Format: #<n><length><data>
         # where n is number of digits in length
         n_digit_char = chr(raw_data[header_end + 1])
         if not n_digit_char.isdigit():
-            raise exceptions.CommandError(
-                self._format_scope_error(
-                    f"Invalid waveform format: non-numeric length digit '{n_digit_char}'", command
-                )
-            )
+            raise exceptions.CommandError(self._format_scope_error(f"Invalid waveform format: non-numeric length digit '{n_digit_char}'", command))
 
         n_digits = int(n_digit_char)
         if n_digits <= 0:
@@ -273,9 +255,7 @@ class Waveform:
         length_field_start = header_end + 2
         length_field_end = length_field_start + n_digits
         if length_field_end > len(raw_data):
-            raise exceptions.CommandError(
-                self._format_scope_error("Invalid waveform format: truncated length field", command)
-            )
+            raise exceptions.CommandError(self._format_scope_error("Invalid waveform format: truncated length field", command))
 
         length_field = raw_data[length_field_start:length_field_end]
         if not re.fullmatch(rb"\d+", length_field):
@@ -291,11 +271,7 @@ class Waveform:
         data_end = data_start + data_length
 
         if data_end > len(raw_data):
-            raise exceptions.CommandError(
-                self._format_scope_error(
-                    "Invalid waveform format: declared data length exceeds available data", command
-                )
-            )
+            raise exceptions.CommandError(self._format_scope_error("Invalid waveform format: declared data length exceeds available data", command))
 
         # Extract binary data
         binary_data = raw_data[data_start:data_end]
@@ -307,20 +283,14 @@ class Waveform:
         elif format == "WORD":
             # 16-bit signed data
             if data_length % 2:
-                raise exceptions.CommandError(
-                    self._format_scope_error(
-                        "Invalid waveform format: WORD data length must be even", command
-                    )
-                )
+                raise exceptions.CommandError(self._format_scope_error("Invalid waveform format: WORD data length must be even", command))
             data = np.frombuffer(binary_data, dtype=np.int16)
         else:
             raise exceptions.InvalidParameterError(f"Invalid format: {format}")
 
         return data
 
-    def _convert_to_voltage(
-        self, codes: np.ndarray, voltage_scale: float, voltage_offset: float
-    ) -> np.ndarray:
+    def _convert_to_voltage(self, codes: np.ndarray, voltage_scale: float, voltage_offset: float) -> np.ndarray:
         """Convert raw ADC codes to voltage values.
 
         Args:
@@ -344,15 +314,11 @@ class Waveform:
             code_center = 0
 
         # Convert codes to voltage
-        voltage = (codes.astype(np.float64) - code_center) * (
-            voltage_scale / code_per_div
-        ) - voltage_offset
+        voltage = (codes.astype(np.float64) - code_center) * (voltage_scale / code_per_div) - voltage_offset
 
         return voltage
 
-    def _generate_time_axis(
-        self, num_samples: int, sample_rate: float, timebase: float
-    ) -> np.ndarray:
+    def _generate_time_axis(self, num_samples: int, sample_rate: float, timebase: float) -> np.ndarray:
         """Generate time axis for waveform.
 
         Args:
@@ -395,9 +361,7 @@ class Waveform:
         Raises:
             CommandError: If parsing fails or expected units are missing.
         """
-        logger.debug(
-            f"Parsing {quantity} from response '{response}' with expected units {expected_units}"
-        )
+        logger.debug(f"Parsing {quantity} from response '{response}' with expected units {expected_units}")
 
         def _strip_prefix(value: str) -> str:
             value = value.strip()
@@ -421,18 +385,10 @@ class Waveform:
                     logger.debug(f"Parsed {quantity}: {value} {unit}")
                     return value
                 except ValueError as exc:
-                    raise exceptions.CommandError(
-                        self._format_scope_error(
-                            f"Invalid {quantity} response: '{response}'", command
-                        )
-                    ) from exc
+                    raise exceptions.CommandError(self._format_scope_error(f"Invalid {quantity} response: '{response}'", command)) from exc
 
         expected = " or ".join(expected_units)
-        raise exceptions.CommandError(
-            self._format_scope_error(
-                f"Invalid {quantity} response: '{response}' (expected units: {expected})", command
-            )
-        )
+        raise exceptions.CommandError(self._format_scope_error(f"Invalid {quantity} response: '{response}' (expected units: {expected})", command))
 
     def get_waveform_preamble(self, channel: int) -> dict:
         """Get waveform preamble information.
@@ -444,9 +400,7 @@ class Waveform:
             Dictionary with waveform metadata
         """
         if not 1 <= channel <= 4:
-            raise exceptions.InvalidParameterError(
-                f"Invalid channel number: {channel}. Must be 1-4."
-            )
+            raise exceptions.InvalidParameterError(f"Invalid channel number: {channel}. Must be 1-4.")
 
         ch = f"C{channel}"
 
@@ -515,9 +469,7 @@ class Waveform:
             self._save_hdf5(waveform, filename, metadata=metadata)
 
         else:
-            raise exceptions.InvalidParameterError(
-                f"Invalid format: {format}. Supported: CSV, CSV_ENHANCED, NPY, MAT, HDF5"
-            )
+            raise exceptions.InvalidParameterError(f"Invalid format: {format}. Supported: CSV, CSV_ENHANCED, NPY, MAT, HDF5")
 
     def _save_csv(
         self,
@@ -559,13 +511,9 @@ class Waveform:
             for t, v in zip(waveform.time, waveform.voltage):
                 writer.writerow([t, v])
 
-        logger.info(
-            f"Waveform saved to {filename} (CSV format, metadata={'included' if include_metadata else 'excluded'})"
-        )
+        logger.info(f"Waveform saved to {filename} (CSV format, metadata={'included' if include_metadata else 'excluded'})")
 
-    def _save_npy(
-        self, waveform: WaveformData, filename: str, metadata: Optional[dict] = None
-    ) -> None:
+    def _save_npy(self, waveform: WaveformData, filename: str, metadata: Optional[dict] = None) -> None:
         """Save waveform as NumPy compressed archive.
 
         Args:
@@ -594,9 +542,7 @@ class Waveform:
         np.savez(filename, **data)
         logger.info(f"Waveform saved to {filename} (NPY format)")
 
-    def _save_mat(
-        self, waveform: WaveformData, filename: str, metadata: Optional[dict] = None
-    ) -> None:
+    def _save_mat(self, waveform: WaveformData, filename: str, metadata: Optional[dict] = None) -> None:
         """Save waveform as MATLAB format.
 
         Args:
@@ -610,9 +556,7 @@ class Waveform:
         try:
             from scipy.io import savemat
         except ImportError:
-            raise ImportError(
-                "scipy is required for MAT file export. Install with: pip install scipy"
-            )
+            raise ImportError("scipy is required for MAT file export. Install with: pip install scipy")
 
         from datetime import datetime
 
@@ -638,9 +582,7 @@ class Waveform:
         savemat(filename, data)
         logger.info(f"Waveform saved to {filename} (MAT format)")
 
-    def _save_hdf5(
-        self, waveform: WaveformData, filename: str, metadata: Optional[dict] = None
-    ) -> None:
+    def _save_hdf5(self, waveform: WaveformData, filename: str, metadata: Optional[dict] = None) -> None:
         """Save waveform as HDF5 format.
 
         Args:
@@ -654,9 +596,7 @@ class Waveform:
         try:
             import h5py
         except ImportError:
-            raise ImportError(
-                "h5py is required for HDF5 file export. Install with: pip install h5py"
-            )
+            raise ImportError("h5py is required for HDF5 file export. Install with: pip install h5py")
 
         from datetime import datetime
 

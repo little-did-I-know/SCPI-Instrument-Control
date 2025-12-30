@@ -201,16 +201,12 @@ class WaveformDisplay(QWidget):
             waveforms: List of WaveformData objects to plot
             fast_update: If True, use fast update for live view (doesn't clear axes)
         """
-        logger.info(
-            f"plot_multiple_waveforms called with {len(waveforms)} waveform(s), fast_update={fast_update}"
-        )
+        logger.info(f"plot_multiple_waveforms called with {len(waveforms)} waveform(s), fast_update={fast_update}")
 
         self.waveforms.clear()
 
         for waveform in waveforms:
-            logger.debug(
-                f"Adding waveform from channel {waveform.channel}, {len(waveform.voltage)} samples"
-            )
+            logger.debug(f"Adding waveform from channel {waveform.channel}, {len(waveform.voltage)} samples")
             self.waveforms[waveform.channel] = waveform
 
         # Store current waveforms for saving
@@ -324,22 +320,16 @@ class WaveformDisplay(QWidget):
                 # Convert time to appropriate units
                 time_data, time_unit = self._convert_time_units(waveform.time)
 
-                logger.debug(
-                    f"Plotting CH{channel}: {len(time_data)} points, time range: {time_data[0]:.3e} to {time_data[-1]:.3e} {time_unit}, voltage range: {waveform.voltage.min():.3f} to {waveform.voltage.max():.3f} V"
-                )
+                logger.debug(f"Plotting CH{channel}: {len(time_data)} points, time range: {time_data[0]:.3e} to {time_data[-1]:.3e} {time_unit}, voltage range: {waveform.voltage.min():.3f} to {waveform.voltage.max():.3f} V")
 
                 # Plot waveform
-                self.ax.plot(
-                    time_data, waveform.voltage, color=color, linewidth=1.0, label=label, alpha=0.9
-                )
+                self.ax.plot(time_data, waveform.voltage, color=color, linewidth=1.0, label=label, alpha=0.9)
 
             # Update x-axis label with appropriate time unit
             self.ax.set_xlabel(f"Time ({time_unit})", color="#cccccc", fontsize=10)
 
             # Add legend
-            legend = self.ax.legend(
-                loc="upper right", framealpha=0.8, facecolor="#1a1a1a", edgecolor="#444444"
-            )
+            legend = self.ax.legend(loc="upper right", framealpha=0.8, facecolor="#1a1a1a", edgecolor="#444444")
             for text in legend.get_texts():
                 text.set_color("#cccccc")
 
@@ -944,9 +934,7 @@ class WaveformDisplay(QWidget):
                 )
 
             # Update legend
-            legend = self.ax.legend(
-                loc="upper right", framealpha=0.8, facecolor="#1a1a1a", edgecolor="#444444"
-            )
+            legend = self.ax.legend(loc="upper right", framealpha=0.8, facecolor="#1a1a1a", edgecolor="#444444")
             for text in legend.get_texts():
                 text.set_color("#cccccc")
 
@@ -1046,9 +1034,7 @@ class WaveformDisplay(QWidget):
         for marker in self.measurement_markers:
             if marker.enabled:
                 # Find waveform for marker's channel
-                waveform = next(
-                    (w for w in self.current_waveforms if w.channel == marker.channel), None
-                )
+                waveform = next((w for w in self.current_waveforms if w.channel == marker.channel), None)
 
                 if waveform:
                     marker.update_measurement(waveform)

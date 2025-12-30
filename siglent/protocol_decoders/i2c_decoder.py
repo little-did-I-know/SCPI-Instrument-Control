@@ -81,9 +81,7 @@ class I2CDecoder(ProtocolDecoder):
             start_times = self._find_start_conditions(sda, scl, time, threshold)
             stop_times = self._find_stop_conditions(sda, scl, time, threshold)
 
-            logger.info(
-                f"I2C: Found {len(start_times)} START and {len(stop_times)} STOP conditions"
-            )
+            logger.info(f"I2C: Found {len(start_times)} START and {len(stop_times)} STOP conditions")
 
             # Decode each transaction
             for start_time in start_times:
@@ -120,9 +118,7 @@ class I2CDecoder(ProtocolDecoder):
                 )
 
                 # Decode bytes between START and STOP
-                self._decode_transaction(
-                    sda, scl, time, threshold, start_time, stop_time, address_bits
-                )
+                self._decode_transaction(sda, scl, time, threshold, start_time, stop_time, address_bits)
 
                 # Add STOP event
                 self.events.append(
@@ -152,9 +148,7 @@ class I2CDecoder(ProtocolDecoder):
 
         return self.events
 
-    def _find_start_conditions(
-        self, sda: np.ndarray, scl: np.ndarray, time: np.ndarray, threshold: float
-    ) -> List[float]:
+    def _find_start_conditions(self, sda: np.ndarray, scl: np.ndarray, time: np.ndarray, threshold: float) -> List[float]:
         """Find I2C START conditions (SDA falling while SCL high).
 
         Args:
@@ -183,9 +177,7 @@ class I2CDecoder(ProtocolDecoder):
 
         return start_times
 
-    def _find_stop_conditions(
-        self, sda: np.ndarray, scl: np.ndarray, time: np.ndarray, threshold: float
-    ) -> List[float]:
+    def _find_stop_conditions(self, sda: np.ndarray, scl: np.ndarray, time: np.ndarray, threshold: float) -> List[float]:
         """Find I2C STOP conditions (SDA rising while SCL high).
 
         Args:

@@ -95,11 +95,7 @@ class LiveViewWorker(QThread):
             return []
 
         waveforms = []
-        supported_channels = (
-            self.scope.supported_channels
-            if hasattr(self.scope, "supported_channels")
-            else range(1, 5)
-        )
+        supported_channels = self.scope.supported_channels if hasattr(self.scope, "supported_channels") else range(1, 5)
 
         for ch_num in supported_channels:
             try:
