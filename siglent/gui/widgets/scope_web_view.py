@@ -79,12 +79,7 @@ class ScopeWebView(QWidget):
         layout.addWidget(self.web_view)
 
         # Info label
-        info_label = QLabel(
-            "<b>Oscilloscope Web Interface:</b><br>"
-            "This displays the built-in web interface of your Siglent oscilloscope.<br>"
-            "You can interact with it just like on the physical scope's touchscreen.<br>"
-            "<i>Note: The web interface provides full VNC access to the scope.</i>"
-        )
+        info_label = QLabel("<b>Oscilloscope Web Interface:</b><br>" "This displays the built-in web interface of your Siglent oscilloscope.<br>" "You can interact with it just like on the physical scope's touchscreen.<br>" "<i>Note: The web interface provides full VNC access to the scope.</i>")
         info_label.setWordWrap(True)
         info_label.setStyleSheet("QLabel { font-size: 9pt; color: #888; padding: 5px; }")
         layout.addWidget(info_label)
