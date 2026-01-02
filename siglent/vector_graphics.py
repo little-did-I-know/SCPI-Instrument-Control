@@ -35,6 +35,8 @@ from typing import List, Optional, Tuple, Union
 
 import numpy as np
 
+from siglent import exceptions
+
 logger = logging.getLogger(__name__)
 
 # Check for optional dependencies
@@ -296,7 +298,8 @@ class Shape:
         # Try to use a reasonable font, fall back to default
         try:
             font = ImageFont.truetype("arial.ttf", int(font_size * 200))
-        except:
+        except (OSError, IOError):
+            # Fallback to default font if arial.ttf not found
             font = ImageFont.load_default()
 
         # Draw text in center
