@@ -5,6 +5,37 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.1] - 2026-01-02
+
+### Added
+- **Comprehensive MkDocs Documentation**
+  - Added complete user guide documentation (5 files, ~3,000 lines):
+    - `basic-usage.md` - Foundation for connecting and controlling oscilloscope
+    - `waveform-capture.md` - Advanced capture techniques and data formats
+    - `measurements.md` - Automated measurement capabilities
+    - `trigger-control.md` - Comprehensive trigger configuration
+    - `advanced-features.md` - FFT, math channels, automation, protocol decoding
+  - Added GUI documentation (7 files, ~4,700 lines):
+    - `overview.md` - GUI introduction and installation
+    - `interface.md` - Complete UI reference with keyboard shortcuts
+    - `live-view.md` - Real-time waveform visualization
+    - `visual-measurements.md` - Interactive measurement markers
+    - `fft-analysis.md` - Frequency domain analysis
+    - `protocol-decoding.md` - I2C/SPI/UART decoding
+    - `vector-graphics.md` - XY mode and waveform generation
+  - Added connection guide (~960 lines):
+    - `connection.md` - Network setup, troubleshooting, VNC access
+  - Added development documentation (3 files, ~2,950 lines):
+    - `building.md` - Build system, testing, documentation generation
+    - `structure.md` - Codebase organization and design patterns
+    - `testing.md` - Testing strategy and best practices
+  - Added API reference:
+    - `gui.md` - Auto-generated GUI API docs using mkdocstrings
+  - **Total: 17 documentation files, ~11,900 lines**
+- Material for MkDocs theme with admonitions (tip, info, warning)
+- Comprehensive examples, troubleshooting sections, and cross-references
+- mkdocstrings integration for auto-generating API docs from Python docstrings
+
 ## [0.3.0] - Unreleased
 
 ### ⚠️ BREAKING CHANGES

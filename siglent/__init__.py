@@ -7,7 +7,7 @@ For high-level automation and data collection, see the automation module:
     from siglent.automation import DataCollector, TriggerWaitCollector
 """
 
-__version__ = "0.3.0"
+__version__ = "0.3.1"
 
 from siglent.exceptions import (
     CommandError,

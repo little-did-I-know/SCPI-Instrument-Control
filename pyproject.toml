@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "Siglent-Oscilloscope"
-version = "0.3.0"
+version = "0.3.1"
 description = "Python library for Siglent oscilloscope control and automation via SCPI over Ethernet/LAN - supports SDS800XHD, SDS1000X-E, SDS2000X Plus, SDS5000X series. Features programmatic API for waveform capture, measurements, trigger control, and PyQt6 GUI with real-time visualization, FFT analysis, protocol decoding (I2C/SPI/UART), and automated data collection"
 readme = { file = "README.md", content-type = "text/markdown" }
 requires-python = ">=3.8"
