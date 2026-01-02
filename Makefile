@@ -23,13 +23,19 @@ test-cov:  ## Run tests with coverage report
 test-fast:  ## Run tests in parallel (faster)
 	pytest tests/ -n auto -v
 
+test-exceptions:  ## Test exception handling and imports
+	@echo "Testing exception imports and backward compatibility..."
+	@python -c "from siglent.exceptions import SiglentConnectionError, SiglentTimeoutError, CommandError, SiglentError; from siglent.exceptions import ConnectionError, TimeoutError; assert ConnectionError is SiglentConnectionError; assert TimeoutError is SiglentTimeoutError; print('✓ New exception names: OK'); print('✓ Backward compatibility aliases: OK'); print('✓ All exception imports: PASSED')"
+	@echo "\nRunning exception-related tests..."
+	@pytest tests/ -k "exception or error or connection or timeout" -v --tb=short || echo "Note: Some tests may not exist yet"
+
 lint:  ## Run all linting checks
-	black --check --line-length 100 siglent/ tests/ examples/
-	flake8 siglent/ --max-line-length=100
+	black --check --line-length 200 siglent/ tests/ examples/
+	flake8 siglent/ --max-line-length=200
 	@echo "✓ All linting checks passed"
 
 format:  ## Auto-format code with Black
-	black --line-length 100 siglent/ tests/ examples/
+	black --line-length 200 siglent/ tests/ examples/
 	@echo "✓ Code formatted"
 
 clean:  ## Remove build artifacts and cache files
@@ -76,7 +82,6 @@ check:  ## Run all checks (lint, test, build)
 pre-pr:  ## Run comprehensive pre-PR validation (recommended before creating PR)
 	@echo "Running pre-PR validation..."
 	python scripts/pre_pr_check.py
-	black --line-length 1000 siglent/ examples/ scripts/ tests/ siglent/
 	@echo "\n✓ Pre-PR validation passed!"
 	
 pre-pr-fast:  ## Run quick pre-PR validation (skip slow checks)

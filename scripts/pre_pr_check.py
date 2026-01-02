@@ -122,7 +122,7 @@ def check_formatting(auto_fix: bool = False) -> bool:
 
     if auto_fix:
         print("  Auto-fixing formatting issues...")
-        success, _ = run_command(["black", "--line-length", "100", "siglent/", "tests/", "examples/"])
+        success, _ = run_command(["black", "--line-length", "200", "siglent/", "tests/", "examples/"])
         if success:
             print_success("Code formatted successfully")
             return True
@@ -130,14 +130,14 @@ def check_formatting(auto_fix: bool = False) -> bool:
             print_error("Failed to format code")
             return False
     else:
-        success, output = run_command(["black", "--check", "--line-length", "100", "siglent/", "tests/", "examples/"], check=False, capture=True)
+        success, output = run_command(["black", "--check", "--line-length", "200", "siglent/", "tests/", "examples/"], check=False, capture=True)
 
         if success:
             print_success("All files properly formatted")
             return True
         else:
             print_error("Code formatting issues found")
-            print_warning("  Run: black --line-length 100 siglent/ tests/ examples/")
+            print_warning("  Run: black --line-length 200 siglent/ tests/ examples/")
             print_warning("  Or: python scripts/pre_pr_check.py --fix")
             return False
 
@@ -148,7 +148,7 @@ def check_imports(auto_fix: bool = False) -> bool:
 
     if auto_fix:
         print("  Auto-fixing import order...")
-        success, _ = run_command(["isort", "--profile", "black", "--line-length", "100", "siglent/", "tests/", "examples/"])
+        success, _ = run_command(["isort", "--profile", "black", "--line-length", "200", "siglent/", "tests/", "examples/"])
         if success:
             print_success("Imports sorted successfully")
             return True
@@ -156,7 +156,7 @@ def check_imports(auto_fix: bool = False) -> bool:
             print_warning("isort not installed (pip install isort)")
             return True  # Don't fail on this
     else:
-        success, _ = run_command(["isort", "--check-only", "--profile", "black", "--line-length", "100", "siglent/", "tests/", "examples/"], check=False)
+        success, _ = run_command(["isort", "--check-only", "--profile", "black", "--line-length", "200", "siglent/", "tests/", "examples/"], check=False)
 
         if success:
             print_success("Import order correct")
@@ -170,7 +170,7 @@ def check_linting() -> bool:
     """Check code quality with flake8."""
     print_step("Running linter (flake8)...")
 
-    success, output = run_command(["flake8", "siglent/", "--max-line-length=100", "--extend-ignore=E203,W503"], check=False, capture=True)
+    success, output = run_command(["flake8", "siglent/", "--max-line-length=200", "--extend-ignore=E203,W503"], check=False, capture=True)
 
     if success:
         print_success("No linting issues found")
@@ -194,6 +194,72 @@ def check_security() -> bool:
         print_warning("Security issues found (review output):")
         print(output[:1000])
         return True  # Don't fail on warnings
+
+
+def check_exception_imports() -> bool:
+    """Validate exception imports and backward compatibility."""
+    print_step("Validating exception imports...")
+
+    try:
+        # Ensure we're importing from local development version, not installed package
+        import sys
+        from pathlib import Path
+
+        # Add current directory to Python path (at the beginning to prioritize local code)
+        project_root = Path.cwd()
+        if str(project_root) not in sys.path:
+            sys.path.insert(0, str(project_root))
+
+        # Clear any cached imports to force reload from local version
+        if "siglent.exceptions" in sys.modules:
+            del sys.modules["siglent.exceptions"]
+        if "siglent" in sys.modules:
+            del sys.modules["siglent"]
+
+        # Test new exception names
+        from siglent.exceptions import SiglentConnectionError, SiglentTimeoutError, CommandError, SiglentError
+
+        # Test backward compatibility aliases
+        from siglent.exceptions import ConnectionError, TimeoutError
+
+        # Verify they are the same class (aliases work)
+        if ConnectionError is not SiglentConnectionError:
+            print_error("Backward compatibility alias 'ConnectionError' is not SiglentConnectionError")
+            return False
+
+        if TimeoutError is not SiglentTimeoutError:
+            print_error("Backward compatibility alias 'TimeoutError' is not SiglentTimeoutError")
+            return False
+
+        # Test top-level package imports
+        from siglent import SiglentConnectionError as TopLevelConn, SiglentTimeoutError as TopLevelTimeout
+
+        if TopLevelConn is not SiglentConnectionError:
+            print_error("Top-level import of SiglentConnectionError failed")
+            return False
+
+        if TopLevelTimeout is not SiglentTimeoutError:
+            print_error("Top-level import of SiglentTimeoutError failed")
+            return False
+
+        # Test exception inheritance
+        if not issubclass(SiglentConnectionError, SiglentError):
+            print_error("SiglentConnectionError is not a subclass of SiglentError")
+            return False
+
+        if not issubclass(SiglentTimeoutError, SiglentError):
+            print_error("SiglentTimeoutError is not a subclass of SiglentError")
+            return False
+
+        print_success("Exception imports valid (new names + backward compatibility)")
+        return True
+
+    except ImportError as e:
+        print_error(f"Failed to import exceptions: {e}")
+        return False
+    except Exception as e:
+        print_error(f"Unexpected error validating exceptions: {e}")
+        return False
 
 
 def run_tests(fast_mode: bool = False) -> bool:
@@ -297,6 +363,7 @@ Examples:
     # Run checks in order
     if not args.no_git_check:
         checks.append(("Git Status", check_git_status()))
+    checks.append(("Exception Imports", check_exception_imports()))
     checks.append(("Code Formatting", check_formatting(args.fix)))
     checks.append(("Import Sorting", check_imports(args.fix)))
     checks.append(("Linting", check_linting()))

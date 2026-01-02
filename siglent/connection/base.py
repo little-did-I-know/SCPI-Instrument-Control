@@ -25,7 +25,8 @@ class BaseConnection(ABC):
         """Establish connection to the oscilloscope.
 
         Raises:
-            ConnectionError: If connection fails
+            SiglentConnectionError: If connection fails
+            SiglentTimeoutError: If connection times out
         """
         pass
 
@@ -42,8 +43,8 @@ class BaseConnection(ABC):
             command: SCPI command string
 
         Raises:
-            ConnectionError: If not connected
-            TimeoutError: If command times out
+            SiglentConnectionError: If not connected
+            SiglentTimeoutError: If command times out
             CommandError: If command fails
         """
         pass
@@ -56,8 +57,8 @@ class BaseConnection(ABC):
             Response string from oscilloscope
 
         Raises:
-            ConnectionError: If not connected
-            TimeoutError: If read times out
+            SiglentConnectionError: If not connected
+            SiglentTimeoutError: If read times out
         """
         pass
 
@@ -72,8 +73,8 @@ class BaseConnection(ABC):
             Response string from oscilloscope
 
         Raises:
-            ConnectionError: If not connected
-            TimeoutError: If command times out
+            SiglentConnectionError: If not connected
+            SiglentTimeoutError: If command times out
             CommandError: If command fails
         """
         pass
@@ -89,8 +90,8 @@ class BaseConnection(ABC):
             Raw binary data
 
         Raises:
-            ConnectionError: If not connected
-            TimeoutError: If read times out
+            SiglentConnectionError: If not connected
+            SiglentTimeoutError: If read times out
         """
         pass
 

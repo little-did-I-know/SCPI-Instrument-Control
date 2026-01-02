@@ -48,6 +48,7 @@ from PyQt6.QtWidgets import (
 )
 
 from siglent.waveform import WaveformData
+from siglent.gui.utils.validators import WaveformValidator
 
 logger = logging.getLogger(__name__)
 
@@ -243,16 +244,33 @@ class WaveformDisplayPG(QWidget):
 
         self.waveforms.clear()
 
-        for waveform in waveforms:
-            logger.debug(f"Adding waveform from channel {waveform.channel}, {len(waveform.voltage)} samples")
+        # Validate all waveforms before plotting
+        valid_waveforms, invalid_info = WaveformValidator.validate_multiple(waveforms)
+
+        # Log any invalid waveforms at WARNING level (visible to users)
+        if invalid_info:
+            for channel, issues in invalid_info:
+                logger.warning(f"Invalid waveform CH{channel}: {'; '.join(issues)}")
+
+        # Add valid waveforms to display
+        for waveform in valid_waveforms:
+            summary = WaveformValidator.get_summary(waveform)
+            logger.info(f"Adding valid waveform: {summary}")
             self.waveforms[waveform.channel] = waveform
 
-        # Store current waveforms for saving
-        self.current_waveforms = waveforms
+        # Store current waveforms for saving (only valid ones)
+        self.current_waveforms = valid_waveforms
+
+        # Update info label if all waveforms were invalid
+        if not valid_waveforms and waveforms:
+            error_msg = f"All {len(waveforms)} waveform(s) invalid - see console for details"
+            logger.error(error_msg)
+            self.info_label.setText("Invalid data - check logs")
+            return
 
         self._update_plot()
 
-        logger.info(f"Plotted {len(waveforms)} waveforms successfully")
+        logger.info(f"Plotted {len(valid_waveforms)} valid waveform(s) successfully")
 
     def update_waveform(self, waveform: WaveformData):
         """Update existing waveform or add new one.
@@ -301,8 +319,24 @@ class WaveformDisplayPG(QWidget):
 
         # Update or create plot items for each channel
         for channel, waveform in sorted(self.waveforms.items()):
+            # Additional runtime validation check
+            if waveform is None:
+                logger.error(f"CH{channel}: waveform is None in _update_plot")
+                continue
+
+            if len(waveform.voltage) == 0:
+                logger.error(f"CH{channel}: empty voltage array in _update_plot")
+                continue
+
+            # Log voltage range for diagnostics
+            valid_voltages = waveform.voltage[~np.isnan(waveform.voltage)]
+            if len(valid_voltages) > 0:
+                v_range = f"[{valid_voltages.min():.3f}V to {valid_voltages.max():.3f}V]"
+            else:
+                v_range = "[all NaN]"
+
             color = self.CHANNEL_COLORS.get(channel, (255, 255, 255))
-            logger.info(f"  Updating CH{channel}: {len(waveform.voltage)} points, color={color}")
+            logger.info(f"  Updating CH{channel}: {len(waveform.voltage)} points, range {v_range}, color={color}")
 
             # Downsample if necessary for display performance
             time_data, voltage_data = self._downsample_for_display(waveform.time, waveform.voltage)

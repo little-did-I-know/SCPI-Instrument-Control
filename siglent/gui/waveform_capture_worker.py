@@ -27,6 +27,7 @@ from typing import List
 from PyQt6.QtCore import QThread, pyqtSignal
 
 from siglent.waveform import WaveformData
+from siglent.gui.utils.validators import WaveformValidator
 
 logger = logging.getLogger(__name__)
 
@@ -95,12 +96,27 @@ class WaveformCaptureWorker(QThread):
                 errors.append(error_msg)
 
         # Final progress update
-        self.progress_update.emit("Processing waveforms...", 100)
+        self.progress_update.emit("Validating waveforms...", 100)
 
+        # Validate all captured waveforms before emitting
         if waveforms:
-            logger.info(f"Capture complete: {len(waveforms)} waveform(s) captured")
-            self.waveforms_ready.emit(waveforms)
-            self.capture_complete.emit(len(waveforms))
+            valid_waveforms, invalid_info = WaveformValidator.validate_multiple(waveforms)
+
+            # Log validation results
+            for channel, issues in invalid_info:
+                logger.warning(f"Capture worker: Invalid waveform CH{channel}: {'; '.join(issues)}")
+                errors.append(f"CH{channel} validation failed: {'; '.join(issues)}")
+
+            if valid_waveforms:
+                logger.info(f"Capture complete: {len(valid_waveforms)} valid waveform(s) captured")
+                self.waveforms_ready.emit(valid_waveforms)
+                self.capture_complete.emit(len(valid_waveforms))
+            else:
+                error_msg = f"All {len(waveforms)} captured waveform(s) failed validation."
+                if errors:
+                    error_msg += "\n\nErrors:\n" + "\n".join(errors[:3])  # Show first 3 errors
+                logger.error(f"Capture failed: {error_msg}")
+                self.error_occurred.emit(error_msg)
         else:
             error_msg = "Could not capture waveforms."
             if errors:

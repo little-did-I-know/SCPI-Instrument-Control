@@ -15,6 +15,12 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+# Waveform conversion constants from Siglent SCPI programming manual
+# These constants are used to convert raw ADC codes to voltage values
+WAVEFORM_CODE_PER_DIV_8BIT = 25.0  # Codes per vertical division for 8-bit ADC
+WAVEFORM_CODE_PER_DIV_16BIT = 6400.0  # Codes per vertical division for 16-bit ADC
+WAVEFORM_CODE_CENTER = 0  # Center code value for signed integer ADC data
+
 
 @dataclass
 class WaveformData:
@@ -293,28 +299,29 @@ class Waveform:
     def _convert_to_voltage(self, codes: np.ndarray, voltage_scale: float, voltage_offset: float) -> np.ndarray:
         """Convert raw ADC codes to voltage values.
 
+        Uses conversion formula from Siglent SCPI programming manual:
+        voltage = (code - code_center) * (voltage_scale / code_per_div) - voltage_offset
+
+        For 8-bit ADC:  25 codes per vertical division
+        For 16-bit ADC: 6400 codes per vertical division
+
         Args:
-            codes: Raw ADC code values
-            voltage_scale: Voltage scale (V/div)
-            voltage_offset: Voltage offset (V)
+            codes: Raw ADC code values (signed int8 or int16)
+            voltage_scale: Voltage scale in volts/division
+            voltage_offset: Voltage offset in volts
 
         Returns:
             Voltage array in volts
         """
-        # Siglent conversion formula (for 8-bit data):
-        # voltage = (code - 127) * voltage_scale / 25 - voltage_offset
-        # The factor 25 is because there are ~25 codes per division in 8-bit mode
-
-        # For 8-bit data
+        # Select conversion constants based on ADC resolution
         if codes.dtype == np.int8:
-            code_per_div = 25.0
-            code_center = 0  # Since it's signed int8, center is 0
+            code_per_div = WAVEFORM_CODE_PER_DIV_8BIT
         else:  # 16-bit data
-            code_per_div = 6400.0
-            code_center = 0
+            code_per_div = WAVEFORM_CODE_PER_DIV_16BIT
 
-        # Convert codes to voltage
-        voltage = (codes.astype(np.float64) - code_center) * (voltage_scale / code_per_div) - voltage_offset
+        # Convert codes to voltage using Siglent formula
+        # Since we use signed integers, center code is 0
+        voltage = (codes.astype(np.float64) - WAVEFORM_CODE_CENTER) * (voltage_scale / code_per_div) - voltage_offset
 
         return voltage
 

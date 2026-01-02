@@ -27,7 +27,7 @@ from PyQt6.QtWidgets import (
 )
 
 from siglent import Oscilloscope
-from siglent.exceptions import ConnectionError, SiglentError
+from siglent.exceptions import SiglentConnectionError, SiglentError
 
 # Try to use PyQtGraph for high-performance plotting, fallback to matplotlib
 try:
@@ -47,6 +47,7 @@ from siglent.gui.live_view_worker import LiveViewWorker
 from siglent.gui.waveform_capture_worker import WaveformCaptureWorker
 from siglent.gui.widgets.channel_control import ChannelControl
 from siglent.gui.widgets.cursor_panel import CursorPanel
+from siglent.gui.widgets.error_dialog import DetailedErrorDialog
 from siglent.gui.widgets.fft_display import FFTDisplay
 from siglent.gui.widgets.math_panel import MathPanel
 from siglent.gui.widgets.measurement_panel import MeasurementPanel
@@ -579,7 +580,7 @@ class MainWindow(QMainWindow):
             self.connection_manager.add_connection(ip, port, model)
             self._update_recent_connections_menu()
 
-        except (ConnectionError, SiglentError) as e:
+        except (SiglentConnectionError, SiglentError) as e:
             self.statusBar().showMessage("Connection failed")
             QMessageBox.critical(self, "Connection Error", f"Failed to connect to oscilloscope:\n{str(e)}")
             logger.error(f"Connection failed: {e}")
@@ -932,6 +933,7 @@ class MainWindow(QMainWindow):
                 self.live_view_worker = LiveViewWorker(self.scope, self)
                 self.live_view_worker.waveforms_ready.connect(self._on_waveforms_ready)
                 self.live_view_worker.error_occurred.connect(self._on_live_view_error)
+                self.live_view_worker.status_update.connect(self._on_live_view_status)
                 self.live_view_worker.start()
 
                 self.statusBar().showMessage("Live view enabled (AUTO mode)")
@@ -980,14 +982,37 @@ class MainWindow(QMainWindow):
         else:
             self.statusBar().showMessage("Live view: No enabled channels")
 
-    def _on_live_view_error(self, error_msg):
+    def _on_live_view_error(self, error_info):
         """Handle errors from background worker thread.
 
         Args:
-            error_msg: Error message string
+            error_info: Error information dictionary with details
         """
+        # Log the full error
+        error_msg = error_info.get("message", "Unknown error") if isinstance(error_info, dict) else str(error_info)
         logger.error(f"Live view worker error: {error_msg}")
-        self.statusBar().showMessage(f"Live view error: {error_msg[:50]}")
+
+        # Update status bar with brief message
+        brief_msg = error_msg[:60] if len(error_msg) > 60 else error_msg
+        self.statusBar().showMessage(f"Live view error: {brief_msg}", 5000)
+
+        # Show detailed error dialog if we have structured error info
+        if isinstance(error_info, dict):
+            dialog = DetailedErrorDialog(error_info, self)
+            dialog.exec()
+        else:
+            # Fallback for old-style string errors
+            QMessageBox.warning(self, "Live View Error", str(error_info))
+
+    def _on_live_view_status(self, status_msg):
+        """Handle status updates from live view worker.
+
+        Args:
+            status_msg: Status message string
+        """
+        # Update status bar with worker status
+        self.statusBar().showMessage(status_msg)
+        logger.debug(f"Live view status: {status_msg}")
 
     def _on_save_waveform(self):
         """Handle save waveform action."""

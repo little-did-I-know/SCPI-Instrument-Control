@@ -74,7 +74,7 @@ class MockConnection(BaseConnection):
     def write(self, command: str) -> None:
         """Record the command and update simple internal state."""
         if not self._connected:
-            raise exceptions.ConnectionError(f"Not connected to oscilloscope at {self.host}:{self.port}")
+            raise exceptions.SiglentConnectionError(f"Not connected to oscilloscope at {self.host}:{self.port}")
 
         command = command.strip()
         self.writes.append(command)

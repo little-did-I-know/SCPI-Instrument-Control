@@ -417,8 +417,8 @@ class VectorDisplay:
             # For now, we'll note this in documentation
             try:
                 self._scope.write("XY_MODE ON")
-            except:
-                logger.warning("Could not enable XY mode automatically. " "Please manually enable XY mode on the oscilloscope:\n" "  Display → XY Mode → ON")
+            except (exceptions.CommandError, exceptions.SiglentConnectionError, exceptions.SiglentTimeoutError) as e:
+                logger.warning(f"Could not enable XY mode automatically: {e}. " "Please manually enable XY mode on the oscilloscope:\n" "  Display → XY Mode → ON")
 
             self._xy_mode_enabled = True
             logger.info("XY mode enabled")
@@ -432,8 +432,8 @@ class VectorDisplay:
         try:
             try:
                 self._scope.write("XY_MODE OFF")
-            except:
-                logger.warning("Could not disable XY mode automatically. Please disable manually.")
+            except (exceptions.CommandError, exceptions.SiglentConnectionError, exceptions.SiglentTimeoutError) as e:
+                logger.warning(f"Could not disable XY mode automatically: {e}. Please disable manually.")
 
             self._xy_mode_enabled = False
             logger.info("XY mode disabled")

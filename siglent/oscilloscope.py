@@ -139,7 +139,8 @@ class Oscilloscope:
         model-specific capabilities and channels.
 
         Raises:
-            ConnectionError: If connection fails
+            SiglentConnectionError: If connection fails
+            SiglentTimeoutError: If connection times out
         """
         logger.info(f"Connecting to oscilloscope at {self.host}:{self.port}")
         self._connection.connect()
@@ -173,7 +174,7 @@ class Oscilloscope:
         except Exception as e:
             logger.error(f"Failed to identify device or initialize: {e}")
             self.disconnect()
-            raise exceptions.ConnectionError(f"Connected but failed to identify device: {e}")
+            raise exceptions.SiglentConnectionError(f"Connected but failed to identify device: {e}")
 
     def disconnect(self) -> None:
         """Close connection to the oscilloscope."""
@@ -209,7 +210,8 @@ class Oscilloscope:
             command: SCPI command string
 
         Raises:
-            ConnectionError: If not connected
+            SiglentConnectionError: If not connected
+            CommandError: If command contains invalid characters
         """
         logger.debug(f"Write: {command}")
         self._connection.write(command)
@@ -224,7 +226,9 @@ class Oscilloscope:
             Response string from oscilloscope
 
         Raises:
-            ConnectionError: If not connected
+            SiglentConnectionError: If not connected
+            SiglentTimeoutError: If query times out
+            CommandError: If command contains invalid characters
         """
         logger.debug(f"Query: {command}")
         response = self._connection.query(command)
