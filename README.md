@@ -1,5 +1,7 @@
 # Siglent Oscilloscope Control
 
+[![Documentation](https://img.shields.io/badge/docs-GitHub%20Pages-blue?logo=github)](https://little-did-I-know.github.io/Siglent-Oscilloscope/)
+[![Documentation](https://img.shields.io/badge/docs-ReadTheDocs-blue?logo=readthedocs)](https://siglent-oscilloscope.readthedocs.io)
 [![CI](https://github.com/little-did-I-know/Siglent-Oscilloscope/actions/workflows/ci.yml/badge.svg)](https://github.com/little-did-I-know/Siglent-Oscilloscope/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/little-did-I-know/Siglent-Oscilloscope/branch/main/graph/badge.svg)](https://codecov.io/gh/little-did-I-know/Siglent-Oscilloscope)
 [![PyPI version](https://img.shields.io/pypi/v/Siglent-Oscilloscope.svg)](https://pypi.org/project/Siglent-Oscilloscope/)

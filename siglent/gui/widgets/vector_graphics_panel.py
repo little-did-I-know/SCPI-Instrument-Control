@@ -198,7 +198,12 @@ class VectorGraphicsPanel(QWidget):
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         msg_layout.addWidget(title)
 
-        info = QLabel("<p>This feature allows you to draw shapes, text, and animations<br>" "on your oscilloscope screen using XY mode!</p>" "<p><b>Installation Required:</b></p>" "<p>The vector graphics feature requires additional packages.</p>")
+        info = QLabel(
+            "<p>This feature allows you to draw shapes, text, and animations<br>"
+            "on your oscilloscope screen using XY mode!</p>"
+            "<p><b>Installation Required:</b></p>"
+            "<p>The vector graphics feature requires additional packages.</p>"
+        )
         info.setAlignment(Qt.AlignmentFlag.AlignCenter)
         info.setWordWrap(True)
         msg_layout.addWidget(info)
@@ -208,7 +213,15 @@ class VectorGraphicsPanel(QWidget):
         install_label.setStyleSheet("background-color: #f0f0f0; padding: 10px; font-family: monospace;")
         msg_layout.addWidget(install_label)
 
-        features = QLabel("<p><b>What you can do:</b></p>" "<ul>" "<li>Draw circles, stars, rectangles, and more</li>" "<li>Display text messages on screen</li>" "<li>Create Lissajous figures</li>" "<li>Generate animations</li>" "</ul>")
+        features = QLabel(
+            "<p><b>What you can do:</b></p>"
+            "<ul>"
+            "<li>Draw circles, stars, rectangles, and more</li>"
+            "<li>Display text messages on screen</li>"
+            "<li>Create Lissajous figures</li>"
+            "<li>Generate animations</li>"
+            "</ul>"
+        )
         features.setWordWrap(True)
         msg_layout.addWidget(features)
 
@@ -446,7 +459,12 @@ class VectorGraphicsPanel(QWidget):
             QMessageBox.information(
                 self,
                 "Export Successful",
-                f"Waveforms saved:\n" f"  {filename}_x.{file_format}\n" f"  {filename}_y.{file_format}\n\n" f"Sample rate: {sample_rate/1e6:.1f} MSa/s\n" f"Duration: {duration*1000:.1f} ms\n\n" f"Load these files into your AWG channels to display the shape!",
+                f"Waveforms saved:\n"
+                f"  {filename}_x.{file_format}\n"
+                f"  {filename}_y.{file_format}\n\n"
+                f"Sample rate: {sample_rate/1e6:.1f} MSa/s\n"
+                f"Duration: {duration*1000:.1f} ms\n\n"
+                f"Load these files into your AWG channels to display the shape!",
             )
 
             self.info_text.append(f"\nExported to {filename}_x/y.{file_format}\n" f"Ready for AWG upload!")
@@ -471,7 +489,14 @@ class VectorGraphicsPanel(QWidget):
             self.enable_xy_btn.setEnabled(False)
             self.disable_xy_btn.setEnabled(True)
 
-            self.info_text.setPlainText("XY mode enabled!\n\n" "Channels configured:\n" f"  CH{self._vector_display.ch_x} = X axis\n" f"  CH{self._vector_display.ch_y} = Y axis\n\n" "You may need to manually enable XY mode on scope:\n" "  Display → XY Mode → ON")
+            self.info_text.setPlainText(
+                "XY mode enabled!\n\n"
+                "Channels configured:\n"
+                f"  CH{self._vector_display.ch_x} = X axis\n"
+                f"  CH{self._vector_display.ch_y} = Y axis\n\n"
+                "You may need to manually enable XY mode on scope:\n"
+                "  Display → XY Mode → ON"
+            )
 
             logger.info("XY mode enabled")
 

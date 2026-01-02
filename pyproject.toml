@@ -45,7 +45,8 @@ dependencies = [
 
 [project.urls]
 Homepage = "https://github.com/little-did-I-know/Siglent-Oscilloscope"
-Documentation = "https://github.com/little-did-I-know/Siglent-Oscilloscope#readme"
+Documentation = "https://siglent-oscilloscope.readthedocs.io"
+"Documentation (GitHub Pages)" = "https://little-did-I-know.github.io/Siglent-Oscilloscope/"
 Repository = "https://github.com/little-did-I-know/Siglent-Oscilloscope"
 Issues = "https://github.com/little-did-I-know/Siglent-Oscilloscope/issues"
 Changelog = "https://github.com/little-did-I-know/Siglent-Oscilloscope/blob/main/CHANGELOG.md"

@@ -1,7 +1,10 @@
 site_name: Siglent Oscilloscope Control
 site_description: Python library for controlling Siglent oscilloscopes via SCPI over Ethernet
 site_author: Robin Mumm
-site_url: https://siglent-oscilloscope.readthedocs.io
+# Note: site_url is auto-detected by ReadTheDocs and GitHub Pages
+# ReadTheDocs: https://siglent-oscilloscope.readthedocs.io
+# GitHub Pages: https://little-did-I-know.github.io/Siglent-Oscilloscope/
+site_url: https://little-did-I-know.github.io/Siglent-Oscilloscope/
 repo_url: https://github.com/little-did-I-know/Siglent-Oscilloscope
 repo_name: little-did-I-know/Siglent-Oscilloscope
 edit_uri: edit/main/docs/

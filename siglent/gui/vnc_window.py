@@ -201,7 +201,13 @@ class VNCWindow(QMainWindow):
             QMessageBox.warning(
                 self,
                 "Connection Failed",
-                f"Failed to load the oscilloscope VNC interface.\n\n" f"Troubleshooting:\n" f"1. Verify the oscilloscope IP address is correct\n" f"2. Ensure the oscilloscope is powered on and connected to the network\n" f"3. Check that VNC/web interface is enabled on the oscilloscope\n" f"4. Verify your computer can ping the oscilloscope\n\n" f"Current URL: http://{self.scope_ip}/Instrument/novnc/vnc_auto.php",
+                f"Failed to load the oscilloscope VNC interface.\n\n"
+                f"Troubleshooting:\n"
+                f"1. Verify the oscilloscope IP address is correct\n"
+                f"2. Ensure the oscilloscope is powered on and connected to the network\n"
+                f"3. Check that VNC/web interface is enabled on the oscilloscope\n"
+                f"4. Verify your computer can ping the oscilloscope\n\n"
+                f"Current URL: http://{self.scope_ip}/Instrument/novnc/vnc_auto.php",
             )
 
     def _show_help(self):

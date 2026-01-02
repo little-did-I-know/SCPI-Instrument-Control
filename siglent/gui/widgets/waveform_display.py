@@ -332,7 +332,9 @@ class WaveformDisplay(QWidget):
                 if len(voltage_data) < len(waveform.voltage):
                     logger.info(f"Downsampled CH{channel} from {len(waveform.voltage)} to {len(voltage_data)} points for display")
 
-                logger.debug(f"Plotting CH{channel}: {len(time_data)} points, time range: {time_data[0]:.3e} to {time_data[-1]:.3e} {time_unit}, voltage range: {voltage_data.min():.3f} to {voltage_data.max():.3f} V")
+                logger.debug(
+                    f"Plotting CH{channel}: {len(time_data)} points, time range: {time_data[0]:.3e} to {time_data[-1]:.3e} {time_unit}, voltage range: {voltage_data.min():.3f} to {voltage_data.max():.3f} V"
+                )
 
                 # Plot waveform
                 self.ax.plot(time_data, voltage_data, color=color, linewidth=1.0, label=label, alpha=0.9)
