@@ -71,6 +71,12 @@ fun = [
     "Pillow>=10.0.0",
     "svgpathtools>=1.6.0",
 ]
+report-generator = [
+    "PyQt6>=6.6.0",
+    "Pillow>=10.0.0",
+    "requests>=2.31.0",
+    "reportlab>=4.0.0",
+]
 docs = [
     "mkdocs>=1.5.0",
     "mkdocs-material>=9.5.0",
@@ -90,10 +96,13 @@ all = [
     "shapely>=2.0.0",
     "Pillow>=10.0.0",
     "svgpathtools>=1.6.0",
+    "requests>=2.31.0",
+    "reportlab>=4.0.0",
 ]
 
 [project.scripts]
 siglent-gui = "siglent.gui.app:main"
+siglent-report-generator = "siglent.report_generator.app:main"
 
 [tool.setuptools]
 include-package-data = true
