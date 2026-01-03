@@ -22,6 +22,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 from pathlib import Path
+import re
 
 from siglent.report_generator.llm.client import LLMClient, LLMConfig
 
@@ -134,6 +135,10 @@ class LLMSettingsDialog(QDialog):
 
         form = QFormLayout()
 
+        self.ollama_hostname_edit = QLineEdit("localhost")
+        self.ollama_hostname_edit.setPlaceholderText("localhost or IP address (e.g., 192.168.1.100)")
+        form.addRow("Hostname/IP:", self.ollama_hostname_edit)
+
         self.ollama_port_spin = QSpinBox()
         self.ollama_port_spin.setRange(1, 65535)
         self.ollama_port_spin.setValue(11434)
@@ -166,6 +171,10 @@ class LLMSettingsDialog(QDialog):
         layout.addWidget(info_label)
 
         form = QFormLayout()
+
+        self.lm_studio_hostname_edit = QLineEdit("localhost")
+        self.lm_studio_hostname_edit.setPlaceholderText("localhost or IP address (e.g., 192.168.1.100)")
+        form.addRow("Hostname/IP:", self.lm_studio_hostname_edit)
 
         self.lm_studio_port_spin = QSpinBox()
         self.lm_studio_port_spin.setRange(1, 65535)
@@ -256,21 +265,83 @@ class LLMSettingsDialog(QDialog):
         widget.setLayout(layout)
         return widget
 
+    def _validate_hostname(self, hostname: str) -> tuple[bool, str]:
+        """
+        Validate hostname or IP address format.
+
+        Args:
+            hostname: Hostname or IP address to validate
+
+        Returns:
+            Tuple of (is_valid, error_message)
+        """
+        hostname = hostname.strip()
+
+        if not hostname:
+            return False, "Hostname cannot be empty"
+
+        # Accept localhost
+        if hostname.lower() == "localhost":
+            return True, ""
+
+        # Validate IP address
+        ip_pattern = r'^(\d{1,3}\.){3}\d{1,3}$'
+        if re.match(ip_pattern, hostname):
+            # Check range
+            parts = hostname.split('.')
+            try:
+                if all(0 <= int(p) <= 255 for p in parts):
+                    return True, ""
+                else:
+                    return False, "IP address octets must be between 0 and 255"
+            except ValueError:
+                return False, "Invalid IP address format"
+
+        # Accept valid hostnames (letters, numbers, dots, hyphens)
+        hostname_pattern = r'^[a-zA-Z0-9][a-zA-Z0-9.-]*[a-zA-Z0-9]$|^[a-zA-Z0-9]$'
+        if re.match(hostname_pattern, hostname):
+            return True, ""
+
+        return False, "Invalid hostname format (use letters, numbers, dots, and hyphens)"
+
     def _use_ollama(self):
         """Use Ollama settings."""
+        hostname = self.ollama_hostname_edit.text().strip()
         port = self.ollama_port_spin.value()
         model = self.ollama_model_edit.text()
 
-        self.custom_endpoint_edit.setText(f"http://localhost:{port}/v1")
+        # Validate hostname
+        is_valid, error_msg = self._validate_hostname(hostname)
+        if not is_valid:
+            QMessageBox.warning(
+                self,
+                "Invalid Hostname",
+                f"Invalid hostname or IP address:\n{error_msg}",
+            )
+            return
+
+        # Use Ollama native API endpoint (will use Python client automatically)
+        self.custom_endpoint_edit.setText(f"http://{hostname}:{port}/api")
         self.custom_model_edit.setText(model)
         self.custom_api_key_edit.clear()
 
     def _use_lm_studio(self):
         """Use LM Studio settings."""
+        hostname = self.lm_studio_hostname_edit.text().strip()
         port = self.lm_studio_port_spin.value()
         model = self.lm_studio_model_edit.text()
 
-        self.custom_endpoint_edit.setText(f"http://localhost:{port}/v1")
+        # Validate hostname
+        is_valid, error_msg = self._validate_hostname(hostname)
+        if not is_valid:
+            QMessageBox.warning(
+                self,
+                "Invalid Hostname",
+                f"Invalid hostname or IP address:\n{error_msg}",
+            )
+            return
+
+        self.custom_endpoint_edit.setText(f"http://{hostname}:{port}/v1")
         self.custom_model_edit.setText(model)
         self.custom_api_key_edit.clear()
 

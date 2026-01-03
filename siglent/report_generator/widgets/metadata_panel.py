@@ -15,12 +15,14 @@ from PyQt6.QtWidgets import (
     QPushButton,
     QGroupBox,
     QFileDialog,
+    QComboBox,
 )
 from PyQt6.QtCore import Qt, QDateTime, pyqtSignal
 from datetime import datetime
 from pathlib import Path
 
 from siglent.report_generator.models.report_data import ReportMetadata
+from siglent.report_generator.models.test_types import get_test_type_names
 
 
 class MetadataPanel(QWidget):
@@ -87,6 +89,18 @@ class MetadataPanel(QWidget):
         # Test details
         test_group = QGroupBox("Test Details")
         test_layout = QFormLayout()
+
+        # Test type selector
+        self.test_type_combo = QComboBox()
+        self.test_type_combo.setToolTip(
+            "Select the type of test being performed.\n"
+            "This helps the AI understand the expected signal characteristics."
+        )
+        # Populate with test types
+        for test_id, test_name in get_test_type_names():
+            self.test_type_combo.addItem(test_name, test_id)
+        self.test_type_combo.currentIndexChanged.connect(self.metadata_changed.emit)
+        test_layout.addRow("Test Type:", self.test_type_combo)
 
         self.project_edit = QLineEdit()
         self.project_edit.textChanged.connect(self.metadata_changed.emit)
@@ -197,6 +211,11 @@ class MetadataPanel(QWidget):
         Returns:
             ReportMetadata object
         """
+        # Get selected test type ID from combo box
+        test_type_id = self.test_type_combo.currentData()
+        if test_type_id is None:
+            test_type_id = "general"
+
         return ReportMetadata(
             title=self.title_edit.text().strip(),
             technician=self.technician_edit.text().strip(),
@@ -204,6 +223,7 @@ class MetadataPanel(QWidget):
             equipment_model=self.equipment_model_edit.text().strip() or None,
             equipment_id=self.equipment_id_edit.text().strip() or None,
             test_procedure=self.procedure_edit.text().strip() or None,
+            test_type=test_type_id,
             project_name=self.project_edit.text().strip() or None,
             customer=self.customer_edit.text().strip() or None,
             temperature=self.temperature_edit.text().strip() or None,
@@ -226,6 +246,18 @@ class MetadataPanel(QWidget):
         self.title_edit.setText(metadata.title or "")
         self.technician_edit.setText(metadata.technician or "")
         self.test_date_edit.setDateTime(QDateTime(metadata.test_date))
+
+        # Set test type
+        if metadata.test_type:
+            # Find index of test type in combo box
+            index = self.test_type_combo.findData(metadata.test_type)
+            if index >= 0:
+                self.test_type_combo.setCurrentIndex(index)
+            else:
+                # If not found, default to "general"
+                index = self.test_type_combo.findData("general")
+                if index >= 0:
+                    self.test_type_combo.setCurrentIndex(index)
 
         if metadata.equipment_model:
             self.equipment_model_edit.setText(metadata.equipment_model)
@@ -263,6 +295,10 @@ class MetadataPanel(QWidget):
         self.equipment_model_edit.clear()
         self.equipment_id_edit.clear()
         self.procedure_edit.clear()
+        # Reset test type to "general"
+        index = self.test_type_combo.findData("general")
+        if index >= 0:
+            self.test_type_combo.setCurrentIndex(index)
         self.project_edit.clear()
         self.customer_edit.clear()
         self.temperature_edit.clear()

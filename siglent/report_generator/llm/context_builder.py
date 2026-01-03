@@ -14,6 +14,7 @@ from siglent.report_generator.models.report_data import (
     TestReport,
     TestSection,
 )
+from siglent.report_generator.models.test_types import get_test_type
 
 
 class ContextBuilder:
@@ -144,6 +145,14 @@ class ContextBuilder:
         if report.metadata.test_procedure:
             lines.append(f"Procedure: {report.metadata.test_procedure}")
 
+        # Add test type information if available
+        if report.metadata.test_type:
+            test_type_def = get_test_type(report.metadata.test_type)
+            if test_type_def:
+                lines.append(f"Test Type: {test_type_def.name}")
+            else:
+                lines.append(f"Test Type: {report.metadata.test_type}")
+
         lines.append("")
 
         # Overall result
@@ -187,6 +196,27 @@ class ContextBuilder:
         """
         context = ContextBuilder.build_report_context(report, include_sections=True)
 
+        # Build test type specific context if available
+        test_type_context = ""
+        if report.metadata.test_type:
+            test_type_def = get_test_type(report.metadata.test_type)
+            print(f"[DEBUG] Test type ID: {report.metadata.test_type}")
+            print(f"[DEBUG] Test type definition: {test_type_def.name if test_type_def else 'None'}")
+            if test_type_def and test_type_def.id != "general":
+                test_type_context = (
+                    "=== TEST TYPE CONTEXT ===\n\n"
+                    f"{test_type_def.get_ai_context()}\n\n"
+                    "IMPORTANT: When analyzing this data, consider the expected signal characteristics "
+                    "and analysis focus areas listed above. Do not flag expected signal characteristics "
+                    "as problems. For example:\n"
+                    "- In probe calibration tests, square waves are EXPECTED and should not be interpreted as noise\n"
+                    "- In power supply ripple tests, small AC ripple on DC is EXPECTED\n"
+                    "- In clock signal tests, periodic square waves are EXPECTED\n\n"
+                )
+                print(f"[DEBUG] Adding test type context for: {test_type_def.name}")
+        else:
+            print("[DEBUG] No test type set in report metadata")
+
         if analysis_type == "summary":
             prompt = (
                 "Please provide a concise executive summary of this oscilloscope test report. "
@@ -214,8 +244,19 @@ class ContextBuilder:
         if focus_areas:
             prompt += f"Pay special attention to: {', '.join(focus_areas)}\n\n"
 
+        # Add test type context before report data
+        if test_type_context:
+            prompt += test_type_context
+
         prompt += "=== TEST REPORT DATA ===\n\n"
         prompt += context
+
+        # Debug: Print full prompt
+        print("\n" + "="*80)
+        print("FULL PROMPT BEING SENT TO LLM:")
+        print("="*80)
+        print(prompt[:1000] + "..." if len(prompt) > 1000 else prompt)
+        print("="*80 + "\n")
 
         return prompt
 
@@ -237,8 +278,17 @@ class ContextBuilder:
             "You are an expert oscilloscope technician and test engineer. "
             "Answer the following question about this test report data. "
             "Be specific, technical, and refer to actual measurements when relevant.\n\n"
-            "=== TEST REPORT DATA ===\n\n"
         )
+
+        # Add test type context if available
+        if report.metadata.test_type:
+            test_type_def = get_test_type(report.metadata.test_type)
+            if test_type_def and test_type_def.id != "general":
+                prompt += "=== TEST TYPE CONTEXT ===\n\n"
+                prompt += test_type_def.get_ai_context()
+                prompt += "\n\nWhen answering, consider the expected signal characteristics for this test type.\n\n"
+
+        prompt += "=== TEST REPORT DATA ===\n\n"
         prompt += context
         prompt += "\n\n=== USER QUESTION ===\n\n"
         prompt += user_question

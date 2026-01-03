@@ -30,6 +30,9 @@ class ReportMetadata:
     customer: Optional[str] = None
     revision: Optional[str] = None
 
+    # Test type context for AI analysis
+    test_type: Optional[str] = "general"  # Test type ID from test_types module
+
     # Branding
     company_name: Optional[str] = None
     company_logo_path: Optional[Path] = None
@@ -48,7 +51,8 @@ class ReportMetadata:
         optional_fields = [
             "equipment_id", "equipment_model", "test_procedure", "notes",
             "temperature", "humidity", "location", "project_name",
-            "customer", "revision", "company_name", "header_text", "footer_text"
+            "customer", "revision", "test_type",
+            "company_name", "header_text", "footer_text"
         ]
 
         for field_name in optional_fields:

@@ -17,21 +17,24 @@ from siglent.report_generator.models.report_data import (
     MeasurementResult,
     WaveformData,
 )
+from siglent.report_generator.models.plot_style import PlotStyle
 
 
 class MarkdownReportGenerator(BaseReportGenerator):
     """Generator for Markdown format reports."""
 
-    def __init__(self, include_plots: bool = True, plots_dir: str = "plots"):
+    def __init__(self, include_plots: bool = True, plots_dir: str = "plots", plot_style: PlotStyle = None):
         """
         Initialize Markdown generator.
 
         Args:
             include_plots: Whether to generate and include waveform plots
             plots_dir: Directory name for saving plot images (relative to report)
+            plot_style: Plot style configuration for matplotlib plots
         """
         self.include_plots = include_plots
         self.plots_dir = plots_dir
+        self.plot_style = plot_style or PlotStyle()
 
     def get_file_extension(self) -> str:
         """Get file extension."""
@@ -291,19 +294,31 @@ class MarkdownReportGenerator(BaseReportGenerator):
         return "\n".join(lines)
 
     def _generate_waveform_plot(self, waveform: WaveformData, base_path: Path, name: str) -> str:
-        """Generate and save waveform plot."""
+        """Generate and save waveform plot with custom style."""
         plots_path = base_path / self.plots_dir
         plots_path.mkdir(parents=True, exist_ok=True)
 
         filename = f"{name.replace(' ', '_')}.png"
         filepath = plots_path / filename
 
+        # Apply matplotlib style preset
+        if self.plot_style.matplotlib_style != "default":
+            plt.style.use(self.plot_style.matplotlib_style)
+
         fig, ax = plt.subplots(figsize=(10, 4))
-        ax.plot(waveform.time_data * 1e6, waveform.voltage_data, color=waveform.color or "#1f77b4", linewidth=0.5)
-        ax.set_xlabel("Time (µs)")
-        ax.set_ylabel("Voltage (V)")
-        ax.set_title(waveform.label)
-        ax.grid(True, alpha=0.3)
+
+        # Use plot style colors and settings
+        ax.plot(waveform.time_data * 1e6, waveform.voltage_data,
+               color=waveform.color or self.plot_style.waveform_color,
+               linewidth=self.plot_style.waveform_linewidth)
+
+        # Apply style to axes
+        self.plot_style.apply_to_axes(ax)
+
+        # Set labels with custom font sizes
+        ax.set_xlabel("Time (µs)", fontsize=self.plot_style.label_fontsize)
+        ax.set_ylabel("Voltage (V)", fontsize=self.plot_style.label_fontsize)
+        ax.set_title(waveform.label, fontsize=self.plot_style.title_fontsize)
 
         plt.tight_layout()
         plt.savefig(filepath, dpi=150, bbox_inches="tight")
@@ -312,19 +327,31 @@ class MarkdownReportGenerator(BaseReportGenerator):
         return f"{self.plots_dir}/{filename}"
 
     def _generate_fft_plot(self, frequency: np.ndarray, magnitude: np.ndarray, base_path: Path, name: str) -> str:
-        """Generate and save FFT plot."""
+        """Generate and save FFT plot with custom style."""
         plots_path = base_path / self.plots_dir
         plots_path.mkdir(parents=True, exist_ok=True)
 
         filename = f"{name.replace(' ', '_')}_fft.png"
         filepath = plots_path / filename
 
+        # Apply matplotlib style preset
+        if self.plot_style.matplotlib_style != "default":
+            plt.style.use(self.plot_style.matplotlib_style)
+
         fig, ax = plt.subplots(figsize=(10, 4))
-        ax.plot(frequency / 1e6, magnitude, color="#ff7f0e", linewidth=0.5)
-        ax.set_xlabel("Frequency (MHz)")
-        ax.set_ylabel("Magnitude (dB)")
-        ax.set_title("FFT Analysis")
-        ax.grid(True, alpha=0.3)
+
+        # Use plot style colors and settings
+        ax.plot(frequency / 1e6, magnitude,
+               color=self.plot_style.fft_color,
+               linewidth=self.plot_style.waveform_linewidth)
+
+        # Apply style to axes
+        self.plot_style.apply_to_axes(ax)
+
+        # Set labels with custom font sizes
+        ax.set_xlabel("Frequency (MHz)", fontsize=self.plot_style.label_fontsize)
+        ax.set_ylabel("Magnitude (dB)", fontsize=self.plot_style.label_fontsize)
+        ax.set_title("FFT Analysis", fontsize=self.plot_style.title_fontsize)
 
         plt.tight_layout()
         plt.savefig(filepath, dpi=150, bbox_inches="tight")

@@ -5,10 +5,13 @@ Generates professional PDF reports with waveform plots, measurements,
 company branding, and AI-generated insights.
 """
 
+from __future__ import annotations
+
 from pathlib import Path
 from typing import List, Optional, Tuple
 from datetime import datetime
 import io
+import re
 
 try:
     from reportlab.lib import colors
@@ -43,6 +46,7 @@ from siglent.report_generator.models.report_data import (
     MeasurementResult,
     WaveformData,
 )
+from siglent.report_generator.models.plot_style import PlotStyle
 
 
 class PDFReportGenerator(BaseReportGenerator):
@@ -54,6 +58,7 @@ class PDFReportGenerator(BaseReportGenerator):
         include_plots: bool = True,
         plot_width: float = 6.5,
         plot_height: float = 3.0,
+        plot_style: PlotStyle = None,
     ):
         """
         Initialize PDF generator.
@@ -63,6 +68,7 @@ class PDFReportGenerator(BaseReportGenerator):
             include_plots: Whether to include waveform plots
             plot_width: Plot width in inches
             plot_height: Plot height in inches
+            plot_style: Plot style configuration for matplotlib plots
         """
         if not REPORTLAB_AVAILABLE:
             raise ImportError(
@@ -78,6 +84,7 @@ class PDFReportGenerator(BaseReportGenerator):
         self.include_plots = include_plots
         self.plot_width = plot_width * inch
         self.plot_height = plot_height * inch
+        self.plot_style = plot_style or PlotStyle()
 
         # Set up styles
         self.styles = getSampleStyleSheet()
@@ -138,6 +145,61 @@ class PDFReportGenerator(BaseReportGenerator):
     def get_file_extension(self) -> str:
         """Get file extension."""
         return ".pdf"
+
+    def _markdown_to_reportlab(self, text: str) -> str:
+        """
+        Convert simple markdown to ReportLab XML tags.
+
+        Args:
+            text: Markdown text
+
+        Returns:
+            Text with ReportLab XML tags
+        """
+        if not text:
+            return ""
+
+        # Normalize unicode characters that might cause rendering issues
+        # Replace various dash types with regular hyphen
+        text = text.replace('\u2013', '-')  # en-dash
+        text = text.replace('\u2014', '-')  # em-dash
+        text = text.replace('\u2212', '-')  # minus sign
+        text = text.replace('\u00ad', '')   # soft hyphen (remove)
+
+        # Store markdown patterns before escaping
+        # We'll process them in order to avoid conflicts
+
+        # First, protect code blocks (they shouldn't be processed)
+        code_blocks = {}
+        def save_code(match):
+            key = f"__CODE_{len(code_blocks)}__"
+            code_blocks[key] = match.group(1)
+            return key
+        text = re.sub(r'`(.+?)`', save_code, text)
+
+        # Escape XML characters (but not in our saved code blocks)
+        text = text.replace('&', '&amp;')
+        text = text.replace('<', '&lt;')
+        text = text.replace('>', '&gt;')
+
+        # Convert markdown bold (**text** or __text__)
+        text = re.sub(r'\*\*(.+?)\*\*', r'<b>\1</b>', text)
+        text = re.sub(r'__(.+?)__', r'<b>\1</b>', text)
+
+        # Convert markdown italic (*text* or _text_)
+        text = re.sub(r'(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)', r'<i>\1</i>', text)
+        text = re.sub(r'(?<!_)_(?!_)(.+?)(?<!_)_(?!_)', r'<i>\1</i>', text)
+
+        # Restore code blocks with proper formatting
+        for key, code in code_blocks.items():
+            # Escape the code content too
+            code = code.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+            text = text.replace(key, f'<font face="Courier">{code}</font>')
+
+        # Convert line breaks
+        text = text.replace('\n', '<br/>')
+
+        return text
 
     def generate(self, report: TestReport, output_path: Path) -> bool:
         """
@@ -257,13 +319,19 @@ class PDFReportGenerator(BaseReportGenerator):
 
         table = Table(data, colWidths=[2*inch, 4.5*inch])
         table.setStyle(TableStyle([
-            ('ALIGN', (0, 0), (0, -1), 'RIGHT'),
-            ('ALIGN', (1, 0), (1, -1), 'LEFT'),
+            ('ALIGN', (0, 0), (0, -1), 'LEFT'),  # Left-align labels
+            ('ALIGN', (1, 0), (1, -1), 'LEFT'),  # Left-align values
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),  # Top-align vertically
             ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
             ('FONTNAME', (1, 0), (1, -1), 'Helvetica'),
             ('FONTSIZE', (0, 0), (-1, -1), 10),
             ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
             ('TOPPADDING', (0, 0), (-1, -1), 6),
+            ('LEFTPADDING', (0, 0), (-1, -1), 8),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 8),
+            # Add grid borders
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+            ('BOX', (0, 0), (-1, -1), 1, colors.black),
         ]))
 
         story.append(table)
@@ -307,7 +375,8 @@ class PDFReportGenerator(BaseReportGenerator):
 
         story.append(Paragraph("Executive Summary", self.styles['SectionHeading']))
 
-        summary_text = report.executive_summary.replace('\n', '<br/>')
+        # Convert markdown to ReportLab XML
+        summary_text = self._markdown_to_reportlab(report.executive_summary)
         story.append(Paragraph(summary_text, self.styles['Normal']))
 
         if report.ai_generated_summary:
@@ -325,7 +394,9 @@ class PDFReportGenerator(BaseReportGenerator):
         story.append(Paragraph("Key Findings", self.styles['SectionHeading']))
 
         for finding in report.key_findings:
-            story.append(Paragraph(f"• {finding}", self.styles['Normal']))
+            # Convert markdown to ReportLab XML
+            finding_text = self._markdown_to_reportlab(finding)
+            story.append(Paragraph(f"• {finding_text}", self.styles['Normal']))
 
         story.append(Spacer(1, 0.2*inch))
 
@@ -488,16 +559,26 @@ class PDFReportGenerator(BaseReportGenerator):
         return table
 
     def _generate_waveform_plot(self, waveform: WaveformData) -> Optional[RLImage]:
-        """Generate waveform plot as image."""
+        """Generate waveform plot as image with custom style."""
         try:
+            # Apply matplotlib style preset
+            if self.plot_style.matplotlib_style != "default":
+                plt.style.use(self.plot_style.matplotlib_style)
+
             fig, ax = plt.subplots(figsize=(self.plot_width/inch, self.plot_height/inch))
+
+            # Use plot style colors and settings
             ax.plot(waveform.time_data * 1e6, waveform.voltage_data,
-                   color=waveform.color or "#1f77b4", linewidth=0.8)
-            ax.set_xlabel("Time (µs)", fontsize=10)
-            ax.set_ylabel("Voltage (V)", fontsize=10)
-            ax.set_title(waveform.label, fontsize=11, fontweight='bold')
-            ax.grid(True, alpha=0.3)
-            ax.tick_params(labelsize=9)
+                   color=waveform.color or self.plot_style.waveform_color,
+                   linewidth=self.plot_style.waveform_linewidth)
+
+            # Apply style to axes
+            self.plot_style.apply_to_axes(ax)
+
+            # Set labels with custom font sizes
+            ax.set_xlabel("Time (µs)", fontsize=self.plot_style.label_fontsize)
+            ax.set_ylabel("Voltage (V)", fontsize=self.plot_style.label_fontsize)
+            ax.set_title(waveform.label, fontsize=self.plot_style.title_fontsize, fontweight='bold')
 
             plt.tight_layout()
 
@@ -516,15 +597,26 @@ class PDFReportGenerator(BaseReportGenerator):
             return None
 
     def _generate_fft_plot(self, frequency: np.ndarray, magnitude: np.ndarray) -> Optional[RLImage]:
-        """Generate FFT plot as image."""
+        """Generate FFT plot as image with custom style."""
         try:
+            # Apply matplotlib style preset
+            if self.plot_style.matplotlib_style != "default":
+                plt.style.use(self.plot_style.matplotlib_style)
+
             fig, ax = plt.subplots(figsize=(self.plot_width/inch, self.plot_height/inch))
-            ax.plot(frequency / 1e6, magnitude, color="#ff7f0e", linewidth=0.8)
-            ax.set_xlabel("Frequency (MHz)", fontsize=10)
-            ax.set_ylabel("Magnitude (dB)", fontsize=10)
-            ax.set_title("FFT Analysis", fontsize=11, fontweight='bold')
-            ax.grid(True, alpha=0.3)
-            ax.tick_params(labelsize=9)
+
+            # Use plot style colors and settings
+            ax.plot(frequency / 1e6, magnitude,
+                   color=self.plot_style.fft_color,
+                   linewidth=self.plot_style.waveform_linewidth)
+
+            # Apply style to axes
+            self.plot_style.apply_to_axes(ax)
+
+            # Set labels with custom font sizes
+            ax.set_xlabel("Frequency (MHz)", fontsize=self.plot_style.label_fontsize)
+            ax.set_ylabel("Magnitude (dB)", fontsize=self.plot_style.label_fontsize)
+            ax.set_title("FFT Analysis", fontsize=self.plot_style.title_fontsize, fontweight='bold')
 
             plt.tight_layout()
 
@@ -549,7 +641,9 @@ class PDFReportGenerator(BaseReportGenerator):
         story.append(Paragraph("Recommendations", self.styles['SectionHeading']))
 
         for i, rec in enumerate(report.recommendations, 1):
-            story.append(Paragraph(f"{i}. {rec}", self.styles['Normal']))
+            # Convert markdown to ReportLab XML
+            rec_text = self._markdown_to_reportlab(rec)
+            story.append(Paragraph(f"{i}. {rec_text}", self.styles['Normal']))
 
         story.append(Spacer(1, 0.2*inch))
 
