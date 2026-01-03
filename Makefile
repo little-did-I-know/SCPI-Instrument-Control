@@ -1,4 +1,4 @@
-.PHONY: help install install-dev install-all test test-cov lint format clean build publish docs docs-generate docs-examples docs-api docs-serve docs-deploy pre-commit
+.PHONY: help install install-dev install-all test test-cov lint format clean build publish build-exe build-exe-clean build-exe-test install-pyinstaller test-build-system docs docs-generate docs-examples docs-api docs-serve docs-deploy pre-commit
 
 help:  ## Show this help message
 	@echo "Available commands:"
@@ -39,10 +39,10 @@ format:  ## Auto-format code with Black
 	@echo "✓ Code formatted"
 
 clean:  ## Remove build artifacts and cache files
-	rm -rf build/ dist/ *.egg-info .pytest_cache .coverage htmlcov/
+	rm -rf build/ dist/ *.egg-info .pytest_cache .coverage htmlcov/ *.spec~
 	find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
 	find . -type f -name "*.pyc" -delete
-	@echo "✓ Cleaned build artifacts"
+	@echo "✓ Cleaned build artifacts (including PyInstaller)"
 
 build:  ## Build distribution packages
 	python -m build
@@ -57,6 +57,48 @@ publish:  ## Publish to PyPI (production)
 	@echo "Press Ctrl+C to cancel, or Enter to continue..."
 	@read line
 	twine upload dist/*
+
+# Executable building
+.PHONY: build-exe build-exe-clean install-pyinstaller
+
+install-pyinstaller:  ## Install PyInstaller for building executables
+	pip install pyinstaller
+
+build-exe-clean:  ## Clean PyInstaller build artifacts
+	rm -rf build/ dist/ *.spec~
+	@echo "✓ Cleaned PyInstaller artifacts"
+
+build-exe:  ## Build standalone executable for current platform
+	@echo "Building standalone executable for current platform..."
+	@$(MAKE) install-pyinstaller
+	pyinstaller --clean siglent-gui.spec
+	@echo ""
+	@echo "✓ Build complete!"
+	@echo "  Executable location: dist/"
+	@echo ""
+	@echo "Platform-specific instructions:"
+	@echo "  Windows: dist/SiglentGUI.exe"
+	@echo "  macOS:   dist/SiglentGUI.app"
+	@echo "  Linux:   dist/SiglentGUI"
+
+build-exe-test:  ## Build and test the executable
+	@$(MAKE) build-exe
+	@echo "\nTesting executable..."
+	@if [ -f "dist/SiglentGUI.exe" ]; then \
+		echo "Windows executable found: dist/SiglentGUI.exe"; \
+	elif [ -d "dist/SiglentGUI.app" ]; then \
+		echo "macOS app bundle found: dist/SiglentGUI.app"; \
+		open dist/SiglentGUI.app; \
+	elif [ -f "dist/SiglentGUI" ]; then \
+		echo "Linux executable found: dist/SiglentGUI"; \
+		./dist/SiglentGUI; \
+	else \
+		echo "ERROR: No executable found!"; \
+		exit 1; \
+	fi
+
+test-build-system:  ## Run pre-flight checks for build system
+	python scripts/test_build_system.py
 
 docs-generate:  ## Generate all documentation from code
 	@echo "Generating documentation from code..."

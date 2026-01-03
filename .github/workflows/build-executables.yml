@@ -1,0 +1,250 @@
+name: Build Standalone Executables
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'  # Trigger on version tags like v0.3.2, v1.0.0
+  workflow_dispatch:  # Allow manual trigger from GitHub Actions UI
+
+permissions:
+  contents: write  # Required to upload release assets
+
+jobs:
+  build-windows:
+    name: Build Windows Executable
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install ".[all]"
+          pip install pyinstaller
+
+      - name: Build executable with PyInstaller
+        run: |
+          pyinstaller --clean siglent-gui.spec
+
+      - name: Get version from tag
+        id: get_version
+        shell: bash
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            echo "version=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          else
+            echo "version=dev-$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create ZIP archive
+        shell: bash
+        run: |
+          cd dist
+          7z a -tzip SiglentGUI-${{ steps.get_version.outputs.version }}-Windows-x64.zip SiglentGUI.exe ../README.md ../LICENSE
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-executable
+          path: dist/SiglentGUI-${{ steps.get_version.outputs.version }}-Windows-x64.zip
+          retention-days: 30
+
+      - name: Upload to release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v1
+        with:
+          files: dist/SiglentGUI-${{ steps.get_version.outputs.version }}-Windows-x64.zip
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-macos:
+    name: Build macOS Application
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install ".[all]"
+          pip install pyinstaller
+
+      - name: Build application with PyInstaller
+        run: |
+          pyinstaller --clean siglent-gui.spec
+
+      - name: Get version from tag
+        id: get_version
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            echo "version=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          else
+            echo "version=dev-$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create DMG (optional) or ZIP archive
+        run: |
+          cd dist
+          # Create a ZIP for now (DMG creation requires additional tools)
+          zip -r SiglentGUI-${{ steps.get_version.outputs.version }}-macOS-arm64.zip SiglentGUI.app ../README.md ../LICENSE
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-executable
+          path: dist/SiglentGUI-${{ steps.get_version.outputs.version }}-macOS-arm64.zip
+          retention-days: 30
+
+      - name: Upload to release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v1
+        with:
+          files: dist/SiglentGUI-${{ steps.get_version.outputs.version }}-macOS-arm64.zip
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-linux:
+    name: Build Linux Binary
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libxcb-xinerama0 \
+            libxcb-icccm4 \
+            libxcb-image0 \
+            libxcb-keysyms1 \
+            libxcb-randr0 \
+            libxcb-render-util0 \
+            libxcb-shape0 \
+            libxkbcommon-x11-0 \
+            libdbus-1-3 \
+            libegl1 \
+            libfontconfig1 \
+            libgl1 \
+            libglib2.0-0
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install ".[all]"
+          pip install pyinstaller
+
+      - name: Build executable with PyInstaller
+        run: |
+          pyinstaller --clean siglent-gui.spec
+
+      - name: Get version from tag
+        id: get_version
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            echo "version=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          else
+            echo "version=dev-$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create tar.gz archive
+        run: |
+          cd dist
+          tar -czf SiglentGUI-${{ steps.get_version.outputs.version }}-Linux-x86_64.tar.gz SiglentGUI ../README.md ../LICENSE
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-executable
+          path: dist/SiglentGUI-${{ steps.get_version.outputs.version }}-Linux-x86_64.tar.gz
+          retention-days: 30
+
+      - name: Upload to release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v1
+        with:
+          files: dist/SiglentGUI-${{ steps.get_version.outputs.version }}-Linux-x86_64.tar.gz
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  create-release-notes:
+    name: Create Release Summary
+    runs-on: ubuntu-latest
+    needs: [build-windows, build-macos, build-linux]
+    if: startsWith(github.ref, 'refs/tags/')
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Get version
+        id: get_version
+        run: echo "version=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
+      - name: Update release with installation notes
+        uses: softprops/action-gh-release@v1
+        with:
+          append_body: true
+          body: |
+
+            ## 📦 Standalone Executables
+
+            Download the appropriate package for your operating system:
+
+            - **Windows**: `SiglentGUI-${{ steps.get_version.outputs.version }}-Windows-x64.zip`
+              - Extract and run `SiglentGUI.exe`
+              - No Python installation required
+
+            - **macOS**: `SiglentGUI-${{ steps.get_version.outputs.version }}-macOS-arm64.zip`
+              - Extract and open `SiglentGUI.app`
+              - You may need to right-click → Open the first time (unsigned app)
+              - No Python installation required
+
+            - **Linux**: `SiglentGUI-${{ steps.get_version.outputs.version }}-Linux-x86_64.tar.gz`
+              - Extract: `tar -xzf SiglentGUI-*.tar.gz`
+              - Run: `./SiglentGUI`
+              - Make executable if needed: `chmod +x SiglentGUI`
+              - No Python installation required
+
+            ## 🐍 Python Package
+
+            Install via pip:
+            ```bash
+            pip install Siglent-Oscilloscope==${{ steps.get_version.outputs.version }}
+            ```
+
+            Or upgrade:
+            ```bash
+            pip install --upgrade Siglent-Oscilloscope
+            ```
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

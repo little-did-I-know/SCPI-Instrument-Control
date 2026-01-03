@@ -79,6 +79,9 @@ docs = [
     "mkdocs-literate-nav>=0.6.0",
     "mkdocs-section-index>=0.3.0",
 ]
+build-exe = [
+    "pyinstaller>=6.0.0",
+]
 all = [
     "h5py>=3.8.0",
     "PyQt6>=6.6.0",

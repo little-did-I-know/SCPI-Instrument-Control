@@ -36,6 +36,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Comprehensive examples, troubleshooting sections, and cross-references
 - mkdocstrings integration for auto-generating API docs from Python docstrings
 
+### Fixed
+- **Windows Executable Build Workflow**
+  - Fixed 7-Zip archive creation failing with "The system cannot find the file specified" errors
+  - Updated Windows build workflow to correctly reference README.md and LICENSE from parent directory
+  - Changed paths from `README.md LICENSE` to `../README.md ../LICENSE` to match macOS/Linux builds
+  - Resolved workflow exit code 1 error during archive creation
+
 ## [0.3.0] - Unreleased
 
 ### ⚠️ BREAKING CHANGES
