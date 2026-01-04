@@ -658,6 +658,7 @@ See our [Code of Conduct](CODE_OF_CONDUCT.md) and [Security Policy](SECURITY.md)
 - 📁 **[Examples Directory](examples/)** - Ready-to-run example scripts
 - 📖 **[API Documentation](#api-documentation)** - Complete API reference in this README
 - 🔧 **[Contributing Guide](CONTRIBUTING.md)** - How to contribute to the project
+- 🧪 **[Experimental Features Guide](docs/development/EXPERIMENTAL_FEATURES.md)** - Beta releases and experimental features
 - 🔒 **[Security Policy](SECURITY.md)** - Security best practices and reporting
 
 ## License

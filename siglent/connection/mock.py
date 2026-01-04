@@ -37,6 +37,10 @@ class MockConnection(BaseConnection):
         timebase: float = 1e-3,
         trigger_status: Optional[List[str]] = None,
         custom_responses: Optional[Dict[str, Union[str, List[str]]]] = None,
+        # Power supply parameters
+        psu_mode: bool = False,
+        psu_idn: str = "Siglent Technologies,SPD3303X,SPD123456,1.0",
+        psu_outputs: Optional[Dict[int, Dict[str, float]]] = None,
     ):
         super().__init__(host, port, timeout)
         channels = channel_states.keys() if channel_states else range(1, 3)
@@ -63,6 +67,21 @@ class MockConnection(BaseConnection):
         self.waveform_requests: List[int] = []
         self._last_waveform_channel: Optional[int] = None
 
+        # Power supply mode
+        self.psu_mode = psu_mode
+        self.psu_idn = psu_idn
+        self.psu_outputs: Dict[int, Dict[str, float]] = psu_outputs or {
+            1: {"voltage": 0.0, "current": 0.0, "enabled": False},
+            2: {"voltage": 0.0, "current": 0.0, "enabled": False},
+            3: {"voltage": 0.0, "current": 0.0, "enabled": False},
+        }
+        # PSU advanced features state
+        self.psu_tracking_mode = "INDEPENDENT"
+        self.psu_timer_enabled: Dict[int, bool] = {1: False, 2: False, 3: False}
+        self.psu_waveform_enabled: Dict[int, bool] = {1: False, 2: False, 3: False}
+        self.psu_ovp_levels: Dict[int, float] = {1: 30.0, 2: 30.0, 3: 5.0}
+        self.psu_ocp_levels: Dict[int, float] = {1: 3.0, 2: 3.0, 3: 3.0}
+
     def connect(self) -> None:
         """Mark the connection as established."""
         self._connected = True
@@ -79,6 +98,66 @@ class MockConnection(BaseConnection):
         command = command.strip()
         self.writes.append(command)
 
+        # Power supply commands
+        if self.psu_mode:
+            # Voltage setting: CH1:VOLT 5.0 (Siglent) or SOUR1:VOLT 5.0 (generic)
+            if match := re.match(r"(?:CH|SOUR)(\d+):VOLT\s+([\d.]+)", command, re.IGNORECASE):
+                ch = int(match.group(1))
+                voltage = float(match.group(2))
+                if ch in self.psu_outputs:
+                    self.psu_outputs[ch]["voltage"] = voltage
+                return
+
+            # Current setting: CH1:CURR 2.0 (Siglent) or SOUR1:CURR 2.0 (generic)
+            if match := re.match(r"(?:CH|SOUR)(\d+):CURR\s+([\d.]+)", command, re.IGNORECASE):
+                ch = int(match.group(1))
+                current = float(match.group(2))
+                if ch in self.psu_outputs:
+                    self.psu_outputs[ch]["current"] = current
+                return
+
+            # Output enable: OUTPut CH1,ON (Siglent) or OUTP1 ON (generic)
+            if match := re.match(r"OUTP(?:UT)?\s*(?:CH\s*)?(\d+)[\s,]+(ON|OFF)", command, re.IGNORECASE):
+                ch = int(match.group(1))
+                enabled = match.group(2).upper() == "ON"
+                if ch in self.psu_outputs:
+                    self.psu_outputs[ch]["enabled"] = enabled
+                return
+
+            # Tracking mode: OUTP:TRACK SERIES
+            if match := re.match(r"OUTP(?:UT)?:TRACK\s+(INDEPENDENT|SERIES|PARALLEL)", command, re.IGNORECASE):
+                self.psu_tracking_mode = match.group(1).upper()
+                return
+
+            # Timer enable: TIMEr CH1,ON
+            if match := re.match(r"TIME(?:R)?\s+CH(\d+),(ON|OFF)", command, re.IGNORECASE):
+                ch = int(match.group(1))
+                enabled = match.group(2).upper() == "ON"
+                self.psu_timer_enabled[ch] = enabled
+                return
+
+            # Waveform enable: WAVE CH1,ON
+            if match := re.match(r"WAVE\s+CH(\d+),(ON|OFF)", command, re.IGNORECASE):
+                ch = int(match.group(1))
+                enabled = match.group(2).upper() == "ON"
+                self.psu_waveform_enabled[ch] = enabled
+                return
+
+            # OVP setting: CH1:VOLT:PROT 25.0 or SOUR1:VOLT:PROT 25.0
+            if match := re.match(r"(?:CH|SOUR)(\d+):VOLT:PROT\s+([\d.]+)", command, re.IGNORECASE):
+                ch = int(match.group(1))
+                level = float(match.group(2))
+                self.psu_ovp_levels[ch] = level
+                return
+
+            # OCP setting: CH1:CURR:PROT 2.5 or SOUR1:CURR:PROT 2.5
+            if match := re.match(r"(?:CH|SOUR)(\d+):CURR:PROT\s+([\d.]+)", command, re.IGNORECASE):
+                ch = int(match.group(1))
+                level = float(match.group(2))
+                self.psu_ocp_levels[ch] = level
+                return
+
+        # Oscilloscope commands
         if command.upper().startswith("TDIV "):
             value = command.split(" ", 1)[1]
             try:
@@ -142,7 +221,92 @@ class MockConnection(BaseConnection):
         upper = command.upper()
 
         if upper == "*IDN?":
-            return self.idn
+            return self.psu_idn if self.psu_mode else self.idn
+
+        # Power supply queries
+        if self.psu_mode:
+            # Voltage queries: CH1:VOLT? (Siglent) or SOUR1:VOLT? (generic)
+            if match := re.match(r"(?:CH|SOUR)(\d+):VOLT\?", upper):
+                ch = int(match.group(1))
+                if ch in self.psu_outputs:
+                    return f"{self.psu_outputs[ch]['voltage']:.3f}"
+                return "0.000"
+
+            # Current queries: CH1:CURR? (Siglent) or SOUR1:CURR? (generic)
+            if match := re.match(r"(?:CH|SOUR)(\d+):CURR\?", upper):
+                ch = int(match.group(1))
+                if ch in self.psu_outputs:
+                    return f"{self.psu_outputs[ch]['current']:.3f}"
+                return "0.000"
+
+            # Output state queries: OUTPut? CH1 (Siglent) or OUTP1? (generic)
+            # Matches: OUTP1?, OUTPUT1?, OUTP? CH1, OUTPUT? CH1
+            if match := re.match(r"OUTP(?:UT)?(\d+)\?|OUTP(?:UT)?\?\s*(?:CH\s*)?(\d+)", upper):
+                ch = int(match.group(1) or match.group(2))
+                if ch in self.psu_outputs:
+                    return "ON" if self.psu_outputs[ch]["enabled"] else "OFF"
+                return "OFF"
+
+            # Measurements - simulate with slight noise
+            # MEAS1:VOLT? (generic) or MEASure1:VOLTage? (Siglent)
+            if match := re.match(r"MEAS(?:URE)?(\d+):VOLT(?:AGE)?\?", upper):
+                ch = int(match.group(1))
+                if ch in self.psu_outputs:
+                    v = self.psu_outputs[ch]["voltage"]
+                    # Add small noise to measurement (0-2mV)
+                    noise = 0.001 if v > 0 else 0.0
+                    return f"{v + noise:.3f}"
+                return "0.000"
+
+            if match := re.match(r"MEAS(?:URE)?(\d+):CURR(?:ENT)?\?", upper):
+                ch = int(match.group(1))
+                if ch in self.psu_outputs:
+                    i = self.psu_outputs[ch]["current"]
+                    # Add small noise to measurement (0-2mA)
+                    noise = 0.001 if i > 0 else 0.0
+                    return f"{i + noise:.3f}"
+                return "0.000"
+
+            if match := re.match(r"MEAS(?:URE)?(\d+):POW(?:ER)?\?", upper):
+                ch = int(match.group(1))
+                if ch in self.psu_outputs:
+                    v = self.psu_outputs[ch]["voltage"]
+                    i = self.psu_outputs[ch]["current"]
+                    p = v * i
+                    return f"{p:.3f}"
+                return "0.000"
+
+            # Tracking mode query
+            if "OUTP:TRACK?" in upper or "OUTPUT:TRACK?" in upper:
+                return self.psu_tracking_mode
+
+            # Timer queries
+            if match := re.match(r"TIME(?:R)?\?\s*CH(\d+)", upper):
+                ch = int(match.group(1))
+                return "ON" if self.psu_timer_enabled.get(ch, False) else "OFF"
+
+            # Waveform queries
+            if match := re.match(r"WAVE\?\s*CH(\d+)", upper):
+                ch = int(match.group(1))
+                return "ON" if self.psu_waveform_enabled.get(ch, False) else "OFF"
+
+            # OVP queries: SOUR1:VOLT:PROT? (generic) or CH1:VOLT:PROT? (Siglent)
+            if match := re.match(r"(?:CH|SOUR)(\d+):VOLT:PROT\?", upper):
+                ch = int(match.group(1))
+                return f"{self.psu_ovp_levels.get(ch, 30.0):.3f}"
+
+            # OCP queries: SOUR1:CURR:PROT? (generic) or CH1:CURR:PROT? (Siglent)
+            if match := re.match(r"(?:CH|SOUR)(\d+):CURR:PROT\?", upper):
+                ch = int(match.group(1))
+                return f"{self.psu_ocp_levels.get(ch, 3.0):.3f}"
+
+            # Output mode query (CV or CC)
+            if match := re.match(r"OUTP(?:UT)?(\d+):MODE\?", upper):
+                ch = int(match.group(1))
+                if ch in self.psu_outputs:
+                    # Return CV (constant voltage) by default
+                    return "CV"
+                return "CV"
 
         if upper in {":TRIG:STAT?", "TRIG:STAT?"}:
             if len(self.trigger_status) > 1:

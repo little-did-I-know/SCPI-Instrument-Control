@@ -26,7 +26,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from siglent import Oscilloscope
+from siglent import Oscilloscope, PowerSupply
 from siglent.exceptions import SiglentConnectionError, SiglentError
 
 # Try to use PyQtGraph for high-performance plotting, fallback to matplotlib
@@ -52,6 +52,7 @@ from siglent.gui.widgets.fft_display import FFTDisplay
 from siglent.gui.widgets.math_panel import MathPanel
 from siglent.gui.widgets.measurement_panel import MeasurementPanel
 from siglent.gui.widgets.protocol_decode_panel import ProtocolDecodePanel
+from siglent.gui.widgets.psu_control import PSUControl
 from siglent.gui.widgets.reference_panel import ReferencePanel
 from siglent.gui.widgets.terminal_widget import TerminalWidget
 from siglent.gui.widgets.timebase_control import TimebaseControl
@@ -71,6 +72,7 @@ class MainWindow(QMainWindow):
         super().__init__()
 
         self.scope: Optional[Oscilloscope] = None
+        self.psu: Optional[PowerSupply] = None
         self.is_live_view = False
         self.live_view_worker: Optional[LiveViewWorker] = None
         self.capture_worker: Optional[WaveformCaptureWorker] = None
@@ -96,6 +98,7 @@ class MainWindow(QMainWindow):
         self.fft_display: Optional[FFTDisplay] = None
         self.reference_panel: Optional[ReferencePanel] = None
         self.protocol_decode_panel: Optional[ProtocolDecodePanel] = None
+        self.psu_control: Optional[PSUControl] = None
         self.terminal_widget: Optional[TerminalWidget] = None
 
         # VNC window (separate window)
@@ -242,6 +245,10 @@ class MainWindow(QMainWindow):
         self.terminal_widget = TerminalWidget()
         self.tabs.addTab(self.terminal_widget, "Terminal")
 
+        # Power Supply tab
+        self.psu_control = PSUControl()
+        self.tabs.addTab(self.psu_control, "Power Supply")
+
         layout.addWidget(self.tabs)
 
         return panel
@@ -275,14 +282,26 @@ class MainWindow(QMainWindow):
         # File menu
         file_menu = menubar.addMenu("&File")
 
-        connect_action = QAction("&Connect...", self)
+        connect_action = QAction("&Connect to Oscilloscope...", self)
         connect_action.setShortcut("Ctrl+O")
         connect_action.triggered.connect(self._on_connect)
         file_menu.addAction(connect_action)
 
-        disconnect_action = QAction("&Disconnect", self)
+        disconnect_action = QAction("&Disconnect Oscilloscope", self)
         disconnect_action.triggered.connect(self._on_disconnect)
         file_menu.addAction(disconnect_action)
+
+        file_menu.addSeparator()
+
+        # Power Supply menu items
+        psu_connect_action = QAction("Connect to &Power Supply...", self)
+        psu_connect_action.setShortcut("Ctrl+P")
+        psu_connect_action.triggered.connect(self._on_psu_connect)
+        file_menu.addAction(psu_connect_action)
+
+        psu_disconnect_action = QAction("Disconnect Po&wer Supply", self)
+        psu_disconnect_action.triggered.connect(self._on_psu_disconnect)
+        file_menu.addAction(psu_disconnect_action)
 
         file_menu.addSeparator()
 
@@ -613,6 +632,85 @@ class MainWindow(QMainWindow):
             logger.info("Disconnected from oscilloscope")
         else:
             QMessageBox.warning(self, "Not Connected", "No oscilloscope connected")
+
+    def _on_psu_connect(self):
+        """Handle PSU connect action."""
+        # Get IP address from user
+        ip, ok = QInputDialog.getText(
+            self, "Connect to Power Supply", "Enter power supply IP address:", text="192.168.1.200"
+        )
+
+        if ok and ip:
+            self._connect_to_psu(ip)
+
+    def _connect_to_psu(self, ip: str, port: int = 5024):
+        """Connect to power supply at specified IP and port.
+
+        Args:
+            ip: IP address or hostname
+            port: TCP port (default: 5024)
+        """
+        try:
+            self.statusBar().showMessage(f"Connecting to PSU at {ip}...")
+            self.psu = PowerSupply(ip, port)
+            self.psu.connect()
+
+            device_info = self.psu.device_info
+            model = device_info.get("model", "Unknown") if device_info else "Unknown"
+            manufacturer = device_info.get("manufacturer", "Unknown") if device_info else "Unknown"
+
+            # Pass PSU reference to control widget
+            self.psu_control.set_psu(self.psu)
+
+            # Create detailed status message with model capability info
+            if self.psu.model_capability:
+                cap = self.psu.model_capability
+                status_msg = (
+                    f"PSU Connected: {model} | "
+                    f"{cap.num_outputs} outputs | "
+                    f"{cap.scpi_variant} | {ip}"
+                )
+                info_msg = (
+                    f"Successfully connected to power supply:\n\n"
+                    f"Manufacturer: {manufacturer}\n"
+                    f"Model: {model}\n"
+                    f"Outputs: {cap.num_outputs}\n"
+                    f"SCPI Variant: {cap.scpi_variant}\n"
+                    f"IP Address: {ip}"
+                )
+            else:
+                status_msg = f"PSU Connected to {model} at {ip}"
+                info_msg = f"Successfully connected to {model}\nIP: {ip}"
+
+            self.statusBar().showMessage(status_msg)
+            QMessageBox.information(self, "PSU Connected", info_msg)
+            logger.info(f"Connected to power supply at {ip}")
+
+            # Switch to Power Supply tab
+            for i in range(self.tabs.count()):
+                if self.tabs.tabText(i) == "Power Supply":
+                    self.tabs.setCurrentIndex(i)
+                    break
+
+        except (SiglentConnectionError, SiglentError) as e:
+            self.statusBar().showMessage("PSU connection failed")
+            QMessageBox.critical(self, "PSU Connection Error", f"Failed to connect to power supply:\n{str(e)}")
+            logger.error(f"PSU connection failed: {e}")
+            self.psu = None
+
+    def _on_psu_disconnect(self):
+        """Handle PSU disconnect action."""
+        if self.psu:
+            self.psu.disconnect()
+            self.psu = None
+
+            # Clear PSU reference from control widget
+            self.psu_control.set_psu(None)
+
+            self.statusBar().showMessage("PSU Disconnected")
+            logger.info("Disconnected from power supply")
+        else:
+            QMessageBox.warning(self, "Not Connected", "No power supply connected")
 
     def _on_run(self):
         """Handle run action."""

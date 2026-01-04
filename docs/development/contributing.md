@@ -384,6 +384,40 @@ Mock-ups, examples, or references
 5. **Documentation** - update docs and examples
 6. **Review** - submit PR and address feedback
 
+### Experimental Features
+
+For features that are innovative but need user feedback before stabilization:
+
+**When to mark as experimental:**
+- New hardware support (untested models)
+- Novel functionality without proven use cases
+- API designs that need validation
+- Features requiring extensive real-world testing
+
+**How to implement:**
+- Use optional dependency groups: `[feature-name-beta]`
+- Add module-level warnings: `warnings.warn(..., FutureWarning)`
+- Mark with `@experimental` decorator for individual methods
+- Document clearly in README and changelog
+- Use pre-release versions: `0.x.0-alpha.1`, `0.x.0-beta.1`
+
+**Full guide**: See [`docs/development/EXPERIMENTAL_FEATURES.md`](EXPERIMENTAL_FEATURES.md) for comprehensive instructions on:
+- Marking features as experimental
+- Version numbering strategies
+- Testing requirements
+- Documentation standards
+- Graduation and deprecation process
+
+**Example:**
+```python
+# siglent/power_supply.py (experimental module)
+import warnings
+warnings.warn(
+    "siglent.power_supply is experimental. API may change.",
+    FutureWarning
+)
+```
+
 ## Development Tips
 
 ### Hardware Testing
