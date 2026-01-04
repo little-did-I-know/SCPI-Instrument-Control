@@ -84,7 +84,14 @@ class WaveformValidator:
             issues.append(f"CH{channel}: Time array is empty (0 samples)")
 
         # Check 5: Time and voltage arrays have matching lengths
-        if hasattr(waveform, "voltage") and hasattr(waveform, "time") and waveform.voltage is not None and waveform.time is not None and isinstance(waveform.voltage, np.ndarray) and isinstance(waveform.time, np.ndarray):
+        if (
+            hasattr(waveform, "voltage")
+            and hasattr(waveform, "time")
+            and waveform.voltage is not None
+            and waveform.time is not None
+            and isinstance(waveform.voltage, np.ndarray)
+            and isinstance(waveform.time, np.ndarray)
+        ):
 
             if len(waveform.time) != len(waveform.voltage):
                 issues.append(f"CH{channel}: Time/voltage length mismatch " f"(time: {len(waveform.time)}, voltage: {len(waveform.voltage)})")

@@ -26,14 +26,14 @@ jobs:
 
       - name: Check code formatting with Black
         run: |
-          black --check --line-length 1000 siglent/ examples/
+          black --check --line-length 200 siglent/ examples/
 
       - name: Lint with flake8
         run: |
           # Stop the build if there are Python syntax errors or undefined names
           flake8 siglent/ --count --select=E9,F63,F7,F82 --show-source --statistics
           # Exit-zero treats all errors as warnings
-          flake8 siglent/ --count --exit-zero --max-line-length=1000 --statistics
+          flake8 siglent/ --count --exit-zero --max-line-length=200 --statistics
 
   build:
     name: Build Package

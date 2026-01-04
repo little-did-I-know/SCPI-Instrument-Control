@@ -111,7 +111,9 @@ class SocketConnection(BaseConnection):
                 # Check for timeout in the read loop
                 if time.time() - start_time > self.timeout:
                     command_context = f"for '{self._last_command}' " if self._last_command else ""
-                    raise exceptions.SiglentTimeoutError(f"Read timeout {command_context}after {self.timeout}s waiting for newline terminator " f"(received {len(data)} bytes so far) from {self.host}:{self.port}")
+                    raise exceptions.SiglentTimeoutError(
+                        f"Read timeout {command_context}after {self.timeout}s waiting for newline terminator " f"(received {len(data)} bytes so far) from {self.host}:{self.port}"
+                    )
 
                 chunk = self._socket.recv(self._buffer_size)
                 if not chunk:
