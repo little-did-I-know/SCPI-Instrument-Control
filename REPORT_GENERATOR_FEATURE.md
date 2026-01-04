@@ -6,17 +6,21 @@ The **Siglent Report Generator** is a powerful standalone application for creati
 
 ## ✨ Key Features
 
-### 🔬 Data Import
+### 🔬 Data Import & Analysis
 - **Multiple file formats:** NPZ, CSV, MATLAB (.mat), HDF5
 - **Batch import:** Load multiple waveform files at once
 - **Image import:** Add screenshots, setup photos, diagrams
 - **Live scope connection:** Ready for future real-time capture integration
+- **Signal type detection:** Automatic waveform classification (sine, square, triangle, sawtooth, pulse, DC, noise)
+- **Comprehensive statistics:** 25+ measurements including amplitude, frequency, timing, and quality metrics
+- **Plateau stability:** Measures noise on flat signal regions for power supply and logic level testing
 
 ### 📝 Professional Reports
 - **PDF Reports:** Publication-ready PDFs with company branding
 - **Markdown Reports:** Documentation-friendly format for version control
 - **Customizable branding:** Company logo, header/footer, custom colors
 - **Automatic plots:** Waveform graphs, FFT analysis, embedded images
+- **Real-time progress:** Visual progress bar with granular updates during PDF generation
 
 ### ✅ Pass/Fail Testing
 - **Measurement criteria:** Define acceptable ranges for measurements
@@ -167,6 +171,7 @@ See `BUILD_EXECUTABLE.md` for detailed AppImage creation instructions.
    - Go to Settings → LLM Configuration
    - Select "Ollama" tab
    - Default settings should work (port 11434, model llama3.2)
+   - **NEW:** Click "Detect Models" to automatically populate available models
    - Click "Test Connection"
 
 ### Option 2: LM Studio
@@ -177,7 +182,9 @@ See `BUILD_EXECUTABLE.md` for detailed AppImage creation instructions.
 4. **In Report Generator:**
    - Go to Settings → LLM Configuration
    - Select "LM Studio" tab
-   - Set port and model name
+   - Set port number
+   - **NEW:** Click "Detect Models" to automatically populate available models
+   - Select your model from dropdown or type manually
    - Click "Test Connection"
 
 ### Recommended Models
@@ -249,11 +256,77 @@ Reports can include:
 - **Executive Summary** (AI-generated or custom)
 - **Test Metadata** (technician, date, equipment, conditions)
 - **Waveform Captures** (plots with statistics)
+- **Signal Type Classification** (automatic detection with confidence score)
+- **Comprehensive Statistics** (25+ measurements per waveform)
+- **Plateau Stability Analysis** (optional, for periodic signals)
 - **Measurement Results** (with pass/fail status)
 - **FFT Analysis** (frequency domain plots)
 - **Custom Images** (setup photos, diagrams)
 - **AI Insights** (signal quality analysis)
 - **Recommendations** (next steps, troubleshooting)
+
+## 🔬 Advanced Waveform Analysis
+
+### Signal Type Detection
+
+The report generator automatically classifies waveforms using FFT harmonic analysis:
+
+- **Sine waves:** Detected by dominant fundamental frequency (THD < 10%)
+- **Square waves:** Odd harmonics with 1/n amplitude ratio
+- **Triangle waves:** Odd harmonics with 1/n² amplitude ratio
+- **Sawtooth waves:** All harmonics with 1/n amplitude ratio
+- **Pulse/PWM:** Detected by duty cycle and harmonic pattern
+- **DC signals:** Constant voltage with no AC component
+- **Noise:** Random signal with no dominant frequency
+- **Complex/Unknown:** Mixed or unclassified signals
+
+Each classification includes a confidence score (0-100%) displayed in the report.
+
+### Comprehensive Waveform Statistics
+
+Every waveform is analyzed with 25+ measurements:
+
+**Amplitude Measurements:**
+- Vmax, Vmin, Vpp (peak-to-peak)
+- VRMS (root mean square)
+- Vmean (average voltage)
+- DC offset
+
+**Frequency & Timing:**
+- Frequency and period
+- Rise time and fall time
+- Pulse width and duty cycle
+
+**Quality Metrics:**
+- SNR (Signal-to-Noise Ratio)
+- THD (Total Harmonic Distortion)
+- Noise level
+- Overshoot and undershoot
+- Jitter
+
+All statistics are automatically formatted with appropriate SI prefixes (mV, µs, kHz, etc.).
+
+### Plateau Stability Analysis (Optional)
+
+For periodic signals (square waves, pulses, PWM, etc.), you can enable **Plateau Stability Analysis** to measure noise on flat signal regions:
+
+**How it works:**
+1. Identifies high and low plateau regions using run-length encoding
+2. Analyzes the middle 60% of each plateau (excludes edge transitions)
+3. Calculates standard deviation as a measure of noise
+
+**Reported metrics:**
+- **Plateau High Noise:** Noise on high-level plateaus
+- **Plateau Low Noise:** Noise on low-level plateaus
+- **Plateau Stability:** Average noise across all plateaus
+
+**Use cases:**
+- Power supply ripple testing
+- Logic level stability verification
+- Signal integrity assessment
+- Switch bounce analysis
+
+**To enable:** Check "Plateau Stability Analysis (Advanced)" in the Report Options dialog
 
 ## ⚙️ Configuration
 

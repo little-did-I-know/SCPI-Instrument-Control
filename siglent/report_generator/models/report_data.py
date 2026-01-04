@@ -100,10 +100,62 @@ class WaveformData:
     color: Optional[str] = "#1f77b4"  # Default matplotlib blue
     label: Optional[str] = None
 
+    # Signal analysis results
+    signal_type: Optional[str] = None
+    signal_type_confidence: Optional[float] = None
+    statistics: Optional[Dict[str, Any]] = None
+
     def __post_init__(self):
         """Set default label if not provided."""
         if self.label is None:
             self.label = self.channel_name
+
+    def analyze(self) -> None:
+        """
+        Analyze the waveform and populate signal type and statistics.
+
+        This method uses the WaveformAnalyzer to detect signal type and
+        calculate comprehensive statistics, storing them in the instance.
+        """
+        # Import here to avoid circular dependency
+        from siglent.report_generator.utils.waveform_analyzer import WaveformAnalyzer
+
+        # Calculate all statistics including signal type
+        self.statistics = WaveformAnalyzer.analyze(self)
+
+        # Extract signal type info to dedicated fields for easy access
+        if self.statistics:
+            self.signal_type = self.statistics.get('signal_type')
+            self.signal_type_confidence = self.statistics.get('signal_type_confidence')
+
+    def get_statistic(self, name: str) -> Optional[Any]:
+        """
+        Get a specific statistic by name.
+
+        Args:
+            name: Statistic name (e.g., 'vmax', 'frequency', 'rise_time')
+
+        Returns:
+            The statistic value, or None if not calculated
+        """
+        if self.statistics is None:
+            return None
+        return self.statistics.get(name)
+
+    def format_statistic(self, name: str) -> str:
+        """
+        Get a formatted string for a statistic.
+
+        Args:
+            name: Statistic name
+
+        Returns:
+            Formatted string with value and units
+        """
+        from siglent.report_generator.utils.waveform_analyzer import WaveformAnalyzer
+
+        value = self.get_statistic(name)
+        return WaveformAnalyzer.format_stat_value(name, value)
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary (excludes numpy arrays for JSON serialization)."""
@@ -118,7 +170,7 @@ class WaveformData:
         # Add optional fields
         optional_fields = [
             "timebase", "voltage_scale", "voltage_offset",
-            "probe_ratio", "coupling"
+            "probe_ratio", "coupling", "signal_type", "signal_type_confidence"
         ]
 
         for field_name in optional_fields:
@@ -130,6 +182,19 @@ class WaveformData:
             data["source_file"] = str(self.source_file)
         if self.capture_timestamp:
             data["capture_timestamp"] = self.capture_timestamp.isoformat()
+
+        # Add statistics (exclude numpy arrays and convert values to basic types)
+        if self.statistics:
+            stats_serializable = {}
+            for key, value in self.statistics.items():
+                if value is not None and not isinstance(value, np.ndarray):
+                    # Convert numpy types to Python types
+                    if isinstance(value, (np.integer, np.floating)):
+                        stats_serializable[key] = float(value)
+                    else:
+                        stats_serializable[key] = value
+            if stats_serializable:
+                data["statistics"] = stats_serializable
 
         return data
 

@@ -8,7 +8,7 @@ company branding, and AI-generated insights.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Callable
 from datetime import datetime
 import io
 import re
@@ -62,6 +62,7 @@ class PDFReportGenerator(BaseReportGenerator):
         plot_height: float = 3.0,
         plot_style: PlotStyle = None,
         report_options: ReportOptions = None,
+        progress_callback: Optional[Callable[[int, str], None]] = None,
     ):
         """
         Initialize PDF generator.
@@ -73,6 +74,7 @@ class PDFReportGenerator(BaseReportGenerator):
             plot_height: Plot height in inches
             plot_style: Plot style configuration for matplotlib plots
             report_options: Report options for statistics and other settings
+            progress_callback: Optional callback function(progress_percent, status_message)
         """
         if not REPORTLAB_AVAILABLE:
             raise ImportError(
@@ -90,6 +92,7 @@ class PDFReportGenerator(BaseReportGenerator):
         self.plot_height = plot_height * inch
         self.plot_style = plot_style or PlotStyle()
         self.report_options = report_options or ReportOptions()
+        self.progress_callback = progress_callback
 
         # Set up styles
         self.styles = getSampleStyleSheet()
@@ -127,6 +130,18 @@ class PDFReportGenerator(BaseReportGenerator):
             spaceBefore=15,
         ))
 
+        # Waveform heading (for individual waveforms)
+        # Only add if it doesn't exist
+        if 'Heading4' not in self.styles:
+            self.styles.add(ParagraphStyle(
+                name='Heading4',
+                parent=self.styles['Heading3'],
+                fontSize=12,
+                textColor=colors.HexColor('#ff7f0e'),
+                spaceAfter=6,
+                spaceBefore=10,
+            ))
+
         # Result PASS style
         self.styles.add(ParagraphStyle(
             name='ResultPass',
@@ -151,6 +166,23 @@ class PDFReportGenerator(BaseReportGenerator):
         """Get file extension."""
         return ".pdf"
 
+    def _report_progress(self, percent: int, message: str = "") -> None:
+        """
+        Report progress to callback if available, otherwise print to console.
+
+        Args:
+            percent: Progress percentage (0-100)
+            message: Optional status message
+        """
+        if self.progress_callback:
+            self.progress_callback(percent, message)
+        else:
+            # Fallback to console output
+            if message:
+                print(f"Generating PDF... {percent}% - {message}")
+            else:
+                print(f"Generating PDF... {percent}%")
+
     def _markdown_to_reportlab(self, text: str) -> str:
         """
         Convert simple markdown to ReportLab XML tags.
@@ -165,11 +197,48 @@ class PDFReportGenerator(BaseReportGenerator):
             return ""
 
         # Normalize unicode characters that might cause rendering issues
-        # Replace various dash types with regular hyphen
+        # These are commonly used by LLMs but may not render properly in PDFs
+
+        # Dashes and hyphens
         text = text.replace('\u2013', '-')  # en-dash
         text = text.replace('\u2014', '-')  # em-dash
         text = text.replace('\u2212', '-')  # minus sign
         text = text.replace('\u00ad', '')   # soft hyphen (remove)
+
+        # Quotes
+        text = text.replace('\u2018', "'")  # left single quote
+        text = text.replace('\u2019', "'")  # right single quote
+        text = text.replace('\u201a', "'")  # single low-9 quote
+        text = text.replace('\u201c', '"')  # left double quote
+        text = text.replace('\u201d', '"')  # right double quote
+        text = text.replace('\u201e', '"')  # double low-9 quote
+
+        # Bullets and symbols
+        text = text.replace('\u2022', '*')  # bullet
+        text = text.replace('\u2023', '*')  # triangular bullet
+        text = text.replace('\u2043', '*')  # hyphen bullet
+        text = text.replace('\u25e6', '*')  # white bullet
+        text = text.replace('\u2219', '*')  # bullet operator
+
+        # Ellipsis
+        text = text.replace('\u2026', '...')  # horizontal ellipsis
+
+        # Spaces
+        text = text.replace('\u00a0', ' ')  # non-breaking space
+        text = text.replace('\u2009', ' ')  # thin space
+        text = text.replace('\u200a', ' ')  # hair space
+
+        # Mathematical symbols
+        text = text.replace('\u00d7', 'x')  # multiplication sign
+        text = text.replace('\u00f7', '/')  # division sign
+        text = text.replace('\u2264', '<=')  # less than or equal
+        text = text.replace('\u2265', '>=')  # greater than or equal
+        text = text.replace('\u2260', '!=')  # not equal
+
+        # Degrees and other symbols
+        text = text.replace('\u00b0', ' deg')  # degree symbol
+        text = text.replace('\u2103', ' C')  # degree celsius
+        text = text.replace('\u2109', ' F')  # degree fahrenheit
 
         # Store markdown patterns before escaping
         # We'll process them in order to avoid conflicts
@@ -224,6 +293,8 @@ class PDFReportGenerator(BaseReportGenerator):
         try:
             output_path = Path(output_path)
 
+            self._report_progress(0, "Starting PDF generation")
+
             # Create PDF document
             doc = SimpleDocTemplate(
                 str(output_path),
@@ -234,23 +305,61 @@ class PDFReportGenerator(BaseReportGenerator):
                 bottomMargin=0.75*inch,
             )
 
+            self._report_progress(5, "Building document structure")
+
+            # Calculate progress steps
+            # 5% - setup
+            # 10% - header/metadata
+            # 15% - overall result/summary
+            # 20-80% - sections (divided among sections)
+            # 85% - recommendations
+            # 90% - building PDF
+            # 100% - complete
+
             # Build content
             story = []
             story.extend(self._generate_header(report))
+            self._report_progress(10, "Generated header")
+
             story.extend(self._generate_metadata_section(report))
             story.extend(self._generate_overall_result(report))
+            self._report_progress(12, "Generated metadata")
 
             # Executive summary
             if report.executive_summary:
                 story.extend(self._generate_executive_summary(report))
+                self._report_progress(15, "Generated summary")
 
             # Key findings
             if report.key_findings:
                 story.extend(self._generate_key_findings(report))
+                self._report_progress(18, "Generated key findings")
 
-            # Sections
-            for section in report.sections:
-                story.extend(self._generate_section(section))
+            # Sections - track progress through them
+            num_sections = len(report.sections)
+            if num_sections > 0:
+                # Count total waveforms for more granular progress
+                total_waveforms = sum(len(s.waveforms) for s in report.sections)
+                waveforms_processed = 0
+
+                section_progress_range = 60  # 20% to 80%
+                for i, section in enumerate(report.sections):
+                    section_percent = 20 + int((i / num_sections) * section_progress_range)
+                    self._report_progress(section_percent, f"Processing section {i+1}/{num_sections}")
+
+                    # Pass waveform progress tracking
+                    story.extend(self._generate_section(
+                        section,
+                        section_index=i,
+                        waveforms_processed_before=waveforms_processed,
+                        total_waveforms=total_waveforms,
+                        progress_start=section_percent,
+                        progress_range=section_progress_range / num_sections
+                    ))
+
+                    waveforms_processed += len(section.waveforms)
+
+            self._report_progress(82, "Sections complete")
 
             # Recommendations
             if report.recommendations:
@@ -259,8 +368,12 @@ class PDFReportGenerator(BaseReportGenerator):
             # Footer
             story.extend(self._generate_footer(report))
 
+            self._report_progress(88, "Building PDF document")
+
             # Build PDF
             doc.build(story)
+
+            self._report_progress(100, "PDF generation complete")
 
             return True
 
@@ -407,8 +520,16 @@ class PDFReportGenerator(BaseReportGenerator):
 
         return story
 
-    def _generate_section(self, section: TestSection) -> List:
-        """Generate a report section."""
+    def _generate_section(
+        self,
+        section: TestSection,
+        section_index: int = 0,
+        waveforms_processed_before: int = 0,
+        total_waveforms: int = 1,
+        progress_start: int = 20,
+        progress_range: float = 60,
+    ) -> List:
+        """Generate a report section with progress tracking."""
         story = []
 
         story.append(Paragraph(section.title, self.styles['SectionHeading']))
@@ -421,21 +542,35 @@ class PDFReportGenerator(BaseReportGenerator):
         # AI insights
         if section.ai_summary:
             story.append(Paragraph("AI Analysis", self.styles['SubsectionHeading']))
-            ai_text = section.ai_summary.replace('\n', '<br/>')
+            # Normalize Unicode characters from AI-generated text
+            ai_text = self._markdown_to_reportlab(section.ai_summary)
             story.append(Paragraph(ai_text, self.styles['Normal']))
             story.append(Spacer(1, 0.1*inch))
 
         if section.ai_insights:
             story.append(Paragraph("AI Insights", self.styles['SubsectionHeading']))
-            insights_text = section.ai_insights.replace('\n', '<br/>')
+            # Normalize Unicode characters from AI-generated text
+            insights_text = self._markdown_to_reportlab(section.ai_insights)
             story.append(Paragraph(insights_text, self.styles['Normal']))
             story.append(Spacer(1, 0.1*inch))
 
         # Waveforms
         if section.waveforms:
             story.append(Paragraph("Waveforms", self.styles['SubsectionHeading']))
-            for waveform in section.waveforms:
-                story.extend(self._generate_waveform(waveform))
+            for i, waveform in enumerate(section.waveforms):
+                # Calculate progress for this waveform
+                waveform_global_index = waveforms_processed_before + i
+                if total_waveforms > 0:
+                    # Progress within the section range
+                    waveform_progress = progress_start + int((waveform_global_index / total_waveforms) * progress_range)
+                    self._report_progress(
+                        waveform_progress,
+                        f"Generating waveform {waveform_global_index + 1}/{total_waveforms}"
+                    )
+
+                # Generate waveform with title+plot kept together
+                waveform_elements = self._generate_waveform(waveform, index=i+1)
+                story.extend(waveform_elements)
 
         # Measurements
         if section.measurements:
@@ -467,17 +602,38 @@ class PDFReportGenerator(BaseReportGenerator):
 
         return story
 
-    def _generate_waveform(self, waveform: WaveformData) -> List:
-        """Generate waveform plot and info."""
+    def _generate_waveform(self, waveform: WaveformData, index: int = 1) -> List:
+        """
+        Generate waveform plot and info with title+plot kept together.
+
+        Args:
+            waveform: Waveform data
+            index: Waveform index number for the title
+
+        Returns:
+            List of flowable elements
+        """
         story = []
+
+        # Elements to keep together (title + plot)
+        keep_together_elements = []
+
+        # Waveform title (e.g., "Waveform 1: CH1")
+        waveform_title = f"Waveform {index}: {waveform.label}"
+        keep_together_elements.append(Paragraph(waveform_title, self.styles['Heading4']))
+        keep_together_elements.append(Spacer(1, 0.05*inch))
 
         # Plot
         if self.include_plots:
             plot_img = self._generate_waveform_plot(waveform)
             if plot_img:
-                story.append(plot_img)
+                keep_together_elements.append(plot_img)
 
-        # Info table
+        # Use KeepTogether to prevent title and plot from being separated
+        if keep_together_elements:
+            story.append(KeepTogether(keep_together_elements))
+
+        # Info table (can be on next page if needed)
         v_min = np.min(waveform.voltage_data)
         v_max = np.max(waveform.voltage_data)
         v_pp = v_max - v_min
@@ -506,7 +662,7 @@ class PDFReportGenerator(BaseReportGenerator):
         story.append(table)
         story.append(Spacer(1, 0.1*inch))
 
-        # Statistics table
+        # Statistics table (can split across pages if needed)
         stats_table = self._generate_statistics_table(waveform)
         if stats_table:
             story.append(stats_table)
@@ -528,10 +684,21 @@ class PDFReportGenerator(BaseReportGenerator):
             return None
 
         # Calculate all statistics using WaveformAnalyzer
-        stats = WaveformAnalyzer.analyze(waveform)
+        stats = WaveformAnalyzer.analyze(
+            waveform,
+            include_plateau_stability=self.report_options.include_plateau_stability
+        )
 
         # Build table data based on enabled categories
         data = [['Statistic', 'Value']]  # Header
+
+        # Signal Type (always show if detected)
+        if stats.get('signal_type'):
+            signal_type_str = WaveformAnalyzer.format_stat_value('signal_type', stats['signal_type'])
+            if stats.get('signal_type_confidence'):
+                confidence_str = WaveformAnalyzer.format_stat_value('signal_type_confidence', stats['signal_type_confidence'])
+                signal_type_str = f"{signal_type_str} ({confidence_str})"
+            data.append(['Signal Type:', signal_type_str])
 
         # Frequency and Period
         if self.report_options.include_frequency_stats:
@@ -574,12 +741,23 @@ class PDFReportGenerator(BaseReportGenerator):
                 data.append(['Noise Level:', WaveformAnalyzer.format_stat_value('noise_level', stats['noise_level'])])
             if stats.get('snr') is not None:
                 data.append(['SNR:', WaveformAnalyzer.format_stat_value('snr', stats['snr'])])
+            if stats.get('thd') is not None:
+                data.append(['THD:', WaveformAnalyzer.format_stat_value('thd', stats['thd'])])
             if stats.get('overshoot') is not None:
                 data.append(['Overshoot:', WaveformAnalyzer.format_stat_value('overshoot', stats['overshoot'])])
             if stats.get('undershoot') is not None:
                 data.append(['Undershoot:', WaveformAnalyzer.format_stat_value('undershoot', stats['undershoot'])])
             if stats.get('jitter') is not None:
                 data.append(['Jitter:', WaveformAnalyzer.format_stat_value('jitter', stats['jitter'])])
+
+        # Plateau Stability (if enabled and calculated)
+        if self.report_options.include_plateau_stability:
+            if stats.get('plateau_stability') is not None:
+                data.append(['Plateau Stability:', WaveformAnalyzer.format_stat_value('plateau_stability', stats['plateau_stability'])])
+            if stats.get('plateau_high_noise') is not None:
+                data.append(['High Plateau Noise:', WaveformAnalyzer.format_stat_value('plateau_high_noise', stats['plateau_high_noise'])])
+            if stats.get('plateau_low_noise') is not None:
+                data.append(['Low Plateau Noise:', WaveformAnalyzer.format_stat_value('plateau_low_noise', stats['plateau_low_noise'])])
 
         # If only header row exists, don't create table
         if len(data) <= 1:

@@ -144,8 +144,20 @@ class LLMSettingsDialog(QDialog):
         self.ollama_port_spin.setValue(11434)
         form.addRow("Port:", self.ollama_port_spin)
 
-        self.ollama_model_edit = QLineEdit("llama3.2")
-        form.addRow("Model:", self.ollama_model_edit)
+        # Model selection with detect button
+        model_layout = QHBoxLayout()
+        self.ollama_model_combo = QComboBox()
+        self.ollama_model_combo.setEditable(True)  # Allow manual entry
+        self.ollama_model_combo.setPlaceholderText("llama3.2")
+        self.ollama_model_combo.addItem("llama3.2")  # Default
+        model_layout.addWidget(self.ollama_model_combo, stretch=1)
+
+        detect_btn = QPushButton("Detect Models")
+        detect_btn.setToolTip("Query Ollama server for available models")
+        detect_btn.clicked.connect(self._detect_ollama_models)
+        model_layout.addWidget(detect_btn)
+
+        form.addRow("Model:", model_layout)
 
         layout.addLayout(form)
 
@@ -181,8 +193,20 @@ class LLMSettingsDialog(QDialog):
         self.lm_studio_port_spin.setValue(1234)
         form.addRow("Port:", self.lm_studio_port_spin)
 
-        self.lm_studio_model_edit = QLineEdit("local-model")
-        form.addRow("Model:", self.lm_studio_model_edit)
+        # Model selection with detect button
+        model_layout = QHBoxLayout()
+        self.lm_studio_model_combo = QComboBox()
+        self.lm_studio_model_combo.setEditable(True)  # Allow manual entry
+        self.lm_studio_model_combo.setPlaceholderText("local-model")
+        self.lm_studio_model_combo.addItem("local-model")  # Default
+        model_layout.addWidget(self.lm_studio_model_combo, stretch=1)
+
+        detect_btn = QPushButton("Detect Models")
+        detect_btn.setToolTip("Query LM Studio server for available models")
+        detect_btn.clicked.connect(self._detect_lm_studio_models)
+        model_layout.addWidget(detect_btn)
+
+        form.addRow("Model:", model_layout)
 
         layout.addLayout(form)
 
@@ -308,7 +332,7 @@ class LLMSettingsDialog(QDialog):
         """Use Ollama settings."""
         hostname = self.ollama_hostname_edit.text().strip()
         port = self.ollama_port_spin.value()
-        model = self.ollama_model_edit.text()
+        model = self.ollama_model_combo.currentText().strip()
 
         # Validate hostname
         is_valid, error_msg = self._validate_hostname(hostname)
@@ -329,7 +353,7 @@ class LLMSettingsDialog(QDialog):
         """Use LM Studio settings."""
         hostname = self.lm_studio_hostname_edit.text().strip()
         port = self.lm_studio_port_spin.value()
-        model = self.lm_studio_model_edit.text()
+        model = self.lm_studio_model_combo.currentText().strip()
 
         # Validate hostname
         is_valid, error_msg = self._validate_hostname(hostname)
@@ -369,6 +393,17 @@ class LLMSettingsDialog(QDialog):
         self.max_tokens_spin.setValue(self.config.max_tokens)
         self.timeout_spin.setValue(self.config.timeout)
 
+        # Try to populate Ollama/LM Studio combo boxes if the model is not in the list
+        # This allows loading saved configs even if the model list hasn't been fetched yet
+        if self.config.model:
+            # Check if it's in Ollama combo (add if not present)
+            if self.ollama_model_combo.findText(self.config.model) < 0:
+                self.ollama_model_combo.addItem(self.config.model)
+
+            # Check if it's in LM Studio combo (add if not present)
+            if self.lm_studio_model_combo.findText(self.config.model) < 0:
+                self.lm_studio_model_combo.addItem(self.config.model)
+
     def get_config(self) -> LLMConfig:
         """
         Get the configured LLM settings.
@@ -388,6 +423,146 @@ class LLMSettingsDialog(QDialog):
             max_tokens=self.max_tokens_spin.value(),
             timeout=self.timeout_spin.value(),
         )
+
+    def _detect_ollama_models(self):
+        """Detect available models from Ollama server."""
+        hostname = self.ollama_hostname_edit.text().strip()
+        port = self.ollama_port_spin.value()
+
+        # Validate hostname
+        is_valid, error_msg = self._validate_hostname(hostname)
+        if not is_valid:
+            QMessageBox.warning(
+                self,
+                "Invalid Hostname",
+                f"Invalid hostname or IP address:\n{error_msg}",
+            )
+            return
+
+        try:
+            # Create a temporary config for Ollama
+            temp_config = LLMConfig.create_ollama_config(
+                model="dummy",  # Doesn't matter for listing
+                hostname=hostname,
+                port=port,
+                use_native_api=True
+            )
+
+            # Create client
+            client = LLMClient(temp_config)
+
+            # Get available models
+            models = client.get_available_models()
+
+            if not models:
+                QMessageBox.warning(
+                    self,
+                    "No Models Found",
+                    f"No models found on Ollama server at {hostname}:{port}.\n\n"
+                    "Make sure:\n"
+                    "1. Ollama is running\n"
+                    "2. At least one model is pulled (e.g., 'ollama pull llama3.2')\n"
+                    "3. The hostname and port are correct",
+                )
+                return
+
+            # Save current selection
+            current_model = self.ollama_model_combo.currentText()
+
+            # Update combo box
+            self.ollama_model_combo.clear()
+            self.ollama_model_combo.addItems(models)
+
+            # Restore previous selection if it exists in the list
+            index = self.ollama_model_combo.findText(current_model)
+            if index >= 0:
+                self.ollama_model_combo.setCurrentIndex(index)
+
+            QMessageBox.information(
+                self,
+                "Models Detected",
+                f"Found {len(models)} model(s) on Ollama server:\n\n" +
+                "\n".join(f"  - {model}" for model in models[:10]) +
+                (f"\n  ... and {len(models) - 10} more" if len(models) > 10 else ""),
+            )
+
+        except Exception as e:
+            QMessageBox.critical(
+                self,
+                "Detection Failed",
+                f"Failed to detect models from Ollama server:\n{str(e)}\n\n"
+                "Make sure Ollama is running and accessible.",
+            )
+
+    def _detect_lm_studio_models(self):
+        """Detect available models from LM Studio server."""
+        hostname = self.lm_studio_hostname_edit.text().strip()
+        port = self.lm_studio_port_spin.value()
+
+        # Validate hostname
+        is_valid, error_msg = self._validate_hostname(hostname)
+        if not is_valid:
+            QMessageBox.warning(
+                self,
+                "Invalid Hostname",
+                f"Invalid hostname or IP address:\n{error_msg}",
+            )
+            return
+
+        try:
+            # Create a temporary config for LM Studio
+            temp_config = LLMConfig.create_lm_studio_config(
+                model="dummy",  # Doesn't matter for listing
+                hostname=hostname,
+                port=port
+            )
+
+            # Create client
+            client = LLMClient(temp_config)
+
+            # Get available models
+            models = client.get_available_models()
+
+            if not models:
+                QMessageBox.warning(
+                    self,
+                    "No Models Found",
+                    f"No models found on LM Studio server at {hostname}:{port}.\n\n"
+                    "Make sure:\n"
+                    "1. LM Studio is running\n"
+                    "2. A model is loaded in LM Studio\n"
+                    "3. The local server is started in LM Studio\n"
+                    "4. The hostname and port are correct",
+                )
+                return
+
+            # Save current selection
+            current_model = self.lm_studio_model_combo.currentText()
+
+            # Update combo box
+            self.lm_studio_model_combo.clear()
+            self.lm_studio_model_combo.addItems(models)
+
+            # Restore previous selection if it exists in the list
+            index = self.lm_studio_model_combo.findText(current_model)
+            if index >= 0:
+                self.lm_studio_model_combo.setCurrentIndex(index)
+
+            QMessageBox.information(
+                self,
+                "Models Detected",
+                f"Found {len(models)} model(s) on LM Studio server:\n\n" +
+                "\n".join(f"  - {model}" for model in models[:10]) +
+                (f"\n  ... and {len(models) - 10} more" if len(models) > 10 else ""),
+            )
+
+        except Exception as e:
+            QMessageBox.critical(
+                self,
+                "Detection Failed",
+                f"Failed to detect models from LM Studio server:\n{str(e)}\n\n"
+                "Make sure LM Studio is running with the local server started.",
+            )
 
     def _test_connection(self):
         """Test the LLM connection."""

@@ -38,6 +38,7 @@ class ReportOptions:
     include_amplitude_stats: bool = True
     include_timing_stats: bool = True
     include_quality_stats: bool = True
+    include_plateau_stability: bool = False  # Advanced: plateau noise analysis for periodic signals
 
     def to_dict(self) -> Dict[str, Any]:
         """

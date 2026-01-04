@@ -13,11 +13,24 @@ from scipy.fft import fft, fftfreq
 from siglent.report_generator.models.report_data import WaveformData
 
 
+class SignalType:
+    """Signal type constants."""
+    SINE = "sine"
+    SQUARE = "square"
+    TRIANGLE = "triangle"
+    SAWTOOTH = "sawtooth"
+    PULSE = "pulse"
+    DC = "dc"
+    NOISE = "noise"
+    COMPLEX = "complex"
+    UNKNOWN = "unknown"
+
+
 class WaveformAnalyzer:
     """Analyzes waveform data to extract signal statistics."""
 
     @staticmethod
-    def analyze(waveform: WaveformData) -> Dict[str, Optional[float]]:
+    def analyze(waveform: WaveformData, include_plateau_stability: bool = False) -> Dict[str, Optional[float]]:
         """
         Analyze a waveform and calculate all statistics.
 
@@ -28,6 +41,11 @@ class WaveformAnalyzer:
             Dictionary of calculated statistics
         """
         stats = {}
+
+        # Signal type detection
+        signal_type, confidence = WaveformAnalyzer.detect_signal_type(waveform)
+        stats['signal_type'] = signal_type
+        stats['signal_type_confidence'] = confidence
 
         # Amplitude measurements
         stats.update(WaveformAnalyzer.calculate_amplitude_stats(waveform))
@@ -40,6 +58,19 @@ class WaveformAnalyzer:
 
         # Signal quality metrics
         stats.update(WaveformAnalyzer.calculate_quality_stats(waveform))
+
+        # Calculate THD for periodic signals
+        if signal_type in [SignalType.SINE, SignalType.SQUARE, SignalType.TRIANGLE, SignalType.SAWTOOTH]:
+            thd = WaveformAnalyzer.calculate_thd(waveform)
+            stats['thd'] = thd
+
+        # Calculate plateau stability for applicable signals
+        if include_plateau_stability:
+            # Apply to square, pulse, and all periodic signals
+            if signal_type in [SignalType.SQUARE, SignalType.PULSE, SignalType.TRIANGLE,
+                              SignalType.SAWTOOTH, SignalType.SINE]:
+                plateau_stats = WaveformAnalyzer.calculate_plateau_stability(waveform, signal_type)
+                stats.update(plateau_stats)
 
         return stats
 
@@ -260,7 +291,8 @@ class WaveformAnalyzer:
             return "N/A"
 
         # Voltage measurements
-        if name in ['vmax', 'vmin', 'vpp', 'vmean', 'vrms', 'vamp', 'dc_offset', 'noise_level']:
+        if name in ['vmax', 'vmin', 'vpp', 'vmean', 'vrms', 'vamp', 'dc_offset', 'noise_level',
+                    'plateau_high_noise', 'plateau_low_noise', 'plateau_stability']:
             if abs(value) >= 1:
                 return f"{value:.3f} V"
             elif abs(value) >= 0.001:
@@ -296,6 +328,411 @@ class WaveformAnalyzer:
         elif name == 'snr':
             return f"{value:.2f} dB"
 
+        # THD (percentage)
+        elif name == 'thd':
+            return f"{value:.2f} %"
+
+        # Signal type (string)
+        elif name == 'signal_type':
+            if isinstance(value, str):
+                return value.capitalize()
+            return str(value)
+
+        # Signal type confidence (percentage)
+        elif name == 'signal_type_confidence':
+            return f"{value:.1f} %"
+
         # Default
         else:
             return f"{value:.4g}"
+
+    @staticmethod
+    def detect_signal_type(waveform: WaveformData) -> Tuple[str, float]:
+        """
+        Detect the type of signal in the waveform.
+
+        Args:
+            waveform: Waveform data to analyze
+
+        Returns:
+            Tuple of (signal_type, confidence) where confidence is 0-100%
+        """
+        try:
+            v = waveform.voltage_data
+
+            # Check for DC signal first
+            if WaveformAnalyzer._is_dc_signal(v):
+                return SignalType.DC, 95.0
+
+            # Check for noise
+            if WaveformAnalyzer._is_noise(v):
+                return SignalType.NOISE, 85.0
+
+            # Analyze frequency content
+            harmonics = WaveformAnalyzer._get_harmonic_ratios(waveform)
+
+            if harmonics is not None and len(harmonics) >= 3:
+                # Calculate THD as indicator of harmonic content
+                # For sine: very low THD (<5%)
+                # For square/triangle/sawtooth: higher THD
+                total_harmonic_power = np.sum(harmonics[1:]**2)
+                fundamental_power = harmonics[0]**2
+                thd_ratio = np.sqrt(total_harmonic_power / fundamental_power) if fundamental_power > 0 else 0
+
+                # Check for sine wave first (very low THD)
+                if thd_ratio < 0.1:  # THD < 10%
+                    return SignalType.SINE, min(95.0, (1 - thd_ratio) * 100)
+
+                # Check waveform patterns based on harmonic signatures
+                square_score = WaveformAnalyzer._score_square_wave(harmonics)
+                triangle_score = WaveformAnalyzer._score_triangle_wave(harmonics)
+                sawtooth_score = WaveformAnalyzer._score_sawtooth_wave(harmonics)
+
+                # Find best match
+                scores = {
+                    SignalType.SQUARE: square_score,
+                    SignalType.TRIANGLE: triangle_score,
+                    SignalType.SAWTOOTH: sawtooth_score
+                }
+
+                best_type = max(scores, key=scores.get)
+                best_score = scores[best_type]
+
+                if best_score > 0.6:
+                    return best_type, min(90.0, best_score * 100)
+
+            # Check for pulse/PWM based on duty cycle
+            duty_cycle = WaveformAnalyzer._estimate_duty_cycle(v)
+            if duty_cycle is not None and (duty_cycle < 40 or duty_cycle > 60):
+                return SignalType.PULSE, 80.0
+
+            # If periodic but doesn't match standard types
+            if harmonics is not None and len(harmonics) > 0:
+                return SignalType.COMPLEX, 70.0
+
+            return SignalType.UNKNOWN, 50.0
+
+        except Exception as e:
+            print(f"Error detecting signal type: {e}")
+            return SignalType.UNKNOWN, 0.0
+
+    @staticmethod
+    def _is_dc_signal(v: np.ndarray, threshold: float = 0.01) -> bool:
+        """Check if signal is DC (very low variation)."""
+        std = np.std(v)
+        mean = np.mean(np.abs(v))
+        if mean == 0:
+            return std < threshold
+        return (std / mean) < threshold
+
+    @staticmethod
+    def _is_noise(v: np.ndarray) -> bool:
+        """Check if signal is primarily noise."""
+        # Calculate autocorrelation
+        v_normalized = v - np.mean(v)
+        autocorr = np.correlate(v_normalized, v_normalized, mode='full')
+        autocorr = autocorr[len(autocorr)//2:]
+        autocorr = autocorr / autocorr[0]
+
+        # For noise, autocorrelation drops quickly
+        # Check if autocorrelation at lag=10% of signal is < 0.3
+        lag = max(1, len(autocorr) // 10)
+        if lag < len(autocorr):
+            return autocorr[lag] < 0.3
+        return False
+
+    @staticmethod
+    def _get_harmonic_ratios(waveform: WaveformData, num_harmonics: int = 5) -> Optional[np.ndarray]:
+        """
+        Get the relative amplitudes of harmonics.
+
+        Returns array where [0] is fundamental, [1] is 2nd harmonic, etc.
+        Values are normalized so fundamental = 1.0 for periodic signals.
+        """
+        try:
+            v = waveform.voltage_data
+            sample_rate = waveform.sample_rate
+
+            # Compute FFT
+            n = len(v)
+            yf = fft(v - np.mean(v))  # Remove DC
+            xf = fftfreq(n, 1/sample_rate)
+
+            # Get positive frequencies only
+            pos_mask = xf > 0
+            xf_pos = xf[pos_mask]
+            yf_pos = np.abs(yf[pos_mask])
+
+            if len(yf_pos) < 2:
+                return None
+
+            # Find fundamental frequency (peak)
+            peak_idx = np.argmax(yf_pos[1:]) + 1  # Skip DC
+            fundamental_freq = xf_pos[peak_idx]
+            fundamental_amp = yf_pos[peak_idx]
+
+            if fundamental_freq == 0 or fundamental_amp == 0:
+                return None
+
+            # Find harmonics
+            harmonic_amps = []
+            for i in range(1, num_harmonics + 1):
+                harmonic_freq = fundamental_freq * i
+                # Find closest frequency bin
+                idx = np.argmin(np.abs(xf_pos - harmonic_freq))
+                # Check if we're actually close to the harmonic
+                if np.abs(xf_pos[idx] - harmonic_freq) < (sample_rate / n * 3):
+                    harmonic_amps.append(yf_pos[idx])
+                else:
+                    harmonic_amps.append(0.0)
+
+            # Normalize to fundamental
+            harmonic_ratios = np.array(harmonic_amps) / fundamental_amp
+            return harmonic_ratios
+
+        except Exception:
+            return None
+
+    @staticmethod
+    def _score_square_wave(harmonics: np.ndarray) -> float:
+        """
+        Score how well harmonics match a square wave.
+        Square wave has odd harmonics at 1/n amplitude.
+        """
+        if len(harmonics) < 3:
+            return 0.0
+
+        # Expected pattern: [1, 0, 1/3, 0, 1/5, ...]
+        expected = []
+        for i in range(len(harmonics)):
+            n = i + 1
+            if n % 2 == 1:  # Odd harmonic
+                expected.append(1.0 / n)
+            else:  # Even harmonic (should be ~0)
+                expected.append(0.0)
+
+        expected = np.array(expected)
+
+        # Normalize both to fundamental
+        if expected[0] > 0:
+            expected = expected / expected[0]
+
+        # Calculate correlation
+        correlation = np.corrcoef(harmonics[:len(expected)], expected)[0, 1]
+        if np.isnan(correlation):
+            return 0.0
+
+        return max(0.0, correlation)
+
+    @staticmethod
+    def _score_triangle_wave(harmonics: np.ndarray) -> float:
+        """
+        Score how well harmonics match a triangle wave.
+        Triangle wave has odd harmonics at 1/n^2 amplitude.
+        """
+        if len(harmonics) < 3:
+            return 0.0
+
+        # Expected pattern: [1, 0, 1/9, 0, 1/25, ...]
+        expected = []
+        for i in range(len(harmonics)):
+            n = i + 1
+            if n % 2 == 1:  # Odd harmonic
+                expected.append(1.0 / (n * n))
+            else:  # Even harmonic
+                expected.append(0.0)
+
+        expected = np.array(expected)
+
+        # Normalize
+        if expected[0] > 0:
+            expected = expected / expected[0]
+
+        # Calculate correlation
+        correlation = np.corrcoef(harmonics[:len(expected)], expected)[0, 1]
+        if np.isnan(correlation):
+            return 0.0
+
+        return max(0.0, correlation)
+
+    @staticmethod
+    def _score_sawtooth_wave(harmonics: np.ndarray) -> float:
+        """
+        Score how well harmonics match a sawtooth wave.
+        Sawtooth has all harmonics at 1/n amplitude.
+        """
+        if len(harmonics) < 3:
+            return 0.0
+
+        # Expected pattern: [1, 1/2, 1/3, 1/4, 1/5, ...]
+        expected = np.array([1.0 / (i + 1) for i in range(len(harmonics))])
+
+        # Normalize
+        if expected[0] > 0:
+            expected = expected / expected[0]
+
+        # Calculate correlation
+        correlation = np.corrcoef(harmonics, expected)[0, 1]
+        if np.isnan(correlation):
+            return 0.0
+
+        return max(0.0, correlation)
+
+    @staticmethod
+    def _estimate_duty_cycle(v: np.ndarray) -> Optional[float]:
+        """Estimate duty cycle of a pulse signal."""
+        try:
+            vmax = np.max(v)
+            vmin = np.min(v)
+            v_threshold = (vmax + vmin) / 2
+
+            # Count samples above threshold
+            high_samples = np.sum(v > v_threshold)
+            duty_cycle = (high_samples / len(v)) * 100
+
+            return duty_cycle
+        except Exception:
+            return None
+
+    @staticmethod
+    def calculate_thd(waveform: WaveformData, num_harmonics: int = 10) -> Optional[float]:
+        """
+        Calculate Total Harmonic Distortion (THD) as a percentage.
+
+        THD = sqrt(sum(harmonics[2:]^2)) / fundamental * 100
+
+        Args:
+            waveform: Waveform data
+            num_harmonics: Number of harmonics to include
+
+        Returns:
+            THD percentage, or None if calculation fails
+        """
+        try:
+            harmonics = WaveformAnalyzer._get_harmonic_ratios(waveform, num_harmonics)
+
+            if harmonics is None or len(harmonics) < 2:
+                return None
+
+            # THD = sqrt(sum of squares of harmonics) / fundamental
+            fundamental = harmonics[0]
+            if fundamental == 0:
+                return None
+
+            harmonic_power = np.sum(harmonics[1:]**2)
+            thd = np.sqrt(harmonic_power) / fundamental * 100
+
+            return thd
+
+        except Exception as e:
+            print(f"Error calculating THD: {e}")
+            return None
+
+    @staticmethod
+    def calculate_plateau_stability(waveform: WaveformData, signal_type: str) -> Dict[str, Optional[float]]:
+        """
+        Calculate plateau stability (noise on high and low levels).
+
+        Measures the standard deviation of voltage during stable plateau regions.
+        Uses the middle 60% of each plateau to exclude edge transitions.
+
+        Args:
+            waveform: Waveform data
+            signal_type: Detected signal type
+
+        Returns:
+            Dictionary with plateau stability metrics
+        """
+        try:
+            v = waveform.voltage_data
+            t = waveform.time_data
+
+            vmax = np.max(v)
+            vmin = np.min(v)
+            v_50 = (vmax + vmin) / 2
+
+            # Find high and low regions
+            high_samples = v > v_50
+            low_samples = v <= v_50
+
+            # Find contiguous regions for better analysis
+            # This helps identify stable plateaus
+            high_regions = []
+            low_regions = []
+
+            # Simple run-length encoding to find plateau regions
+            current_high = []
+            current_low = []
+
+            for i, is_high in enumerate(high_samples):
+                if is_high:
+                    if current_low:
+                        if len(current_low) > 10:  # Minimum plateau length
+                            low_regions.append(current_low)
+                        current_low = []
+                    current_high.append(i)
+                else:
+                    if current_high:
+                        if len(current_high) > 10:
+                            high_regions.append(current_high)
+                        current_high = []
+                    current_low.append(i)
+
+            # Don't forget the last region
+            if current_high and len(current_high) > 10:
+                high_regions.append(current_high)
+            if current_low and len(current_low) > 10:
+                low_regions.append(current_low)
+
+            high_plateau_noise = None
+            low_plateau_noise = None
+
+            # Analyze high plateaus (use middle 60%)
+            if high_regions:
+                high_plateau_samples = []
+                for region in high_regions:
+                    if len(region) >= 5:
+                        # Use middle 60%
+                        start_idx = int(len(region) * 0.2)
+                        end_idx = int(len(region) * 0.8)
+                        middle_indices = region[start_idx:end_idx]
+                        if middle_indices:
+                            high_plateau_samples.extend(v[middle_indices])
+
+                if high_plateau_samples:
+                    high_plateau_noise = np.std(high_plateau_samples)
+
+            # Analyze low plateaus (use middle 60%)
+            if low_regions:
+                low_plateau_samples = []
+                for region in low_regions:
+                    if len(region) >= 5:
+                        # Use middle 60%
+                        start_idx = int(len(region) * 0.2)
+                        end_idx = int(len(region) * 0.8)
+                        middle_indices = region[start_idx:end_idx]
+                        if middle_indices:
+                            low_plateau_samples.extend(v[middle_indices])
+
+                if low_plateau_samples:
+                    low_plateau_noise = np.std(low_plateau_samples)
+
+            # Calculate combined plateau stability metric
+            plateau_stability = None
+            if high_plateau_noise is not None and low_plateau_noise is not None:
+                # Average of both plateaus
+                plateau_stability = (high_plateau_noise + low_plateau_noise) / 2
+
+            return {
+                'plateau_high_noise': high_plateau_noise,
+                'plateau_low_noise': low_plateau_noise,
+                'plateau_stability': plateau_stability,
+            }
+
+        except Exception as e:
+            print(f"Error calculating plateau stability: {e}")
+            return {
+                'plateau_high_noise': None,
+                'plateau_low_noise': None,
+                'plateau_stability': None,
+            }

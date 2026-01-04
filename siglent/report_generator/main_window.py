@@ -386,10 +386,6 @@ class MainWindow(QMainWindow):
                     report.recommendations = []
 
                 # Generate PDF to temp location
-                progress = QProgressDialog("Generating preview...", None, 0, 0, self)
-                progress.setWindowModality(Qt.WindowModality.WindowModal)
-                progress.show()
-
                 from reportlab.lib.pagesizes import letter, A4
                 page_size = A4 if self.current_options.page_size == "a4" else letter
 
@@ -400,6 +396,24 @@ class MainWindow(QMainWindow):
                 print(f"Waveforms: {sum(len(s.waveforms) for s in report.sections)}")
                 print(f"Page size: {self.current_options.page_size}")
 
+                # Create progress dialog with proper range
+                progress = QProgressDialog("Starting PDF generation...", None, 0, 100, self)
+                progress.setWindowModality(Qt.WindowModality.WindowModal)
+                progress.setMinimumDuration(0)  # Show immediately
+                progress.setAutoClose(True)
+                progress.setAutoReset(False)
+                progress.show()
+                QApplication.processEvents()  # Force show
+
+                # Progress callback to update the dialog
+                def update_progress(percent: int, message: str):
+                    progress.setValue(percent)
+                    if message:
+                        progress.setLabelText(f"Generating PDF... {percent}%\n{message}")
+                    else:
+                        progress.setLabelText(f"Generating PDF... {percent}%")
+                    QApplication.processEvents()  # Keep UI responsive
+
                 generator = PDFReportGenerator(
                     page_size=page_size,
                     include_plots=self.current_options.include_waveform_plots,
@@ -407,6 +421,7 @@ class MainWindow(QMainWindow):
                     plot_height=self.current_options.plot_height_inches,
                     plot_style=plot_style,
                     report_options=self.current_options,
+                    progress_callback=update_progress,
                 )
 
                 print(f"Calling generator.generate()...")

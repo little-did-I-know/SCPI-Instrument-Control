@@ -332,6 +332,15 @@ class ReportOptionsDialog(QDialog):
         )
         stats_layout.addWidget(self.include_quality_stats_cb)
 
+        # Plateau stability
+        self.include_plateau_stability_cb = QCheckBox("Plateau Stability Analysis (Advanced)")
+        self.include_plateau_stability_cb.setChecked(False)
+        self.include_plateau_stability_cb.setToolTip(
+            "Measures noise on high and low plateaus for square waves, pulses, and periodic signals. "
+            "Shows how stable/clean the plateau levels are."
+        )
+        stats_layout.addWidget(self.include_plateau_stability_cb)
+
         stats_group.setLayout(stats_layout)
         layout.addWidget(stats_group)
 
@@ -420,6 +429,7 @@ class ReportOptionsDialog(QDialog):
         self.include_amplitude_stats_cb.setChecked(self.options.include_amplitude_stats)
         self.include_timing_stats_cb.setChecked(self.options.include_timing_stats)
         self.include_quality_stats_cb.setChecked(self.options.include_quality_stats)
+        self.include_plateau_stability_cb.setChecked(self.options.include_plateau_stability)
 
     def get_options(self) -> ReportOptions:
         """
@@ -448,6 +458,7 @@ class ReportOptionsDialog(QDialog):
         self.options.include_amplitude_stats = self.include_amplitude_stats_cb.isChecked()
         self.options.include_timing_stats = self.include_timing_stats_cb.isChecked()
         self.options.include_quality_stats = self.include_quality_stats_cb.isChecked()
+        self.options.include_plateau_stability = self.include_plateau_stability_cb.isChecked()
 
         return self.options
 

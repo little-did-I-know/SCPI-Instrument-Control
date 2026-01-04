@@ -250,13 +250,55 @@ class MarkdownReportGenerator(BaseReportGenerator):
         if waveform.probe_ratio:
             lines.append(f"| Probe Ratio | {waveform.probe_ratio}:1 |")
 
-        # Statistics
-        v_min = np.min(waveform.voltage_data)
-        v_max = np.max(waveform.voltage_data)
-        v_pp = v_max - v_min
-        lines.append(f"| Peak-to-Peak | {v_pp:.4f} V |")
-        lines.append(f"| Min | {v_min:.4f} V |")
-        lines.append(f"| Max | {v_max:.4f} V |")
+        # Signal Type (if analyzed)
+        if waveform.signal_type:
+            confidence_str = f" ({waveform.signal_type_confidence:.1f}% confidence)" if waveform.signal_type_confidence else ""
+            lines.append(f"| **Signal Type** | **{waveform.signal_type.capitalize()}**{confidence_str} |")
+
+        # Enhanced Statistics (if available)
+        if waveform.statistics:
+            lines.append("")
+            lines.append("**Signal Statistics:**")
+            lines.append("")
+            lines.append("| Measurement | Value |")
+            lines.append("|-------------|-------|")
+
+            # Amplitude measurements
+            for stat in ['vmax', 'vmin', 'vpp', 'vrms', 'vmean', 'dc_offset']:
+                if stat in waveform.statistics and waveform.statistics[stat] is not None:
+                    formatted = waveform.format_statistic(stat)
+                    stat_label = stat.upper() if len(stat) <= 4 else stat.replace('_', ' ').title()
+                    lines.append(f"| {stat_label} | {formatted} |")
+
+            # Frequency and timing
+            for stat in ['frequency', 'period', 'rise_time', 'fall_time', 'pulse_width', 'duty_cycle']:
+                if stat in waveform.statistics and waveform.statistics[stat] is not None:
+                    formatted = waveform.format_statistic(stat)
+                    stat_label = stat.replace('_', ' ').title()
+                    lines.append(f"| {stat_label} | {formatted} |")
+
+            # Quality metrics
+            for stat in ['snr', 'thd', 'noise_level', 'overshoot', 'undershoot', 'jitter']:
+                if stat in waveform.statistics and waveform.statistics[stat] is not None:
+                    formatted = waveform.format_statistic(stat)
+                    stat_label = stat.upper() if stat in ['snr', 'thd'] else stat.replace('_', ' ').title()
+                    lines.append(f"| {stat_label} | {formatted} |")
+
+            # Plateau stability metrics (if calculated)
+            for stat in ['plateau_stability', 'plateau_high_noise', 'plateau_low_noise']:
+                if stat in waveform.statistics and waveform.statistics[stat] is not None:
+                    formatted = waveform.format_statistic(stat)
+                    stat_label = stat.replace('_', ' ').title()
+                    lines.append(f"| {stat_label} | {formatted} |")
+
+        else:
+            # Fallback to basic statistics if not analyzed
+            v_min = np.min(waveform.voltage_data)
+            v_max = np.max(waveform.voltage_data)
+            v_pp = v_max - v_min
+            lines.append(f"| Peak-to-Peak | {v_pp:.4f} V |")
+            lines.append(f"| Min | {v_min:.4f} V |")
+            lines.append(f"| Max | {v_max:.4f} V |")
 
         return "\n".join(lines)
 
