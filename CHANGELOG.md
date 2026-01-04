@@ -129,6 +129,186 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Graceful error handling with actionable user feedback
   - No duplicate code between Ollama and LM Studio detection
 
+## [0.4.0-beta.1] - 2026-01-04
+
+### Added (EXPERIMENTAL 🧪)
+
+**Power Supply Control** - BETA Release
+- ⚠️ **EXPERIMENTAL**: Power supply API is unstable and may change without warning
+- **Installation**: `pip install "Siglent-Oscilloscope[power-supply-beta]"`
+- **Target Stable Release**: v0.5.0 (pending community feedback)
+- **Feedback**: Please report issues at [GitHub Issues](https://github.com/little-did-I-know/Siglent-Oscilloscope/issues)
+
+**Core Power Supply Features**:
+- **Main PowerSupply Class** (`siglent.power_supply.PowerSupply`)
+  - SCPI-based communication over Ethernet (port 5024) or USB
+  - **Multiple connection types supported**:
+    - **Ethernet/LAN** via `SocketConnection` (default)
+    - **USB** via `VISAConnection` (new - requires `[usb]` extras)
+    - **GPIB** via `VISAConnection` (IEEE-488)
+    - **Serial** via `VISAConnection` (RS-232)
+  - Automatic model detection from `*IDN?` response
+  - Capability-based feature availability
+  - Context manager support for automatic connection management
+  - Support for multiple power supply models via capability registry
+
+- **Model Support**:
+  - **Siglent SPD3303X / SPD3303X-E** (triple output, 30V/3A + 30V/3A + 5V/3A)
+    - Full feature support including OVP, OCP, timer, waveform generation, tracking modes
+  - **Siglent SPD1305X** (single output, 30V/5A)
+  - **Siglent SPD1168X** (single output, 16V/8A)
+  - **Generic SCPI-99 PSUs** (fallback with conservative defaults)
+
+- **Output Control** (`siglent.power_supply_output.PowerSupplyOutput`)
+  - Voltage setpoint control with validation against model limits
+  - Current limit configuration
+  - Output enable/disable
+  - Real-time voltage, current, and power measurements
+  - Operating mode detection (CV/CC)
+  - Over-voltage protection (OVP) and over-current protection (OCP) settings
+  - Timer functionality (Siglent SPD specific)
+  - Waveform generation enable/disable (SPD3303X specific)
+
+- **Advanced Features**:
+  - **Tracking Modes** for multi-output PSUs:
+    - Independent mode (default)
+    - Series tracking (voltages add)
+    - Parallel tracking (currents add)
+  - Dynamic output creation based on model capabilities
+  - Model-specific SCPI command variants
+  - Comprehensive error handling and logging
+
+- **Model Registry and Capability System** (`siglent.psu_models`)
+  - `PSUCapability` dataclass with complete model specifications
+  - `OutputSpec` defining per-output voltage/current/power limits
+  - Automatic model detection with fuzzy matching
+  - Generic SCPI fallback for unknown models
+  - Extensible registry for adding new models
+
+- **SCPI Command Management** (`siglent.psu_scpi_commands`)
+  - Model-specific command variants (Siglent SPD vs generic SCPI)
+  - Template-based command generation with parameter substitution
+  - Support for multiple SCPI dialects
+
+- **Data Logging** (`siglent.psu_data_logger`)
+  - **PSUDataLogger**: Manual data capture with configurable channels
+  - **TimedPSULogger**: Automated time-series data collection
+    - Configurable sampling intervals
+    - Background thread-based acquisition
+    - Real-time data access during logging
+    - Export to CSV, JSON, or custom formats
+  - Voltage, current, and power logging for all outputs
+  - Timestamp-based data organization
+
+- **Connection Layer** (`siglent.connection`)
+  - **VISAConnection** class for USB/GPIB/Serial support (new)
+    - PyVISA-based connection supporting multiple transport protocols
+    - USB-TMC protocol for USB connections
+    - GPIB (IEEE-488) support
+    - Serial (RS-232) support
+    - Optional dependency: install with `[usb]` extras
+    - Pure Python backend (pyvisa-py) requires no proprietary drivers
+  - **Resource discovery utilities**:
+    - `list_visa_resources()` - List all VISA devices
+    - `find_siglent_devices()` - Automatically find Siglent instruments
+  - Graceful fallback when PyVISA not installed
+
+- **Examples**:
+  - `examples/psu_basic_control.py` - Basic voltage/current control, measurements (Ethernet)
+  - `examples/psu_usb_connection.py` - USB/GPIB/Serial connection examples (new)
+  - `examples/psu_advanced_features.py` - Tracking modes, data logging, timer, waveform generation
+  - `examples/psu_gui_test.py` - GUI integration test (experimental)
+
+- **Testing**:
+  - `tests/test_power_supply.py` - Unit tests with mock connection
+  - `tests/test_visa_connection.py` - Tests for USB/VISA connections (new)
+  - Hardware tests marked with `@pytest.mark.hardware`
+  - Coverage for core functionality, model detection, SCPI commands, VISA connections
+
+**Documentation**:
+- Added `docs/development/EXPERIMENTAL_FEATURES.md` - Comprehensive guide for experimental features
+  - Guidelines for marking features as experimental
+  - Version numbering strategies (alpha/beta/rc)
+  - Installation and discovery patterns
+  - Documentation standards
+  - Testing requirements
+  - Graduation and deprecation processes
+- Updated `docs/development/contributing.md` with experimental features section
+- Module docstrings with experimental warnings and installation instructions
+
+### Changed
+
+- **Version Bumped**: `0.3.2` → `0.4.0-beta.1`
+  - Pre-release version indicates experimental status
+  - Follows semantic versioning with beta tag
+
+- **Package Description Updated**:
+  - PyPI description now mentions power supply support (beta)
+  - Added SPD series models to package description
+  - New keywords: "power supply", "SPD", "PSU", "voltage", "current"
+
+- **Export Structure**:
+  - `siglent.__init__.py` clearly separates stable vs experimental exports
+  - PowerSupply, PSUDataLogger, TimedPSULogger marked as experimental (v0.4.0-beta.1)
+  - Documentation in docstring warns about experimental status
+
+### Technical Details
+
+**Experimental Feature Implementation**:
+- Module-level `FutureWarning` on import with clear experimental notice
+- Optional dependency groups in pyproject.toml:
+  - `[power-supply-beta]` - Power supply features (no extra dependencies)
+  - `[usb]` - USB/GPIB/Serial support via PyVISA (optional)
+- `[experimental]` group added for future experimental features
+- Graceful degradation when optional dependencies not installed
+
+**Architecture Highlights**:
+- **Connection abstraction layer** (`BaseConnection`)
+  - `SocketConnection` for TCP/IP Ethernet (default)
+  - `VISAConnection` for USB/GPIB/Serial (optional via PyVISA)
+  - Consistent SCPI interface across all connection types
+- Shares exception hierarchy (`SiglentConnectionError`, `SiglentTimeoutError`, `CommandError`)
+- Capability-based design allows easy addition of new models
+- SCPI command abstraction supports multiple manufacturers and SCPI dialects
+- Pluggable transport layer - easy to add new connection types
+
+**Known Limitations** (Beta Status):
+- Limited hardware testing (primarily SPD3303X-E)
+- Some SCPI commands may vary between models
+- Timer and waveform generation features only tested on SPD3303X
+- Remote sensing support not yet implemented
+- No GUI integration for power supply control (gui test script only)
+
+**API Stability Notice**:
+- Power supply API may change in future releases without deprecation warnings
+- Breaking changes possible in any 0.x release
+- Recommend pinning to specific version for production use: `Siglent-Oscilloscope==0.4.0-beta.1`
+- Feedback welcome to help stabilize API before v0.5.0 stable release
+
+### Upgrading from 0.3.x
+
+**For Oscilloscope Users** (No Changes Required):
+- All oscilloscope functionality remains stable
+- No breaking changes to existing APIs
+- Update to `0.4.0-beta.1` is backward compatible
+
+**For Power Supply Users** (New Feature):
+```bash
+# Install with power supply support (Ethernet/LAN only)
+pip install "Siglent-Oscilloscope[power-supply-beta]==0.4.0-beta.1"
+
+# Install with USB support (includes PyVISA for USB/GPIB/Serial)
+pip install "Siglent-Oscilloscope[usb]==0.4.0-beta.1"
+
+# Install both
+pip install "Siglent-Oscilloscope[power-supply-beta,usb]==0.4.0-beta.1"
+```
+
+**For Developers**:
+- See `docs/development/EXPERIMENTAL_FEATURES.md` for guidance on experimental features
+- Power supply modules will show experimental warnings on import
+- Set `PYTHONWARNINGS=default::FutureWarning` to see all warnings during development
+
 ## [0.3.1] - 2026-01-02
 
 ### Added

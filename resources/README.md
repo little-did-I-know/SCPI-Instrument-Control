@@ -1,36 +1,38 @@
-# Resources Directory
+# Application Icons
 
-This directory contains application resources for building standalone executables.
+This directory contains icons for the Siglent Oscilloscope GUI application.
 
-## Required Files for Executable Builds
+## Icon Files
 
-### Application Icons
+The build process expects the following icon files:
 
-To add custom icons to your executables, create the following files:
+- **Windows**: `siglent-icon.ico` (256x256 pixels, .ico format)
+- **macOS**: `siglent-icon.icns` (multiple resolutions, .icns format)
+- **Linux**: No specific icon file required (uses desktop integration)
 
-- **`siglent-icon.ico`** - Windows application icon
-  - Format: ICO (multi-resolution)
-  - Recommended sizes: 16x16, 32x32, 48x48, 256x256
+## Creating Icons
 
-- **`siglent-icon.icns`** - macOS application icon
-  - Format: ICNS (multi-resolution)
-  - Recommended sizes: 16x16 to 1024x1024
+### From Source Image
 
-### Creating Icons
+Start with a high-resolution square image (at least 1024x1024 px).
 
-See the full guide in `docs/development/BUILDING_EXECUTABLES.md` for detailed instructions.
+### Windows (.ico)
 
-**Quick method using online tools:**
+```bash
+# Using ImageMagick
+convert icon-source.png -define icon:auto-resize=256,128,64,48,32,16 siglent-icon.ico
+```
 
-1. Create a 1024x1024 PNG image with your icon design
-2. Convert to .ico: https://convertio.co/png-ico/
-3. Convert to .icns: https://cloudconvert.com/png-to-icns
-4. Place the files in this directory
+### macOS (.icns)
 
-**The build will work without icons**, but the executable will use a generic Python icon instead.
+```bash
+# Create iconset and convert
+mkdir siglent.iconset
+sips -z 512 512 icon-source.png --out siglent.iconset/icon_512x512.png
+iconutil -c icns siglent.iconset
+mv siglent.icns siglent-icon.icns
+```
 
 ## Current Status
 
-This directory is currently empty. Icons are optional but recommended for professional appearance.
-
-When you add icon files, the PyInstaller build will automatically include them in the executables.
+Icons are currently missing. The build will work without them but executables will have default icons.

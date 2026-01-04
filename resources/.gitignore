@@ -1,0 +1,5 @@
+# Icon files (to be created)
+*.ico
+*.icns
+*.png
+!README.md
