@@ -30,10 +30,6 @@ jobs:
           pip install ".[all]"
           pip install pyinstaller
 
-      - name: Build executable with PyInstaller
-        run: |
-          pyinstaller --clean siglent-gui.spec
-
       - name: Get version from tag
         id: get_version
         shell: bash
@@ -43,6 +39,13 @@ jobs:
           else
             echo "version=dev-$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
           fi
+
+      - name: Build executable with PyInstaller
+        shell: bash
+        env:
+          APP_VERSION: ${{ steps.get_version.outputs.version }}
+        run: |
+          pyinstaller --clean siglent-gui.spec
 
       - name: Create ZIP archive
         shell: bash
@@ -67,9 +70,9 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  build-macos:
-    name: Build macOS Application
-    runs-on: macos-latest
+  build-macos-arm64:
+    name: Build macOS Application (Apple Silicon)
+    runs-on: macos-14  # M1 runner for native ARM64
 
     steps:
       - name: Checkout code
@@ -87,9 +90,67 @@ jobs:
           pip install ".[all]"
           pip install pyinstaller
 
+      - name: Get version from tag
+        id: get_version
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            echo "version=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          else
+            echo "version=dev-$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+          fi
+
       - name: Build application with PyInstaller
+        env:
+          APP_VERSION: ${{ steps.get_version.outputs.version }}
         run: |
           pyinstaller --clean siglent-gui.spec
+
+      - name: Verify architecture
+        run: |
+          file dist/SiglentGUI.app/Contents/MacOS/SiglentGUI
+          lipo -info dist/SiglentGUI.app/Contents/MacOS/SiglentGUI || true
+
+      - name: Create ZIP archive
+        run: |
+          cd dist
+          zip -r SiglentGUI-${{ steps.get_version.outputs.version }}-macOS-arm64.zip SiglentGUI.app ../README.md ../LICENSE
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-arm64-executable
+          path: dist/SiglentGUI-${{ steps.get_version.outputs.version }}-macOS-arm64.zip
+          retention-days: 30
+
+      - name: Upload to release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v1
+        with:
+          files: dist/SiglentGUI-${{ steps.get_version.outputs.version }}-macOS-arm64.zip
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-macos-x64:
+    name: Build macOS Application (Intel)
+    runs-on: macos-13  # Intel runner for x86_64
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install ".[all]"
+          pip install pyinstaller
 
       - name: Get version from tag
         id: get_version
@@ -100,24 +161,34 @@ jobs:
             echo "version=dev-$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
           fi
 
-      - name: Create DMG (optional) or ZIP archive
+      - name: Build application with PyInstaller
+        env:
+          APP_VERSION: ${{ steps.get_version.outputs.version }}
+        run: |
+          pyinstaller --clean siglent-gui.spec
+
+      - name: Verify architecture
+        run: |
+          file dist/SiglentGUI.app/Contents/MacOS/SiglentGUI
+          lipo -info dist/SiglentGUI.app/Contents/MacOS/SiglentGUI || true
+
+      - name: Create ZIP archive
         run: |
           cd dist
-          # Create a ZIP for now (DMG creation requires additional tools)
-          zip -r SiglentGUI-${{ steps.get_version.outputs.version }}-macOS-arm64.zip SiglentGUI.app ../README.md ../LICENSE
+          zip -r SiglentGUI-${{ steps.get_version.outputs.version }}-macOS-x86_64.zip SiglentGUI.app ../README.md ../LICENSE
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: macos-executable
-          path: dist/SiglentGUI-${{ steps.get_version.outputs.version }}-macOS-arm64.zip
+          name: macos-x64-executable
+          path: dist/SiglentGUI-${{ steps.get_version.outputs.version }}-macOS-x86_64.zip
           retention-days: 30
 
       - name: Upload to release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v1
         with:
-          files: dist/SiglentGUI-${{ steps.get_version.outputs.version }}-macOS-arm64.zip
+          files: dist/SiglentGUI-${{ steps.get_version.outputs.version }}-macOS-x86_64.zip
           draft: false
           prerelease: false
         env:
@@ -161,10 +232,6 @@ jobs:
           pip install ".[all]"
           pip install pyinstaller
 
-      - name: Build executable with PyInstaller
-        run: |
-          pyinstaller --clean siglent-gui.spec
-
       - name: Get version from tag
         id: get_version
         run: |
@@ -173,6 +240,12 @@ jobs:
           else
             echo "version=dev-$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
           fi
+
+      - name: Build executable with PyInstaller
+        env:
+          APP_VERSION: ${{ steps.get_version.outputs.version }}
+        run: |
+          pyinstaller --clean siglent-gui.spec
 
       - name: Create tar.gz archive
         run: |
@@ -199,7 +272,7 @@ jobs:
   create-release-notes:
     name: Create Release Summary
     runs-on: ubuntu-latest
-    needs: [build-windows, build-macos, build-linux]
+    needs: [build-windows, build-macos-arm64, build-macos-x64, build-linux]
     if: startsWith(github.ref, 'refs/tags/')
 
     steps:
@@ -224,7 +297,12 @@ jobs:
               - Extract and run `SiglentGUI.exe`
               - No Python installation required
 
-            - **macOS**: `SiglentGUI-${{ steps.get_version.outputs.version }}-macOS-arm64.zip`
+            - **macOS (Apple Silicon/M1/M2/M3)**: `SiglentGUI-${{ steps.get_version.outputs.version }}-macOS-arm64.zip`
+              - Extract and open `SiglentGUI.app`
+              - You may need to right-click → Open the first time (unsigned app)
+              - No Python installation required
+
+            - **macOS (Intel)**: `SiglentGUI-${{ steps.get_version.outputs.version }}-macOS-x86_64.zip`
               - Extract and open `SiglentGUI.app`
               - You may need to right-click → Open the first time (unsigned app)
               - No Python installation required

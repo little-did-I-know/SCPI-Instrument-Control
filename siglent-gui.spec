@@ -6,9 +6,28 @@ This file defines how to build standalone executables for Windows, macOS, and Li
 """
 
 import sys
+import os
 from pathlib import Path
 
 block_cipher = None
+
+# Get version from package or environment
+def get_version():
+    """Get version from siglent package or environment variable."""
+    # Try environment variable first (set by CI)
+    version = os.environ.get('APP_VERSION')
+    if version:
+        return version.lstrip('v')  # Remove 'v' prefix if present
+
+    # Try importing from package
+    try:
+        import siglent
+        return siglent.__version__
+    except:
+        return "0.0.0"
+
+APP_VERSION = get_version()
+print(f"Building version: {APP_VERSION}")
 
 # Determine platform-specific settings
 is_windows = sys.platform.startswith('win')
@@ -125,8 +144,8 @@ if is_macos:
         info_plist={
             'CFBundleName': 'Siglent Oscilloscope',
             'CFBundleDisplayName': 'Siglent Oscilloscope Control',
-            'CFBundleVersion': '0.3.1',
-            'CFBundleShortVersionString': '0.3.1',
+            'CFBundleVersion': APP_VERSION,
+            'CFBundleShortVersionString': APP_VERSION,
             'NSHighResolutionCapable': 'True',
             'LSMinimumSystemVersion': '10.13.0',
         },
