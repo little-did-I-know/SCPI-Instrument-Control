@@ -54,7 +54,7 @@ jobs:
           7z a -tzip SiglentGUI-${{ steps.get_version.outputs.version }}-Windows-x64.zip SiglentGUI.exe ../README.md ../LICENSE
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: windows-executable
           path: dist/SiglentGUI-${{ steps.get_version.outputs.version }}-Windows-x64.zip
@@ -116,7 +116,7 @@ jobs:
           zip -r SiglentGUI-${{ steps.get_version.outputs.version }}-macOS-arm64.zip SiglentGUI.app ../README.md ../LICENSE
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: macos-arm64-executable
           path: dist/SiglentGUI-${{ steps.get_version.outputs.version }}-macOS-arm64.zip
@@ -178,7 +178,7 @@ jobs:
           zip -r SiglentGUI-${{ steps.get_version.outputs.version }}-macOS-x86_64.zip SiglentGUI.app ../README.md ../LICENSE
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: macos-x64-executable
           path: dist/SiglentGUI-${{ steps.get_version.outputs.version }}-macOS-x86_64.zip
@@ -253,7 +253,7 @@ jobs:
           tar -czf SiglentGUI-${{ steps.get_version.outputs.version }}-Linux-x86_64.tar.gz SiglentGUI ../README.md ../LICENSE
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: linux-executable
           path: dist/SiglentGUI-${{ steps.get_version.outputs.version }}-Linux-x86_64.tar.gz
