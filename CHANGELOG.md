@@ -7,7 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added - Report Generator Features
+## [0.5.0] - 2026-01-04
+
+### Added
+
+**Automated Test Report Generation** 📊
+- **Installation**: `pip install "Siglent-Oscilloscope[report-generator]"`
+- **PDF and Markdown Report Generators**
+  - Professional publication-ready reports with waveform plots and analysis
+  - Comprehensive metadata tracking (test ID, operator, timestamp, scope model)
+  - Multiple output formats (PDF via ReportLab, Markdown with embedded plots)
+  - Automatic file organization and asset management
 
 - **Signal Type Detection** (`siglent/report_generator/utils/waveform_analyzer.py`)
   - Automatic waveform classification using FFT harmonic analysis
@@ -128,6 +138,69 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Handles both Ollama native API and OpenAI-compatible endpoints
   - Graceful error handling with actionable user feedback
   - No duplicate code between Ollama and LM Studio detection
+
+**Power Supply - Now Stable** ✅
+- Power supply support graduated from BETA to stable
+- API is now considered production-ready
+- Removed experimental warnings and beta tags
+- Full support for SPD3303X series power supplies
+- Installation: Standard package or `pip install "Siglent-Oscilloscope[power-supply-beta]"` (alias maintained)
+
+**Pre-Commit Checks and Code Coverage** 🔍
+- New `make pre-commit-branch` target for lightweight branch commit validation
+  - Code formatting checks (Black, Flake8)
+  - Fast parallel test execution
+  - ~1 minute validation for rapid development
+- Enhanced `make pre-pr` with codecov integration
+  - Full test suite with coverage reporting
+  - Automatic coverage upload to Codecov
+  - Comprehensive validation before pull requests
+- Codecov configuration (`.codecov.yml`)
+  - 70-100% coverage range targets
+  - Project and patch thresholds
+  - Proper ignore patterns for tests, examples, docs
+- Coverage documentation (`docs/development/PRE_COMMIT_CHECKS.md`)
+  - Complete guide for pre-commit workflows
+  - Coverage concepts and best practices
+  - Troubleshooting and CI/CD integration
+
+### Changed
+
+**Documentation Updates**
+- Updated README with comprehensive Automated Report Generation section
+  - Installation instructions for `[report-generator]` extra
+  - Code examples and feature highlights
+  - Added to Features, Installation, Optional Extras, and Examples sections
+- Removed BETA designation from power supply in documentation
+- Enhanced package description with automated report generation features
+
+**Project Organization**
+- Reorganized main directory structure for better clarity
+- Moved test/development scripts to `scripts/` directory:
+  - `test_llm_model_detection.py`
+  - `test_pdf_progress.py` and `test_report_progress.pdf`
+  - `test_signal_detection.py`
+  - `test_unicode_rendering.py` and `test_unicode_rendering.pdf`
+- Moved `ICON_SETUP.md` to `docs/development/` for better organization
+- Removed duplicate `codecov.yml` (keeping `.codecov.yml`)
+- Cleaned up empty `node_modules/` directory
+- Root directory now contains 22 essential files/directories
+
+### Fixed
+
+**Development Dependencies**
+- Added `pytest-cov>=4.0.0` to dev dependencies
+  - Fixes "unrecognized arguments: --cov" error
+  - Ensures coverage plugin available after `pip install -e ".[dev]"`
+- Added `codecov>=2.1.0` to dev dependencies
+  - Required by `make codecov-report` and `make pre-pr`
+  - Enables coverage uploads in development
+
+**Makefile Pytest Integration**
+- Updated all pytest calls to use `python -m pytest`
+  - Ensures pytest-cov plugin is properly loaded
+  - Fixes coverage generation in nested make calls
+  - Updated targets: `test`, `test-cov`, `test-fast`, `test-exceptions`
 
 ## [0.4.0-beta.1] - 2026-01-04
 
