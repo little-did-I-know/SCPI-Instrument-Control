@@ -14,21 +14,21 @@ install-all:  ## Install package with all optional dependencies
 	pip install -e ".[all,dev]"
 
 test:  ## Run tests
-	pytest tests/ -v
+	python -m pytest tests/ -v
 
 test-cov:  ## Run tests with coverage report
-	pytest tests/ --cov=siglent --cov-report=html --cov-report=term-missing --cov-report=xml -v
+	python -m pytest tests/ --cov=siglent --cov-report=html --cov-report=term-missing --cov-report=xml -v
 	@echo "Coverage report generated in htmlcov/index.html"
 	@echo "Coverage XML generated in coverage.xml"
 
 test-fast:  ## Run tests in parallel (faster)
-	pytest tests/ -n auto -v
+	python -m pytest tests/ -n auto -v
 
 test-exceptions:  ## Test exception handling and imports
 	@echo "Testing exception imports and backward compatibility..."
 	@python -c "from siglent.exceptions import SiglentConnectionError, SiglentTimeoutError, CommandError, SiglentError; from siglent.exceptions import ConnectionError, TimeoutError; assert ConnectionError is SiglentConnectionError; assert TimeoutError is SiglentTimeoutError; print('✓ New exception names: OK'); print('✓ Backward compatibility aliases: OK'); print('✓ All exception imports: PASSED')"
 	@echo "\nRunning exception-related tests..."
-	@pytest tests/ -k "exception or error or connection or timeout" -v --tb=short || echo "Note: Some tests may not exist yet"
+	@python -m pytest tests/ -k "exception or error or connection or timeout" -v --tb=short || echo "Note: Some tests may not exist yet"
 
 codecov-install:  ## Install codecov CLI
 	@echo "Installing codecov..."

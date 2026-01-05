@@ -40,6 +40,63 @@ A professional Python package for controlling Siglent oscilloscopes via Ethernet
 - **Math Functions**: Custom math expressions on waveforms
 - **VNC Display**: Embedded oscilloscope screen viewer
 
+### Automated Test Report Generation 📊
+
+**Automatically generate comprehensive PDF and Markdown test reports** from your waveform captures with detailed analysis, visualizations, and AI-powered insights. Perfect for documentation, test validation, and automated quality control.
+
+```python
+# Install report generator dependencies
+# pip install "Siglent-Oscilloscope[report-generator]"
+
+from siglent.report_generator import ReportGenerator, PDFGenerator, MarkdownGenerator
+from pathlib import Path
+
+# Create a report generator
+report = ReportGenerator(
+    title="Probe Calibration Test Report",
+    test_id="CAL-2024-001",
+    operator="Lab Technician"
+)
+
+# Add waveform captures
+waveform = scope.get_waveform(channel=1)
+report.add_waveform(waveform, channel_number=1, name="Calibration Signal")
+
+# Automatic signal analysis
+waveform.analyze()  # Auto-detects signal type, calculates 25+ statistics
+
+# Optional: Add AI insights (requires Ollama)
+report.set_ai_model("llama3.2")  # Local LLM analysis
+
+# Generate reports in multiple formats
+pdf_gen = PDFGenerator(report_data=report.data)
+pdf_gen.generate(Path("calibration_report.pdf"))
+
+markdown_gen = MarkdownGenerator(report_data=report.data)
+markdown_gen.generate(Path("calibration_report.md"))
+```
+
+**Key Features:**
+
+- ✅ **Automatic Signal Detection** - FFT-based classification (sine, square, triangle, pulse, etc.)
+- ✅ **Comprehensive Statistics** - 25+ parameters including Vpp, RMS, frequency, SNR, THD, jitter, overshoot
+- ✅ **AI-Powered Analysis** - Optional LLM integration via Ollama for intelligent waveform insights
+- ✅ **Region Extraction** - Zoom into plateaus, edges, and transients with calibration guidance
+- ✅ **Multiple Formats** - Generate PDF and Markdown reports with embedded plots
+- ✅ **Professional Layout** - Publication-ready reports with metadata, statistics tables, and visualizations
+
+**Report Sections Include:**
+
+- Test metadata (title, ID, operator, timestamp, scope model)
+- Waveform plots with automatic scaling
+- Signal classification and characteristics
+- Detailed measurement tables
+- Region-of-interest analysis with zoomed views
+- AI-generated insights and recommendations (optional)
+- Pass/fail criteria and test conclusions
+
+See `examples/probe_calibration_analysis.py` for complete examples including region extraction and automated probe compensation guidance.
+
 ### Vector Graphics / XY Mode (Fun! 🎨)
 
 Use your oscilloscope as a vector display by generating waveforms for XY mode:
@@ -88,6 +145,9 @@ To include optional features, use extras:
 ```bash
 # GUI application with PyQt6
 pip install "Siglent-Oscilloscope[gui]"
+
+# Automated report generation (PDF/Markdown with AI analysis)
+pip install "Siglent-Oscilloscope[report-generator]"
 
 # Vector graphics and XY mode (draw shapes on scope!)
 pip install "Siglent-Oscilloscope[fun]"
@@ -187,6 +247,7 @@ Install with `[gui]` extra to add:
 
 ### Optional Extras
 
+- **Report Generator**: Install with `[report-generator]` to add PyQt6, Pillow, requests, ReportLab, Ollama (PDF/Markdown reports with AI)
 - **HDF5 support**: Install with `[hdf5]` to add h5py >= 3.8.0
 - **Vector Graphics**: Install with `[fun]` to add shapely, Pillow, svgpathtools (XY mode drawing)
 - **All features**: Install with `[all]` for complete functionality
@@ -599,6 +660,7 @@ See the `examples/` directory for complete working examples:
 - **waveform_capture.py** - Capture and save waveforms
 - **measurements.py** - Automated measurements
 - **live_plot.py** - Real-time plotting
+- **probe_calibration_analysis.py** - Automated report generation with region extraction and AI analysis
 
 ## Supported Models
 
