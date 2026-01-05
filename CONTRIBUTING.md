@@ -230,6 +230,7 @@ python scripts/pre_pr_check.py --fast --fix
 ```
 
 The pre-PR script checks:
+
 - ✅ Code formatting (Black)
 - ✅ Import sorting (isort)
 - ✅ Linting (flake8)

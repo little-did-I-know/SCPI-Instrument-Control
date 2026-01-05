@@ -1,52 +1,26 @@
 """Main PowerSupply class for controlling SCPI power supplies.
 
-⚠️ **EXPERIMENTAL FEATURE**
-
-This module is experimental and may change in future releases without warning.
-API stability is not guaranteed. Use in production at your own risk.
-
 Supports generic SCPI-99 compliant power supplies and Siglent SPD series models.
 
 Installation:
+    pip install "Siglent-Oscilloscope"
+    # Or with power supply examples:
     pip install "Siglent-Oscilloscope[power-supply-beta]"
 
-Stability Timeline:
-    - v0.4.0-beta.1: Initial experimental release
-    - Target stable release: v0.5.0 (pending community feedback)
+Features:
+    - Multiple connection types: Ethernet/LAN, USB, GPIB, Serial
+    - Full control of voltage, current, and output state
+    - Model-specific capability detection
+    - Data logging and automation support
+    - Context manager support for automatic connection management
 
 Feedback:
     Please report issues and suggestions at:
     https://github.com/little-did-I-know/Siglent-Oscilloscope/issues
-
-See Also:
-    docs/development/EXPERIMENTAL_FEATURES.md for more information about
-    experimental features in this project.
 """
 
 import logging
-import warnings
 from typing import Any, Dict, List, Optional
-
-# Experimental feature warning
-warnings.warn(
-    "\n"
-    "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-    "⚠️  EXPERIMENTAL FEATURE WARNING\n"
-    "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-    "You are using siglent.power_supply, an EXPERIMENTAL feature.\n"
-    "\n"
-    "This feature:\n"
-    "  • May change or be removed in any release\n"
-    "  • Has limited hardware testing\n"
-    "  • Is NOT recommended for production use\n"
-    "\n"
-    "Install: pip install 'Siglent-Oscilloscope[power-supply-beta]'\n"
-    "Feedback: https://github.com/little-did-I-know/Siglent-Oscilloscope/issues\n"
-    "Docs: docs/development/EXPERIMENTAL_FEATURES.md\n"
-    "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n",
-    FutureWarning,
-    stacklevel=2,
-)
 
 from siglent import exceptions
 from siglent.connection import BaseConnection, SocketConnection

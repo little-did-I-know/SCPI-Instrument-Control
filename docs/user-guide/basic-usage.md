@@ -38,11 +38,7 @@ with Oscilloscope('192.168.1.100') as scope:
     # Disconnection happens automatically
 ```
 
-!!! tip "Why Use Context Manager?"
-    - Automatic connection/disconnection
-    - Ensures cleanup even if errors occur
-    - More concise and Pythonic
-    - Prevents resource leaks
+!!! tip "Why Use Context Manager?" - Automatic connection/disconnection - Ensures cleanup even if errors occur - More concise and Pythonic - Prevents resource leaks
 
 ### Connection Parameters
 
@@ -89,11 +85,7 @@ print(f"Sample Rate: {caps.max_sample_rate/1e9} GSa/s")
 print(f"Memory Depth: {caps.max_memory_depth/1e6} Mpts")
 ```
 
-!!! info "Supported Models"
-    - SDS800X HD Series (e.g., SDS824X HD)
-    - SDS1000X-E Series
-    - SDS2000X Plus Series
-    - SDS5000X Series
+!!! info "Supported Models" - SDS800X HD Series (e.g., SDS824X HD) - SDS1000X-E Series - SDS2000X Plus Series - SDS5000X Series
 
 ## Working with Channels
 
@@ -380,7 +372,7 @@ print(f"Channel 1 scale: {value} V/div")
 ```
 
 !!! warning "Use High-Level API When Possible"
-    The library provides high-level methods for most operations. Only use direct SCPI commands when the functionality isn't available through the API.
+The library provides high-level methods for most operations. Only use direct SCPI commands when the functionality isn't available through the API.
 
 ## Error Handling
 
@@ -470,25 +462,13 @@ with Oscilloscope(SCOPE_IP) as scope:
 
 ## Best Practices
 
-!!! tip "Connection Management"
-    - Always use context managers (`with` statement) when possible
-    - Ensure `disconnect()` is called in `finally` blocks if not using context manager
-    - Set appropriate timeouts based on your network and operation type
+!!! tip "Connection Management" - Always use context managers (`with` statement) when possible - Ensure `disconnect()` is called in `finally` blocks if not using context manager - Set appropriate timeouts based on your network and operation type
 
-!!! tip "Channel Configuration"
-    - Set probe ratio to match your actual probe (usually 10X)
-    - Use appropriate coupling: DC for DC-coupled signals, AC to remove DC offset
-    - Enable bandwidth limiting to reduce high-frequency noise when not needed
+!!! tip "Channel Configuration" - Set probe ratio to match your actual probe (usually 10X) - Use appropriate coupling: DC for DC-coupled signals, AC to remove DC offset - Enable bandwidth limiting to reduce high-frequency noise when not needed
 
-!!! tip "Performance"
-    - Only enable channels you need to capture
-    - Use appropriate timebase and memory depth for your application
-    - Consider using `get_waveforms()` for multi-channel capture instead of multiple `get_waveform()` calls
+!!! tip "Performance" - Only enable channels you need to capture - Use appropriate timebase and memory depth for your application - Consider using `get_waveforms()` for multi-channel capture instead of multiple `get_waveform()` calls
 
-!!! tip "Error Handling"
-    - Always wrap oscilloscope operations in try/except blocks
-    - Handle network timeouts appropriately
-    - Log errors for debugging
+!!! tip "Error Handling" - Always wrap oscilloscope operations in try/except blocks - Handle network timeouts appropriately - Log errors for debugging
 
 ## Next Steps
 

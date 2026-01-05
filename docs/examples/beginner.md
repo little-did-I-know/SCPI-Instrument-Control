@@ -4,12 +4,12 @@ Complete examples for getting started with the Siglent Oscilloscope library. The
 
 ## Quick Reference
 
-| Example | Description |
-|---------|-------------|
+| Example                                                                                                       | Description                                           |
+| ------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
 | [Basic usage example for Siglent oscilloscope control](#basic-usage-example-for-siglent-oscilloscope-control) | Basic usage example for Siglent oscilloscope control. |
-| [Measurement example for Siglent oscilloscope](#measurement-example-for-siglent-oscilloscope) | Measurement example for Siglent oscilloscope. |
-| [Simple single capture example](#simple-single-capture-example) | Simple single capture example. |
-| [Waveform capture example for Siglent oscilloscope](#waveform-capture-example-for-siglent-oscilloscope) | Waveform capture example for Siglent oscilloscope. |
+| [Measurement example for Siglent oscilloscope](#measurement-example-for-siglent-oscilloscope)                 | Measurement example for Siglent oscilloscope.         |
+| [Simple single capture example](#simple-single-capture-example)                                               | Simple single capture example.                        |
+| [Waveform capture example for Siglent oscilloscope](#waveform-capture-example-for-siglent-oscilloscope)       | Waveform capture example for Siglent oscilloscope.    |
 
 ---
 

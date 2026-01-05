@@ -46,23 +46,27 @@ I2C is a two-wire synchronous serial protocol:
 ### Configuring I2C Decoder
 
 **1. Select Protocol:**
+
 ```
 Protocol: I2C
 ```
 
 **2. Assign Channels:**
+
 ```
 SDA Channel: C1
 SCL Channel: C2
 ```
 
 **3. Set Parameters:**
+
 ```
 Address Width: 7-bit (or 10-bit)
 Decode Format: Hex (or Binary, Decimal)
 ```
 
 **4. Enable Decoding:**
+
 ```
 ☑ Enable I2C Decode
 ```
@@ -70,6 +74,7 @@ Decode Format: Hex (or Binary, Decimal)
 ### I2C Decode Display
 
 **Waveform Overlay:**
+
 - START condition marker (S)
 - Address bytes with R/W bit
 - Data bytes
@@ -77,11 +82,13 @@ Decode Format: Hex (or Binary, Decimal)
 - STOP condition marker (P)
 
 **Example Display:**
+
 ```
 S [0x50 W] A [0x12] A [0x34] A P
 ```
 
 Where:
+
 - S = START
 - 0x50 = 7-bit address (0x28) with W bit
 - W = Write
@@ -92,6 +99,7 @@ Where:
 ### I2C Decode Table
 
 **Columns:**
+
 - Timestamp
 - Event (START, ADDR, DATA, STOP)
 - Value
@@ -100,6 +108,7 @@ Where:
 - Error
 
 **Example:**
+
 ```
 Time      | Event | Value  | R/W | ACK | Error
 ----------|-------|--------|-----|-----|------
@@ -113,6 +122,7 @@ Time      | Event | Value  | R/W | ACK | Error
 ### I2C Triggering
 
 **Trigger on I2C Events:**
+
 - START condition
 - Specific address
 - Specific data value
@@ -120,6 +130,7 @@ Time      | Event | Value  | R/W | ACK | Error
 - NACK (error)
 
 **Setup:**
+
 1. Trigger tab
 2. Type: I2C
 3. Condition: Address Match
@@ -139,11 +150,13 @@ SPI is a four-wire synchronous serial protocol:
 ### Configuring SPI Decoder
 
 **1. Select Protocol:**
+
 ```
 Protocol: SPI
 ```
 
 **2. Assign Channels:**
+
 ```
 MOSI: C1
 MISO: C2
@@ -152,6 +165,7 @@ CS:   C4
 ```
 
 **3. Set Parameters:**
+
 ```
 Clock Polarity (CPOL): 0 (or 1)
 Clock Phase (CPHA):    0 (or 1)
@@ -161,6 +175,7 @@ CS Polarity:           Active Low (or High)
 ```
 
 **4. Enable Decoding:**
+
 ```
 ☑ Enable SPI Decode
 ```
@@ -170,7 +185,7 @@ CS Polarity:           Active Low (or High)
 **CPOL and CPHA define 4 modes:**
 
 | Mode | CPOL | CPHA | Clock Idle | Sample Edge |
-|------|------|------|------------|-------------|
+| ---- | ---- | ---- | ---------- | ----------- |
 | 0    | 0    | 0    | Low        | Rising      |
 | 1    | 0    | 1    | Low        | Falling     |
 | 2    | 1    | 0    | High       | Falling     |
@@ -179,12 +194,14 @@ CS Polarity:           Active Low (or High)
 ### SPI Decode Display
 
 **Waveform Overlay:**
+
 - MOSI data bytes
 - MISO data bytes
 - CS active regions
 - Byte boundaries
 
 **Example:**
+
 ```
 CS ↓
 MOSI: 0x12 0x34 0x56
@@ -195,12 +212,14 @@ CS ↑
 ### SPI Decode Table
 
 **Columns:**
+
 - Timestamp
 - MOSI Data
 - MISO Data
 - CS State
 
 **Example:**
+
 ```
 Time      | MOSI   | MISO   | CS
 ----------|--------|--------|----
@@ -225,17 +244,20 @@ UART is asynchronous serial communication:
 ### Configuring UART Decoder
 
 **1. Select Protocol:**
+
 ```
 Protocol: UART
 ```
 
 **2. Assign Channels:**
+
 ```
 TX Channel: C1
 RX Channel: C2
 ```
 
 **3. Set Parameters:**
+
 ```
 Baud Rate:   9600 (or custom)
 Data Bits:   8 (5, 6, 7, 8, 9)
@@ -246,6 +268,7 @@ Polarity:    Non-inverted (or Inverted)
 ```
 
 **4. Enable Decoding:**
+
 ```
 ☑ Enable UART Decode
 ```
@@ -267,12 +290,14 @@ Polarity:    Non-inverted (or Inverted)
 ### UART Decode Display
 
 **Waveform Overlay:**
+
 - TX data bytes
 - RX data bytes
 - Frame errors
 - Parity errors
 
 **Example:**
+
 ```
 TX: H e l l o
 RX: O K
@@ -281,12 +306,14 @@ RX: O K
 ### UART Decode Table
 
 **Columns:**
+
 - Timestamp
 - Direction (TX/RX)
 - Data (Hex/ASCII)
 - Error
 
 **Example:**
+
 ```
 Time      | Dir | Data (Hex) | ASCII | Error
 ----------|-----|------------|-------|-------
@@ -304,28 +331,33 @@ Time      | Dir | Data (Hex) | ASCII | Error
 ### Display Modes
 
 **Overlay Mode:**
+
 - Decoded data overlaid on waveform
 - Color-coded by protocol element
 - Helps correlate timing with data
 
 **Table Mode:**
+
 - Decoded data in tabular format
 - Easy to read and analyze
 - Sortable and filterable
 
 **Both Modes:**
+
 - Show both simultaneously
 - Best for analysis
 
 ### Data Format Options
 
 **Display Formats:**
+
 - **Hexadecimal**: 0x12, 0x34
 - **Decimal**: 18, 52
 - **Binary**: 0b00010010, 0b00110100
 - **ASCII**: 'A', 'B', 'C'
 
 **Selection:**
+
 ```
 Format dropdown → Choose format
 ```
@@ -333,6 +365,7 @@ Format dropdown → Choose format
 ### Error Detection
 
 **Detected Errors:**
+
 - Framing errors (UART)
 - Parity errors (UART)
 - Missing ACK (I2C)
@@ -340,6 +373,7 @@ Format dropdown → Choose format
 - Bus contentionColor
 
 **Error Highlighting:**
+
 - Red background for errors
 - Error column in table
 - Visual marker on waveform
@@ -349,12 +383,14 @@ Format dropdown → Choose format
 ### Filter Decoded Data
 
 **Filter by:**
+
 - Protocol element (Address, Data, etc.)
 - Value range
 - Error status
 - Time range
 
 **Example:**
+
 ```
 Filter: I2C Address = 0x50
 Result: Show only transactions to/from 0x50
@@ -363,12 +399,14 @@ Result: Show only transactions to/from 0x50
 ### Search Function
 
 **Search for:**
+
 - Specific byte value
 - Byte sequence
 - ASCII string (UART)
 - Address (I2C)
 
 **Example:**
+
 ```
 Search: "Hello" in UART data
 Result: Highlights all occurrences
@@ -379,6 +417,7 @@ Result: Highlights all occurrences
 ### Export to CSV
 
 **Format:**
+
 ```
 Timestamp, Protocol, Event, Value, Details
 0.000, I2C, START, -, -
@@ -388,6 +427,7 @@ Timestamp, Protocol, Event, Value, Details
 ```
 
 **To Export:**
+
 1. Protocol Decode tab
 2. Click "Export" button
 3. Choose file location
@@ -396,6 +436,7 @@ Timestamp, Protocol, Event, Value, Details
 ### Export to Text
 
 **Human-Readable Format:**
+
 ```
 I2C Transaction at 0.000 ms:
   START
@@ -408,6 +449,7 @@ I2C Transaction at 0.000 ms:
 ### Include in Waveform Export
 
 When saving waveform:
+
 - Checkbox: "Include protocol decode"
 - Decode data saved with waveform
 - Reload together
@@ -424,6 +466,7 @@ When saving waveform:
 4. Table updates in real-time
 
 **Use Cases:**
+
 - Monitor bus traffic
 - Debug communication
 - Verify protocol compliance
@@ -439,6 +482,7 @@ When saving waveform:
 4. Capture when event occurs
 
 **Example:**
+
 - Trigger on I2C address 0x50
 - Capture write to EEPROM
 - Decode and save transaction
@@ -450,6 +494,7 @@ When saving waveform:
 **Objective:** Decode I2C EEPROM read operation
 
 **Configuration:**
+
 ```
 Protocol: I2C
 SDA: C1
@@ -458,11 +503,13 @@ Address Width: 7-bit
 ```
 
 **Captured Transaction:**
+
 ```
 S [0x50 W] A [0x00] A [0x10] A Sr [0x51 R] A [0xAB] A [0xCD] N P
 ```
 
 **Interpretation:**
+
 1. START
 2. Address 0x50 (Write) - ACK
 3. Register address 0x00 (high byte) - ACK
@@ -480,6 +527,7 @@ S [0x50 W] A [0x00] A [0x10] A Sr [0x51 R] A [0xAB] A [0xCD] N P
 **Objective:** Decode SPI Flash read command
 
 **Configuration:**
+
 ```
 Protocol: SPI
 MOSI: C1, MISO: C2, CLK: C3, CS: C4
@@ -487,6 +535,7 @@ Mode: 0 (CPOL=0, CPHA=0)
 ```
 
 **Captured Transaction:**
+
 ```
 CS ↓
 MOSI: 0x03 0x00 0x10 0x00 [0x00 0x00 ...]
@@ -495,6 +544,7 @@ CS ↑
 ```
 
 **Interpretation:**
+
 1. CS active (low)
 2. Command: 0x03 (Read Data)
 3. Address: 0x001000 (24-bit)
@@ -507,6 +557,7 @@ CS ↑
 **Objective:** Decode UART AT commands
 
 **Configuration:**
+
 ```
 Protocol: UART
 TX: C1, RX: C2
@@ -515,6 +566,7 @@ Format: 8N1
 ```
 
 **Captured Data:**
+
 ```
 TX: "AT\r\n"
 RX: "OK\r\n"
@@ -523,6 +575,7 @@ RX: "v1.2.3\r\nOK\r\n"
 ```
 
 **Interpretation:**
+
 - Send AT command
 - Receive OK response
 - Query version (AT+GMR)
@@ -535,6 +588,7 @@ RX: "v1.2.3\r\nOK\r\n"
 **Problem:** Decoder shows no data
 
 **Solutions:**
+
 1. Verify channels assigned correctly
 2. Check signal levels (logic high/low)
 3. Verify protocol parameters (baud rate, clock polarity, etc.)
@@ -546,6 +600,7 @@ RX: "v1.2.3\r\nOK\r\n"
 **Problem:** Decoded data incorrect
 
 **Solutions:**
+
 1. Verify baud rate (UART)
 2. Check clock polarity/phase (SPI)
 3. Verify bit order (MSB/LSB first)
@@ -557,6 +612,7 @@ RX: "v1.2.3\r\nOK\r\n"
 **Problem:** Some bytes not decoded
 
 **Solutions:**
+
 1. Increase sample rate
 2. Extend capture time
 3. Check for signal integrity issues
@@ -567,6 +623,7 @@ RX: "v1.2.3\r\nOK\r\n"
 **Problem:** Many frame/parity errors
 
 **Solutions:**
+
 1. Verify baud rate is correct
 2. Check signal quality
 3. Verify parity and stop bit settings
@@ -577,47 +634,30 @@ RX: "v1.2.3\r\nOK\r\n"
 
 ### Signal Quality
 
-!!! tip "Clean Signals"
-    - Use short ground leads on probes
-    - Proper grounding essential
-    - Minimize noise and ringing
-    - Check signal integrity with eye diagram
+!!! tip "Clean Signals" - Use short ground leads on probes - Proper grounding essential - Minimize noise and ringing - Check signal integrity with eye diagram
 
 ### Sample Rate
 
-!!! tip "Adequate Sampling"
-    - Sample rate ≥ 10× baud rate (UART)
-    - Sample rate ≥ 10× clock frequency (I2C, SPI)
-    - Higher is better for reliability
-    - Minimum: 4× for basic decoding
+!!! tip "Adequate Sampling" - Sample rate ≥ 10× baud rate (UART) - Sample rate ≥ 10× clock frequency (I2C, SPI) - Higher is better for reliability - Minimum: 4× for basic decoding
 
 ### Trigger Setup
 
-!!! tip "Efficient Triggering"
-    - Trigger on START condition (I2C)
-    - Trigger on CS edge (SPI)
-    - Trigger on specific data value
-    - Use protocol trigger, not edge trigger
+!!! tip "Efficient Triggering" - Trigger on START condition (I2C) - Trigger on CS edge (SPI) - Trigger on specific data value - Use protocol trigger, not edge trigger
 
 ### Analysis Workflow
 
-!!! tip "Systematic Analysis"
-    1. Capture known-good transaction first
-    2. Verify decoder configuration
-    3. Compare with expected data
-    4. Look for timing violations
-    5. Check for errors and retries
+!!! tip "Systematic Analysis" 1. Capture known-good transaction first 2. Verify decoder configuration 3. Compare with expected data 4. Look for timing violations 5. Check for errors and retries
 
 ## Keyboard Shortcuts
 
-| Shortcut | Action |
-|----------|--------|
-| `Ctrl+P` | Open protocol decode panel |
-| `Ctrl+F` | Find/search in decoded data |
-| `Ctrl+E` | Export decoded data |
-| `Ctrl+R` | Reset decoder |
-| `F3` | Find next |
-| `Shift+F3` | Find previous |
+| Shortcut   | Action                      |
+| ---------- | --------------------------- |
+| `Ctrl+P`   | Open protocol decode panel  |
+| `Ctrl+F`   | Find/search in decoded data |
+| `Ctrl+E`   | Export decoded data         |
+| `Ctrl+R`   | Reset decoder               |
+| `F3`       | Find next                   |
+| `Shift+F3` | Find previous               |
 
 ## Next Steps
 

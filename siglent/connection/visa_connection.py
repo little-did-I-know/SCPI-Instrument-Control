@@ -17,11 +17,7 @@ import logging
 from typing import Optional
 
 from siglent.connection.base import BaseConnection
-from siglent.exceptions import (
-    CommandError,
-    SiglentConnectionError,
-    SiglentTimeoutError,
-)
+from siglent.exceptions import CommandError, SiglentConnectionError, SiglentTimeoutError
 
 logger = logging.getLogger(__name__)
 

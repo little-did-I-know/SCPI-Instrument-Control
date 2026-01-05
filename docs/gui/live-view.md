@@ -45,12 +45,14 @@ When Live View is active:
 ### Display Updates
 
 **Update Cycle:**
+
 1. Oscilloscope captures waveform
 2. Data transferred over network
 3. GUI processes and displays data
 4. Repeat continuously
 
 **Frame Rate:**
+
 - **With PyQtGraph**: 100-1000+ fps typical
 - **With Matplotlib**: 10-30 fps typical
 - Depends on: Network speed, timebase, enabled channels
@@ -67,6 +69,7 @@ pip install "Siglent-Oscilloscope[gui]"
 ```
 
 **Benefits:**
+
 - 10-100x faster rendering
 - Smooth, fluid updates
 - GPU acceleration (when available)
@@ -74,6 +77,7 @@ pip install "Siglent-Oscilloscope[gui]"
 - Support for higher frame rates
 
 **Verification:**
+
 - Check console on startup
 - Should see: "Using PyQtGraph for waveform display (high performance mode)"
 - Status bar shows higher FPS values
@@ -83,12 +87,14 @@ pip install "Siglent-Oscilloscope[gui]"
 If PyQtGraph is not available, the GUI falls back to matplotlib:
 
 **Characteristics:**
+
 - Lower frame rates (10-30 fps)
 - Higher CPU usage
 - Still fully functional
 - All features available
 
 **When to Use:**
+
 - PyQtGraph incompatible with system
 - Troubleshooting display issues
 - Preference for matplotlib rendering
@@ -142,11 +148,13 @@ Hide panels you're not using:
 ### Start/Stop
 
 **Start Live View:**
+
 - Click "Live View" button
 - Press `Ctrl+L`
 - View menu → Live View
 
 **Stop Live View:**
+
 - Click "Stop" button
 - Press `Ctrl+L` again
 - Press `Esc`
@@ -154,11 +162,13 @@ Hide panels you're not using:
 ### Auto-Scaling
 
 **Enable Auto-Scale:**
+
 - Tools → Auto Scale
 - Right-click display → Auto Scale
 - Automatically adjusts voltage scales to fit signal
 
 **Behavior:**
+
 - Monitors signal amplitude
 - Adjusts voltage scale when needed
 - Maintains optimal display
@@ -173,6 +183,7 @@ FPS: 45
 ```
 
 **Interpretation:**
+
 - **100+**: Excellent performance
 - **30-100**: Good performance
 - **10-30**: Adequate performance
@@ -187,6 +198,7 @@ Latency: 25 ms
 ```
 
 **Typical Values:**
+
 - **<50ms**: Excellent
 - **50-100ms**: Good
 - **100-200ms**: Acceptable
@@ -213,6 +225,7 @@ All channels overlaid on same axes:
 - May be cluttered with many channels
 
 **To Enable:**
+
 - Right-click display → Overlay Mode
 - Or View menu → Display Mode → Overlay
 
@@ -226,6 +239,7 @@ Separate subplot for each channel:
 - Good for unrelated signals
 
 **To Enable:**
+
 - Right-click display → Split View
 - Or View menu → Display Mode → Split View
 
@@ -236,12 +250,14 @@ Separate subplot for each channel:
 Measurements update continuously in Live View:
 
 **To Use:**
+
 1. Add measurements in Measurements tab
 2. Enable statistics for tracking
 3. Values update with each frame
 4. Statistics accumulate over time
 
 **Example:**
+
 ```
 Frequency: 1.023 kHz → 1.025 kHz → 1.021 kHz
 Vpp: 3.14 V → 3.15 V → 3.13 V
@@ -252,16 +268,19 @@ Vpp: 3.14 V → 3.15 V → 3.13 V
 Add markers that track the live waveform:
 
 **Voltage Markers:**
+
 - Horizontal lines
 - Show voltage value
 - Follow waveform if snapped
 
 **Time Markers:**
+
 - Vertical lines
 - Show time value
 - Fixed to time axis
 
 **To Add:**
+
 - Click "Add Marker" button
 - Or right-click display → Add Marker
 - Drag to position
@@ -275,6 +294,7 @@ Trigger status updates in real-time:
 - 🔴 **Stopped**: Trigger stopped
 
 **Useful For:**
+
 - Verifying trigger is working
 - Adjusting trigger level
 - Ensuring stable display
@@ -282,11 +302,13 @@ Trigger status updates in real-time:
 ### Grid and Cursors
 
 **Grid:**
+
 - Toggle with `Ctrl+G`
 - Matches oscilloscope divisions
 - 14 horizontal × 10 vertical
 
 **Cursors:**
+
 - Toggle with `Ctrl+R`
 - Measure specific points
 - Delta calculations
@@ -307,6 +329,7 @@ While in Live View, press `Ctrl+C` to:
 Keep Live View running while capturing to file:
 
 **Using Batch Capture:**
+
 1. Tools → Capture Batch
 2. Set number of captures
 3. Set interval
@@ -314,6 +337,7 @@ Keep Live View running while capturing to file:
 5. Live View continues during capture
 
 **Example:**
+
 - Capture 100 waveforms
 - 1 second interval
 - Auto-save as NPZ files
@@ -324,6 +348,7 @@ Keep Live View running while capturing to file:
 ### Low Frame Rate
 
 **Symptoms:**
+
 - FPS <10
 - Jerky updates
 - Slow response
@@ -331,6 +356,7 @@ Keep Live View running while capturing to file:
 **Solutions:**
 
 1. **Install PyQtGraph**
+
    ```bash
    pip install pyqtgraph
    ```
@@ -355,6 +381,7 @@ Keep Live View running while capturing to file:
 ### Display Freezing
 
 **Symptoms:**
+
 - Display stops updating
 - FPS drops to 0
 - GUI becomes unresponsive
@@ -379,6 +406,7 @@ Keep Live View running while capturing to file:
 ### High CPU Usage
 
 **Symptoms:**
+
 - CPU at 80-100%
 - Fan noise
 - System slowdown
@@ -405,6 +433,7 @@ Keep Live View running while capturing to file:
 ### Choppy Display
 
 **Symptoms:**
+
 - Stuttering updates
 - Inconsistent frame rate
 - Visual jittering
@@ -429,48 +458,32 @@ Keep Live View running while capturing to file:
 
 ### For Monitoring
 
-!!! tip "Continuous Monitoring"
-    - Use AUTO trigger mode
-    - Enable auto-scaling
-    - Add key measurements to table
-    - Enable statistics for trending
+!!! tip "Continuous Monitoring" - Use AUTO trigger mode - Enable auto-scaling - Add key measurements to table - Enable statistics for trending
 
 ### For Debugging
 
-!!! tip "Debug Workflow"
-    - Start with AUTO mode to see signal
-    - Switch to NORMAL for stable trigger
-    - Adjust trigger level in real-time
-    - Use visual markers for reference points
+!!! tip "Debug Workflow" - Start with AUTO mode to see signal - Switch to NORMAL for stable trigger - Adjust trigger level in real-time - Use visual markers for reference points
 
 ### For Testing
 
-!!! tip "Test Setup"
-    - Use NORMAL mode for repeatable measurements
-    - Enable all needed measurements
-    - Set up cursors or markers
-    - Capture when event occurs
+!!! tip "Test Setup" - Use NORMAL mode for repeatable measurements - Enable all needed measurements - Set up cursors or markers - Capture when event occurs
 
 ### For Recording
 
-!!! tip "Recording Data"
-    - Use batch capture during Live View
-    - Set appropriate interval
-    - Monitor in Live View
-    - Auto-save to files
+!!! tip "Recording Data" - Use batch capture during Live View - Set appropriate interval - Monitor in Live View - Auto-save to files
 
 ## Keyboard Shortcuts for Live View
 
-| Shortcut | Action |
-|----------|--------|
-| `Ctrl+L` | Start/stop Live View |
+| Shortcut | Action                 |
+| -------- | ---------------------- |
+| `Ctrl+L` | Start/stop Live View   |
 | `Ctrl+C` | Capture from Live View |
-| `Esc` | Stop Live View |
-| `Ctrl+G` | Toggle grid |
-| `Ctrl+R` | Toggle cursors |
-| `Ctrl+M` | Add marker |
-| `Ctrl+0` | Reset zoom |
-| `F5` | Refresh display |
+| `Esc`    | Stop Live View         |
+| `Ctrl+G` | Toggle grid            |
+| `Ctrl+R` | Toggle cursors         |
+| `Ctrl+M` | Add marker             |
+| `Ctrl+0` | Reset zoom             |
+| `F5`     | Refresh display        |
 
 ## Advanced Live View
 
@@ -485,6 +498,7 @@ Keep Live View running while capturing to file:
 5. Peaks tracked automatically
 
 **Useful For:**
+
 - Monitoring frequency stability
 - Detecting harmonics
 - Tracking spectral changes
@@ -500,6 +514,7 @@ Keep Live View running while capturing to file:
 5. Visual overlay on waveform
 
 **Useful For:**
+
 - Monitoring bus traffic
 - Debugging communication
 - Verifying data integrity
@@ -514,6 +529,7 @@ Keep Live View running while capturing to file:
 4. See differences in real-time
 
 **Useful For:**
+
 - Comparing before/after
 - Tracking signal degradation
 - Quality control
@@ -522,24 +538,24 @@ Keep Live View running while capturing to file:
 
 ### PyQtGraph vs Matplotlib
 
-| Feature | PyQtGraph | Matplotlib |
-|---------|-----------|------------|
-| FPS (typical) | 100-1000+ | 10-30 |
-| CPU usage | Low-Medium | Medium-High |
-| GPU acceleration | Yes | No |
-| Latency | Lower | Higher |
-| Installation | Optional | Fallback |
-| Platforms | All | All |
+| Feature          | PyQtGraph  | Matplotlib  |
+| ---------------- | ---------- | ----------- |
+| FPS (typical)    | 100-1000+  | 10-30       |
+| CPU usage        | Low-Medium | Medium-High |
+| GPU acceleration | Yes        | No          |
+| Latency          | Lower      | Higher      |
+| Installation     | Optional   | Fallback    |
+| Platforms        | All        | All         |
 
 ### Network Impact
 
-| Connection | Latency | FPS Impact |
-|------------|---------|------------|
-| Direct Gigabit | <10ms | Minimal |
-| LAN Gigabit | 10-50ms | Low |
-| LAN 100Mbps | 20-100ms | Medium |
-| WiFi | 50-200ms | High |
-| Remote/VPN | 100-500ms | Very High |
+| Connection     | Latency   | FPS Impact |
+| -------------- | --------- | ---------- |
+| Direct Gigabit | <10ms     | Minimal    |
+| LAN Gigabit    | 10-50ms   | Low        |
+| LAN 100Mbps    | 20-100ms  | Medium     |
+| WiFi           | 50-200ms  | High       |
+| Remote/VPN     | 100-500ms | Very High  |
 
 ## Next Steps
 

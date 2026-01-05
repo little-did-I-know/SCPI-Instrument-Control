@@ -8,28 +8,30 @@ Usage:
     python scripts/test_build_system.py
 """
 
-import sys
 import os
+import sys
 from pathlib import Path
 
 # Fix Windows console encoding for Unicode characters
-if sys.platform == 'win32':
+if sys.platform == "win32":
     try:
         import codecs
-        sys.stdout.reconfigure(encoding='utf-8')
-        sys.stderr.reconfigure(encoding='utf-8')
+
+        sys.stdout.reconfigure(encoding="utf-8")
+        sys.stderr.reconfigure(encoding="utf-8")
     except Exception:
         pass  # If it fails, we'll fall back to ASCII symbols
 
 
 class Color:
     """ANSI color codes for terminal output."""
-    GREEN = '\033[92m'
-    RED = '\033[91m'
-    YELLOW = '\033[93m'
-    BLUE = '\033[94m'
-    BOLD = '\033[1m'
-    END = '\033[0m'
+
+    GREEN = "\033[92m"
+    RED = "\033[91m"
+    YELLOW = "\033[93m"
+    BLUE = "\033[94m"
+    BOLD = "\033[1m"
+    END = "\033[0m"
 
 
 def print_header(text):
@@ -146,7 +148,7 @@ def check_spec_file():
         print_error("siglent-gui.spec not found!")
         return False
 
-    content = spec_file.read_text(encoding='utf-8')
+    content = spec_file.read_text(encoding="utf-8")
 
     # Check for key components
     checks = {
@@ -226,7 +228,7 @@ def check_entry_point():
     print_success(f"Entry point exists: {entry_script}")
 
     # Check if the main function exists
-    content = entry_script.read_text(encoding='utf-8')
+    content = entry_script.read_text(encoding="utf-8")
 
     if "def main(" in content:
         print_success("Found main() function")
@@ -238,9 +240,10 @@ def check_entry_point():
     try:
         sys.path.insert(0, str(Path.cwd()))
         from siglent.gui import app
+
         print_success("Successfully imported siglent.gui.app")
 
-        if hasattr(app, 'main'):
+        if hasattr(app, "main"):
             print_success("main() function is accessible")
         else:
             print_error("main() function not found in module")
@@ -265,7 +268,7 @@ def check_workflow_file():
 
     print_success(f"Workflow file exists: {workflow_file}")
 
-    content = workflow_file.read_text(encoding='utf-8')
+    content = workflow_file.read_text(encoding="utf-8")
 
     # Check for required jobs
     required_jobs = [
@@ -307,16 +310,16 @@ def check_version():
         print_error("pyproject.toml not found!")
         return False
 
-    content = pyproject.read_text(encoding='utf-8')
+    content = pyproject.read_text(encoding="utf-8")
 
     # Extract version
-    for line in content.split('\n'):
-        if line.strip().startswith('version'):
-            version = line.split('=')[1].strip().strip('"').strip("'")
+    for line in content.split("\n"):
+        if line.strip().startswith("version"):
+            version = line.split("=")[1].strip().strip('"').strip("'")
             print_success(f"Current version: {version}")
 
             # Check if it looks like a valid version
-            parts = version.split('.')
+            parts = version.split(".")
             if len(parts) >= 2 and all(p.isdigit() for p in parts[:2]):
                 print_success("Version format looks valid")
             else:
@@ -336,12 +339,7 @@ def check_git_status():
 
     # Check if we're in a git repo
     try:
-        subprocess.run(
-            ["git", "rev-parse", "--git-dir"],
-            check=True,
-            capture_output=True,
-            text=True
-        )
+        subprocess.run(["git", "rev-parse", "--git-dir"], check=True, capture_output=True, text=True)
         print_success("Git repository detected")
     except (subprocess.CalledProcessError, FileNotFoundError):
         print_error("Not in a git repository!")
@@ -349,18 +347,13 @@ def check_git_status():
 
     # Check for uncommitted changes
     try:
-        result = subprocess.run(
-            ["git", "status", "--porcelain"],
-            check=True,
-            capture_output=True,
-            text=True
-        )
+        result = subprocess.run(["git", "status", "--porcelain"], check=True, capture_output=True, text=True)
 
         if result.stdout.strip():
             print_warning("Uncommitted changes detected:")
-            for line in result.stdout.strip().split('\n')[:5]:
+            for line in result.stdout.strip().split("\n")[:5]:
                 print_info(f"  {line}")
-            if len(result.stdout.strip().split('\n')) > 5:
+            if len(result.stdout.strip().split("\n")) > 5:
                 print_info("  ...")
             print_info("Consider committing before creating a release tag")
         else:
@@ -370,12 +363,7 @@ def check_git_status():
 
     # Check current branch
     try:
-        result = subprocess.run(
-            ["git", "rev-parse", "--abbrev-ref", "HEAD"],
-            check=True,
-            capture_output=True,
-            text=True
-        )
+        result = subprocess.run(["git", "rev-parse", "--abbrev-ref", "HEAD"], check=True, capture_output=True, text=True)
         branch = result.stdout.strip()
         print_success(f"Current branch: {branch}")
 

@@ -230,6 +230,7 @@ python scripts/pre_pr_check.py --fast --fix
 ```
 
 The pre-PR script checks:
+
 - ✅ Code formatting (Black)
 - ✅ Import sorting (isort)
 - ✅ Linting (flake8)
@@ -389,12 +390,14 @@ Mock-ups, examples, or references
 For features that are innovative but need user feedback before stabilization:
 
 **When to mark as experimental:**
+
 - New hardware support (untested models)
 - Novel functionality without proven use cases
 - API designs that need validation
 - Features requiring extensive real-world testing
 
 **How to implement:**
+
 - Use optional dependency groups: `[feature-name-beta]`
 - Add module-level warnings: `warnings.warn(..., FutureWarning)`
 - Mark with `@experimental` decorator for individual methods
@@ -402,6 +405,7 @@ For features that are innovative but need user feedback before stabilization:
 - Use pre-release versions: `0.x.0-alpha.1`, `0.x.0-beta.1`
 
 **Full guide**: See [`docs/development/EXPERIMENTAL_FEATURES.md`](EXPERIMENTAL_FEATURES.md) for comprehensive instructions on:
+
 - Marking features as experimental
 - Version numbering strategies
 - Testing requirements
@@ -409,6 +413,7 @@ For features that are innovative but need user feedback before stabilization:
 - Graduation and deprecation process
 
 **Example:**
+
 ```python
 # siglent/power_supply.py (experimental module)
 import warnings

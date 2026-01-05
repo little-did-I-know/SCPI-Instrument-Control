@@ -1,9 +1,11 @@
 """Comprehensive tests for measurement module."""
 
+from unittest.mock import MagicMock, Mock, patch
+
 import pytest
-from unittest.mock import Mock, MagicMock, patch
-from siglent.measurement import Measurement
+
 from siglent.exceptions import CommandError
+from siglent.measurement import Measurement
 
 
 @pytest.fixture

@@ -39,6 +39,7 @@ git push origin v0.3.2
 ```
 
 This will:
+
 1. Build executables for Windows, macOS, and Linux
 2. Create release archives (.zip for Windows/macOS, .tar.gz for Linux)
 3. Upload to GitHub Releases automatically
@@ -48,11 +49,13 @@ This will:
 ### For Local Builds
 
 1. **Install the package with all dependencies:**
+
    ```bash
    pip install -e ".[all]"
    ```
 
 2. **Install PyInstaller:**
+
    ```bash
    pip install ".[build-exe]"
    # or directly:
@@ -110,12 +113,14 @@ pyinstaller --clean siglent-gui.spec
 After building, you'll find:
 
 ### Windows
+
 ```
 dist/
 └── SiglentGUI.exe          # ~150-250 MB single executable
 ```
 
 ### macOS
+
 ```
 dist/
 └── SiglentGUI.app/         # Application bundle
@@ -127,6 +132,7 @@ dist/
 ```
 
 ### Linux
+
 ```
 dist/
 └── SiglentGUI              # ~150-250 MB binary
@@ -143,11 +149,13 @@ python scripts/build_executable.py --archive
 ```
 
 This creates:
+
 - **Windows**: `SiglentGUI-v0.3.1-Windows-x64.zip`
 - **macOS**: `SiglentGUI-v0.3.1-macOS-arm64.zip`
 - **Linux**: `SiglentGUI-v0.3.1-Linux-x86_64.tar.gz`
 
 Each archive includes:
+
 - The executable/app
 - README.md
 - LICENSE
@@ -197,6 +205,7 @@ Application icons make your executable look professional and identifiable.
    - https://www.icoconverter.com/
 
    Or using ImageMagick:
+
    ```bash
    convert icon.png -define icon:auto-resize=256,128,64,48,32,16 siglent-icon.ico
    ```
@@ -204,6 +213,7 @@ Application icons make your executable look professional and identifiable.
 3. **Convert to .icns (macOS):**
 
    Using `iconutil` (macOS only):
+
    ```bash
    # Create iconset directory
    mkdir siglent-icon.iconset
@@ -283,6 +293,7 @@ To modify the build:
 4. Change executable name or icon
 
 Then rebuild:
+
 ```bash
 make build-exe
 ```
@@ -294,6 +305,7 @@ make build-exe
 **Problem:** PyInstaller can't find a module
 
 **Solution:** Add to `hiddenimports` in `siglent-gui.spec`:
+
 ```python
 hiddenimports=[
     'missing_module_name',
@@ -305,6 +317,7 @@ hiddenimports=[
 **Problem:** Executable is 400+ MB
 
 **Solutions:**
+
 - Add unused modules to `excludes` list
 - Enable UPX compression (already enabled)
 - Use folder distribution instead of single file
@@ -314,11 +327,13 @@ hiddenimports=[
 **Problem:** Executable crashes on startup
 
 **Solutions:**
+
 - Check console output (run from terminal)
 - Test on clean machine without Python installed
 - Verify all dependencies are included
 
 **Windows:** Run from Command Prompt to see errors:
+
 ```cmd
 dist\SiglentGUI.exe
 ```
@@ -326,6 +341,7 @@ dist\SiglentGUI.exe
 **macOS:** Check Console app for crash logs
 
 **Linux:** Run from terminal:
+
 ```bash
 ./dist/SiglentGUI
 ```
@@ -335,6 +351,7 @@ dist\SiglentGUI.exe
 **Problem:** Executable doesn't show custom icon
 
 **Solutions:**
+
 - Verify icon files exist in `resources/` directory
 - Check icon file format (.ico for Windows, .icns for macOS)
 - Rebuild after adding icons
@@ -347,6 +364,7 @@ dist\SiglentGUI.exe
 **Solution:** Users need to right-click → Open the first time
 
 For developers: Code sign the app (requires Apple Developer account):
+
 ```bash
 codesign --deep --force --verify --verbose --sign "Developer ID Application: Your Name" dist/SiglentGUI.app
 ```
@@ -356,6 +374,7 @@ codesign --deep --force --verify --verbose --sign "Developer ID Application: You
 **Problem:** Windows Defender flags executable as malware
 
 **Solutions:**
+
 - This is common with PyInstaller executables
 - Code sign the executable (requires certificate)
 - Submit to Microsoft for analysis
@@ -366,11 +385,13 @@ codesign --deep --force --verify --verbose --sign "Developer ID Application: You
 ### Local Testing
 
 1. **Build the executable:**
+
    ```bash
    make build-exe
    ```
 
 2. **Test on your development machine:**
+
    ```bash
    # Windows
    dist\SiglentGUI.exe
@@ -390,6 +411,7 @@ codesign --deep --force --verify --verbose --sign "Developer ID Application: You
 ### Automated Testing
 
 The GitHub Actions workflow includes basic checks:
+
 - Verifies executable was created
 - Checks file size (should be 100-300 MB)
 - Validates archive creation
@@ -397,6 +419,7 @@ The GitHub Actions workflow includes basic checks:
 ## File Size Optimization
 
 Typical executable sizes:
+
 - **Minimal**: ~100 MB (core GUI only)
 - **Standard**: ~150-200 MB (all features)
 - **Maximum**: ~250-300 MB (all optional features)
@@ -404,6 +427,7 @@ Typical executable sizes:
 To reduce size:
 
 1. **Exclude unused modules in spec file:**
+
    ```python
    excludes=['tkinter', 'IPython', 'jupyter', 'pytest']
    ```
@@ -412,6 +436,7 @@ To reduce size:
    - Comment out unused items in `hiddenimports`
 
 3. **Use UPX compression** (already enabled):
+
    ```python
    upx=True,
    ```
@@ -441,16 +466,19 @@ Before creating a release with executables:
 For production releases, code signing prevents security warnings:
 
 **Windows:**
+
 - Requires code signing certificate (from DigiCert, Sectigo, etc.)
 - Use SignTool.exe
 - Cost: $100-400/year
 
 **macOS:**
+
 - Requires Apple Developer account ($99/year)
 - Use `codesign` and `notarytool`
 - Necessary for Gatekeeper approval
 
 **Linux:**
+
 - Generally not required
 - Can use GPG signatures for packages
 
@@ -459,16 +487,19 @@ For production releases, code signing prevents security warnings:
 For professional distribution:
 
 **Windows:**
+
 - Inno Setup (free)
 - NSIS (free)
 - WiX Toolset (free)
 
 **macOS:**
+
 - DMG canvas (paid)
 - `hdiutil` (built-in, free)
 - `.pkg` installer
 
 **Linux:**
+
 - AppImage
 - Flatpak
 - Snap package

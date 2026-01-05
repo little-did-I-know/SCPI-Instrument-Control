@@ -5,7 +5,9 @@ allowing you to test the interface without physical hardware.
 """
 
 import sys
+
 from PyQt6.QtWidgets import QApplication, QMessageBox
+
 from siglent import PowerSupply
 from siglent.connection.mock import MockConnection
 from siglent.gui.main_window import MainWindow

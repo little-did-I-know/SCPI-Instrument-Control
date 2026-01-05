@@ -104,7 +104,7 @@ plugins:
             separate_signature: true
             merge_init_into_class: true
             filters:
-              - "!^_"  # Exclude private members
+              - "!^_" # Exclude private members
             heading_level: 2
 
 nav:
@@ -127,6 +127,12 @@ nav:
       - FFT Analysis: gui/fft-analysis.md
       - Protocol Decoding: gui/protocol-decoding.md
       - Vector Graphics: gui/vector-graphics.md
+  - Report Generator:
+      - Overview: report-generator/index.md
+      - Getting Started: report-generator/getting-started.md
+      - LLM Setup: report-generator/llm-setup.md
+      - Templates & Criteria: report-generator/templates.md
+      - API Reference: report-generator/api-reference.md
   - API Reference:
       - Oscilloscope: api/oscilloscope.md
       - Channel: api/channel.md

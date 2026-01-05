@@ -1,7 +1,9 @@
 """Tests for channel control module."""
 
+from unittest.mock import MagicMock, Mock, patch
+
 import pytest
-from unittest.mock import Mock, MagicMock, patch
+
 from siglent.channel import Channel
 from siglent.exceptions import CommandError
 

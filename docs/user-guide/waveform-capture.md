@@ -43,7 +43,7 @@ for wf in waveforms:
 ```
 
 !!! tip "Performance"
-    Using `get_waveforms()` is more efficient than calling `get_waveform()` multiple times as it captures all channels in a single operation.
+Using `get_waveforms()` is more efficient than calling `get_waveform()` multiple times as it captures all channels in a single operation.
 
 ### Specific Channel Selection
 
@@ -129,6 +129,7 @@ scope.waveform.save_waveform(waveform, "waveform.csv", format="CSV")
 ```
 
 CSV format:
+
 ```
 Time (s),Voltage (V)
 -0.000070,0.125
@@ -162,6 +163,7 @@ waveform.save_mat("waveform.mat")
 ```
 
 In MATLAB:
+
 ```matlab
 data = load('waveform.mat');
 plot(data.time, data.voltage);
@@ -480,23 +482,11 @@ print(f"Reference has {len(ref_waveform)} samples")
 
 ## Performance Tips
 
-!!! tip "Capture Speed"
-    - Disable channels you don't need
-    - Use appropriate timebase (shorter = faster transfer)
-    - Use `get_waveforms()` for multi-channel instead of multiple `get_waveform()` calls
-    - Consider using automation classes for complex workflows
+!!! tip "Capture Speed" - Disable channels you don't need - Use appropriate timebase (shorter = faster transfer) - Use `get_waveforms()` for multi-channel instead of multiple `get_waveform()` calls - Consider using automation classes for complex workflows
 
-!!! tip "Memory Usage"
-    - Each waveform can be several MB (140,000 samples × 2 arrays × 8 bytes ≈ 2.2 MB)
-    - Downsample if you don't need full resolution
-    - Save to disk and free memory for long captures
-    - Use NPZ format with compression for efficient storage
+!!! tip "Memory Usage" - Each waveform can be several MB (140,000 samples × 2 arrays × 8 bytes ≈ 2.2 MB) - Downsample if you don't need full resolution - Save to disk and free memory for long captures - Use NPZ format with compression for efficient storage
 
-!!! tip "Data Quality"
-    - Always check `sample_rate` to ensure you're capturing at expected rate
-    - Verify `record_length` matches your expectations
-    - Use appropriate timebase for your signal frequency
-    - Enable bandwidth limiting to reduce high-frequency noise
+!!! tip "Data Quality" - Always check `sample_rate` to ensure you're capturing at expected rate - Verify `record_length` matches your expectations - Use appropriate timebase for your signal frequency - Enable bandwidth limiting to reduce high-frequency noise
 
 ## Troubleshooting
 

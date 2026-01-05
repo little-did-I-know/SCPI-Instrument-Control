@@ -15,17 +15,20 @@ The Siglent Oscilloscope Control library communicates with oscilloscopes using t
 ### Connection Methods
 
 **LAN (Ethernet)** - Recommended
+
 - Fast and reliable
 - Best performance for live view
 - No special drivers needed
 - Works across platforms
 
 **USB** - Not directly supported
+
 - Requires USBTMC drivers
 - Platform-specific limitations
 - Use LAN for best results
 
 **GPIB** - Not supported
+
 - Legacy interface
 - Requires GPIB adapter
 - Use LAN instead
@@ -35,16 +38,19 @@ The Siglent Oscilloscope Control library communicates with oscilloscopes using t
 ### Hardware Requirements
 
 **Oscilloscope:**
+
 - Siglent SDS1000X-E, SDS2000X-E, or SDS5000X series
 - Ethernet port
 - Network connectivity enabled
 
 **Computer:**
+
 - Network interface (Ethernet or WiFi)
 - Python 3.8 or later installed
 - Siglent library installed: `pip install Siglent-Oscilloscope`
 
 **Network:**
+
 - Ethernet cable (for direct connection)
 - Network switch/router (for network connection)
 - Same subnet for oscilloscope and computer
@@ -52,16 +58,19 @@ The Siglent Oscilloscope Control library communicates with oscilloscopes using t
 ### Software Requirements
 
 **Python Packages:**
+
 ```bash
 pip install Siglent-Oscilloscope
 ```
 
 **Optional for GUI:**
+
 ```bash
 pip install "Siglent-Oscilloscope[gui]"
 ```
 
 **Network Tools (for troubleshooting):**
+
 - `ping` - Test connectivity
 - `nmap` - Scan for devices
 - `telnet` or `nc` - Test port access
@@ -71,16 +80,19 @@ pip install "Siglent-Oscilloscope[gui]"
 ### From the Oscilloscope
 
 **Method 1: Utility Menu**
+
 1. Press **Utility** button on oscilloscope
 2. Navigate to **IO Setting** → **LAN Config**
 3. Note the IP address shown
 
 **Method 2: System Info**
+
 1. Press **Utility** button
 2. Select **System** → **System Info**
 3. IP address displayed in network section
 
 **Typical Display:**
+
 ```
 IP Address: 192.168.1.100
 Subnet Mask: 255.255.255.0
@@ -91,6 +103,7 @@ Port: 5024
 ### Network Scanning
 
 **Using nmap (Linux/Mac):**
+
 ```bash
 # Scan your local network
 nmap -p 5024 192.168.1.0/24
@@ -102,6 +115,7 @@ nmap -p 5024 192.168.1.0/24
 ```
 
 **Using Siglent Discovery Tool:**
+
 ```python
 from siglent.discovery import find_oscilloscopes
 
@@ -112,6 +126,7 @@ for scope in scopes:
 ```
 
 **Manual Check:**
+
 ```bash
 # Ping common IP addresses
 ping 192.168.1.100
@@ -147,6 +162,7 @@ ping 192.168.1.101
    - Subnet: `255.255.255.0`
 
    **Linux:**
+
    ```bash
    sudo ip addr add 192.168.1.10/24 dev eth0
    ```
@@ -194,6 +210,7 @@ ping 192.168.1.101
 ### Firewall Configuration
 
 **Windows Firewall:**
+
 ```powershell
 # Allow Python through firewall
 netsh advfirewall firewall add rule name="Python SCPI" dir=in action=allow program="C:\Python39\python.exe" enable=yes
@@ -203,11 +220,13 @@ netsh advfirewall firewall add rule name="SCPI Port" dir=in action=allow protoco
 ```
 
 **Linux (ufw):**
+
 ```bash
 sudo ufw allow from 192.168.1.100 to any port 5024
 ```
 
 **macOS:**
+
 - System Preferences → Security & Privacy → Firewall
 - Firewall Options
 - Add Python application
@@ -218,6 +237,7 @@ sudo ufw allow from 192.168.1.100 to any port 5024
 ### Using Python API
 
 **Basic Connection:**
+
 ```python
 from siglent import Oscilloscope
 
@@ -233,6 +253,7 @@ scope.close()
 ```
 
 **Using Context Manager (Recommended):**
+
 ```python
 from siglent import Oscilloscope
 
@@ -243,11 +264,13 @@ with Oscilloscope('192.168.1.100') as scope:
 ```
 
 **With Custom Timeout:**
+
 ```python
 scope = Oscilloscope('192.168.1.100', timeout=10.0)
 ```
 
 **Custom Port:**
+
 ```python
 scope = Oscilloscope('192.168.1.100', port=5025)
 ```
@@ -255,11 +278,13 @@ scope = Oscilloscope('192.168.1.100', port=5025)
 ### Using GUI Application
 
 **Launch GUI:**
+
 ```bash
 siglent-gui
 ```
 
 **Connection Steps:**
+
 1. Click **Connect** button or press `Ctrl+O`
 2. Enter oscilloscope IP address
 3. (Optional) Set timeout and port
@@ -267,6 +292,7 @@ siglent-gui
 5. Connection status shown in status bar
 
 **Save Connection Profile:**
+
 1. After entering IP address
 2. Enter a name (e.g., "Lab Scope")
 3. Click **Save Profile**
@@ -277,12 +303,14 @@ siglent-gui
 ### Verify Connectivity
 
 **Ping Test:**
+
 ```bash
 ping 192.168.1.100
 # Should see replies
 ```
 
 **Port Test:**
+
 ```bash
 # Using telnet
 telnet 192.168.1.100 5024
@@ -293,6 +321,7 @@ nc -zv 192.168.1.100 5024
 ```
 
 **Python Test:**
+
 ```python
 from siglent import Oscilloscope
 
@@ -313,6 +342,7 @@ except Exception as e:
 ### Performance Test
 
 **Measure Latency:**
+
 ```python
 from siglent import Oscilloscope
 import time
@@ -328,11 +358,13 @@ with Oscilloscope('192.168.1.100') as scope:
 ```
 
 **Expected Latency:**
+
 - **Direct/LAN**: 5-20 ms
 - **WiFi**: 10-50 ms
 - **Remote/VPN**: 50-200 ms
 
 **Transfer Speed:**
+
 ```python
 from siglent import Oscilloscope
 import time
@@ -350,6 +382,7 @@ with Oscilloscope('192.168.1.100') as scope:
 ```
 
 **Expected Speed:**
+
 - **Gigabit LAN**: 500-2000 kSa/s
 - **100 Mbps LAN**: 100-500 kSa/s
 - **WiFi**: 50-300 kSa/s
@@ -359,6 +392,7 @@ with Oscilloscope('192.168.1.100') as scope:
 ### Connection Profiles
 
 **Save Multiple Scopes:**
+
 ```python
 from siglent import ConnectionManager
 
@@ -378,6 +412,7 @@ for name, config in manager.profiles.items():
 ```
 
 **Configuration File (~/.siglent/connections.json):**
+
 ```json
 {
   "lab_scope": {
@@ -396,6 +431,7 @@ for name, config in manager.profiles.items():
 ### Multiple Oscilloscopes
 
 **Connect to Multiple Scopes:**
+
 ```python
 from siglent import Oscilloscope
 
@@ -416,6 +452,7 @@ scope2.close()
 ```
 
 **Using Context Managers:**
+
 ```python
 from siglent import Oscilloscope
 
@@ -434,6 +471,7 @@ with Oscilloscope('192.168.1.100') as scope1, \
 ### Hostname/DNS
 
 **Use Hostname Instead of IP:**
+
 ```python
 # If DNS/mDNS is configured
 scope = Oscilloscope('scope.local')
@@ -441,12 +479,14 @@ scope = Oscilloscope('lab-scope.example.com')
 ```
 
 **Configure mDNS on Oscilloscope:**
+
 1. Utility → IO Setting → LAN Config
 2. Set hostname: `lab-scope`
 3. Enable mDNS (if available)
 4. Connect using: `lab-scope.local`
 
 **Add to /etc/hosts (Linux/Mac):**
+
 ```bash
 sudo nano /etc/hosts
 # Add line:
@@ -454,6 +494,7 @@ sudo nano /etc/hosts
 ```
 
 **Windows hosts file:**
+
 ```
 C:\Windows\System32\drivers\etc\hosts
 # Add line:
@@ -463,12 +504,14 @@ C:\Windows\System32\drivers\etc\hosts
 ### VNC Access
 
 **Enable VNC Server on Oscilloscope:**
+
 1. Utility → IO Setting → VNC Config
 2. Enable VNC Server
 3. Set password (optional but recommended)
 4. Note VNC port (default: 5900)
 
 **Using GUI VNC Viewer:**
+
 ```bash
 siglent-gui
 # Tools → VNC Viewer
@@ -476,12 +519,14 @@ siglent-gui
 ```
 
 **Standalone VNC Client:**
+
 ```bash
 # Using TightVNC, RealVNC, etc.
 vncviewer 192.168.1.100:5900
 ```
 
 **Python VNC Access:**
+
 ```python
 from siglent import Oscilloscope
 
@@ -495,19 +540,16 @@ with Oscilloscope('192.168.1.100') as scope:
 
 ### Network Security
 
-!!! warning "Security Best Practices"
-    - Use isolated network for lab equipment
-    - Don't expose oscilloscope to internet
-    - Use VPN for remote access
-    - Change default passwords
-    - Disable unused services
+!!! warning "Security Best Practices" - Use isolated network for lab equipment - Don't expose oscilloscope to internet - Use VPN for remote access - Change default passwords - Disable unused services
 
 **Isolated Network:**
+
 - Dedicated VLAN for test equipment
 - Separate from corporate network
 - Firewall rules to control access
 
 **VPN Access:**
+
 ```
 [Your Computer] → [VPN] → [Lab Network] → [Oscilloscope]
 ```
@@ -517,16 +559,19 @@ Better than direct internet exposure
 ### Authentication
 
 **SCPI Protocol:**
+
 - No built-in authentication
 - Anyone on network can connect
 - Use network security for protection
 
 **VNC Server:**
+
 - Set strong password
 - Change from default
 - Use encrypted VNC if possible
 
 **Best Practices:**
+
 1. Physical network security
 2. Firewall rules
 3. Access control lists
@@ -552,6 +597,7 @@ Better than direct internet exposure
    - Correct subnet mask
 
 3. **Check Same Subnet**
+
    ```bash
    # Your PC: 192.168.1.10/255.255.255.0
    # Scope must be: 192.168.1.x/255.255.255.0
@@ -574,15 +620,19 @@ Better than direct internet exposure
 **Solutions:**
 
 1. **Verify Connectivity**
+
    ```bash
    ping 192.168.1.100
    ```
+
    If ping fails, network issue
 
 2. **Check Port 5024**
+
    ```bash
    telnet 192.168.1.100 5024
    ```
+
    Should connect immediately
 
 3. **Check Firewall**
@@ -591,6 +641,7 @@ Better than direct internet exposure
    - Re-enable firewall
 
 4. **Increase Timeout**
+
    ```python
    scope = Oscilloscope('192.168.1.100', timeout=10.0)
    ```
@@ -612,6 +663,7 @@ Better than direct internet exposure
    - Check IO settings
 
 2. **Verify Port Number**
+
    ```python
    # Try default ports
    scope = Oscilloscope('192.168.1.100', port=5024)  # SCPI
@@ -630,6 +682,7 @@ Better than direct internet exposure
 **Solutions:**
 
 1. **Check Network Speed**
+
    ```python
    # Measure latency (see Performance Test above)
    ```
@@ -639,6 +692,7 @@ Better than direct internet exposure
    - Use Ethernet for best performance
 
 3. **Reduce Waveform Size**
+
    ```python
    # Get fewer points
    waveform = scope.get_waveform(1, max_points=1000)
@@ -650,6 +704,7 @@ Better than direct internet exposure
    - Video streaming
 
 5. **Optimize Code**
+
    ```python
    # Bad: Many small commands
    for i in range(100):
@@ -696,6 +751,7 @@ Better than direct internet exposure
 **Solutions:**
 
 1. **Verify IP Address**
+
    ```python
    with Oscilloscope('192.168.1.100') as scope:
        print(f"Connected to: {scope.model}")
@@ -730,12 +786,14 @@ python3
 ### VPN Connection
 
 **Setup:**
+
 1. Configure VPN to lab network
 2. Connect to VPN
 3. Access oscilloscope using lab IP
 4. Works like local connection
 
 **Example:**
+
 ```python
 # After VPN connected
 from siglent import Oscilloscope
@@ -747,9 +805,10 @@ scope = Oscilloscope('10.0.50.100')
 ### Port Forwarding (Not Recommended)
 
 !!! warning "Security Risk"
-    Exposing oscilloscope directly to internet is a security risk. Use VPN instead.
+Exposing oscilloscope directly to internet is a security risk. Use VPN instead.
 
 If you must:
+
 ```
 Router: Forward external:5024 → 192.168.1.100:5024
 Access: scope = Oscilloscope('your-public-ip', timeout=30)
@@ -760,20 +819,20 @@ Access: scope = Oscilloscope('your-public-ip', timeout=30)
 ### Connection Management
 
 !!! tip "Use Context Managers"
-    Always use `with` statements to ensure connections are closed properly:
-    ```python
+Always use `with` statements to ensure connections are closed properly:
+`python
     with Oscilloscope('192.168.1.100') as scope:
         # Your code here
         pass
     # Connection automatically closed
-    ```
+    `
 
 ### Error Handling
 
 !!! tip "Handle Connection Errors"
-    ```python
-    from siglent import Oscilloscope
-    import time
+```python
+from siglent import Oscilloscope
+import time
 
     def connect_with_retry(ip, max_retries=3):
         for attempt in range(max_retries):
@@ -793,30 +852,24 @@ Access: scope = Oscilloscope('your-public-ip', timeout=30)
 
 ### Network Configuration
 
-!!! tip "Static IP for Lab Equipment"
-    - Use static IP addresses for oscilloscopes
-    - Document IP addresses
-    - Keep list of equipment and IPs
-    - Use consistent IP scheme (e.g., .100-.199 for scopes)
+!!! tip "Static IP for Lab Equipment" - Use static IP addresses for oscilloscopes - Document IP addresses - Keep list of equipment and IPs - Use consistent IP scheme (e.g., .100-.199 for scopes)
 
 ### Performance Optimization
 
-!!! tip "Optimize for Your Use Case"
-    - **Live View**: Use Gigabit Ethernet, minimize latency
-    - **Batch Capture**: Wired connection, optimize data transfer
-    - **Automation**: Increase timeout for long operations
-    - **Remote**: Use VPN, increase timeout, reduce data size
+!!! tip "Optimize for Your Use Case" - **Live View**: Use Gigabit Ethernet, minimize latency - **Batch Capture**: Wired connection, optimize data transfer - **Automation**: Increase timeout for long operations - **Remote**: Use VPN, increase timeout, reduce data size
 
 ## Example Configurations
 
 ### Home Lab Setup
 
 **Equipment:**
+
 - 1 oscilloscope
 - 1 PC
 - Direct Ethernet connection
 
 **Configuration:**
+
 ```
 Oscilloscope:
   IP: 192.168.1.100
@@ -834,11 +887,13 @@ Connection:
 ### University Lab
 
 **Equipment:**
+
 - Multiple oscilloscopes
 - Multiple PCs
 - Network switch
 
 **Configuration:**
+
 ```
 Network: 192.168.50.0/24
 Router/DHCP: 192.168.50.1
@@ -855,11 +910,13 @@ PCs (DHCP):
 ### Industrial Test Station
 
 **Equipment:**
+
 - Production oscilloscope
 - Test PC
 - Isolated network
 
 **Configuration:**
+
 ```
 Dedicated VLAN: 10.50.0.0/24
 
@@ -881,20 +938,20 @@ Firewall:
 
 ### Common IP Addresses
 
-| Device | Typical IP | Port |
-|--------|-----------|------|
+| Device              | Typical IP    | Port |
+| ------------------- | ------------- | ---- |
 | Oscilloscope (SCPI) | 192.168.1.100 | 5024 |
-| Oscilloscope (VNC) | 192.168.1.100 | 5900 |
-| Oscilloscope (Web) | 192.168.1.100 | 80 |
+| Oscilloscope (VNC)  | 192.168.1.100 | 5900 |
+| Oscilloscope (Web)  | 192.168.1.100 | 80   |
 
 ### Default Settings
 
-| Parameter | Default Value |
-|-----------|---------------|
-| Port | 5024 (SCPI) |
-| Timeout | 5.0 seconds |
+| Parameter   | Default Value |
+| ----------- | ------------- |
+| Port        | 5024 (SCPI)   |
+| Timeout     | 5.0 seconds   |
 | Subnet Mask | 255.255.255.0 |
-| VNC Port | 5900 |
+| VNC Port    | 5900          |
 
 ### Network Commands
 
@@ -942,16 +999,19 @@ Now that you have a working connection:
 ## Additional Resources
 
 **Siglent Resources:**
+
 - [Siglent Official Website](https://www.siglentamerica.com/)
 - Oscilloscope User Manual
 - Programming Manual (SCPI commands)
 
 **Network Tools:**
+
 - [Wireshark](https://www.wireshark.org/) - Network packet analysis
 - [nmap](https://nmap.org/) - Network scanner
 - Advanced IP Scanner (Windows)
 
 **Support:**
+
 - GitHub Issues: Report problems
 - Documentation: This guide
 - Community Forums: Ask questions

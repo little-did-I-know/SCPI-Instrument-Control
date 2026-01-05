@@ -5,6 +5,7 @@ This guide explains how to set up code signing for the Siglent Oscilloscope GUI 
 ## Why Code Signing?
 
 Code signing provides:
+
 - **User trust**: Users know the software comes from you
 - **Security**: Prevents "Unknown developer" warnings
 - **macOS Gatekeeper**: Required for easy installation on macOS
@@ -15,15 +16,17 @@ Code signing provides:
 **Code signing is NOT currently enabled.** Users will see warnings when running executables:
 
 - **Windows**: "Windows protected your PC" SmartScreen warning
-- **macOS**: "App is from an unidentified developer"  
+- **macOS**: "App is from an unidentified developer"
 - **Linux**: No warnings (Linux doesn't require code signing)
 
 ## Workarounds for Users
 
 ### macOS
+
 Right-click app → "Open" → Confirm opening unsigned app
 
-### Windows  
+### Windows
+
 Click "More info" → "Run anyway"
 
 ## Setting Up Code Signing (Optional)
@@ -31,6 +34,7 @@ Click "More info" → "Run anyway"
 ### macOS Code Signing
 
 **Requirements:**
+
 - Apple Developer Account ($99/year)
 - Developer ID Application certificate
 
@@ -85,6 +89,7 @@ exe = EXE(
 ### Windows Code Signing
 
 **Requirements:**
+
 - Code signing certificate from a trusted CA (DigiCert, Sectigo, etc.)
 - Costs $100-400/year
 
@@ -110,7 +115,7 @@ exe = EXE(
     $cert_path = "certificate.pfx"
     $bytes = [Convert]::FromBase64String($env:CERTIFICATE_BASE64)
     [IO.File]::WriteAllBytes($cert_path, $bytes)
-    
+
     & "C:\Program Files (x86)\Windows Kits\10\bin\10.0.19041.0\x64\signtool.exe" sign `
       /f $cert_path `
       /p $env:CERTIFICATE_PASSWORD `
@@ -118,7 +123,7 @@ exe = EXE(
       /td sha256 `
       /fd sha256 `
       dist\SiglentGUI.exe
-    
+
     Remove-Item $cert_path
 ```
 
@@ -140,11 +145,13 @@ Not recommended for distribution - users will still see warnings.
 ## Recommendations
 
 **For Open Source Projects:**
+
 1. **Start without signing** - Document the warnings in README
 2. **Build reputation** - Users will trust after a while
 3. **Consider signing later** - When project is established
 
 **For Commercial Use:**
+
 - Invest in proper certificates from day one
 - Professional appearance matters
 
@@ -164,9 +171,11 @@ Include this in your README:
 The executables are not code-signed. You may see security warnings:
 
 ### macOS
+
 Right-click the app → "Open" → Confirm opening
 
 ### Windows
+
 Click "More info" → "Run anyway"
 
 This is expected for unsigned applications. The source code is open and builds are automated via GitHub Actions.
@@ -181,8 +190,9 @@ This is expected for unsigned applications. The source code is open and builds a
 ## Future Considerations
 
 When ready to implement code signing:
+
 1. Open issue to track progress
-2. Obtain necessary certificates  
+2. Obtain necessary certificates
 3. Set up GitHub secrets securely
 4. Update workflows (examples above)
 5. Test signed builds

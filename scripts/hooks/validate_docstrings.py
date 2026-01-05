@@ -196,9 +196,7 @@ class DocstringValidator:
 
         min_length = self.config.get("min_module_docstring_length", 10)
         if len(docstring) < min_length:
-            self.warnings.append(
-                f"Module docstring too short ({len(docstring)} chars, minimum {min_length})"
-            )
+            self.warnings.append(f"Module docstring too short ({len(docstring)} chars, minimum {min_length})")
 
     def check_class_docstring(self, node: ast.ClassDef) -> None:
         """Check if class has a docstring.
@@ -219,10 +217,7 @@ class DocstringValidator:
 
         min_length = self.config.get("min_class_docstring_length", 20)
         if len(docstring) < min_length:
-            self.warnings.append(
-                f"Class '{node.name}' docstring too short "
-                f"({len(docstring)} chars, minimum {min_length}, line {node.lineno})"
-            )
+            self.warnings.append(f"Class '{node.name}' docstring too short " f"({len(docstring)} chars, minimum {min_length}, line {node.lineno})")
 
     def check_function_docstring(self, node: ast.FunctionDef) -> None:
         """Check if function has a docstring.
@@ -238,17 +233,12 @@ class DocstringValidator:
 
         docstring = ast.get_docstring(node)
         if not docstring:
-            self.errors.append(
-                f"Function '{node.name}' missing docstring (line {node.lineno})"
-            )
+            self.errors.append(f"Function '{node.name}' missing docstring (line {node.lineno})")
             return
 
         min_length = self.config.get("min_function_docstring_length", 15)
         if len(docstring) < min_length:
-            self.warnings.append(
-                f"Function '{node.name}' docstring too short "
-                f"({len(docstring)} chars, minimum {min_length}, line {node.lineno})"
-            )
+            self.warnings.append(f"Function '{node.name}' docstring too short " f"({len(docstring)} chars, minimum {min_length}, line {node.lineno})")
 
         # Check Google-style sections
         section_errors = check_google_style_sections(docstring, node, self.config)

@@ -11,9 +11,9 @@ Usage:
     python scripts/pre_pr_check.py --fix     # Auto-fix issues where possible
 """
 
+import argparse
 import subprocess
 import sys
-import argparse
 from pathlib import Path
 from typing import List, Tuple
 
@@ -217,10 +217,8 @@ def check_exception_imports() -> bool:
             del sys.modules["siglent"]
 
         # Test new exception names
-        from siglent.exceptions import SiglentConnectionError, SiglentTimeoutError, CommandError, SiglentError
-
         # Test backward compatibility aliases
-        from siglent.exceptions import ConnectionError, TimeoutError
+        from siglent.exceptions import CommandError, ConnectionError, SiglentConnectionError, SiglentError, SiglentTimeoutError, TimeoutError
 
         # Verify they are the same class (aliases work)
         if ConnectionError is not SiglentConnectionError:
@@ -232,7 +230,8 @@ def check_exception_imports() -> bool:
             return False
 
         # Test top-level package imports
-        from siglent import SiglentConnectionError as TopLevelConn, SiglentTimeoutError as TopLevelTimeout
+        from siglent import SiglentConnectionError as TopLevelConn
+        from siglent import SiglentTimeoutError as TopLevelTimeout
 
         if TopLevelConn is not SiglentConnectionError:
             print_error("Top-level import of SiglentConnectionError failed")

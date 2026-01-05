@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Impact:** All code that imports or catches `ConnectionError` or `TimeoutError` from siglent.exceptions needs updating
 
 ### Added
+
 - **Waveform Validation System** (`siglent/gui/utils/validators.py`)
   - `WaveformValidator` class for comprehensive data quality checks
   - Validates waveform data before plotting or processing
@@ -64,6 +65,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Status bar updates reflect worker progress in real-time
 
 ### Changed
+
 - **LiveViewWorker Error Handling Enhanced**
   - Changed `error_occurred` signal from `pyqtSignal(str)` → `pyqtSignal(dict)`
   - Errors now emit structured dictionaries with full context
@@ -101,6 +103,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - User-friendly error display with expandable technical details
 
 ### Fixed
+
 - **Blank Plot Issue from Invalid Waveforms**
   - Root cause: Invalid waveforms (None, empty arrays, all NaN) were being plotted
   - Solution: Comprehensive validation before plotting in all code paths
@@ -129,6 +132,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Both now correctly report version 0.2.6 (will be bumped to 0.3.0 for this release)
 
 ### Technical Improvements
+
 - **Input Validation for SCPI Commands** (Issue #4 from Code Review)
   - Added ASCII validation before encoding commands in `socket.py`
   - Raises `CommandError` with clear message if non-ASCII characters detected
@@ -154,6 +158,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 See [full changelog on GitHub](https://github.com/little-did-I-know/Siglent-Oscilloscope/blob/main/CHANGELOG.md) for detailed version history.
 
 Previous releases include:
+
 - **v0.2.6**: Background waveform capture, progress dialogs, intelligent downsampling, modern graph styling
 - **v0.2.5**: Comprehensive test suite (490+ tests), Codecov integration, professional badges
 - **v0.2.4**: Vector graphics/XY mode, GUI integration, shape generators

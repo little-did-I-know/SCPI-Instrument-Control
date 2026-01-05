@@ -16,16 +16,19 @@ Visual measurements allow you to:
 ### Marker Types
 
 **Voltage Markers (Horizontal)**
+
 - Measure voltage values
 - Horizontal lines across display
 - Multiple markers for delta measurements
 
 **Time Markers (Vertical)**
+
 - Measure time values
 - Vertical lines across display
 - Calculate time differences
 
 **Frequency Markers**
+
 - Measure periods
 - Calculate frequency from period
 - Useful for periodic signals
@@ -55,6 +58,7 @@ Press `Ctrl+M` to add marker at cursor position
 ### Creating Voltage Marker
 
 **Method 1: Add from Tab**
+
 ```
 1. Click "Add Voltage Marker" button
 2. Marker appears at center
@@ -62,6 +66,7 @@ Press `Ctrl+M` to add marker at cursor position
 ```
 
 **Method 2: Right-Click**
+
 ```
 1. Right-click at voltage position
 2. Select "Add Voltage Marker"
@@ -71,16 +76,19 @@ Press `Ctrl+M` to add marker at cursor position
 ### Voltage Marker Features
 
 **Display:**
+
 - Horizontal line spanning display
 - Label showing voltage value
 - Color-coded for visibility
 
 **Interaction:**
+
 - Click and drag vertically to move
 - Snaps to waveform if enabled
 - Shows real-time voltage value
 
 **Label Format:**
+
 ```
 V1: 2.345 V
 ```
@@ -96,6 +104,7 @@ V2: 1.200 V
 ```
 
 **Delta Calculation:**
+
 - Automatically calculated between markers
 - Shows voltage difference
 - Updates as markers move
@@ -105,6 +114,7 @@ V2: 1.200 V
 ### Creating Time Marker
 
 **Method 1: Add from Tab**
+
 ```
 1. Click "Add Time Marker" button
 2. Marker appears at center
@@ -112,6 +122,7 @@ V2: 1.200 V
 ```
 
 **Method 2: Right-Click**
+
 ```
 1. Right-click at time position
 2. Select "Add Time Marker"
@@ -121,16 +132,19 @@ V2: 1.200 V
 ### Time Marker Features
 
 **Display:**
+
 - Vertical line from top to bottom
 - Label showing time value
 - Dotted or solid line style
 
 **Interaction:**
+
 - Click and drag horizontally to move
 - Shows real-time time value
 - Snaps to grid if enabled
 
 **Label Format:**
+
 ```
 T1: 125.3 µs
 ```
@@ -147,6 +161,7 @@ f = 40.0 kHz  (1/Δt)
 ```
 
 **Delta Calculations:**
+
 - Time difference (Δt)
 - Frequency (1/Δt)
 - Updates in real-time
@@ -165,6 +180,7 @@ Use two time markers to measure period:
 ```
 
 **Example:**
+
 ```
 T1: 0.00 µs
 T2: 10.0 µs
@@ -192,6 +208,7 @@ Measure pulse width and duty cycle:
 All markers shown in Visual Measurements tab:
 
 **Columns:**
+
 - Type (Voltage/Time)
 - Label
 - Value
@@ -199,6 +216,7 @@ All markers shown in Visual Measurements tab:
 - Visible (checkbox)
 
 **Actions:**
+
 - Click to select
 - Checkbox to show/hide
 - Delete button to remove
@@ -207,11 +225,13 @@ All markers shown in Visual Measurements tab:
 ### Selecting Markers
 
 **Click on Marker:**
+
 - Selects marker
 - Highlights in list
 - Shows properties
 
 **Click in List:**
+
 - Selects from list
 - Highlights on display
 - Ready to edit
@@ -219,16 +239,19 @@ All markers shown in Visual Measurements tab:
 ### Moving Markers
 
 **Drag with Mouse:**
+
 - Click and hold marker
 - Drag to new position
 - Release to set
 
 **Keyboard:**
+
 - Arrow keys for fine adjustment
 - Shift+Arrow for larger steps
 - Works when marker selected
 
 **Numeric Input:**
+
 - Double-click marker label
 - Enter exact value
 - Press Enter to apply
@@ -236,11 +259,13 @@ All markers shown in Visual Measurements tab:
 ### Deleting Markers
 
 **Individual:**
+
 - Select marker
 - Press `Delete` key
 - Or click Delete button in list
 
 **All:**
+
 - Tools menu → Clear All Measurements
 - Removes all markers
 
@@ -249,21 +274,25 @@ All markers shown in Visual Measurements tab:
 ### Customizing Markers
 
 **Label Text:**
+
 - Double-click to edit
 - Custom names (e.g., "Vmax", "Start Time")
 - Displayed on marker
 
 **Color:**
+
 - Click color picker
 - Choose from palette
 - Custom RGB values
 
 **Line Style:**
+
 - Solid, dashed, or dotted
 - Line width adjustment
 - Opacity/transparency
 
 **Font:**
+
 - Label font size
 - Font family
 - Bold/italic
@@ -271,16 +300,19 @@ All markers shown in Visual Measurements tab:
 ### Snap to Waveform
 
 **Enable Snapping:**
+
 - Checkbox in marker properties
 - Marker follows waveform data
 - Finds nearest data point
 
 **Behavior:**
+
 - Voltage markers snap to Y values
 - Helps find peaks/troughs
 - More accurate measurements
 
 **Example:**
+
 ```
 Without snap: V = 2.347 V (approximate)
 With snap: V = 2.350 V (exact data point)
@@ -293,6 +325,7 @@ With snap: V = 2.350 V (exact data point)
 When multiple markers of same type exist:
 
 **Voltage Deltas:**
+
 ```
 V1: 3.5 V
 V2: 1.2 V
@@ -300,6 +333,7 @@ V2: 1.2 V
 ```
 
 **Time Deltas:**
+
 ```
 T1: 100 µs
 T2: 150 µs
@@ -310,11 +344,13 @@ f: 20 kHz (1/Δt)
 ### Delta Display Options
 
 **Show in Label:**
+
 - Delta shown near markers
 - Updates as markers move
 - Toggle on/off
 
 **Show in Table:**
+
 - Delta measurements in list
 - Export with other measurements
 - Statistics tracking
@@ -360,11 +396,13 @@ Measure phase between channels:
 ### Precision
 
 **Time Measurements:**
+
 - Limited by sample rate
 - Resolution = 1/sample_rate
 - Example: 1 GSa/s → 1 ns resolution
 
 **Voltage Measurements:**
+
 - Limited by ADC resolution
 - 8-bit: ~0.4% accuracy
 - 12-bit: ~0.024% accuracy
@@ -372,21 +410,25 @@ Measure phase between channels:
 ### Improving Accuracy
 
 **1. Increase Sample Rate:**
+
 - Use shorter timebase
 - Higher resolution
 - Better time accuracy
 
 **2. Enable Snap to Waveform:**
+
 - Uses actual data points
 - Eliminates interpolation error
 - More precise readings
 
 **3. Average Multiple Measurements:**
+
 - Take several readings
 - Calculate mean
 - Reduces noise effects
 
 **4. Use Statistics:**
+
 - Enable measurement statistics
 - View min/max/mean
 - See standard deviation
@@ -398,11 +440,13 @@ Measure phase between channels:
 Markers can be assigned to channels:
 
 **Channel 1 Markers:**
+
 - Snap to C1 waveform only
 - Color matches C1
 - Independent from other channels
 
 **Channel 2 Markers:**
+
 - Snap to C2 waveform
 - Different color
 - Separate measurements
@@ -412,6 +456,7 @@ Markers can be assigned to channels:
 Measure between channels:
 
 **Time Delay:**
+
 ```
 1. Add T1 at C1 event
 2. Add T2 at C2 event
@@ -419,6 +464,7 @@ Measure between channels:
 ```
 
 **Voltage Difference:**
+
 ```
 1. Add V1 on C1
 2. Add V2 on C2 (same time)
@@ -443,6 +489,7 @@ f, Frequency, 20.0, kHz
 ```
 
 **To Export:**
+
 1. Visual Measurements tab
 2. Click "Export" button
 3. Choose file location
@@ -460,46 +507,30 @@ When saving waveform data:
 
 ### Effective Measurement
 
-!!! tip "Marker Placement"
-    - Use snap-to-waveform for accuracy
-    - Zoom in for precise positioning
-    - Use cursors for reference
-    - Label markers clearly
+!!! tip "Marker Placement" - Use snap-to-waveform for accuracy - Zoom in for precise positioning - Use cursors for reference - Label markers clearly
 
 ### Organization
 
-!!! tip "Managing Many Markers"
-    - Use consistent naming (V1, V2, V3...)
-    - Color code by function
-    - Hide markers not currently needed
-    - Group related markers
+!!! tip "Managing Many Markers" - Use consistent naming (V1, V2, V3...) - Color code by function - Hide markers not currently needed - Group related markers
 
 ### Accuracy
 
-!!! tip "Precise Measurements"
-    - Enable snap to waveform
-    - Increase sample rate for time measurements
-    - Use multiple markers and average
-    - Enable measurement statistics
+!!! tip "Precise Measurements" - Enable snap to waveform - Increase sample rate for time measurements - Use multiple markers and average - Enable measurement statistics
 
 ### Workflow
 
-!!! tip "Efficient Workflow"
-    - Right-click to add markers quickly
-    - Use keyboard shortcuts
-    - Save marker configurations
-    - Export measurements for documentation
+!!! tip "Efficient Workflow" - Right-click to add markers quickly - Use keyboard shortcuts - Save marker configurations - Export measurements for documentation
 
 ## Keyboard Shortcuts
 
-| Shortcut | Action |
-|----------|--------|
-| `Ctrl+M` | Add marker at cursor |
-| `Delete` | Remove selected marker |
-| `Arrow keys` | Fine-tune marker position |
-| `Shift+Arrow` | Large steps |
-| `Tab` | Select next marker |
-| `Shift+Tab` | Select previous marker |
+| Shortcut      | Action                    |
+| ------------- | ------------------------- |
+| `Ctrl+M`      | Add marker at cursor      |
+| `Delete`      | Remove selected marker    |
+| `Arrow keys`  | Fine-tune marker position |
+| `Shift+Arrow` | Large steps               |
+| `Tab`         | Select next marker        |
+| `Shift+Tab`   | Select previous marker    |
 
 ## Troubleshooting
 
@@ -508,6 +539,7 @@ When saving waveform data:
 **Problem:** Snap to waveform not working
 
 **Solutions:**
+
 1. Enable "Snap to Waveform" in marker properties
 2. Ensure channel is enabled and visible
 3. Check waveform has data at marker position
@@ -518,6 +550,7 @@ When saving waveform data:
 **Problem:** Measurements don't match expected values
 
 **Solutions:**
+
 1. Check probe ratio settings
 2. Verify voltage scale calibration
 3. Enable snap to waveform
@@ -529,6 +562,7 @@ When saving waveform data:
 **Problem:** Markers not visible
 
 **Solutions:**
+
 1. Check visibility checkbox in marker list
 2. Markers may be off-screen (reset zoom)
 3. Verify markers weren't accidentally deleted
@@ -539,6 +573,7 @@ When saving waveform data:
 **Problem:** Marker won't drag
 
 **Solutions:**
+
 1. Click directly on marker line
 2. Ensure marker is selected
 3. Try using arrow keys instead

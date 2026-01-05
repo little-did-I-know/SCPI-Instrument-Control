@@ -11,6 +11,7 @@ python scripts/test_build_system.py
 ```
 
 This checks:
+
 - ✅ All required files exist
 - ✅ Icons are present (optional but recommended)
 - ✅ Dependencies are installed
@@ -48,6 +49,7 @@ python scripts/test_build_system.py
 ```
 
 Expected output:
+
 ```
 ✓ Project Structure: PASS
 ✓ Icons: PASS
@@ -69,6 +71,7 @@ make build-exe
 ```
 
 This will:
+
 1. Clean previous builds
 2. Install PyInstaller if needed
 3. Run PyInstaller with `siglent-gui.spec`
@@ -77,6 +80,7 @@ This will:
 **Expected time:** 2-5 minutes
 
 **Expected output:**
+
 ```
 Building standalone executable for current platform...
 Target: SiglentGUI.exe (or .app on macOS, binary on Linux)
@@ -133,6 +137,7 @@ open dist/SiglentGUI.app
 ```
 
 **What to test:**
+
 - [ ] Application launches without errors
 - [ ] GUI window appears
 - [ ] Main window UI loads correctly
@@ -145,15 +150,18 @@ open dist/SiglentGUI.app
 ### Step 6: Test Icon Display
 
 **Windows:**
+
 - Right-click `SiglentGUI.exe` → Properties
 - Check if custom icon appears in file properties
 - Check taskbar icon when running
 
 **macOS:**
+
 - Check Finder icon
 - Check Dock icon when running
 
 **Linux:**
+
 - Icons typically not embedded in binary
 - Check if it runs without icon-related errors
 
@@ -197,6 +205,7 @@ git push origin v0.3.1-test
 4. Click on it to watch progress
 
 **Expected jobs:**
+
 - `build-windows` (~5-10 min)
 - `build-macos` (~5-10 min)
 - `build-linux` (~5-10 min)
@@ -209,6 +218,7 @@ git push origin v0.3.1-test
 Click on each job to see the build logs:
 
 **What to look for:**
+
 - ✅ Dependencies install successfully
 - ✅ PyInstaller runs without errors
 - ✅ Executable is created
@@ -216,6 +226,7 @@ Click on each job to see the build logs:
 - ✅ Upload to release succeeds
 
 **Common issues:**
+
 - Missing dependencies → Check `pyproject.toml`
 - PyInstaller errors → Check `siglent-gui.spec`
 - Upload fails → Check repository permissions
@@ -256,6 +267,7 @@ cd test-windows
 ```
 
 **Test checklist:**
+
 - [ ] Extracts without errors
 - [ ] Executable runs
 - [ ] No Python installation required
@@ -273,11 +285,13 @@ open SiglentGUI.app
 ```
 
 **If you get "App can't be opened" error:**
+
 1. Right-click → Open
 2. Click "Open" in the dialog
 3. macOS will remember this choice
 
 **Test checklist:**
+
 - [ ] Extracts without errors
 - [ ] Can open .app bundle
 - [ ] No Python installation required
@@ -298,6 +312,7 @@ chmod +x SiglentGUI
 ```
 
 **Test checklist:**
+
 - [ ] Extracts without errors
 - [ ] Executable runs
 - [ ] No Python installation required
@@ -332,11 +347,13 @@ Once everything works:
 ### Step 1: Update Version (if needed)
 
 Edit `pyproject.toml`:
+
 ```toml
 version = "0.3.2"  # or whatever your next version is
 ```
 
 Commit:
+
 ```bash
 git add pyproject.toml
 git commit -m "Bump version to 0.3.2"
@@ -356,6 +373,7 @@ git push origin v0.3.2
 ### Step 3: Monitor and Verify
 
 Same as test release, but this time:
+
 - Release will be public
 - Users can download immediately
 - Consider making release notes more detailed
@@ -369,6 +387,7 @@ Same as test release, but this time:
 **Error:** `PyInstaller: command not found`
 
 **Fix:**
+
 ```bash
 pip install pyinstaller
 ```
@@ -378,6 +397,7 @@ pip install pyinstaller
 **Error:** `No module named 'PyQt6'`
 
 **Fix:**
+
 ```bash
 pip install ".[all]"
 ```
@@ -387,6 +407,7 @@ pip install ".[all]"
 **Error:** `Icon file not found`
 
 **Fix:**
+
 - Icons are optional
 - If you have icons, verify paths in `siglent-gui.spec`
 - If not, remove icon references from spec file
@@ -398,6 +419,7 @@ pip install ".[all]"
 **Error:** Workflow doesn't trigger
 
 **Check:**
+
 - Tag format must match `v*.*.*` (e.g., `v0.3.1`, not `0.3.1`)
 - Workflow file is in `.github/workflows/`
 - You pushed the tag: `git push origin v0.3.1`
@@ -407,6 +429,7 @@ pip install ".[all]"
 **Error:** `Permission denied` when uploading to release
 
 **Fix:**
+
 - Check repository settings → Actions → General
 - Enable "Read and write permissions" for GITHUB_TOKEN
 
@@ -415,6 +438,7 @@ pip install ".[all]"
 **Error:** PyInstaller fails in workflow
 
 **Check:**
+
 - Compare local build to CI build logs
 - Ensure all dependencies are in `pyproject.toml`
 - Check `hiddenimports` in `siglent-gui.spec`
@@ -426,6 +450,7 @@ pip install ".[all]"
 **Error:** Windows: "Missing DLL" or crashes silently
 
 **Fix:**
+
 - Run from Command Prompt to see error messages
 - Check if antivirus is blocking (common with PyInstaller)
 - Rebuild with `--debug all` flag for verbose output
@@ -435,6 +460,7 @@ pip install ".[all]"
 **Error:** macOS: "App is damaged"
 
 **Fix:**
+
 - This is normal for unsigned apps
 - Tell users to: Right-click → Open (first time only)
 - For production, consider code signing
@@ -444,6 +470,7 @@ pip install ".[all]"
 **Error:** Linux: "Permission denied"
 
 **Fix:**
+
 ```bash
 chmod +x SiglentGUI
 ```
@@ -455,6 +482,7 @@ chmod +x SiglentGUI
 Use this checklist for each release:
 
 ### Pre-Release Testing
+
 - [ ] Run `python scripts/test_build_system.py` - all checks pass
 - [ ] Icons are in `resources/` directory
 - [ ] Local build succeeds (`make build-exe`)
@@ -463,6 +491,7 @@ Use this checklist for each release:
 - [ ] Version number updated in `pyproject.toml`
 
 ### Test Release
+
 - [ ] Create test tag (e.g., `v0.3.1-test`)
 - [ ] GitHub Actions workflow triggers
 - [ ] All three platform builds succeed
@@ -471,6 +500,7 @@ Use this checklist for each release:
 - [ ] Delete test release when done
 
 ### Official Release
+
 - [ ] Create official tag (e.g., `v0.3.2`)
 - [ ] Monitor workflow completion
 - [ ] Download and quick-test each platform
@@ -478,6 +508,7 @@ Use this checklist for each release:
 - [ ] Update README with download links
 
 ### Post-Release
+
 - [ ] Test downloads from public release page
 - [ ] Verify file sizes are reasonable (100-300 MB)
 - [ ] Check that custom icons display
@@ -492,16 +523,19 @@ Use this checklist for each release:
 For thorough testing, use a clean virtual machine:
 
 **Windows:**
+
 - VirtualBox with fresh Windows 10/11 install
 - Download and run executable
 - Verify no Python needed
 
 **macOS:**
+
 - Fresh macOS VM (requires macOS host)
 - Test with and without Homebrew
 - Verify no Python needed
 
 **Linux:**
+
 - Ubuntu/Debian/Fedora VM
 - Test on minimal installation
 - Verify dependencies are bundled
@@ -509,6 +543,7 @@ For thorough testing, use a clean virtual machine:
 ### Test with Real Oscilloscope
 
 If you have hardware:
+
 - [ ] Connect to actual SDS5000X oscilloscope
 - [ ] Test waveform capture
 - [ ] Test all GUI features

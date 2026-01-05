@@ -23,33 +23,13 @@ def get_platform_info():
     system = platform.system().lower()
 
     if system == "windows":
-        return {
-            "name": "Windows",
-            "executable": "SiglentGUI.exe",
-            "archive_ext": ".zip",
-            "platform_suffix": "Windows-x64"
-        }
+        return {"name": "Windows", "executable": "SiglentGUI.exe", "archive_ext": ".zip", "platform_suffix": "Windows-x64"}
     elif system == "darwin":
-        return {
-            "name": "macOS",
-            "executable": "SiglentGUI.app",
-            "archive_ext": ".zip",
-            "platform_suffix": "macOS-arm64"
-        }
+        return {"name": "macOS", "executable": "SiglentGUI.app", "archive_ext": ".zip", "platform_suffix": "macOS-arm64"}
     elif system == "linux":
-        return {
-            "name": "Linux",
-            "executable": "SiglentGUI",
-            "archive_ext": ".tar.gz",
-            "platform_suffix": "Linux-x86_64"
-        }
+        return {"name": "Linux", "executable": "SiglentGUI", "archive_ext": ".tar.gz", "platform_suffix": "Linux-x86_64"}
     else:
-        return {
-            "name": system,
-            "executable": "SiglentGUI",
-            "archive_ext": ".tar.gz",
-            "platform_suffix": system
-        }
+        return {"name": system, "executable": "SiglentGUI", "archive_ext": ".tar.gz", "platform_suffix": system}
 
 
 def clean_build_artifacts():
@@ -80,6 +60,7 @@ def check_dependencies():
 
     try:
         import PyInstaller
+
         print(f"  ✓ PyInstaller {PyInstaller.__version__}")
     except ImportError:
         print("  ✗ PyInstaller not found")
@@ -106,14 +87,7 @@ def build_executable():
     print(f"Target: {platform_info['executable']}\n")
 
     # Run PyInstaller
-    cmd = [
-        sys.executable,
-        "-m",
-        "PyInstaller",
-        "--clean",
-        "--noconfirm",
-        "siglent-gui.spec"
-    ]
+    cmd = [sys.executable, "-m", "PyInstaller", "--clean", "--noconfirm", "siglent-gui.spec"]
 
     print(f"Running: {' '.join(cmd)}\n")
     print("=" * 70)
@@ -143,7 +117,7 @@ def build_executable():
         print(f"\nFile size: {size_mb:.1f} MB")
     elif dist_path.is_dir():
         # Calculate size of .app bundle
-        total_size = sum(f.stat().st_size for f in dist_path.rglob('*') if f.is_file())
+        total_size = sum(f.stat().st_size for f in dist_path.rglob("*") if f.is_file())
         size_mb = total_size / (1024 * 1024)
         print(f"\nBundle size: {size_mb:.1f} MB")
 
@@ -208,13 +182,13 @@ def create_archive(executable_path):
 
         archive_path = dist_dir / f"{archive_name}.zip"
 
-        with zipfile.ZipFile(archive_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+        with zipfile.ZipFile(archive_path, "w", zipfile.ZIP_DEFLATED) as zipf:
             # Add executable
             if executable_path.is_file():
                 zipf.write(executable_path, executable_path.name)
             elif executable_path.is_dir():
                 # Add .app bundle recursively
-                for file in executable_path.rglob('*'):
+                for file in executable_path.rglob("*"):
                     if file.is_file():
                         arcname = str(file.relative_to(dist_dir))
                         zipf.write(file, arcname)
@@ -231,7 +205,7 @@ def create_archive(executable_path):
 
         archive_path = dist_dir / f"{archive_name}.tar.gz"
 
-        with tarfile.open(archive_path, 'w:gz') as tar:
+        with tarfile.open(archive_path, "w:gz") as tar:
             tar.add(executable_path, arcname=executable_path.name)
 
             for doc_file in ["README.md", "LICENSE"]:
@@ -290,26 +264,14 @@ Examples:
   python scripts/build_executable.py --clean      # Clean before building
   python scripts/build_executable.py --test       # Build and test
   python scripts/build_executable.py --archive    # Build and create archive
-        """
+        """,
     )
 
-    parser.add_argument(
-        "--clean",
-        action="store_true",
-        help="Clean build artifacts before building"
-    )
+    parser.add_argument("--clean", action="store_true", help="Clean build artifacts before building")
 
-    parser.add_argument(
-        "--test",
-        action="store_true",
-        help="Test the executable after building"
-    )
+    parser.add_argument("--test", action="store_true", help="Test the executable after building")
 
-    parser.add_argument(
-        "--archive",
-        action="store_true",
-        help="Create a distributable archive after building"
-    )
+    parser.add_argument("--archive", action="store_true", help="Create a distributable archive after building")
 
     args = parser.parse_args()
 

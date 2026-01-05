@@ -13,11 +13,7 @@ from siglent.connection.socket import SocketConnection
 # Optional VISA connection (requires pyvisa)
 # Import is attempted but won't fail if pyvisa not installed
 try:
-    from siglent.connection.visa_connection import (
-        VISAConnection,
-        list_visa_resources,
-        find_siglent_devices,
-    )
+    from siglent.connection.visa_connection import VISAConnection, find_siglent_devices, list_visa_resources
 
     _VISA_AVAILABLE = True
 except ImportError:

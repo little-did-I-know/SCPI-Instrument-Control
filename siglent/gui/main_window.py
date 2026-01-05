@@ -10,21 +10,7 @@ if TYPE_CHECKING:
 
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QAction
-from PyQt6.QtWidgets import (
-    QFileDialog,
-    QGroupBox,
-    QHBoxLayout,
-    QInputDialog,
-    QMainWindow,
-    QMessageBox,
-    QProgressDialog,
-    QPushButton,
-    QSplitter,
-    QStatusBar,
-    QTabWidget,
-    QVBoxLayout,
-    QWidget,
-)
+from PyQt6.QtWidgets import QFileDialog, QGroupBox, QHBoxLayout, QInputDialog, QMainWindow, QMessageBox, QProgressDialog, QPushButton, QSplitter, QStatusBar, QTabWidget, QVBoxLayout, QWidget
 
 from siglent import Oscilloscope, PowerSupply
 from siglent.exceptions import SiglentConnectionError, SiglentError

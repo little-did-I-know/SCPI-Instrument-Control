@@ -69,7 +69,7 @@ FAILURES=0
 run_check() {
     local check_name=$1
     shift
-    
+
     if "$@"; then
         print_success "$check_name PASSED"
         return 0
@@ -118,7 +118,7 @@ run_check "Linting" flake8 siglent/ --max-line-length=100 --extend-ignore=E203,W
 if [ "$FAST_MODE" = false ]; then
     print_step "Running tests..."
     run_check "Tests" pytest tests/ -v
-    
+
     print_step "Checking coverage..."
     pytest tests/ --cov=siglent --cov-report=term-missing -q && print_success "Coverage OK" || print_warning "Coverage check had issues"
 else

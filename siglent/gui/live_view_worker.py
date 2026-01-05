@@ -35,8 +35,8 @@ from typing import List, Optional
 
 from PyQt6.QtCore import QThread, pyqtSignal
 
-from siglent.waveform import WaveformData
 from siglent.gui.utils.validators import WaveformValidator
+from siglent.waveform import WaveformData
 
 logger = logging.getLogger(__name__)
 

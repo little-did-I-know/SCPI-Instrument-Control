@@ -24,6 +24,7 @@ pip install "Siglent-Oscilloscope[gui]"
 ```
 
 This installs:
+
 - PyQt6 (GUI framework)
 - PyQtGraph (high-performance plotting)
 - PyQt6-WebEngine (for VNC display)
@@ -128,6 +129,7 @@ The GUI features a clean, intuitive layout:
 ### Layout Components
 
 **Left Panel (Control Panel):**
+
 - Resizable, typically 25% of window width
 - Tabbed interface for different control groups
 - Channel controls
@@ -140,6 +142,7 @@ The GUI features a clean, intuitive layout:
 - Visual measurements
 
 **Right Panel (Display Panel):**
+
 - Waveform display area (75% of window width)
 - High-performance real-time plotting
 - Multi-channel display
@@ -147,6 +150,7 @@ The GUI features a clean, intuitive layout:
 - Zoom and pan capabilities
 
 **Splitter:**
+
 - Draggable divider between panels
 - Resize to your preference
 - Settings are remembered
@@ -274,25 +278,26 @@ If PyQtGraph is not available, the GUI falls back to matplotlib:
 
 ## Keyboard Shortcuts
 
-| Shortcut | Action |
-|----------|--------|
+| Shortcut | Action                 |
+| -------- | ---------------------- |
 | `Ctrl+O` | Open connection dialog |
-| `Ctrl+L` | Toggle live view |
-| `Ctrl+C` | Capture waveform |
-| `Ctrl+S` | Save waveform |
-| `Ctrl+E` | Export waveform |
-| `Ctrl+T` | Open terminal |
-| `Ctrl+V` | Open VNC window |
-| `Ctrl+Q` | Quit application |
-| `F5` | Refresh display |
-| `F11` | Toggle fullscreen |
-| `Esc` | Stop live view |
+| `Ctrl+L` | Toggle live view       |
+| `Ctrl+C` | Capture waveform       |
+| `Ctrl+S` | Save waveform          |
+| `Ctrl+E` | Export waveform        |
+| `Ctrl+T` | Open terminal          |
+| `Ctrl+V` | Open VNC window        |
+| `Ctrl+Q` | Quit application       |
+| `F5`     | Refresh display        |
+| `F11`    | Toggle fullscreen      |
+| `Esc`    | Stop live view         |
 
 ## Getting Started Workflow
 
 ### Basic Measurement Workflow
 
 1. **Launch GUI**
+
    ```bash
    siglent-gui
    ```
@@ -375,11 +380,13 @@ If PyQtGraph is not available, the GUI falls back to matplotlib:
 ### Dependencies
 
 **Required:**
+
 - PyQt6 >= 6.6.0
 - numpy >= 1.20.0
 - scipy >= 1.7.0
 
 **Optional (Recommended):**
+
 - pyqtgraph >= 0.13.0 (high-performance plotting)
 - PyQt6-WebEngine >= 6.6.0 (VNC display)
 - matplotlib >= 3.5.0 (fallback plotting)

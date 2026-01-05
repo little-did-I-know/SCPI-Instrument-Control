@@ -7,19 +7,19 @@ Get up and running with the Siglent Oscilloscope Control library in 5 minutes!
 First, install the library:
 
 === "Basic (Programmatic Only)"
-    ```bash
+`bash
     pip install Siglent-Oscilloscope
-    ```
+    `
 
 === "With GUI"
-    ```bash
+`bash
     pip install "Siglent-Oscilloscope[gui]"
-    ```
+    `
 
 === "Everything"
-    ```bash
+`bash
     pip install "Siglent-Oscilloscope[all]"
-    ```
+    `
 
 ## Your First Script
 
@@ -62,6 +62,7 @@ scope.disconnect()
 ```
 
 **Expected output:**
+
 ```
 Siglent Technologies,SDS824X HD,SDSMMDD1XXXXX,8.2.5.1.37R9
 Captured 140000 samples
@@ -169,15 +170,10 @@ with DataCollector('192.168.1.100') as collector:
 
 ## Next Steps
 
-!!! tip "Learn More"
-    - [Connection Setup](connection.md) - Configure network and connection settings
-    - [Basic Usage](../user-guide/basic-usage.md) - Detailed usage guide
-    - [Waveform Capture](../user-guide/waveform-capture.md) - Advanced capture techniques
-    - [Measurements](../user-guide/measurements.md) - All measurement types
-    - [GUI Guide](../gui/overview.md) - GUI application features
+!!! tip "Learn More" - [Connection Setup](connection.md) - Configure network and connection settings - [Basic Usage](../user-guide/basic-usage.md) - Detailed usage guide - [Waveform Capture](../user-guide/waveform-capture.md) - Advanced capture techniques - [Measurements](../user-guide/measurements.md) - All measurement types - [GUI Guide](../gui/overview.md) - GUI application features
 
 !!! example "Examples"
-    Check out the [examples directory](https://github.com/little-did-I-know/Siglent-Oscilloscope/tree/main/examples) for more code samples:
+Check out the [examples directory](https://github.com/little-did-I-know/Siglent-Oscilloscope/tree/main/examples) for more code samples:
 
     - Basic oscilloscope control
     - Waveform capture and export
@@ -186,7 +182,7 @@ with DataCollector('192.168.1.100') as collector:
     - Automation scripts
 
 !!! info "API Reference"
-    For detailed API documentation, see:
+For detailed API documentation, see:
 
     - [Oscilloscope API](../api/oscilloscope.md)
     - [Channel API](../api/channel.md)

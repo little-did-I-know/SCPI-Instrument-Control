@@ -4,14 +4,15 @@ These tests verify the VISAConnection class works correctly.
 Most tests use mocking since PyVISA may not be installed.
 """
 
-import pytest
-from unittest.mock import Mock, MagicMock, patch
+from unittest.mock import MagicMock, Mock, patch
 
+import pytest
 
 # Skip all tests if pyvisa not available
 pyvisa_available = False
 try:
     import pyvisa
+
     from siglent.connection.visa_connection import VISAConnection, list_visa_resources
 
     pyvisa_available = True
@@ -31,7 +32,7 @@ class TestVISAConnectionImport:
 
     def test_import_utilities(self):
         """Test utility function imports."""
-        from siglent.connection import list_visa_resources, find_siglent_devices
+        from siglent.connection import find_siglent_devices, list_visa_resources
 
         assert list_visa_resources is not None
         assert find_siglent_devices is not None

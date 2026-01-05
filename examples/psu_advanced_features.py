@@ -9,6 +9,7 @@ Demonstrates:
 """
 
 import time
+
 from siglent import PowerSupply, PSUDataLogger, TimedPSULogger
 from siglent.connection.mock import MockConnection
 

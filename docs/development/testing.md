@@ -21,26 +21,31 @@ The project uses a comprehensive testing approach with multiple test categories:
 ### Running Tests
 
 **All tests:**
+
 ```bash
 make test
 ```
 
 **With coverage:**
+
 ```bash
 make test-cov
 ```
 
 **Fast parallel execution:**
+
 ```bash
 make test-fast
 ```
 
 **Specific test file:**
+
 ```bash
 pytest tests/test_oscilloscope.py -v
 ```
 
 **Specific test function:**
+
 ```bash
 pytest tests/test_oscilloscope.py::test_connection -v
 ```
@@ -48,16 +53,19 @@ pytest tests/test_oscilloscope.py::test_connection -v
 ### Test Markers
 
 **Skip hardware tests:**
+
 ```bash
 pytest -m "not hardware"
 ```
 
 **Only GUI tests:**
+
 ```bash
 pytest -m gui
 ```
 
 **Only hardware tests:**
+
 ```bash
 pytest -m hardware
 ```
@@ -96,6 +104,7 @@ tests/
 ### Test Categories
 
 **Unit Tests:**
+
 - File: `test_*.py`
 - Location: `tests/`
 - Purpose: Test individual functions/classes
@@ -103,6 +112,7 @@ tests/
 - Dependencies: Mock external resources
 
 **Integration Tests:**
+
 - File: `test_*_integration.py`
 - Location: `tests/`
 - Purpose: Test component interactions
@@ -110,6 +120,7 @@ tests/
 - Dependencies: MockConnection
 
 **GUI Tests:**
+
 - Marker: `@pytest.mark.gui`
 - Location: `tests/test_gui/`
 - Purpose: Test UI components
@@ -117,6 +128,7 @@ tests/
 - Dependencies: PyQt6
 
 **Hardware Tests:**
+
 - Marker: `@pytest.mark.hardware`
 - Location: `tests/`
 - Purpose: Test with real oscilloscope
@@ -165,6 +177,7 @@ def test_channel_enable():
 ### Using Fixtures
 
 **Define in conftest.py:**
+
 ```python
 """
 tests/conftest.py
@@ -191,6 +204,7 @@ def sample_waveform():
 ```
 
 **Use in tests:**
+
 ```python
 def test_with_fixture(mock_scope):
     """Test using fixture."""
@@ -306,6 +320,7 @@ class TestLiveView:
 ### Available Markers
 
 **`@pytest.mark.hardware`** - Requires real oscilloscope
+
 ```python
 @pytest.mark.hardware
 def test_real_connection():
@@ -315,6 +330,7 @@ def test_real_connection():
 ```
 
 **`@pytest.mark.gui`** - Requires PyQt6
+
 ```python
 @pytest.mark.gui
 def test_main_window(qtbot):
@@ -325,6 +341,7 @@ def test_main_window(qtbot):
 ```
 
 **`@pytest.mark.slow`** - Slow running tests
+
 ```python
 @pytest.mark.slow
 def test_long_capture():
@@ -334,6 +351,7 @@ def test_long_capture():
 ```
 
 **`@pytest.mark.network`** - Requires network access
+
 ```python
 @pytest.mark.network
 def test_remote_connection():
@@ -344,6 +362,7 @@ def test_remote_connection():
 ### Marker Configuration
 
 **In pyproject.toml:**
+
 ```toml
 [tool.pytest.ini_options]
 markers = [
@@ -357,16 +376,19 @@ markers = [
 ### Skipping Markers
 
 **Skip hardware tests:**
+
 ```bash
 pytest -m "not hardware"
 ```
 
 **Skip slow tests:**
+
 ```bash
 pytest -m "not slow"
 ```
 
 **Only run fast unit tests:**
+
 ```bash
 pytest -m "not hardware and not gui and not slow"
 ```
@@ -397,6 +419,7 @@ assert "C1:TRA ON" in mock.sent_commands
 ### Mock Responses
 
 **File: `tests/fixtures/mock_responses.json`**
+
 ```json
 {
   "*IDN?": "SIGLENT TECHNOLOGIES,SDS2104X Plus,SERIAL123,1.0.0",
@@ -409,6 +432,7 @@ assert "C1:TRA ON" in mock.sent_commands
 ```
 
 **Load in tests:**
+
 ```python
 import json
 from pathlib import Path
@@ -434,6 +458,7 @@ def test_with_mock_responses(mock_responses):
 ### Mocking External Dependencies
 
 **Using unittest.mock:**
+
 ```python
 from unittest.mock import Mock, patch, MagicMock
 
@@ -494,6 +519,7 @@ def test_with_mocker(mocker):
 ### Common Fixtures
 
 **In conftest.py:**
+
 ```python
 import pytest
 import numpy as np
@@ -540,6 +566,7 @@ def captured_waveform(mock_scope):
 ### Fixture Scopes
 
 **Function scope (default):**
+
 ```python
 @pytest.fixture  # Created/destroyed for each test
 def temp_file():
@@ -549,6 +576,7 @@ def temp_file():
 ```
 
 **Class scope:**
+
 ```python
 @pytest.fixture(scope="class")  # Created once per test class
 def database():
@@ -558,6 +586,7 @@ def database():
 ```
 
 **Module scope:**
+
 ```python
 @pytest.fixture(scope="module")  # Created once per test file
 def expensive_resource():
@@ -567,6 +596,7 @@ def expensive_resource():
 ```
 
 **Session scope:**
+
 ```python
 @pytest.fixture(scope="session")  # Created once per test session
 def test_data_dir(tmp_path_factory):
@@ -603,11 +633,13 @@ def test_user_creation(user_table):
 ### PyQt Testing with pytest-qt
 
 **Install:**
+
 ```bash
 pip install pytest-qt
 ```
 
 **Basic widget test:**
+
 ```python
 import pytest
 from PyQt6.QtWidgets import QPushButton
@@ -708,27 +740,32 @@ def test_keyboard_input(qtbot):
 ### Generating Coverage Reports
 
 **Basic coverage:**
+
 ```bash
 pytest --cov=siglent tests/
 ```
 
 **HTML report:**
+
 ```bash
 pytest --cov=siglent --cov-report=html tests/
 # Open htmlcov/index.html
 ```
 
 **Terminal report:**
+
 ```bash
 pytest --cov=siglent --cov-report=term-missing tests/
 ```
 
 **Multiple formats:**
+
 ```bash
 pytest --cov=siglent --cov-report=html --cov-report=term-missing tests/
 ```
 
 **Using Make:**
+
 ```bash
 make test-cov
 ```
@@ -736,6 +773,7 @@ make test-cov
 ### Coverage Configuration
 
 **In pyproject.toml:**
+
 ```toml
 [tool.coverage.run]
 source = ["siglent"]
@@ -762,6 +800,7 @@ exclude_lines = [
 **Overall target:** >80%
 
 **Module-specific targets:**
+
 - Core modules (`oscilloscope.py`, `channel.py`, etc.): >90%
 - Connection layer: >85%
 - Protocol decoders: >80%
@@ -789,6 +828,7 @@ if __name__ == "__main__":  # Excluded by default
 ### GitHub Actions
 
 **Workflow file: `.github/workflows/test.yml`**
+
 ```yaml
 name: Tests
 
@@ -800,36 +840,38 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        python-version: ['3.8', '3.9', '3.10', '3.11', '3.12']
+        python-version: ["3.8", "3.9", "3.10", "3.11", "3.12"]
 
     steps:
-    - uses: actions/checkout@v3
+      - uses: actions/checkout@v3
 
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: ${{ matrix.python-version }}
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
 
-    - name: Install dependencies
-      run: |
-        pip install -e ".[dev]"
+      - name: Install dependencies
+        run: |
+          pip install -e ".[dev]"
 
-    - name: Run tests
-      run: |
-        pytest -m "not hardware and not gui"
+      - name: Run tests
+        run: |
+          pytest -m "not hardware and not gui"
 
-    - name: Upload coverage
-      uses: codecov/codecov-action@v3
+      - name: Upload coverage
+        uses: codecov/codecov-action@v3
 ```
 
 ### Local CI Simulation
 
 **Run all checks:**
+
 ```bash
 make pre-pr
 ```
 
 **Individual checks:**
+
 ```bash
 make lint      # Linting
 make format    # Code formatting
@@ -842,6 +884,7 @@ make build     # Package build
 ### Test Naming
 
 **Good:**
+
 ```python
 def test_channel_enable_sets_state():
     """Test enabling channel sets state correctly."""
@@ -853,6 +896,7 @@ def test_trigger_level_validation_raises_error_for_invalid_value():
 ```
 
 **Bad:**
+
 ```python
 def test1():
     pass
@@ -880,6 +924,7 @@ def test_example():
 ### One Assertion Per Test (Guideline)
 
 **Prefer:**
+
 ```python
 def test_connection_establishes():
     """Test connection established."""
@@ -894,6 +939,7 @@ def test_connection_identifies_model():
 ```
 
 **Over:**
+
 ```python
 def test_connection():
     """Test connection (too many assertions)."""
@@ -907,6 +953,7 @@ def test_connection():
 ### Test Independence
 
 **Good** - Tests don't depend on each other:
+
 ```python
 def test_A():
     scope = create_scope()
@@ -921,6 +968,7 @@ def test_B():
 ```
 
 **Bad** - Tests share state:
+
 ```python
 global_scope = None
 
@@ -938,11 +986,13 @@ def test_B():
 ### Descriptive Assertions
 
 **Good:**
+
 ```python
 assert result == expected, f"Expected {expected}, got {result}"
 ```
 
 **Better:**
+
 ```python
 assert result == expected, (
     f"Waveform processing failed: "
@@ -955,12 +1005,14 @@ assert result == expected, (
 ### Tests Failing
 
 **Import errors:**
+
 ```bash
 # Reinstall in editable mode
 pip install -e ".[dev]"
 ```
 
 **Fixture not found:**
+
 ```python
 # Check conftest.py exists
 # Verify fixture is defined
@@ -968,6 +1020,7 @@ pip install -e ".[dev]"
 ```
 
 **Mock not working:**
+
 ```python
 # Verify mock patch path
 # Check mock is configured before use
@@ -978,6 +1031,7 @@ mock = Mock(spec=RealClass)
 ### Coverage Issues
 
 **Missing coverage:**
+
 ```bash
 # Generate detailed report
 pytest --cov=siglent --cov-report=term-missing tests/
@@ -987,6 +1041,7 @@ pytest --cov=siglent --cov-report=term-missing tests/
 ```
 
 **Incorrect coverage:**
+
 ```bash
 # Clear coverage cache
 rm -rf .coverage htmlcov/
@@ -998,6 +1053,7 @@ pytest --cov=siglent --cov-report=html tests/
 ### GUI Tests Failing
 
 **No display:**
+
 ```bash
 # Linux: Install xvfb
 sudo apt-get install xvfb
@@ -1007,6 +1063,7 @@ xvfb-run pytest -m gui
 ```
 
 **Timing issues:**
+
 ```python
 # Increase timeouts
 with qtbot.waitSignal(signal, timeout=5000):  # 5 seconds
@@ -1020,30 +1077,30 @@ qtbot.wait(100)  # 100ms
 
 ### Common Commands
 
-| Command | Description |
-|---------|-------------|
-| `make test` | Run all tests |
-| `make test-cov` | Run tests with coverage |
-| `make test-fast` | Run tests in parallel |
-| `pytest -v` | Verbose output |
-| `pytest -k "test_name"` | Run specific tests |
-| `pytest -m "not hardware"` | Skip hardware tests |
-| `pytest -x` | Stop on first failure |
-| `pytest --pdb` | Drop to debugger on failure |
+| Command                    | Description                 |
+| -------------------------- | --------------------------- |
+| `make test`                | Run all tests               |
+| `make test-cov`            | Run tests with coverage     |
+| `make test-fast`           | Run tests in parallel       |
+| `pytest -v`                | Verbose output              |
+| `pytest -k "test_name"`    | Run specific tests          |
+| `pytest -m "not hardware"` | Skip hardware tests         |
+| `pytest -x`                | Stop on first failure       |
+| `pytest --pdb`             | Drop to debugger on failure |
 
 ### Useful Pytest Options
 
-| Option | Description |
-|--------|-------------|
-| `-v, --verbose` | Verbose output |
-| `-s` | Show print statements |
-| `-x` | Exit on first failure |
-| `--pdb` | Drop to debugger |
-| `--lf` | Run last failed tests |
-| `--ff` | Run failed tests first |
-| `-k EXPRESSION` | Run matching tests |
-| `-m MARKER` | Run marked tests |
-| `--cov=MODULE` | Measure coverage |
+| Option          | Description            |
+| --------------- | ---------------------- |
+| `-v, --verbose` | Verbose output         |
+| `-s`            | Show print statements  |
+| `-x`            | Exit on first failure  |
+| `--pdb`         | Drop to debugger       |
+| `--lf`          | Run last failed tests  |
+| `--ff`          | Run failed tests first |
+| `-k EXPRESSION` | Run matching tests     |
+| `-m MARKER`     | Run marked tests       |
+| `--cov=MODULE`  | Measure coverage       |
 
 ### Test Structure Template
 

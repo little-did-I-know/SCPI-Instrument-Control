@@ -1,0 +1,43 @@
+# Codecov configuration for Siglent-Oscilloscope
+# Documentation: https://docs.codecov.com/docs/codecov-yaml
+
+codecov:
+  require_ci_to_pass: yes
+  notify:
+    wait_for_ci: yes
+
+coverage:
+  precision: 2
+  round: down
+  range: "70...100"
+
+  status:
+    project:
+      default:
+        target: auto
+        threshold: 1%
+        informational: false
+    patch:
+      default:
+        target: auto
+        threshold: 5%
+        informational: false
+
+  ignore:
+    - "tests/"
+    - "scripts/"
+    - "examples/"
+    - "docs/"
+    - "**/__pycache__"
+    - "**/*.pyc"
+    - "**/test_*.py"
+
+comment:
+  layout: "reach,diff,flags,tree,files"
+  behavior: default
+  require_changes: false
+  require_base: false
+  require_head: true
+
+github_checks:
+  annotations: true

@@ -4,12 +4,12 @@ Intermediate examples showing automation patterns, real-time data capture, and b
 
 ## Quick Reference
 
-| Example | Description |
-|---------|-------------|
-| [Batch capture with different configurations](#batch-capture-with-different-configurations) | Batch capture with different configurations. |
-| [Continuous time-series data collection](#continuous-time-series-data-collection) | Continuous time-series data collection. |
+| Example                                                                                           | Description                                     |
+| ------------------------------------------------------------------------------------------------- | ----------------------------------------------- |
+| [Batch capture with different configurations](#batch-capture-with-different-configurations)       | Batch capture with different configurations.    |
+| [Continuous time-series data collection](#continuous-time-series-data-collection)                 | Continuous time-series data collection.         |
 | [Live plotting example for Siglent oscilloscope](#live-plotting-example-for-siglent-oscilloscope) | Live plotting example for Siglent oscilloscope. |
-| [Trigger-based event capture](#trigger-based-event-capture) | Trigger-based event capture. |
+| [Trigger-based event capture](#trigger-based-event-capture)                                       | Trigger-based event capture.                    |
 
 ---
 

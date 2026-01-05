@@ -56,6 +56,7 @@ fft_rect = scope.fft_analyzer.compute_fft(waveform, window="rectangular")
 ```
 
 **Window Selection Guide:**
+
 - **Hanning**: General purpose, good for most signals
 - **Blackman**: Low spectral leakage, good for finding weak signals
 - **Flat-top**: Accurate amplitude measurements

@@ -5,6 +5,203 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+## [0.5.0] - 2026-01-04
+
+### Added
+
+**Automated Test Report Generation** 📊
+- **Installation**: `pip install "Siglent-Oscilloscope[report-generator]"`
+- **PDF and Markdown Report Generators**
+  - Professional publication-ready reports with waveform plots and analysis
+  - Comprehensive metadata tracking (test ID, operator, timestamp, scope model)
+  - Multiple output formats (PDF via ReportLab, Markdown with embedded plots)
+  - Automatic file organization and asset management
+
+- **Signal Type Detection** (`siglent/report_generator/utils/waveform_analyzer.py`)
+  - Automatic waveform classification using FFT harmonic analysis
+  - Detects 9 signal types: sine, square, triangle, sawtooth, pulse, DC, noise, complex, unknown
+  - Confidence scoring for classification accuracy
+  - THD (Total Harmonic Distortion) calculation for waveform quality assessment
+  - Pattern matching algorithms for periodic signal identification:
+    - Square waves: odd harmonics at 1/n amplitude ratio
+    - Triangle waves: odd harmonics at 1/n² amplitude ratio
+    - Sawtooth waves: all harmonics at 1/n amplitude ratio
+  - Signal type displayed in both PDF and Markdown reports with confidence percentage
+  - Added `SignalType` constants class for standardized type identification
+
+- **Enhanced Waveform Statistics** (`siglent/report_generator/models/report_data.py`)
+  - Comprehensive signal analysis with 25+ measurement parameters
+  - Amplitude measurements: Vmax, Vmin, Vpp, VRMS, Vmean, DC offset
+  - Frequency and timing: frequency, period, rise time, fall time, pulse width, duty cycle
+  - Quality metrics: SNR (Signal-to-Noise Ratio), THD, noise level, overshoot, undershoot, jitter
+  - Automatic statistics calculation via `WaveformData.analyze()` method
+  - Smart unit formatting with SI prefixes (mV, µs, kHz, etc.)
+  - Statistics integration in PDF and Markdown report generators
+
+- **Plateau Stability Analysis** (Optional Feature)
+  - Measures noise on high and low plateaus for periodic signals
+  - Uses run-length encoding to identify flat signal regions
+  - Analyzes middle 60% of each plateau to exclude edge transitions
+  - Reports three metrics:
+    - Plateau High Noise: Standard deviation on high-level plateaus
+    - Plateau Low Noise: Standard deviation on low-level plateaus
+    - Plateau Stability: Average noise across all plateaus
+  - User-configurable via Report Options dialog checkbox
+  - Auto-applies to pulse, square, triangle, sawtooth, and sine waves
+  - Helpful for power supply ripple, logic level stability, and signal quality testing
+
+- **LLM Model Detection Feature** (`siglent/report_generator/widgets/llm_settings_dialog.py`)
+  - "Detect Models" button in Ollama and LM Studio configuration tabs
+  - Automatically queries server for available models and populates dropdown
+  - Changed model input from text field to editable combo box
+  - Preserves previously selected model after detection
+  - User-friendly error messages with troubleshooting steps
+  - Shows model count and lists detected models
+  - Leverages existing `LLMClient.get_available_models()` API
+  - Works with both Ollama Python SDK and OpenAI-compatible endpoints
+
+- **Report Options Dialog** (`siglent/report_generator/widgets/report_options_dialog.py`)
+  - New checkbox: "Plateau Stability Analysis (Advanced)"
+  - Tooltip explains feature usage and applicability
+  - Settings persist with report templates
+  - Integrated with `ReportOptions` model
+
+### Changed - Report Generator Features
+
+- **PDF Generation Progress Tracking** (`siglent/report_generator/generators/pdf_generator.py`)
+  - Enhanced with granular waveform-level progress updates
+  - Progress now updates for each waveform being processed: 20%, 25%, 30%, ..., 80%
+  - Prevents freezing appearance during matplotlib plot generation
+  - Progress callback shows current operation: "Processing section X/Y", "Rendering waveform Z"
+  - Smooth progression instead of jumping from 20% to 100%
+  - Integrated with `QProgressDialog` in GUI for visual feedback
+
+- **Unicode Character Normalization** (`siglent/report_generator/generators/pdf_generator.py`)
+  - Comprehensive character mapping for AI-generated text compatibility
+  - Handles 30+ Unicode characters that ReportLab can't render:
+    - Smart quotes (U+201C, U+201D, U+2018, U+2019) → regular quotes
+    - Em-dash (U+2014) and en-dash (U+2013) → hyphens
+    - Bullets (U+2022) → asterisks
+    - Ellipsis (U+2026) → three dots
+    - Math symbols: ≤→<=, ≥→>=, ≠→!=, ×→x, ÷→/
+    - Degree symbols: °→deg, ℃→C, ℉→F
+    - Non-breaking spaces and special formatting characters → regular space
+  - Applied to all AI-generated text fields: executive summary, AI insights, AI summary
+  - Prevents empty boxes, question marks, or missing characters in PDFs
+  - Maintains readability while ensuring PDF compatibility
+
+- **Waveform Statistics Display** (PDF and Markdown Generators)
+  - Statistics tables now include signal type with confidence
+  - Plateau stability metrics shown when enabled and applicable
+  - Enhanced formatting with proper units and precision
+  - Color-coded headers and organized metric grouping in PDFs
+  - Responsive table layout that adapts to content
+
+### Fixed - Report Generator Features
+
+- **AI-Generated Text Rendering in PDFs**
+  - Fixed special Unicode characters not rendering (showing as boxes/question marks)
+  - Root cause: LLMs generate smart quotes, bullets, and math symbols that ReportLab can't handle
+  - Solution: Comprehensive character normalization before PDF generation
+  - Now handles text from Claude, GPT, Llama, and other LLMs correctly
+
+- **Progress Bar Freezing During Plot Generation**
+  - Fixed progress bar appearing to freeze at 20% during PDF generation
+  - Root cause: No progress updates during slow matplotlib plot rendering
+  - Solution: Track waveforms across sections and report per-waveform progress
+  - Users now see smooth progression throughout the entire generation process
+
+### Technical Improvements - Report Generator
+
+- **FFT-Based Signal Analysis**
+  - NumPy FFT with harmonic ratio analysis for signal classification
+  - Autocorrelation for period detection in non-periodic signals
+  - Robust against noise with configurable confidence thresholds
+  - Optimized for real-world oscilloscope waveforms
+
+- **Extensible Waveform Analyzer**
+  - Static methods for modular analysis capabilities
+  - Separation of detection, measurement, and formatting logic
+  - Easy to add new signal types or analysis algorithms
+  - Comprehensive docstrings with algorithm explanations
+
+- **Report Options Architecture**
+  - `ReportOptions` dataclass for type-safe configuration
+  - Passed through generator chain to all analysis functions
+  - Enables feature flags for optional expensive computations
+  - JSON-serializable for template saving
+
+- **Model Detection Integration**
+  - Reuses existing LLMClient infrastructure
+  - Handles both Ollama native API and OpenAI-compatible endpoints
+  - Graceful error handling with actionable user feedback
+  - No duplicate code between Ollama and LM Studio detection
+
+**Power Supply - Now Stable** ✅
+- Power supply support graduated from BETA to stable
+- API is now considered production-ready
+- Removed experimental warnings and beta tags
+- Full support for SPD3303X series power supplies
+- Installation: Standard package or `pip install "Siglent-Oscilloscope[power-supply-beta]"` (alias maintained)
+
+**Pre-Commit Checks and Code Coverage** 🔍
+- New `make pre-commit-branch` target for lightweight branch commit validation
+  - Code formatting checks (Black, Flake8)
+  - Fast parallel test execution
+  - ~1 minute validation for rapid development
+- Enhanced `make pre-pr` with codecov integration
+  - Full test suite with coverage reporting
+  - Automatic coverage upload to Codecov
+  - Comprehensive validation before pull requests
+- Codecov configuration (`.codecov.yml`)
+  - 70-100% coverage range targets
+  - Project and patch thresholds
+  - Proper ignore patterns for tests, examples, docs
+- Coverage documentation (`docs/development/PRE_COMMIT_CHECKS.md`)
+  - Complete guide for pre-commit workflows
+  - Coverage concepts and best practices
+  - Troubleshooting and CI/CD integration
+
+### Changed
+
+**Documentation Updates**
+- Updated README with comprehensive Automated Report Generation section
+  - Installation instructions for `[report-generator]` extra
+  - Code examples and feature highlights
+  - Added to Features, Installation, Optional Extras, and Examples sections
+- Removed BETA designation from power supply in documentation
+- Enhanced package description with automated report generation features
+
+**Project Organization**
+- Reorganized main directory structure for better clarity
+- Moved test/development scripts to `scripts/` directory:
+  - `test_llm_model_detection.py`
+  - `test_pdf_progress.py` and `test_report_progress.pdf`
+  - `test_signal_detection.py`
+  - `test_unicode_rendering.py` and `test_unicode_rendering.pdf`
+- Moved `ICON_SETUP.md` to `docs/development/` for better organization
+- Removed duplicate `codecov.yml` (keeping `.codecov.yml`)
+- Cleaned up empty `node_modules/` directory
+- Root directory now contains 22 essential files/directories
+
+### Fixed
+
+**Development Dependencies**
+- Added `pytest-cov>=4.0.0` to dev dependencies
+  - Fixes "unrecognized arguments: --cov" error
+  - Ensures coverage plugin available after `pip install -e ".[dev]"`
+- Added `codecov>=2.1.0` to dev dependencies
+  - Required by `make codecov-report` and `make pre-pr`
+  - Enables coverage uploads in development
+
+**Makefile Pytest Integration**
+- Updated all pytest calls to use `python -m pytest`
+  - Ensures pytest-cov plugin is properly loaded
+  - Fixes coverage generation in nested make calls
+  - Updated targets: `test`, `test-cov`, `test-fast`, `test-exceptions`
+
 ## [0.4.0-beta.1] - 2026-01-04
 
 ### Added (EXPERIMENTAL 🧪)

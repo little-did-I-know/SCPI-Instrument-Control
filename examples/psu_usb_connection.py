@@ -14,7 +14,7 @@ Supports:
 """
 
 from siglent import PowerSupply
-from siglent.connection import VISAConnection, list_visa_resources, find_siglent_devices
+from siglent.connection import VISAConnection, find_siglent_devices, list_visa_resources
 
 
 def discover_devices():

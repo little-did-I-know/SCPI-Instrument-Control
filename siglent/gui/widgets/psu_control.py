@@ -4,16 +4,7 @@ import logging
 from typing import Optional
 
 from PyQt6.QtCore import QTimer
-from PyQt6.QtWidgets import (
-    QCheckBox,
-    QDoubleSpinBox,
-    QGridLayout,
-    QGroupBox,
-    QLabel,
-    QPushButton,
-    QVBoxLayout,
-    QWidget,
-)
+from PyQt6.QtWidgets import QCheckBox, QDoubleSpinBox, QGridLayout, QGroupBox, QLabel, QPushButton, QVBoxLayout, QWidget
 
 from siglent import PowerSupply
 

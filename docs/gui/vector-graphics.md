@@ -31,11 +31,13 @@ pip install "Siglent-Oscilloscope[fun]"
 ```
 
 **Dependencies:**
+
 - NumPy (for waveform calculations)
 - SciPy (for signal processing)
 - PyQt6 (for GUI)
 
 **Optional:**
+
 - PyQtGraph (for high-performance preview)
 
 ## Accessing Vector Graphics
@@ -53,6 +55,7 @@ Click the **Vector Graphics** button (📐 icon)
 ### Docking Panel
 
 Vector Graphics can be:
+
 - Docked to main window
 - Floating window
 - Tabbed with other panels
@@ -64,12 +67,14 @@ Vector Graphics can be:
 XY mode displays one channel on the X-axis and another on the Y-axis, creating 2D plots instead of time-domain waveforms.
 
 **Normal Time Mode:**
+
 ```
 Y-axis: Voltage
 X-axis: Time
 ```
 
 **XY Mode:**
+
 ```
 Y-axis: Channel 2 Voltage
 X-axis: Channel 1 Voltage
@@ -78,11 +83,13 @@ X-axis: Channel 1 Voltage
 ### Enabling XY Mode
 
 **In GUI:**
+
 1. Vector Graphics panel
 2. Click "Enable XY Mode"
 3. Select channels for X and Y
 
 **Channel Assignment:**
+
 - X-axis: Usually Channel 1
 - Y-axis: Usually Channel 2
 - Adjustable in settings
@@ -90,11 +97,13 @@ X-axis: Channel 1 Voltage
 ### XY Mode Applications
 
 **Lissajous Figures:**
+
 - Compare two sine waves
 - Measure phase relationships
 - Frequency ratio visualization
 
 **Example:**
+
 ```
 C1: sin(ωt) → X-axis
 C2: sin(2ωt) → Y-axis
@@ -102,11 +111,13 @@ Result: Lissajous figure (2:1 ratio)
 ```
 
 **Shape Display:**
+
 - Circles, ellipses
 - Custom closed paths
 - Vector drawings
 
 **Parametric Equations:**
+
 - Rose curves
 - Spirals
 - Mathematical patterns
@@ -118,6 +129,7 @@ Result: Lissajous figure (2:1 ratio)
 The GUI includes a library of common shapes:
 
 **Basic Shapes:**
+
 - Circle
 - Square
 - Triangle
@@ -126,6 +138,7 @@ The GUI includes a library of common shapes:
 - Star
 
 **Advanced Shapes:**
+
 - Heart
 - Infinity symbol
 - Trefoil
@@ -133,6 +146,7 @@ The GUI includes a library of common shapes:
 - Spiral
 
 **Lissajous Patterns:**
+
 - 1:1, 1:2, 2:3 ratios
 - Various phase offsets
 - Amplitude variations
@@ -140,6 +154,7 @@ The GUI includes a library of common shapes:
 ### Creating Shape from Library
 
 **Steps:**
+
 1. Open Vector Graphics panel
 2. Click "Shape Library"
 3. Select shape from list
@@ -151,6 +166,7 @@ The GUI includes a library of common shapes:
 5. Click "Generate"
 
 **Example: Circle**
+
 ```
 Shape: Circle
 Radius: 1.0 V
@@ -163,26 +179,31 @@ Frequency: 1 kHz
 ### Shape Parameters
 
 **Size:**
+
 - Radius for circles
 - Width/Height for rectangles
 - Scale factor for custom shapes
 
 **Position:**
+
 - X offset
 - Y offset
 - Centers the shape
 
 **Rotation:**
+
 - Angle in degrees
 - 0° to 360°
 - Rotates around center
 
 **Resolution:**
+
 - Number of points
 - Higher = smoother curves
 - Typical: 500-2000 points
 
 **Frequency:**
+
 - Waveform frequency
 - Affects display speed
 - Typical: 100 Hz - 10 kHz
@@ -192,12 +213,14 @@ Frequency: 1 kHz
 ### Freehand Drawing
 
 **Interactive Drawing:**
+
 1. Click "Draw Custom Path"
 2. Use mouse to draw on canvas
 3. Path automatically smoothed
 4. Click "Finish" when done
 
 **Features:**
+
 - Automatic path smoothing
 - Point reduction for efficiency
 - Closed path option
@@ -210,6 +233,7 @@ Frequency: 1 kHz
 Enter X and Y as functions of parameter t:
 
 **Example: Rose Curve**
+
 ```
 X(t) = cos(3t) * cos(t)
 Y(t) = cos(3t) * sin(t)
@@ -218,6 +242,7 @@ Points: 1000
 ```
 
 **Example: Spiral**
+
 ```
 X(t) = t * cos(10t)
 Y(t) = t * sin(10t)
@@ -226,6 +251,7 @@ Points: 2000
 ```
 
 **Example: Lissajous (3:2 ratio)**
+
 ```
 X(t) = sin(3*ω*t)
 Y(t) = sin(2*ω*t + π/2)
@@ -235,35 +261,41 @@ Y(t) = sin(2*ω*t + π/2)
 ### Supported Functions
 
 **Mathematical:**
+
 - sin(x), cos(x), tan(x)
 - sqrt(x), exp(x), log(x)
 - abs(x), sign(x)
 
 **Constants:**
+
 - pi (π)
 - e (Euler's number)
 - Custom constants
 
 **Operations:**
-- +, -, *, /
-- ** (power)
+
+- +, -, \*, /
+- \*\* (power)
 - Parentheses
 
 ### Path Editor
 
 **Edit Points:**
+
 - Add/remove points
 - Drag points to adjust
 - Bezier curve handles
 - Snap to grid
 
 **Path Operations:**
+
 - Scale
 - Rotate
 - Mirror (horizontal/vertical)
 - Reverse direction
 
 **Path Properties:**
+
 - Total length
 - Number of points
 - Bounding box
@@ -276,6 +308,7 @@ Y(t) = sin(2*ω*t + π/2)
 The shape is converted to two waveforms (X and Y):
 
 **Process:**
+
 1. Shape path defined (library or custom)
 2. Path sampled at N points
 3. X coordinates → Channel 1 waveform
@@ -283,6 +316,7 @@ The shape is converted to two waveforms (X and Y):
 5. Both waveforms synchronized
 
 **Example:**
+
 ```
 Circle at origin, radius 1V, 1000 points:
 
@@ -294,23 +328,27 @@ n = 0 to 999
 ### Waveform Parameters
 
 **Sample Rate:**
+
 - Determines time resolution
 - Higher rate = smoother display
 - Typical: 1 kSa/s to 1 MSa/s
 
 **Frequency:**
+
 - How fast shape is drawn
 - Lower frequency = slower, smoother
 - Higher frequency = faster, may flicker
 - Typical: 100 Hz - 5 kHz
 
 **Amplitude:**
+
 - Voltage range
 - X and Y independent
 - Must fit within oscilloscope range
 - Typical: ±1V to ±5V
 
 **DC Offset:**
+
 - Center position
 - X and Y independent
 - Shifts shape on screen
@@ -319,18 +357,21 @@ n = 0 to 999
 ### Waveform Preview
 
 **Real-Time Preview:**
+
 - Shows generated waveforms
 - Time domain view (both channels)
 - XY mode preview
 - FFT spectrum view
 
 **Preview Controls:**
+
 - Zoom in/out
 - Pan
 - Measure points
 - Cursors
 
 **Updates:**
+
 - Automatic when parameters change
 - Adjustable update rate
 - Pause preview for performance
@@ -342,27 +383,32 @@ n = 0 to 999
 **Types of Animation:**
 
 **Rotation:**
+
 - Rotate shape over time
 - Speed adjustable
 - Clockwise/counter-clockwise
 
 **Scaling:**
+
 - Grow/shrink
 - Pulsing effect
 - Sine wave modulation
 
 **Translation:**
+
 - Move shape
 - Circular orbit
 - Linear path
 
 **Morphing:**
+
 - Transition between shapes
 - Smooth interpolation
 
 ### Animation Parameters
 
 **Rotation Animation:**
+
 ```
 Rotation Speed: 30°/s
 Direction: Clockwise
@@ -370,6 +416,7 @@ Loop: Continuous
 ```
 
 Implemented as:
+
 ```python
 angle(t) = angle_start + rotation_speed * t
 X_rotated = X * cos(angle) - Y * sin(angle)
@@ -377,6 +424,7 @@ Y_rotated = X * sin(angle) + Y * cos(angle)
 ```
 
 **Pulsing Animation:**
+
 ```
 Pulse Frequency: 2 Hz
 Min Scale: 0.5
@@ -384,6 +432,7 @@ Max Scale: 1.5
 ```
 
 Implemented as:
+
 ```python
 scale(t) = 1.0 + 0.5 * sin(2π * 2 * t)
 X_scaled = X * scale(t)
@@ -393,18 +442,21 @@ Y_scaled = Y * scale(t)
 ### Animation Timeline
 
 **Timeline Editor:**
+
 - Keyframe-based animation
 - Drag keyframes on timeline
 - Interpolation between keyframes
 - Loop/ping-pong modes
 
 **Keyframes:**
+
 - Position
 - Scale
 - Rotation
 - Opacity (via amplitude)
 
 **Playback Controls:**
+
 - Play/pause
 - Speed control
 - Frame-by-frame stepping
@@ -417,6 +469,7 @@ Y_scaled = Y * scale(t)
 Some Siglent oscilloscopes have built-in AWG:
 
 **Output to AWG:**
+
 1. Generate waveform
 2. Click "Send to AWG"
 3. Select AWG channels
@@ -424,12 +477,14 @@ Some Siglent oscilloscopes have built-in AWG:
 5. Enable AWG output
 
 **AWG Settings:**
+
 - Frequency
 - Amplitude
 - Offset
 - Output impedance (50Ω / High-Z)
 
 **Example:**
+
 ```
 AWG Ch1 (X): Circle X-component
   Frequency: 1 kHz
@@ -447,12 +502,14 @@ AWG Ch2 (Y): Circle Y-component
 **Export Waveform Data:**
 
 **Formats:**
+
 - CSV (time, voltage)
 - WAV (audio format, for some AWGs)
 - Binary (raw samples)
 - Arbitrary waveform format (manufacturer-specific)
 
 **Export Steps:**
+
 1. Generate waveform
 2. File → Export Waveform
 3. Choose format
@@ -460,6 +517,7 @@ AWG Ch2 (Y): Circle Y-component
 5. Load into external AWG
 
 **CSV Format Example:**
+
 ```csv
 Time (s), X Voltage (V), Y Voltage (V)
 0.000000, 1.000000, 0.000000
@@ -471,12 +529,14 @@ Time (s), X Voltage (V), Y Voltage (V)
 ### Synchronization
 
 **Critical for XY Display:**
+
 - Both channels must be synchronized
 - Same sample rate
 - Same start time
 - Same number of points
 
 **Synchronization Tips:**
+
 - Use same AWG for both outputs
 - If using two AWGs, use external sync
 - Check relative phase
@@ -487,23 +547,27 @@ Time (s), X Voltage (V), Y Voltage (V)
 ### XY Mode Display
 
 **Aspect Ratio:**
+
 - 1:1 (square) - Default
 - 4:3 (standard)
 - 16:9 (widescreen)
 - Custom
 
 **Persistence:**
+
 - Infinite persistence shows complete path
 - Short persistence for animated shapes
 - Adjustable decay time
 
 **Line Style:**
+
 - Solid line
 - Dotted/dashed (shows direction)
 - Color gradient (shows time progression)
 - Brightness modulation
 
 **Grid:**
+
 - Show/hide grid
 - Grid spacing
 - Polar grid option (for circular shapes)
@@ -511,12 +575,14 @@ Time (s), X Voltage (V), Y Voltage (V)
 ### Color and Brightness
 
 **Color Modes:**
+
 - Single color
 - Gradient (start to end)
 - Rainbow (full spectrum)
 - Custom palette
 
 **Brightness:**
+
 - Constant
 - Modulated (shows speed)
 - Fades at endpoints
@@ -528,6 +594,7 @@ Time (s), X Voltage (V), Y Voltage (V)
 **Objective:** Display a perfect circle in XY mode
 
 **Steps:**
+
 ```
 1. Open Vector Graphics panel
 2. Shape Library → Circle
@@ -551,6 +618,7 @@ Time (s), X Voltage (V), Y Voltage (V)
 **Objective:** Create a 3:2 Lissajous pattern
 
 **Custom Equation:**
+
 ```
 X(t) = sin(3 * 2π * f * t)
 Y(t) = sin(2 * 2π * f * t)
@@ -560,6 +628,7 @@ Sample rate: 10 kSa/s
 ```
 
 **Settings:**
+
 ```
 Amplitude X: 2 V
 Amplitude Y: 2 V
@@ -573,6 +642,7 @@ Offset: 0 V
 **Objective:** Animate a rotating square
 
 **Steps:**
+
 ```
 1. Shape Library → Square
 2. Size: 2V × 2V
@@ -592,6 +662,7 @@ Offset: 0 V
 **Objective:** Display a heart using parametric equations
 
 **Parametric Equations:**
+
 ```
 X(t) = 16 * sin³(t)
 Y(t) = 13*cos(t) - 5*cos(2t) - 2*cos(3t) - cos(4t)
@@ -600,6 +671,7 @@ Scale: 0.1 (to fit ±5V range)
 ```
 
 **Steps:**
+
 ```
 1. Custom Path → Parametric
 2. Enter equations above
@@ -615,6 +687,7 @@ Scale: 0.1 (to fit ±5V range)
 **Objective:** Expanding/contracting spiral
 
 **Parametric with Animation:**
+
 ```
 X(t, anim) = anim * t * cos(10t)
 Y(t, anim) = anim * t * sin(10t)
@@ -623,6 +696,7 @@ anim: 0.5 to 1.5 (sine wave modulation)
 ```
 
 **Animation:**
+
 ```
 anim(time) = 1.0 + 0.5 * sin(2π * 1 Hz * time)
 ```
@@ -634,11 +708,13 @@ anim(time) = 1.0 + 0.5 * sin(2π * 1 Hz * time)
 ### Multi-Path Compositions
 
 **Combine Multiple Shapes:**
+
 - Draw several shapes sequentially
 - Rapid switching between paths
 - Creates composite images
 
 **Implementation:**
+
 - Switch between waveforms rapidly
 - Use blanking signal to control visibility
 - Requires fast AWG or pattern generator
@@ -646,12 +722,14 @@ anim(time) = 1.0 + 0.5 * sin(2π * 1 Hz * time)
 ### 3D Projections
 
 **Project 3D shapes to 2D:**
+
 - Define shape in 3D (X, Y, Z)
 - Apply rotation matrix
 - Project to XY plane
 - Animate rotation for 3D effect
 
 **Example: Rotating Cube**
+
 ```python
 # Define cube vertices in 3D
 # Apply rotation matrix
@@ -663,6 +741,7 @@ anim(time) = 1.0 + 0.5 * sin(2π * 1 Hz * time)
 ### Bitmap to Vector
 
 **Convert Images to Vector Paths:**
+
 1. Import bitmap image
 2. Edge detection
 3. Trace edges to paths
@@ -670,6 +749,7 @@ anim(time) = 1.0 + 0.5 * sin(2π * 1 Hz * time)
 5. Export as waveform
 
 **Use Cases:**
+
 - Display logos
 - Custom artwork
 - Text rendering
@@ -677,12 +757,14 @@ anim(time) = 1.0 + 0.5 * sin(2π * 1 Hz * time)
 ### Text Rendering
 
 **Display Text:**
+
 - Use vector font
 - Convert characters to paths
 - Generate waveform
 - Display in XY mode
 
 **Font Options:**
+
 - Hershey vector fonts
 - Single-stroke fonts
 - Custom fonts
@@ -694,6 +776,7 @@ anim(time) = 1.0 + 0.5 * sin(2π * 1 Hz * time)
 **Problem:** XY mode enabled but no shape visible
 
 **Solutions:**
+
 1. **Check Channels Enabled**
    - Both X and Y channels must be on
    - Verify in Channels tab
@@ -718,6 +801,7 @@ anim(time) = 1.0 + 0.5 * sin(2π * 1 Hz * time)
 **Problem:** Shape is stretched or squashed
 
 **Solutions:**
+
 1. **Match Voltage Scales**
    - Set C1 and C2 to same V/div
    - Equal scales for equal aspect ratio
@@ -736,6 +820,7 @@ anim(time) = 1.0 + 0.5 * sin(2π * 1 Hz * time)
 **Problem:** Shape flickers or is unstable
 
 **Solutions:**
+
 1. **Adjust Frequency**
    - Too high: Flickers
    - Too low: Draws slowly
@@ -756,6 +841,7 @@ anim(time) = 1.0 + 0.5 * sin(2π * 1 Hz * time)
 **Problem:** Shape not closed or has gaps
 
 **Solutions:**
+
 1. **Increase Points**
    - More points = smoother curve
    - Try 1000-2000 points
@@ -773,6 +859,7 @@ anim(time) = 1.0 + 0.5 * sin(2π * 1 Hz * time)
 **Problem:** Animation not smooth
 
 **Solutions:**
+
 1. **Increase Frame Rate**
    - Higher update rate
    - May impact performance
@@ -790,58 +877,38 @@ anim(time) = 1.0 + 0.5 * sin(2π * 1 Hz * time)
 
 ### Shape Design
 
-!!! tip "Good Shapes for XY Display"
-    - **Closed paths** work best (circle, square)
-    - **Smooth curves** display better than sharp angles
-    - **Equal aspect ratio** requires matching X and Y scales
-    - **1000-2000 points** is optimal resolution
+!!! tip "Good Shapes for XY Display" - **Closed paths** work best (circle, square) - **Smooth curves** display better than sharp angles - **Equal aspect ratio** requires matching X and Y scales - **1000-2000 points** is optimal resolution
 
 ### Frequency Selection
 
-!!! tip "Choosing Frequency"
-    - **100-500 Hz**: Best for complex shapes
-    - **500-2000 Hz**: Good balance for most shapes
-    - **2-5 kHz**: Simple shapes, faster animation
-    - **>5 kHz**: May flicker, test on scope
+!!! tip "Choosing Frequency" - **100-500 Hz**: Best for complex shapes - **500-2000 Hz**: Good balance for most shapes - **2-5 kHz**: Simple shapes, faster animation - **>5 kHz**: May flicker, test on scope
 
 ### Amplitude Range
 
-!!! tip "Voltage Levels"
-    - Stay within ±5V for most scopes
-    - Use full range for best resolution
-    - Match AWG output to scope input range
-    - Account for probe attenuation
+!!! tip "Voltage Levels" - Stay within ±5V for most scopes - Use full range for best resolution - Match AWG output to scope input range - Account for probe attenuation
 
 ### Performance
 
-!!! tip "Optimizing Performance"
-    - Use PyQtGraph for preview (10x faster)
-    - Reduce points for faster generation
-    - Disable preview during parameter adjustment
-    - Export to AWG for best display quality
+!!! tip "Optimizing Performance" - Use PyQtGraph for preview (10x faster) - Reduce points for faster generation - Disable preview during parameter adjustment - Export to AWG for best display quality
 
 ### Synchronization
 
-!!! tip "Keeping X and Y in Sync"
-    - Use same AWG for both channels
-    - If separate AWGs, use external clock sync
-    - Check phase alignment with simple shapes
-    - Test with circle before complex shapes
+!!! tip "Keeping X and Y in Sync" - Use same AWG for both channels - If separate AWGs, use external clock sync - Check phase alignment with simple shapes - Test with circle before complex shapes
 
 ## Keyboard Shortcuts
 
-| Shortcut | Action |
-|----------|--------|
-| `Ctrl+X` | Open Vector Graphics panel |
-| `Ctrl+N` | New shape |
-| `Ctrl+G` | Generate waveform |
-| `Ctrl+P` | Preview |
-| `Ctrl+E` | Export to AWG |
-| `Space` | Play/pause animation |
-| `Arrow keys` | Fine-tune position |
-| `Ctrl+Arrow` | Large position steps |
-| `+/-` | Increase/decrease size |
-| `R` | Rotate 90° |
+| Shortcut     | Action                     |
+| ------------ | -------------------------- |
+| `Ctrl+X`     | Open Vector Graphics panel |
+| `Ctrl+N`     | New shape                  |
+| `Ctrl+G`     | Generate waveform          |
+| `Ctrl+P`     | Preview                    |
+| `Ctrl+E`     | Export to AWG              |
+| `Space`      | Play/pause animation       |
+| `Arrow keys` | Fine-tune position         |
+| `Ctrl+Arrow` | Large position steps       |
+| `+/-`        | Increase/decrease size     |
+| `R`          | Rotate 90°                 |
 
 ## Example Workflows
 
@@ -899,6 +966,7 @@ Time: 10-15 minutes
 ### With Live View
 
 **Real-Time XY Display:**
+
 - Enable Live View
 - Switch to XY mode
 - See shape update in real-time
@@ -907,6 +975,7 @@ Time: 10-15 minutes
 ### With FFT Analysis
 
 **Analyze Waveform Components:**
+
 - Generate shape waveform
 - Run FFT on X and Y channels
 - See frequency components
@@ -915,6 +984,7 @@ Time: 10-15 minutes
 ### With Measurements
 
 **Measure Shape Properties:**
+
 - Vpp (size of shape)
 - Frequency (drawing speed)
 - Phase (X vs Y offset)
@@ -923,6 +993,7 @@ Time: 10-15 minutes
 ### With Reference Waveforms
 
 **Compare Shapes:**
+
 - Save current shape as reference
 - Generate new shape
 - Overlay in XY mode
@@ -933,6 +1004,7 @@ Time: 10-15 minutes
 ### Parametric Equations
 
 **General Form:**
+
 ```
 X = f(t)
 Y = g(t)
@@ -942,6 +1014,7 @@ t ∈ [t_start, t_end]
 **Common Parametric Shapes:**
 
 **Circle:**
+
 ```
 X(t) = R * cos(t)
 Y(t) = R * sin(t)
@@ -949,6 +1022,7 @@ t: 0 to 2π
 ```
 
 **Ellipse:**
+
 ```
 X(t) = a * cos(t)
 Y(t) = b * sin(t)
@@ -956,12 +1030,14 @@ t: 0 to 2π
 ```
 
 **Lissajous (m:n ratio):**
+
 ```
 X(t) = A * sin(m*ω*t + φ)
 Y(t) = B * sin(n*ω*t)
 ```
 
 **Rose Curve (k petals):**
+
 ```
 X(t) = cos(k*t) * cos(t)
 Y(t) = cos(k*t) * sin(t)
@@ -970,12 +1046,14 @@ Y(t) = cos(k*t) * sin(t)
 ### Rotation Matrix
 
 **Rotate point (x, y) by angle θ:**
+
 ```
 X' = x*cos(θ) - y*sin(θ)
 Y' = x*sin(θ) + y*cos(θ)
 ```
 
 **For animation:**
+
 ```
 θ(t) = ω * t
 ω = rotation speed (rad/s)
@@ -984,12 +1062,14 @@ Y' = x*sin(θ) + y*cos(θ)
 ### Scaling Transform
 
 **Scale by factor s:**
+
 ```
 X' = s * X
 Y' = s * Y
 ```
 
 **Anisotropic scaling:**
+
 ```
 X' = sx * X
 Y' = sy * Y
@@ -999,28 +1079,22 @@ Y' = sy * Y
 
 ### AWG Limitations
 
-!!! warning "AWG Output Limits"
-    - Check maximum voltage rating
-    - Don't exceed current limits
-    - Verify load impedance
-    - Use appropriate cables
+!!! warning "AWG Output Limits" - Check maximum voltage rating - Don't exceed current limits - Verify load impedance - Use appropriate cables
 
 ### Oscilloscope Input
 
-!!! warning "Protect Oscilloscope Inputs"
-    - Stay within ±400V (typical max input)
-    - Check probe rating
-    - Don't connect AWG directly to HV circuits
-    - Use proper grounding
+!!! warning "Protect Oscilloscope Inputs" - Stay within ±400V (typical max input) - Check probe rating - Don't connect AWG directly to HV circuits - Use proper grounding
 
 ### Frequency Limits
 
 **Sample Rate Nyquist:**
+
 - AWG sample rate ≥ 2 × max frequency component
 - Higher sample rate for smoother curves
 - Check AWG specifications
 
 **Display Refresh:**
+
 - Some shapes require higher persistence
 - Flickering possible at high frequencies
 - Adjust based on oscilloscope capabilities

@@ -299,6 +299,7 @@ Before reaching `1.0.0`, the project is considered unstable:
 - **Experimental features**: Use extra caution, clearly marked
 
 **Current Status**: The project is at `0.3.x`, meaning:
+
 - Core APIs are maturing but not yet stable
 - Breaking changes acceptable in `0.x.0` releases
 - Experimental features have even fewer guarantees
@@ -311,7 +312,7 @@ Document experimental feature installation clearly:
 
 **In README.md:**
 
-```markdown
+````markdown
 ## Experimental Features
 
 ⚠️ **Experimental features are unstable and may change without warning.**
@@ -322,6 +323,7 @@ Document experimental feature installation clearly:
 # Install with experimental power supply support
 pip install "Siglent-Oscilloscope[power-supply-beta]"
 ```
+````
 
 ```python
 import warnings
@@ -336,7 +338,8 @@ psu = PowerSupply('192.168.1.101')
 **Stability**: This feature is experimental. API may change in any release.
 
 **Feedback**: Please report issues and suggestions at [GitHub Issues](https://github.com/little-did-I-know/Siglent-Oscilloscope/issues)
-```
+
+````
 
 ### Runtime Discovery
 
@@ -409,7 +412,7 @@ def list_experimental_features() -> List[Dict]:
         }
         for f in EXPERIMENTAL_FEATURES
     ]
-```
+````
 
 **Usage:**
 
@@ -495,6 +498,7 @@ Document experimental features clearly:
 ## [0.4.0-beta.1] - 2026-01-15
 
 ### Added (EXPERIMENTAL)
+
 - **Power Supply Control** (`siglent.power_supply` module)
   - ⚠️ EXPERIMENTAL: API unstable, may change without warning
   - SPD3303X series support
@@ -525,6 +529,7 @@ Create documentation in `docs/experimental/`:
 This module provides programmatic control of Siglent SPD3303X series power supplies.
 
 **⚠️ Experimental Notice**:
+
 - API is subject to change in any release
 - Limited hardware testing (SPD3303X-E only)
 - Not recommended for production use
@@ -543,6 +548,7 @@ This module provides programmatic control of Siglent SPD3303X series power suppl
 ## Giving Feedback
 
 We need your input to stabilize this feature:
+
 - Which features are most important?
 - What API changes would improve usability?
 - What hardware have you tested?
@@ -560,16 +566,17 @@ Add badges to indicate experimental features:
 ## Features
 
 ### Core Features ✅
+
 - Oscilloscope control via SCPI
 - Waveform capture and analysis
 - GUI application
 
 ### Experimental Features ⚠️
 
-| Feature | Status | Install | Docs |
-|---------|--------|---------|------|
-| Power Supply Control | Beta | `[power-supply-beta]` | [docs](docs/experimental/power-supply.md) |
-| Pattern Generator | Alpha | `[pattern-gen-beta]` | [docs](docs/experimental/pattern-gen.md) |
+| Feature              | Status | Install               | Docs                                      |
+| -------------------- | ------ | --------------------- | ----------------------------------------- |
+| Power Supply Control | Beta   | `[power-supply-beta]` | [docs](docs/experimental/power-supply.md) |
+| Pattern Generator    | Alpha  | `[pattern-gen-beta]`  | [docs](docs/experimental/pattern-gen.md)  |
 ```
 
 ### Warning Messages
@@ -611,17 +618,20 @@ Tag experimental releases clearly:
 ### Experimental Features
 
 **Power Supply Control** 🔬
+
 - NEW: `siglent.power_supply` module for SPD3303X series
 - Install: `pip install "Siglent-Oscilloscope[power-supply-beta]"`
 - **Status**: Beta - API may change, seeking feedback
 - **Docs**: See `docs/experimental/power-supply.md`
 
 **We need your help!**
+
 - Test with your hardware
 - Report issues and suggestions
 - Comment on [Issue #42](link)
 
 ### Stable Features
+
 [... regular changelog ...]
 ```
 
@@ -632,6 +642,7 @@ Experimental features must meet minimum testing standards before inclusion:
 ### Test Coverage
 
 **Minimum Requirements**:
+
 - 50%+ code coverage for experimental modules
 - 70%+ coverage before graduating to stable
 
@@ -692,9 +703,9 @@ name: Experimental Features CI
 
 on:
   push:
-    branches: [ feature/*, experimental/* ]
+    branches: [feature/*, experimental/*]
   pull_request:
-    branches: [ main ]
+    branches: [main]
 
 jobs:
   test-experimental:
@@ -707,7 +718,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.11'
+          python-version: "3.11"
 
       - name: Install experimental dependencies
         run: |
@@ -739,6 +750,7 @@ jobs:
 When an experimental feature is ready for stable release:
 
 **Checklist**:
+
 - [ ] API has stabilized (no changes for 2+ releases)
 - [ ] Test coverage ≥70%
 - [ ] Tested with multiple hardware models
@@ -767,11 +779,15 @@ def set_voltage(self, voltage: float):
 
 ```markdown
 # Before
+
 ## Power Supply Control (EXPERIMENTAL)
+
 ⚠️ **Status**: Beta
 
 # After
+
 ## Power Supply Control
+
 ✅ **Status**: Stable (since v0.5.0)
 ```
 
@@ -797,6 +813,7 @@ power-supply = ["pyvisa>=1.14.0"]  # Stable optional feature
 ## [0.5.0] - 2026-03-01
 
 ### Graduated from Experimental to Stable ✅
+
 - **Power Supply Control** (`siglent.power_supply`)
   - API is now stable and follows semantic versioning
   - Install: `pip install "Siglent-Oscilloscope[power-supply]"` (dropped "-beta")
@@ -809,6 +826,7 @@ power-supply = ["pyvisa>=1.14.0"]  # Stable optional feature
 If an experimental feature needs to be removed:
 
 **Timeline**:
+
 1. **v0.4.0**: Feature marked deprecated (still functional)
 2. **v0.5.0**: Deprecation warnings shown
 3. **v0.6.0**: Feature removed
@@ -846,6 +864,7 @@ def old_experimental_method(self):
 ## [0.4.0] - 2026-01-15
 
 ### Deprecated
+
 - `Oscilloscope.old_experimental_method()` - Will be removed in v0.6.0
   - Use `Oscilloscope.new_method()` instead
   - Reason: Experimental API did not meet stability requirements
@@ -1087,14 +1106,14 @@ pytest -m "not experimental"
 
 **Quick Reference**:
 
-| Mechanism | Use Case | Example |
-|-----------|----------|---------|
-| Optional extras | Experimental modules | `[power-supply-beta]` |
-| Module warnings | Entire modules | `warnings.warn()` in `__init__` |
-| `@experimental` | Individual methods | Decorator on methods |
-| Feature flags | Runtime control | `FeatureFlags.is_enabled()` |
-| Pre-release versions | Testing releases | `0.4.0-beta.1` |
-| Dedicated docs | User guidance | `docs/experimental/*.md` |
-| Test markers | Isolated testing | `@pytest.mark.experimental` |
+| Mechanism            | Use Case             | Example                         |
+| -------------------- | -------------------- | ------------------------------- |
+| Optional extras      | Experimental modules | `[power-supply-beta]`           |
+| Module warnings      | Entire modules       | `warnings.warn()` in `__init__` |
+| `@experimental`      | Individual methods   | Decorator on methods            |
+| Feature flags        | Runtime control      | `FeatureFlags.is_enabled()`     |
+| Pre-release versions | Testing releases     | `0.4.0-beta.1`                  |
+| Dedicated docs       | User guidance        | `docs/experimental/*.md`        |
+| Test markers         | Isolated testing     | `@pytest.mark.experimental`     |
 
 **Questions?** Open a discussion at [GitHub Discussions](https://github.com/little-did-I-know/Siglent-Oscilloscope/discussions)

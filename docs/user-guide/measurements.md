@@ -74,11 +74,7 @@ print(f"Mean: {vmean:.3f} V")
 print(f"Mean (cycle): {vmean_cycle:.3f} V")
 ```
 
-!!! info "RMS vs Mean"
-    - **RMS**: Root-mean-square, useful for AC signals and power calculations
-    - **Mean**: Average value, useful for DC offset measurement
-    - **cycle=True**: Measure over one period (for periodic signals)
-    - **cycle=False**: Measure over entire displayed waveform
+!!! info "RMS vs Mean" - **RMS**: Root-mean-square, useful for AC signals and power calculations - **Mean**: Average value, useful for DC offset measurement - **cycle=True**: Measure over one period (for periodic signals) - **cycle=False**: Measure over entire displayed waveform
 
 ### Frequency and Timing Measurements
 
@@ -106,19 +102,19 @@ print(f"Fall time: {fall*1e9:.2f} ns")
 
 ### Measurement Type Reference
 
-| Measurement | Method | Unit | Description |
-|------------|--------|------|-------------|
-| Peak-to-peak | `measure_vpp()` | V | Difference between max and min |
-| Amplitude | `measure_amplitude()` | V | Half of peak-to-peak |
-| Maximum | `measure_max()` | V | Highest voltage value |
-| Minimum | `measure_min()` | V | Lowest voltage value |
-| RMS | `measure_rms()` | V | Root-mean-square voltage |
-| Mean | `measure_mean()` | V | Average voltage |
-| Frequency | `measure_frequency()` | Hz | Signal frequency |
-| Period | `measure_period()` | s | Signal period |
-| Duty Cycle | `measure_duty_cycle()` | % | Positive width / period × 100 |
-| Rise Time | `measure_rise_time()` | s | 10% to 90% rise time |
-| Fall Time | `measure_fall_time()` | s | 90% to 10% fall time |
+| Measurement  | Method                 | Unit | Description                    |
+| ------------ | ---------------------- | ---- | ------------------------------ |
+| Peak-to-peak | `measure_vpp()`        | V    | Difference between max and min |
+| Amplitude    | `measure_amplitude()`  | V    | Half of peak-to-peak           |
+| Maximum      | `measure_max()`        | V    | Highest voltage value          |
+| Minimum      | `measure_min()`        | V    | Lowest voltage value           |
+| RMS          | `measure_rms()`        | V    | Root-mean-square voltage       |
+| Mean         | `measure_mean()`       | V    | Average voltage                |
+| Frequency    | `measure_frequency()`  | Hz   | Signal frequency               |
+| Period       | `measure_period()`     | s    | Signal period                  |
+| Duty Cycle   | `measure_duty_cycle()` | %    | Positive width / period × 100  |
+| Rise Time    | `measure_rise_time()`  | s    | 10% to 90% rise time           |
+| Fall Time    | `measure_fall_time()`  | s    | 90% to 10% fall time           |
 
 ## Generic Measurement Interface
 
@@ -162,6 +158,7 @@ if measurements['vpp'] is not None:
 ```
 
 The `measure_all()` method returns a dictionary with:
+
 - `vpp` - Peak-to-peak voltage
 - `amplitude` - Amplitude
 - `max` - Maximum voltage
@@ -172,7 +169,7 @@ The `measure_all()` method returns a dictionary with:
 - `period` - Period
 
 !!! tip "Error Handling"
-    `measure_all()` catches exceptions for individual measurements and returns `None` for failed measurements. This is useful when not all measurements are applicable to your signal.
+`measure_all()` catches exceptions for individual measurements and returns `None` for failed measurements. This is useful when not all measurements are applicable to your signal.
 
 ## Measurement Table
 
@@ -233,7 +230,7 @@ scope.measurement.disable_statistics()
 ```
 
 !!! note "Statistics Display"
-    Statistics are displayed on the oscilloscope screen. To access them programmatically, you'll need to use screen capture or query specific measurement values multiple times and calculate statistics yourself.
+Statistics are displayed on the oscilloscope screen. To access them programmatically, you'll need to use screen capture or query specific measurement values multiple times and calculate statistics yourself.
 
 ## Cursors
 
@@ -274,12 +271,7 @@ print(f"Values: {cursor_data['values']}")
 # Values: ['1.00V', '2.00V', '1.00V']
 ```
 
-!!! info "Cursor Types"
-    - **HREL**: Horizontal relative - measures time difference
-    - **VREL**: Vertical relative - measures voltage difference
-    - **HREF**: Horizontal reference - time reference
-    - **VREF**: Vertical reference - voltage reference
-    - **OFF**: Cursors disabled
+!!! info "Cursor Types" - **HREL**: Horizontal relative - measures time difference - **VREL**: Vertical relative - measures voltage difference - **HREF**: Horizontal reference - time reference - **VREF**: Vertical reference - voltage reference - **OFF**: Cursors disabled
 
 ## Programmatic Measurement vs Automated Measurement
 
@@ -294,6 +286,7 @@ vpp = scope.measurement.measure_vpp(1)
 ```
 
 **Advantages:**
+
 - Fast (single SCPI command)
 - Uses oscilloscope's optimized algorithms
 - No data transfer needed
@@ -320,13 +313,14 @@ if len(zero_crossings) >= 2:
 ```
 
 **Advantages:**
+
 - Full control over algorithm
 - Access to raw data for custom analysis
 - Can apply filtering before measurement
 - Useful for complex or custom measurements
 
 !!! tip "Best Practice"
-    Use automated measurements for standard parameters (frequency, Vpp, RMS, etc.) and capture data only when you need custom processing or the full waveform.
+Use automated measurements for standard parameters (frequency, Vpp, RMS, etc.) and capture data only when you need custom processing or the full waveform.
 
 ## Multi-Channel Measurements
 
@@ -449,29 +443,13 @@ with Oscilloscope(SCOPE_IP) as scope:
 
 ## Tips for Accurate Measurements
 
-!!! tip "Signal Conditioning"
-    - Ensure trigger is stable (use NORMAL mode for consistent measurements)
-    - Set appropriate voltage scale (signal should fill 50-80% of display)
-    - Use AC coupling to remove DC offset if measuring AC signals
-    - Enable bandwidth limiting to reduce noise
+!!! tip "Signal Conditioning" - Ensure trigger is stable (use NORMAL mode for consistent measurements) - Set appropriate voltage scale (signal should fill 50-80% of display) - Use AC coupling to remove DC offset if measuring AC signals - Enable bandwidth limiting to reduce noise
 
-!!! tip "Frequency Measurements"
-    - Requires periodic signal with clear edges
-    - Works best with at least 2-3 cycles on screen
-    - May fail on noisy or irregular signals
-    - Use appropriate timebase (show at least 2 periods)
+!!! tip "Frequency Measurements" - Requires periodic signal with clear edges - Works best with at least 2-3 cycles on screen - May fail on noisy or irregular signals - Use appropriate timebase (show at least 2 periods)
 
-!!! tip "Timing Measurements (Rise/Fall Time)"
-    - Requires fast sampling rate relative to edge speed
-    - Set timebase to show edge detail
-    - Single edge should occupy 2-3 divisions
-    - Use 20 MHz bandwidth limit for noisy signals
+!!! tip "Timing Measurements (Rise/Fall Time)" - Requires fast sampling rate relative to edge speed - Set timebase to show edge detail - Single edge should occupy 2-3 divisions - Use 20 MHz bandwidth limit for noisy signals
 
-!!! tip "Voltage Measurements"
-    - Calibrate probe attenuation (set probe_ratio correctly)
-    - Allow signal to stabilize before measuring
-    - Use averaging or statistics for noisy signals
-    - Check for clipping (signal exceeds display range)
+!!! tip "Voltage Measurements" - Calibrate probe attenuation (set probe_ratio correctly) - Allow signal to stabilize before measuring - Use averaging or statistics for noisy signals - Check for clipping (signal exceeds display range)
 
 ## Troubleshooting
 

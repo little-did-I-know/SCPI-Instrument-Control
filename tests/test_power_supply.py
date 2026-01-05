@@ -1,14 +1,10 @@
 """Unit tests for PowerSupply class and related modules."""
 
 import pytest
+
 from siglent import PowerSupply
 from siglent.connection.mock import MockConnection
-from siglent.psu_models import (
-    PSUCapability,
-    OutputSpec,
-    detect_psu_from_idn,
-    create_generic_psu_capability,
-)
+from siglent.psu_models import OutputSpec, PSUCapability, create_generic_psu_capability, detect_psu_from_idn
 from siglent.psu_scpi_commands import PSUSCPICommandSet
 
 
@@ -576,8 +572,9 @@ class TestDataLogging:
 
     def test_timed_psu_logger(self, mock_psu, tmp_path):
         """Test timed PSU logger."""
-        from siglent import TimedPSULogger
         import time
+
+        from siglent import TimedPSULogger
 
         log_file = tmp_path / "test_timed_log.csv"
 
@@ -602,8 +599,9 @@ class TestDataLogging:
 
     def test_timed_psu_logger_context_manager(self, mock_psu, tmp_path):
         """Test timed PSU logger as context manager."""
-        from siglent import TimedPSULogger
         import time
+
+        from siglent import TimedPSULogger
 
         log_file = tmp_path / "test_timed_context.csv"
 

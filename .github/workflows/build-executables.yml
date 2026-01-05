@@ -3,11 +3,11 @@ name: Build Standalone Executables
 on:
   push:
     tags:
-      - 'v*.*.*'  # Trigger on version tags like v0.3.2, v1.0.0
-  workflow_dispatch:  # Allow manual trigger from GitHub Actions UI
+      - "v*.*.*" # Trigger on version tags like v0.3.2, v1.0.0
+  workflow_dispatch: # Allow manual trigger from GitHub Actions UI
 
 permissions:
-  contents: write  # Required to upload release assets
+  contents: write # Required to upload release assets
 
 jobs:
   build-windows:
@@ -21,8 +21,8 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
-          cache: 'pip'
+          python-version: "3.11"
+          cache: "pip"
 
       - name: Install dependencies
         run: |
@@ -72,7 +72,7 @@ jobs:
 
   build-macos-arm64:
     name: Build macOS Application (Apple Silicon)
-    runs-on: macos-14  # M1 runner for native ARM64
+    runs-on: macos-14 # M1 runner for native ARM64
 
     steps:
       - name: Checkout code
@@ -81,8 +81,8 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
-          cache: 'pip'
+          python-version: "3.11"
+          cache: "pip"
 
       - name: Install dependencies
         run: |
@@ -134,7 +134,7 @@ jobs:
 
   build-macos-x64:
     name: Build macOS Application (Intel)
-    runs-on: macos-13  # Intel runner for x86_64
+    runs-on: macos-13 # Intel runner for x86_64
 
     steps:
       - name: Checkout code
@@ -143,8 +143,8 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
-          cache: 'pip'
+          python-version: "3.11"
+          cache: "pip"
 
       - name: Install dependencies
         run: |
@@ -205,8 +205,8 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
-          cache: 'pip'
+          python-version: "3.11"
+          cache: "pip"
 
       - name: Install system dependencies
         run: |

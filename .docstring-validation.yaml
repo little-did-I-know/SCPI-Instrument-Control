@@ -2,7 +2,7 @@
 # Controls how docstrings are validated in the codebase
 
 # Validation strictness
-strict_mode: false  # Set to true to make warnings into errors
+strict_mode: false # Set to true to make warnings into errors
 
 # File patterns to exclude from validation
 exclude_patterns:
@@ -15,7 +15,7 @@ exclude_patterns:
 # Docstring requirements
 require_module_docstrings: true
 require_class_docstrings: true
-require_function_docstrings: true  # For public functions only
+require_function_docstrings: true # For public functions only
 
 # Minimum docstring lengths (in characters)
 min_module_docstring_length: 10
@@ -23,18 +23,18 @@ min_class_docstring_length: 20
 min_function_docstring_length: 15
 
 # Docstring style
-style: "google"  # Options: google, numpy, sphinx
+style: "google" # Options: google, numpy, sphinx
 
 # Required docstring sections
 sections:
-  require_args: true  # Args section for functions with parameters
-  require_returns: true  # Returns section for functions with return values
-  require_raises: false  # Raises section (optional but encouraged)
-  require_examples: false  # Examples section (optional)
+  require_args: true # Args section for functions with parameters
+  require_returns: true # Returns section for functions with return values
+  require_raises: false # Raises section (optional but encouraged)
+  require_examples: false # Examples section (optional)
 
 # Special requirements for examples
 examples:
-  min_docstring_length: 30  # Examples need more detailed docstrings
+  min_docstring_length: 30 # Examples need more detailed docstrings
   require_usage_instructions: true
 
 # Warnings vs Errors

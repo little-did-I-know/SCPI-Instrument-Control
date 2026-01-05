@@ -21,17 +21,20 @@ Siglent-Oscilloscope/
 ### Source Code
 
 **`siglent/`** - Main Python package
+
 - Core oscilloscope control library
 - GUI application
 - Protocol decoders
 - Utilities and helpers
 
 **`tests/`** - Test suite
+
 - Unit tests
 - Integration tests
 - Test fixtures and utilities
 
 **`examples/`** - Example scripts
+
 - Basic usage examples
 - Advanced feature demonstrations
 - GUI usage examples
@@ -39,18 +42,21 @@ Siglent-Oscilloscope/
 ### Documentation
 
 **`docs/`** - Documentation source
+
 - User guides
 - API reference (auto-generated)
 - Development guides
 - Markdown source files
 
 **`site/`** - Built documentation (generated)
+
 - Static HTML output
 - Not version controlled
 
 ### Scripts
 
 **`scripts/`** - Development utilities
+
 - Documentation generation
 - Pre-commit hooks
 - Testing helpers
@@ -59,6 +65,7 @@ Siglent-Oscilloscope/
 ### Configuration
 
 **Root directory:**
+
 - `pyproject.toml` - Package metadata and build config
 - `Makefile` - Task automation
 - `mkdocs.yml` - Documentation configuration
@@ -108,11 +115,13 @@ connection/
 ```
 
 **Key classes:**
+
 - `Connection` - Abstract base class
 - `SocketConnection` - Real TCP/IP implementation
 - `MockConnection` - Testing/simulation
 
 **Responsibilities:**
+
 - Network communication
 - SCPI command sending/receiving
 - Connection lifecycle management
@@ -131,6 +140,7 @@ protocol_decoders/
 ```
 
 **Features:**
+
 - Decode captured waveforms
 - Extract protocol data
 - Error detection
@@ -178,12 +188,14 @@ gui/
 ```
 
 **Architecture:**
+
 - **MVC pattern** - Separation of concerns
 - **Worker threads** - Background tasks (live view, capture)
 - **Signal/Slot** - PyQt event system
 - **Widget composition** - Reusable UI components
 
 **Entry point:**
+
 ```bash
 siglent-gui
 # Defined in pyproject.toml:
@@ -218,24 +230,28 @@ tests/
 ### Test Categories
 
 **Unit Tests:**
+
 - Test individual functions/classes
 - Mock external dependencies
 - Fast execution
 - High coverage target: >90%
 
 **Integration Tests:**
+
 - Test component interaction
 - Use MockConnection
 - Verify protocol correctness
 - Coverage target: >80%
 
 **GUI Tests:**
+
 - Test UI components
 - Marked with `@pytest.mark.gui`
 - Require PyQt6
 - Coverage target: >70%
 
 **Hardware Tests:**
+
 - Test with real oscilloscope
 - Marked with `@pytest.mark.hardware`
 - Skip by default (CI/CD)
@@ -303,24 +319,28 @@ docs/
 ### Auto-generated Documentation
 
 **API Reference:**
+
 - Generated from Python docstrings
 - Uses `mkdocstrings` plugin
 - Renders type hints, parameters, examples
 - Automatically updates with code
 
 **Examples:**
+
 - Generated from `examples/` directory
 - Uses `mkdocs-gen-files`
 - Includes code with syntax highlighting
 - Categorized by topic
 
 **Generation scripts:**
+
 ```bash
 scripts/docs/generate_api_stubs.py      # API reference
 scripts/docs/generate_examples_docs.py  # Examples
 ```
 
 **Build documentation:**
+
 ```bash
 make docs-generate  # Generate auto-docs
 make docs           # Build full site
@@ -351,12 +371,14 @@ examples/
 ### Example Format
 
 Each example includes:
+
 - **Docstring** - Purpose and usage
 - **Requirements** - Dependencies
 - **Code** - Well-commented
 - **Output** - Expected results
 
 **Template:**
+
 ```python
 """
 Example: Capture Waveform
@@ -410,19 +432,23 @@ scripts/
 ### Key Scripts
 
 **Documentation:**
+
 - `generate_api_stubs.py` - Creates API reference from docstrings
 - `generate_examples_docs.py` - Creates example documentation
 
 **Pre-commit:**
+
 - `validate_docstrings.py` - Ensures docstring quality
 - Runs automatically on commit
 
 **Testing:**
+
 - `manual_test_live_view.py` - Test live view performance
 - `manual_test_pyqtgraph.py` - Test PyQtGraph integration
 - `manual_test_waveform_display.py` - Test waveform display
 
 **Validation:**
+
 - `pre_pr_check.py` - Comprehensive pre-PR checks
 - Runs: formatting, linting, tests, docs build
 
@@ -431,6 +457,7 @@ scripts/
 ### Package Configuration
 
 **`pyproject.toml`** - PEP 621 package metadata
+
 - Package name, version, description
 - Dependencies (core and optional)
 - Entry points (scripts)
@@ -438,6 +465,7 @@ scripts/
 - Tool configurations (black, pytest)
 
 **Example:**
+
 ```toml
 [project]
 name = "Siglent-Oscilloscope"
@@ -454,6 +482,7 @@ siglent-gui = "siglent.gui.app:main"
 ### Development Tools
 
 **`Makefile`** - Task automation
+
 - `make test` - Run tests
 - `make build` - Build package
 - `make docs` - Build documentation
@@ -461,6 +490,7 @@ siglent-gui = "siglent.gui.app:main"
 - See [Building Guide](building.md) for all commands
 
 **`.pre-commit-config.yaml`** - Pre-commit hooks
+
 - Black formatting
 - Flake8 linting
 - Trailing whitespace
@@ -468,6 +498,7 @@ siglent-gui = "siglent.gui.app:main"
 - Custom docstring validation
 
 **`.editorconfig`** - Editor configuration
+
 - Indent style (spaces)
 - Indent size (4)
 - End of line (LF)
@@ -476,6 +507,7 @@ siglent-gui = "siglent.gui.app:main"
 ### Testing
 
 **`pytest.ini`** - Pytest configuration (in pyproject.toml)
+
 ```toml
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -488,6 +520,7 @@ markers = [
 **`.coverage`** - Coverage data (generated)
 
 **`codecov.yml`** - Codecov configuration
+
 - Coverage targets
 - Ignore patterns
 - Comment behavior
@@ -495,6 +528,7 @@ markers = [
 ### Documentation
 
 **`mkdocs.yml`** - MkDocs configuration
+
 - Site name and URL
 - Theme (Material)
 - Plugins (mkdocstrings, etc.)
@@ -502,6 +536,7 @@ markers = [
 - See [Building Guide](building.md#documentation)
 
 **`.readthedocs.yml`** - Read the Docs config
+
 - Python version
 - Build requirements
 - Documentation format
@@ -509,11 +544,13 @@ markers = [
 ### Code Quality
 
 **`.docstring-validation.yaml`** - Docstring rules
+
 - Required sections
 - Format requirements
 - Validation rules
 
 **`flake8` config** - In pyproject.toml
+
 ```toml
 [tool.black]
 line-length = 200
@@ -522,6 +559,7 @@ line-length = 200
 ### Git
 
 **`.gitignore`** - Ignored files
+
 - `__pycache__/`, `*.pyc`
 - `build/`, `dist/`, `*.egg-info/`
 - `.venv/`, `venv/`
@@ -529,6 +567,7 @@ line-length = 200
 - IDE files (`.idea/`, `.vscode/`)
 
 **`.github/workflows/`** - GitHub Actions
+
 - `test.yml` - Run tests on push/PR
 - `lint.yml` - Code quality checks
 - `build.yml` - Build package
@@ -569,31 +608,37 @@ oscilloscope.py
 ### Import Hierarchy
 
 **Level 1** - Core utilities (no internal deps)
+
 - `models.py`
 - `exceptions.py`
 - `scpi_commands.py`
 
 **Level 2** - Connection and data
+
 - `connection/`
 - `waveform.py`
 - `measurement_config.py`
 
 **Level 3** - Components
+
 - `channel.py`
 - `trigger.py`
 - `measurement.py`
 - `math_channel.py`
 
 **Level 4** - Main interface
+
 - `oscilloscope.py`
 
 **Level 5** - Extensions
+
 - `analysis.py`
 - `automation.py`
 - `protocol_decode.py`
 - `vector_graphics.py`
 
 **Level 6** - GUI
+
 - `gui/` package
 
 ## Design Patterns
@@ -601,11 +646,13 @@ oscilloscope.py
 ### Main API
 
 **Facade Pattern:**
+
 - `Oscilloscope` class provides simple interface
 - Hides complexity of SCPI protocol
 - Aggregates channel, trigger, measurement classes
 
 **Property Pattern:**
+
 ```python
 class Channel:
     @property
@@ -620,6 +667,7 @@ class Channel:
 ```
 
 **Context Manager:**
+
 ```python
 with Oscilloscope('192.168.1.100') as scope:
     # Use scope
@@ -630,16 +678,19 @@ with Oscilloscope('192.168.1.100') as scope:
 ### GUI Architecture
 
 **Model-View-Controller (MVC):**
+
 - **Model**: `siglent.oscilloscope` (core library)
 - **View**: `gui/widgets/` (Qt widgets)
 - **Controller**: `gui/main_window.py` (coordination)
 
 **Observer Pattern:**
+
 - Qt signals/slots for event handling
 - Decoupled components
 - Reactive updates
 
 **Worker Thread Pattern:**
+
 - Background tasks don't block UI
 - `LiveViewWorker` - Continuous capture
 - `WaveformCaptureWorker` - Single capture
@@ -648,16 +699,19 @@ with Oscilloscope('192.168.1.100') as scope:
 ### Testing
 
 **Mock Object Pattern:**
+
 - `MockConnection` simulates oscilloscope
 - Predictable responses
 - No hardware required
 
 **Fixture Pattern:**
+
 - pytest fixtures for setup/teardown
 - Reusable test data
 - Shared configurations
 
 **Parametrized Tests:**
+
 ```python
 @pytest.mark.parametrize("channel", [1, 2, 3, 4])
 def test_all_channels(channel):
@@ -670,11 +724,13 @@ def test_all_channels(channel):
 ### Formatting
 
 **Black** - Code formatter
+
 - Line length: 200 characters
 - Automatic formatting
 - Consistent style
 
 **Run:**
+
 ```bash
 make format
 ```
@@ -682,11 +738,13 @@ make format
 ### Linting
 
 **Flake8** - Style checker
+
 - PEP 8 compliance
 - Complexity limits
 - Import order
 
 **Run:**
+
 ```bash
 make lint
 ```
@@ -694,11 +752,13 @@ make lint
 ### Type Hints
 
 **Required:**
+
 - All public functions
 - Class attributes
 - Return types
 
 **Example:**
+
 ```python
 def get_waveform(self, channel: int) -> Waveform:
     """Get waveform from channel."""
@@ -706,6 +766,7 @@ def get_waveform(self, channel: int) -> Waveform:
 ```
 
 **Type checking:**
+
 ```bash
 mypy siglent/
 ```
@@ -713,6 +774,7 @@ mypy siglent/
 ### Docstrings
 
 **Google style:**
+
 ```python
 def function(arg1: str, arg2: int) -> bool:
     """Short description.
@@ -737,6 +799,7 @@ def function(arg1: str, arg2: int) -> bool:
 ```
 
 **Required sections:**
+
 - Short description
 - Args (if any)
 - Returns (if not None)
@@ -774,25 +837,30 @@ def function(arg1: str, arg2: int) -> bool:
 ### Where to Add
 
 **New SCPI command:**
+
 - Add to `scpi_commands.py`
 - Add method to appropriate class
 
 **New measurement:**
+
 - Add to `measurement.py`
 - Add to `measurement_config.py`
 - Update GUI if needed
 
 **New protocol decoder:**
+
 - Create file in `protocol_decoders/`
 - Add to `__init__.py`
 - Create tests
 
 **New GUI widget:**
+
 - Create file in `gui/widgets/`
 - Add to `main_window.py`
 - Create tests in `tests/test_gui/`
 
 **New analysis tool:**
+
 - Add to `analysis.py`
 - Add tests
 - Add example
@@ -802,37 +870,45 @@ def function(arg1: str, arg2: int) -> bool:
 ### Naming
 
 **Modules:** `lowercase_with_underscores.py`
+
 - `oscilloscope.py`
 - `protocol_decode.py`
 
 **Classes:** `PascalCase`
+
 - `Oscilloscope`
 - `Channel`
 - `WaveformData`
 
 **Functions/Methods:** `lowercase_with_underscores`
+
 - `get_waveform()`
 - `enable_channel()`
 
 **Constants:** `UPPERCASE_WITH_UNDERSCORES`
+
 - `DEFAULT_TIMEOUT`
 - `MAX_CHANNELS`
 
 **Private:** `_leading_underscore`
+
 - `_send_command()`
 - `_internal_state`
 
 ### File Organization
 
 **One class per file:**
+
 - Preferred for main classes
 - Exception: Related small classes
 
 **Group related functions:**
+
 - Utilities in one module
 - Helpers together
 
 **Separate concerns:**
+
 - Data models vs logic
 - UI vs business logic
 
@@ -840,33 +916,33 @@ def function(arg1: str, arg2: int) -> bool:
 
 ### Key Files
 
-| File | Purpose |
-|------|---------|
-| `siglent/oscilloscope.py` | Main API entry point |
+| File                           | Purpose               |
+| ------------------------------ | --------------------- |
+| `siglent/oscilloscope.py`      | Main API entry point  |
 | `siglent/connection/socket.py` | Network communication |
-| `siglent/gui/main_window.py` | GUI main window |
-| `tests/conftest.py` | Test fixtures |
-| `pyproject.toml` | Package configuration |
-| `Makefile` | Development tasks |
-| `mkdocs.yml` | Documentation config |
+| `siglent/gui/main_window.py`   | GUI main window       |
+| `tests/conftest.py`            | Test fixtures         |
+| `pyproject.toml`               | Package configuration |
+| `Makefile`                     | Development tasks     |
+| `mkdocs.yml`                   | Documentation config  |
 
 ### Important Directories
 
-| Directory | Purpose |
-|-----------|---------|
-| `siglent/` | Main package code |
-| `siglent/gui/` | GUI application |
-| `siglent/connection/` | Connection layer |
-| `siglent/protocol_decoders/` | Protocol decoders |
-| `tests/` | Test suite |
-| `docs/` | Documentation source |
-| `examples/` | Usage examples |
-| `scripts/` | Build and dev scripts |
+| Directory                    | Purpose               |
+| ---------------------------- | --------------------- |
+| `siglent/`                   | Main package code     |
+| `siglent/gui/`               | GUI application       |
+| `siglent/connection/`        | Connection layer      |
+| `siglent/protocol_decoders/` | Protocol decoders     |
+| `tests/`                     | Test suite            |
+| `docs/`                      | Documentation source  |
+| `examples/`                  | Usage examples        |
+| `scripts/`                   | Build and dev scripts |
 
 ### Entry Points
 
-| Command | Module | Function |
-|---------|--------|----------|
+| Command       | Module            | Function |
+| ------------- | ----------------- | -------- |
 | `siglent-gui` | `siglent.gui.app` | `main()` |
 
 ## Next Steps

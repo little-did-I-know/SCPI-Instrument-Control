@@ -31,11 +31,13 @@ with Oscilloscope('192.168.1.100') as scope:
 ```
 
 **Characteristics:**
+
 - Triggers automatically if no valid trigger occurs within timeout (~100ms)
 - Display continuously updates
 - Best for: Quick signal viewing, unknown signals, initial setup
 
 **Use when:**
+
 - You want to see something on screen immediately
 - Signal frequency is low or irregular
 - You're just getting started
@@ -52,12 +54,14 @@ scope.trigger.normal()
 ```
 
 **Characteristics:**
+
 - Waits indefinitely for valid trigger
 - No display update unless trigger occurs
 - Display shows last triggered waveform
 - Best for: Stable measurements, capturing specific events
 
 **Use when:**
+
 - You need repeatable, stable measurements
 - Capturing sporadic events
 - Measuring timing or frequency accurately
@@ -79,12 +83,14 @@ scope.trigger_single()
 ```
 
 **Characteristics:**
+
 - Triggers once then stops
 - Perfect for capturing one-time events
 - Requires re-arming for next capture
 - Best for: Single events, transients, glitches
 
 **Use when:**
+
 - Capturing power-on sequences
 - Analyzing single events
 - Capturing glitches or transients
@@ -101,17 +107,18 @@ scope.trigger.stop()
 ```
 
 **Use when:**
+
 - You want to freeze the display
 - Analyzing a captured waveform
 
 ### Mode Comparison
 
-| Mode | When it Triggers | Display Update | Best For |
-|------|------------------|----------------|----------|
-| AUTO | Automatically or on condition | Continuous | Initial setup, unknown signals |
-| NORMAL | Only on condition | When triggered | Stable measurements, specific events |
-| SINGLE | Once on condition | Once | One-time events, transients |
-| STOP | Never | Frozen | Analysis of captured data |
+| Mode   | When it Triggers              | Display Update | Best For                             |
+| ------ | ----------------------------- | -------------- | ------------------------------------ |
+| AUTO   | Automatically or on condition | Continuous     | Initial setup, unknown signals       |
+| NORMAL | Only on condition             | When triggered | Stable measurements, specific events |
+| SINGLE | Once on condition             | Once           | One-time events, transients          |
+| STOP   | Never                         | Frozen         | Analysis of captured data            |
 
 ## Trigger Source
 
@@ -154,6 +161,7 @@ scope.trigger.source = "LINE"
 ```
 
 **Use when:**
+
 - Debugging AC-powered equipment
 - Viewing signals synchronized with mains frequency
 - Eliminating jitter from line-powered sources
@@ -201,6 +209,7 @@ scope.trigger.set_slope("POS")
 ```
 
 **Slope Options:**
+
 - **POS** (Positive): Rising edge, low-to-high transition
 - **NEG** (Negative): Falling edge, high-to-low transition
 - **WINDOW**: Either edge (model dependent)
@@ -258,6 +267,7 @@ scope.trigger.trigger_type = "GLIT"
 ```
 
 **Use for:**
+
 - Finding short pulses
 - Detecting noise spikes
 - Capturing intermittent problems
@@ -281,6 +291,7 @@ scope.trigger.trigger_type = "RUNT"
 ```
 
 **Use for:**
+
 - Finding malformed pulses
 - Detecting signal integrity issues
 - Protocol violations
@@ -295,6 +306,7 @@ scope.trigger.trigger_type = "PATTERN"
 ```
 
 **Use for:**
+
 - Multi-channel logic analysis
 - Bus state detection
 - Complex trigger conditions
@@ -321,6 +333,7 @@ scope.trigger.force()
 ```
 
 **Use for:**
+
 - Testing without signal
 - Capturing current screen
 - Manual control
@@ -545,35 +558,20 @@ response = scope.query("TRIG_HOLDOFF?")
 ```
 
 **Use for:**
+
 - Complex waveforms with multiple edges
 - Triggering on specific events in a pattern
 - Avoiding false triggers
 
 ## Tips for Stable Triggering
 
-!!! tip "Choosing Trigger Level"
-    - Set trigger level near middle of signal amplitude
-    - For digital signals, use 50% of logic level (e.g., 2.5V for 5V logic)
-    - For AC signals, trigger at zero crossing (level = 0)
-    - Avoid triggering in noisy regions
+!!! tip "Choosing Trigger Level" - Set trigger level near middle of signal amplitude - For digital signals, use 50% of logic level (e.g., 2.5V for 5V logic) - For AC signals, trigger at zero crossing (level = 0) - Avoid triggering in noisy regions
 
-!!! tip "Trigger Mode Selection"
-    - **AUTO**: Good for continuous monitoring and unknown signals
-    - **NORMAL**: Best for stable, repeatable measurements
-    - **SINGLE**: Perfect for one-time events or slow phenomena
-    - Use NORMAL mode for accurate frequency measurements
+!!! tip "Trigger Mode Selection" - **AUTO**: Good for continuous monitoring and unknown signals - **NORMAL**: Best for stable, repeatable measurements - **SINGLE**: Perfect for one-time events or slow phenomena - Use NORMAL mode for accurate frequency measurements
 
-!!! tip "Signal Conditioning"
-    - Use AC coupling to remove DC offset
-    - Enable bandwidth limiting to reduce high-frequency noise
-    - Adjust voltage scale so signal fills 50-80% of screen
-    - Ensure trigger source channel is enabled
+!!! tip "Signal Conditioning" - Use AC coupling to remove DC offset - Enable bandwidth limiting to reduce high-frequency noise - Adjust voltage scale so signal fills 50-80% of screen - Ensure trigger source channel is enabled
 
-!!! tip "Troubleshooting"
-    - If no trigger: Check trigger level is within signal range
-    - If unstable: Increase trigger level or adjust timebase
-    - If too many triggers: Use trigger holdoff
-    - If missing events: Use AUTO mode temporarily to see signal
+!!! tip "Troubleshooting" - If no trigger: Check trigger level is within signal range - If unstable: Increase trigger level or adjust timebase - If too many triggers: Use trigger holdoff - If missing events: Use AUTO mode temporarily to see signal
 
 ## Common Triggering Issues
 

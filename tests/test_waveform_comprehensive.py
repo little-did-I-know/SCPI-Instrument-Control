@@ -1,11 +1,13 @@
 """Comprehensive tests for waveform module."""
 
-import pytest
-import numpy as np
 from pathlib import Path
-from unittest.mock import Mock, MagicMock, patch, mock_open
-from siglent.waveform import WaveformData, Waveform
+from unittest.mock import MagicMock, Mock, mock_open, patch
+
+import numpy as np
+import pytest
+
 from siglent.exceptions import CommandError
+from siglent.waveform import Waveform, WaveformData
 
 
 class TestWaveformData:

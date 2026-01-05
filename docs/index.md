@@ -4,37 +4,37 @@ Welcome to the Siglent Oscilloscope Control library documentation!
 
 <div class="grid cards" markdown>
 
--   :material-clock-fast:{ .lg .middle } __Quick Start__
+- :material-clock-fast:{ .lg .middle } **Quick Start**
 
-    ---
+  ***
 
-    Get up and running in minutes with our quick start guide
+  Get up and running in minutes with our quick start guide
 
-    [:octicons-arrow-right-24: Quick Start](getting-started/quickstart.md)
+  [:octicons-arrow-right-24: Quick Start](getting-started/quickstart.md)
 
--   :material-book-open-variant:{ .lg .middle } __User Guide__
+- :material-book-open-variant:{ .lg .middle } **User Guide**
 
-    ---
+  ***
 
-    Learn how to use all features of the library
+  Learn how to use all features of the library
 
-    [:octicons-arrow-right-24: User Guide](user-guide/basic-usage.md)
+  [:octicons-arrow-right-24: User Guide](user-guide/basic-usage.md)
 
--   :material-desktop-classic:{ .lg .middle } __GUI Application__
+- :material-desktop-classic:{ .lg .middle } **GUI Application**
 
-    ---
+  ***
 
-    Discover the powerful GUI for interactive control
+  Discover the powerful GUI for interactive control
 
-    [:octicons-arrow-right-24: GUI Guide](gui/overview.md)
+  [:octicons-arrow-right-24: GUI Guide](gui/overview.md)
 
--   :material-api:{ .lg .middle } __API Reference__
+- :material-api:{ .lg .middle } **API Reference**
 
-    ---
+  ***
 
-    Complete API documentation for all modules
+  Complete API documentation for all modules
 
-    [:octicons-arrow-right-24: API Docs](api/oscilloscope.md)
+  [:octicons-arrow-right-24: API Docs](api/oscilloscope.md)
 
 </div>
 
@@ -133,14 +133,14 @@ siglent-gui
 <div class="grid" markdown>
 
 !!! info "Getting Started"
-    New to the library? Start here!
+New to the library? Start here!
 
     - [Installation](getting-started/installation.md)
     - [Quick Start](getting-started/quickstart.md)
     - [Connection Setup](getting-started/connection.md)
 
 !!! tip "User Guide"
-    Learn all the features
+Learn all the features
 
     - [Basic Usage](user-guide/basic-usage.md)
     - [Waveform Capture](user-guide/waveform-capture.md)
@@ -148,14 +148,14 @@ siglent-gui
     - [Advanced Features](user-guide/advanced-features.md)
 
 !!! example "Examples"
-    Real-world code examples
+Real-world code examples
 
     - [Beginner Examples](examples/beginner.md)
     - [Intermediate Examples](examples/intermediate.md)
     - [Advanced Examples](examples/advanced.md)
 
 !!! abstract "API Reference"
-    Detailed API documentation
+Detailed API documentation
 
     - [Oscilloscope](api/oscilloscope.md)
     - [Channel](api/channel.md)

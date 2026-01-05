@@ -14,18 +14,21 @@ Siglent/
 ## Commands to Copy Icons
 
 ### On Windows (Command Prompt)
+
 ```cmd
 copy C:\path\to\your\windows-icon.ico resources\siglent-icon.ico
 copy C:\path\to\your\macos-icon.icns resources\siglent-icon.icns
 ```
 
 ### On Windows (PowerShell)
+
 ```powershell
 Copy-Item "C:\path\to\your\windows-icon.ico" -Destination "resources\siglent-icon.ico"
 Copy-Item "C:\path\to\your\macos-icon.icns" -Destination "resources\siglent-icon.icns"
 ```
 
 ### On macOS/Linux
+
 ```bash
 cp /path/to/your/windows-icon.ico resources/siglent-icon.ico
 cp /path/to/your/macos-icon.icns resources/siglent-icon.icns

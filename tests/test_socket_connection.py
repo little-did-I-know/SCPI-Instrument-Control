@@ -1,8 +1,10 @@
 """Tests for socket connection module."""
 
-import pytest
 import socket
-from unittest.mock import Mock, MagicMock, patch, call
+from unittest.mock import MagicMock, Mock, call, patch
+
+import pytest
+
 from siglent.connection.socket import SocketConnection
 from siglent.exceptions import ConnectionError, TimeoutError
 

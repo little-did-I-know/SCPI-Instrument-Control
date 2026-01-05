@@ -1,9 +1,11 @@
 """Comprehensive tests for trigger control module."""
 
+from unittest.mock import MagicMock, Mock
+
 import pytest
-from unittest.mock import Mock, MagicMock
-from siglent.trigger import Trigger
+
 from siglent.exceptions import CommandError
+from siglent.trigger import Trigger
 
 
 @pytest.fixture
