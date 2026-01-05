@@ -4,7 +4,7 @@ PyQt6-based graphical user interface for oscilloscope control
 
 ## Main Window
 
-::: siglent.gui.main*window
+::: siglent.gui.main_window
 options:
 show_root_heading: false
 show_source: true
@@ -18,7 +18,7 @@ filters: - "!^*" # Exclude private members
 
 ## Connection Manager
 
-::: siglent.gui.connection*manager
+::: siglent.gui.connection_manager
 options:
 show_root_heading: false
 show_source: true
@@ -34,7 +34,7 @@ filters: - "!^*"
 
 ### Waveform Display
 
-::: siglent.gui.widgets.waveform*display
+::: siglent.gui.widgets.waveform_display
 options:
 show_root_heading: false
 show_source: true
@@ -43,7 +43,7 @@ members_order: source
 show_signature_annotations: true
 filters: - "!^*"
 
-::: siglent.gui.widgets.waveform*display_pg
+::: siglent.gui.widgets.waveform_display_pg
 options:
 show_root_heading: false
 show_source: true
@@ -54,7 +54,7 @@ filters: - "!^*"
 
 ### Channel Control
 
-::: siglent.gui.widgets.channel*control
+::: siglent.gui.widgets.channel_control
 options:
 show_root_heading: false
 show_source: true
@@ -65,7 +65,7 @@ filters: - "!^*"
 
 ### Trigger Control
 
-::: siglent.gui.widgets.trigger*control
+::: siglent.gui.widgets.trigger_control
 options:
 show_root_heading: false
 show_source: true
@@ -76,7 +76,7 @@ filters: - "!^*"
 
 ### Timebase Control
 
-::: siglent.gui.widgets.timebase*control
+::: siglent.gui.widgets.timebase_control
 options:
 show_root_heading: false
 show_source: true
@@ -87,7 +87,7 @@ filters: - "!^*"
 
 ### Measurement Panel
 
-::: siglent.gui.widgets.measurement*panel
+::: siglent.gui.widgets.measurement_panel
 options:
 show_root_heading: false
 show_source: true
@@ -98,7 +98,7 @@ filters: - "!^*"
 
 ### Cursor Panel
 
-::: siglent.gui.widgets.cursor*panel
+::: siglent.gui.widgets.cursor_panel
 options:
 show_root_heading: false
 show_source: true
@@ -109,7 +109,7 @@ filters: - "!^*"
 
 ### Math Panel
 
-::: siglent.gui.widgets.math*panel
+::: siglent.gui.widgets.math_panel
 options:
 show_root_heading: false
 show_source: true
@@ -120,7 +120,7 @@ filters: - "!^*"
 
 ### Reference Panel
 
-::: siglent.gui.widgets.reference*panel
+::: siglent.gui.widgets.reference_panel
 options:
 show_root_heading: false
 show_source: true
@@ -131,7 +131,7 @@ filters: - "!^*"
 
 ### Protocol Decode Panel
 
-::: siglent.gui.widgets.protocol*decode_panel
+::: siglent.gui.widgets.protocol_decode_panel
 options:
 show_root_heading: false
 show_source: true
@@ -142,7 +142,7 @@ filters: - "!^*"
 
 ### FFT Display
 
-::: siglent.gui.widgets.fft*display
+::: siglent.gui.widgets.fft_display
 options:
 show_root_heading: false
 show_source: true
@@ -153,7 +153,7 @@ filters: - "!^*"
 
 ### Visual Measurement Panel
 
-::: siglent.gui.widgets.visual*measurement_panel
+::: siglent.gui.widgets.visual_measurement_panel
 options:
 show_root_heading: false
 show_source: true
@@ -164,7 +164,7 @@ filters: - "!^*"
 
 ### Vector Graphics Panel
 
-::: siglent.gui.widgets.vector*graphics_panel
+::: siglent.gui.widgets.vector_graphics_panel
 options:
 show_root_heading: false
 show_source: true
@@ -175,7 +175,7 @@ filters: - "!^*"
 
 ### Terminal Widget
 
-::: siglent.gui.widgets.terminal*widget
+::: siglent.gui.widgets.terminal_widget
 options:
 show_root_heading: false
 show_source: true
@@ -186,7 +186,7 @@ filters: - "!^*"
 
 ### Error Dialog
 
-::: siglent.gui.widgets.error*dialog
+::: siglent.gui.widgets.error_dialog
 options:
 show_root_heading: false
 show_source: true
@@ -199,7 +199,7 @@ filters: - "!^*"
 
 ### Live View Worker
 
-::: siglent.gui.live*view_worker
+::: siglent.gui.live_view_worker
 options:
 show_root_heading: false
 show_source: true
@@ -210,7 +210,7 @@ filters: - "!^*"
 
 ### Waveform Capture Worker
 
-::: siglent.gui.waveform*capture_worker
+::: siglent.gui.waveform_capture_worker
 options:
 show_root_heading: false
 show_source: true
@@ -221,7 +221,7 @@ filters: - "!^*"
 
 ## VNC Window
 
-::: siglent.gui.vnc*window
+::: siglent.gui.vnc_window
 options:
 show_root_heading: false
 show_source: true

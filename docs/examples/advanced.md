@@ -4,9 +4,9 @@ Advanced examples demonstrating signal analysis, FFT processing, and specialized
 
 ## Quick Reference
 
-| Example                                                                                         | Description                                   |
-| ----------------------------------------------------------------------------------------------- | --------------------------------------------- |
-| [Advanced waveform analysis and visualization](#advanced-waveform-analysis-and-visualization)   | Advanced waveform analysis and visualization. |
+| Example | Description |
+|---------|-------------|
+| [Advanced waveform analysis and visualization](#advanced-waveform-analysis-and-visualization) | Advanced waveform analysis and visualization. |
 | [Vector Graphics on Oscilloscope using XY Mode](#vector-graphics-on-oscilloscope-using-xy-mode) | Vector Graphics on Oscilloscope using XY Mode |
 
 ---

@@ -13,7 +13,7 @@ For automated test report generation:
     from siglent.report_generator import ReportGenerator
 """
 
-__version__ = "0.5.0"
+__version__ = "0.5.1"
 
 from siglent.exceptions import CommandError, SiglentConnectionError, SiglentError, SiglentTimeoutError
 from siglent.oscilloscope import Oscilloscope

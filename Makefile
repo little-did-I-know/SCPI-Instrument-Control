@@ -1,4 +1,4 @@
-.PHONY: help install install-dev install-all test test-cov test-fast test-exceptions codecov-install codecov-upload codecov-report lint format clean build publish build-exe build-exe-clean build-exe-test install-pyinstaller test-build-system docs docs-generate docs-examples docs-api docs-serve docs-deploy pre-commit pre-commit-branch pre-pr pre-pr-fast pre-pr-fix
+.PHONY: help install install-dev install-all test test-cov test-fast test-exceptions codecov-install codecov-upload codecov-report lint format clean build publish build-exe build-exe-clean build-exe-test install-pyinstaller test-build-system docs docs-generate docs-examples docs-api docs-serve docs-deploy pre-commit pre-commit-branch pre-pr pre-pr-fast pre-pr-fix version-bump bump-major bump-minor bump-patch
 
 help:  ## Show this help message
 	@echo "Available commands:"
@@ -216,3 +216,18 @@ dev-test:  ## Run tests in watch mode (requires pytest-watch)
 dev-watch:  ## Watch for changes and auto-format (requires watchdog)
 	pip install watchdog
 	watchmedo shell-command --patterns="*.py" --recursive --command='make format' siglent/
+
+# Version management
+.PHONY: version-bump bump-major bump-minor bump-patch
+
+version-bump:  ## Interactively bump version (asks major/minor/patch)
+	python scripts/bump_version.py
+
+bump-major:  ## Bump major version (X.0.0) - breaking changes
+	python scripts/bump_version.py --major
+
+bump-minor:  ## Bump minor version (0.X.0) - new features
+	python scripts/bump_version.py --minor
+
+bump-patch:  ## Bump patch version (0.0.X) - bug fixes
+	python scripts/bump_version.py --patch

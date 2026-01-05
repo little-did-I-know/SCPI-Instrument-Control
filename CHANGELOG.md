@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-01-05
+
+### Fixed
+
+**Documentation Build and Deployment**
+- Fixed GUI API documentation with incorrect module references
+  - Corrected all wildcard references (`*`) to proper underscores (`_`) in `docs/api/gui.md`
+  - Fixed 20+ module reference errors (e.g., `siglent.gui.main*window` → `siglent.gui.main_window`)
+  - Documentation now builds successfully without errors
+- Set up automated GitHub Pages deployment
+  - Created `.github/workflows/docs.yml` for automatic documentation deployment
+  - Documentation auto-deploys to GitHub Pages on every push to main branch
+  - Integrated with existing `make docs-generate` automation
+- Updated PyPI documentation URL
+  - Changed from README-only link to proper documentation site
+  - PyPI now links to https://little-did-I-know.github.io/Siglent-Oscilloscope/
+  - Users can access complete API documentation and guides from PyPI
+
+**MkDocs Build System**
+- Ensured autodoc generation works correctly with mkdocstrings
+- Verified API reference pages generate from Python docstrings
+- Confirmed cross-references between documentation pages work properly
+
+### Changed
+
+**Documentation Infrastructure**
+- Documentation now automatically generated and deployed on every main branch update
+- API documentation uses mkdocstrings for automatic extraction from code
+- Examples documentation auto-generated from example scripts
+- Improved documentation discoverability for users installing from PyPI
+
 ## [0.5.0] - 2026-01-04
 
 ### Added

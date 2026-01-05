@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "Siglent-Oscilloscope"
-version = "0.5.0"
+version = "0.5.1"
 description = "Python library for Siglent oscilloscope and power supply control via SCPI over Ethernet/LAN. Oscilloscope support: SDS800XHD, SDS1000X-E, SDS2000X Plus, SDS5000X with waveform capture, measurements, FFT analysis, and PyQt6 GUI. Power supply support: SPD3303X series with programmatic control, data logging, and automation. Automated test report generation with AI analysis."
 readme = { file = "README.md", content-type = "text/markdown" }
 requires-python = ">=3.8"
@@ -45,7 +45,7 @@ dependencies = [
 
 [project.urls]
 Homepage = "https://github.com/little-did-I-know/Siglent-Oscilloscope"
-Documentation = "https://github.com/little-did-I-know/Siglent-Oscilloscope#readme"
+Documentation = "https://little-did-I-know.github.io/Siglent-Oscilloscope/"
 Repository = "https://github.com/little-did-I-know/Siglent-Oscilloscope"
 Issues = "https://github.com/little-did-I-know/Siglent-Oscilloscope/issues"
 Changelog = "https://github.com/little-did-I-know/Siglent-Oscilloscope/blob/main/CHANGELOG.md"
