@@ -58,6 +58,7 @@ dmypy.json
 *.jpg
 !docs/**/*.png
 !docs/**/*.jpg
+!resources/*.png
 
 # Pre-commit
 .pre-commit-cache/
