@@ -14,7 +14,7 @@ For high-level automation and data collection, see the automation module:
 For power supply control:
     from scpi_control import PowerSupply
 
-For function generator control (available in v0.6.0+ when AWG branch is merged):
+For function generator control:
     from scpi_control import FunctionGenerator
 
 For automated test report generation:
@@ -31,8 +31,7 @@ from scpi_control.power_supply import PowerSupply
 from scpi_control.psu_data_logger import PSUDataLogger, TimedPSULogger
 
 # Function generator support (new in v0.6.0, stable in v1.0.0)
-# NOTE: Temporarily commented out until AWG branch is merged
-# from scpi_control.function_generator import FunctionGenerator
+from scpi_control.function_generator import FunctionGenerator
 
 __all__ = [
     # Core features
@@ -45,6 +44,6 @@ __all__ = [
     "PowerSupply",
     "PSUDataLogger",
     "TimedPSULogger",
-    # Function generator features (commented out until AWG branch is merged)
-    # "FunctionGenerator",
+    # Function generator features
+    "FunctionGenerator",
 ]

@@ -41,6 +41,10 @@ class MockConnection(BaseConnection):
         psu_mode: bool = False,
         psu_idn: str = "Siglent Technologies,SPD3303X,SPD123456,1.0",
         psu_outputs: Optional[Dict[int, Dict[str, float]]] = None,
+        # Function generator (AWG) parameters
+        awg_mode: bool = False,
+        awg_idn: str = "Siglent Technologies,SDG1032X,SDG1XXXXX,2.01.01.37R1",
+        awg_channels: Optional[Dict[int, Dict[str, any]]] = None,
     ):
         super().__init__(host, port, timeout)
         channels = channel_states.keys() if channel_states else range(1, 3)
@@ -81,6 +85,32 @@ class MockConnection(BaseConnection):
         self.psu_waveform_enabled: Dict[int, bool] = {1: False, 2: False, 3: False}
         self.psu_ovp_levels: Dict[int, float] = {1: 30.0, 2: 30.0, 3: 5.0}
         self.psu_ocp_levels: Dict[int, float] = {1: 3.0, 2: 3.0, 3: 3.0}
+
+        # Function generator (AWG) mode
+        self.awg_mode = awg_mode
+        self.awg_idn = awg_idn
+        self.awg_channels: Dict[int, Dict[str, any]] = awg_channels or {
+            1: {
+                "function": "SINE",
+                "frequency": 1000.0,
+                "amplitude": 1.0,
+                "offset": 0.0,
+                "phase": 0.0,
+                "enabled": False,
+                "pulse_duty": 50.0,
+                "ramp_symmetry": 50.0,
+            },
+            2: {
+                "function": "SINE",
+                "frequency": 1000.0,
+                "amplitude": 1.0,
+                "offset": 0.0,
+                "phase": 0.0,
+                "enabled": False,
+                "pulse_duty": 50.0,
+                "ramp_symmetry": 50.0,
+            },
+        }
 
     def connect(self) -> None:
         """Mark the connection as established."""
@@ -157,6 +187,120 @@ class MockConnection(BaseConnection):
                 self.psu_ocp_levels[ch] = level
                 return
 
+        # Function generator (AWG) commands
+        if self.awg_mode:
+            # Waveform function: C1:BSWV WVTP,SINE (Siglent) or SOUR1:FUNC SINE (generic)
+            if match := re.match(r"C(\d+):BSWV\s+WVTP,(\w+)", command, re.IGNORECASE):
+                ch = int(match.group(1))
+                function = match.group(2).upper()
+                if ch in self.awg_channels:
+                    self.awg_channels[ch]["function"] = function
+                return
+            if match := re.match(r"SOUR(\d+):FUNC\s+(\w+)", command, re.IGNORECASE):
+                ch = int(match.group(1))
+                function = match.group(2).upper()
+                if ch in self.awg_channels:
+                    self.awg_channels[ch]["function"] = function
+                return
+
+            # Frequency: C1:BSWV FRQ,1000 (Siglent) or SOUR1:FREQ 1000 (generic)
+            if match := re.match(r"C(\d+):BSWV\s+FRQ,([\d.E+\-]+)", command, re.IGNORECASE):
+                ch = int(match.group(1))
+                freq = float(match.group(2))
+                if ch in self.awg_channels:
+                    self.awg_channels[ch]["frequency"] = freq
+                return
+            if match := re.match(r"SOUR(\d+):FREQ\s+([\d.E+\-]+)", command, re.IGNORECASE):
+                ch = int(match.group(1))
+                freq = float(match.group(2))
+                if ch in self.awg_channels:
+                    self.awg_channels[ch]["frequency"] = freq
+                return
+
+            # Amplitude: C1:BSWV AMP,5.0 (Siglent) or SOUR1:VOLT 5.0 (generic)
+            if match := re.match(r"C(\d+):BSWV\s+AMP,([\d.E+\-]+)", command, re.IGNORECASE):
+                ch = int(match.group(1))
+                amp = float(match.group(2))
+                if ch in self.awg_channels:
+                    self.awg_channels[ch]["amplitude"] = amp
+                return
+            if match := re.match(r"SOUR(\d+):VOLT\s+([\d.E+\-]+)", command, re.IGNORECASE):
+                ch = int(match.group(1))
+                amp = float(match.group(2))
+                if ch in self.awg_channels:
+                    self.awg_channels[ch]["amplitude"] = amp
+                return
+
+            # Offset: C1:BSWV OFST,0.5 (Siglent) or SOUR1:VOLT:OFFS 0.5 (generic)
+            if match := re.match(r"C(\d+):BSWV\s+OFST,([\d.E+\-]+)", command, re.IGNORECASE):
+                ch = int(match.group(1))
+                offset = float(match.group(2))
+                if ch in self.awg_channels:
+                    self.awg_channels[ch]["offset"] = offset
+                return
+            if match := re.match(r"SOUR(\d+):VOLT:OFFS\s+([\d.E+\-]+)", command, re.IGNORECASE):
+                ch = int(match.group(1))
+                offset = float(match.group(2))
+                if ch in self.awg_channels:
+                    self.awg_channels[ch]["offset"] = offset
+                return
+
+            # Phase: C1:BSWV PHSE,90 (Siglent) or SOUR1:PHAS 90 (generic)
+            if match := re.match(r"C(\d+):BSWV\s+PHSE,([\d.E+\-]+)", command, re.IGNORECASE):
+                ch = int(match.group(1))
+                phase = float(match.group(2))
+                if ch in self.awg_channels:
+                    self.awg_channels[ch]["phase"] = phase
+                return
+            if match := re.match(r"SOUR(\d+):PHAS\s+([\d.E+\-]+)", command, re.IGNORECASE):
+                ch = int(match.group(1))
+                phase = float(match.group(2))
+                if ch in self.awg_channels:
+                    self.awg_channels[ch]["phase"] = phase
+                return
+
+            # Pulse duty cycle: C1:BSWV DUTY,25 (Siglent) or SOUR1:FUNC:PULS:DCYC 25 (generic)
+            if match := re.match(r"C(\d+):BSWV\s+DUTY,([\d.E+\-]+)", command, re.IGNORECASE):
+                ch = int(match.group(1))
+                duty = float(match.group(2))
+                if ch in self.awg_channels:
+                    self.awg_channels[ch]["pulse_duty"] = duty
+                return
+            if match := re.match(r"SOUR(\d+):FUNC:PULS:DCYC\s+([\d.E+\-]+)", command, re.IGNORECASE):
+                ch = int(match.group(1))
+                duty = float(match.group(2))
+                if ch in self.awg_channels:
+                    self.awg_channels[ch]["pulse_duty"] = duty
+                return
+
+            # Ramp symmetry: C1:BSWV SYM,50 (Siglent) or SOUR1:FUNC:RAMP:SYMM 50 (generic)
+            if match := re.match(r"C(\d+):BSWV\s+SYM,([\d.E+\-]+)", command, re.IGNORECASE):
+                ch = int(match.group(1))
+                symm = float(match.group(2))
+                if ch in self.awg_channels:
+                    self.awg_channels[ch]["ramp_symmetry"] = symm
+                return
+            if match := re.match(r"SOUR(\d+):FUNC:RAMP:SYMM\s+([\d.E+\-]+)", command, re.IGNORECASE):
+                ch = int(match.group(1))
+                symm = float(match.group(2))
+                if ch in self.awg_channels:
+                    self.awg_channels[ch]["ramp_symmetry"] = symm
+                return
+
+            # Output enable: C1:OUTP ON (Siglent) or OUTP1 ON (generic)
+            if match := re.match(r"C(\d+):OUTP\s+(ON|OFF)", command, re.IGNORECASE):
+                ch = int(match.group(1))
+                enabled = match.group(2).upper() == "ON"
+                if ch in self.awg_channels:
+                    self.awg_channels[ch]["enabled"] = enabled
+                return
+            if match := re.match(r"OUTP(\d+)\s+(ON|OFF)", command, re.IGNORECASE):
+                ch = int(match.group(1))
+                enabled = match.group(2).upper() == "ON"
+                if ch in self.awg_channels:
+                    self.awg_channels[ch]["enabled"] = enabled
+                return
+
         # Oscilloscope commands
         if command.upper().startswith("TDIV "):
             value = command.split(" ", 1)[1]
@@ -221,7 +365,110 @@ class MockConnection(BaseConnection):
         upper = command.upper()
 
         if upper == "*IDN?":
-            return self.psu_idn if self.psu_mode else self.idn
+            if self.awg_mode:
+                return self.awg_idn
+            elif self.psu_mode:
+                return self.psu_idn
+            else:
+                return self.idn
+
+        # Function generator (AWG) queries
+        if self.awg_mode:
+            # Function queries: C1:BSWV? WVTP (Siglent) or SOUR1:FUNC? (generic)
+            if match := re.match(r"C(\d+):BSWV\?\s*WVTP", upper):
+                ch = int(match.group(1))
+                if ch in self.awg_channels:
+                    return self.awg_channels[ch]["function"]
+                return "SINE"
+            if match := re.match(r"SOUR(\d+):FUNC\?", upper):
+                ch = int(match.group(1))
+                if ch in self.awg_channels:
+                    return self.awg_channels[ch]["function"]
+                return "SINE"
+
+            # Frequency queries: C1:BSWV? FRQ (Siglent) or SOUR1:FREQ? (generic)
+            if match := re.match(r"C(\d+):BSWV\?\s*FRQ", upper):
+                ch = int(match.group(1))
+                if ch in self.awg_channels:
+                    return f"{self.awg_channels[ch]['frequency']:.6f}"
+                return "1000.0"
+            if match := re.match(r"SOUR(\d+):FREQ\?", upper):
+                ch = int(match.group(1))
+                if ch in self.awg_channels:
+                    return f"{self.awg_channels[ch]['frequency']:.6f}"
+                return "1000.0"
+
+            # Amplitude queries: C1:BSWV? AMP (Siglent) or SOUR1:VOLT? (generic)
+            if match := re.match(r"C(\d+):BSWV\?\s*AMP", upper):
+                ch = int(match.group(1))
+                if ch in self.awg_channels:
+                    return f"{self.awg_channels[ch]['amplitude']:.3f}"
+                return "1.0"
+            if match := re.match(r"SOUR(\d+):VOLT\?", upper):
+                ch = int(match.group(1))
+                if ch in self.awg_channels:
+                    return f"{self.awg_channels[ch]['amplitude']:.3f}"
+                return "1.0"
+
+            # Offset queries: C1:BSWV? OFST (Siglent) or SOUR1:VOLT:OFFS? (generic)
+            if match := re.match(r"C(\d+):BSWV\?\s*OFST", upper):
+                ch = int(match.group(1))
+                if ch in self.awg_channels:
+                    return f"{self.awg_channels[ch]['offset']:.3f}"
+                return "0.0"
+            if match := re.match(r"SOUR(\d+):VOLT:OFFS\?", upper):
+                ch = int(match.group(1))
+                if ch in self.awg_channels:
+                    return f"{self.awg_channels[ch]['offset']:.3f}"
+                return "0.0"
+
+            # Phase queries: C1:BSWV? PHSE (Siglent) or SOUR1:PHAS? (generic)
+            if match := re.match(r"C(\d+):BSWV\?\s*PHSE", upper):
+                ch = int(match.group(1))
+                if ch in self.awg_channels:
+                    return f"{self.awg_channels[ch]['phase']:.1f}"
+                return "0.0"
+            if match := re.match(r"SOUR(\d+):PHAS\?", upper):
+                ch = int(match.group(1))
+                if ch in self.awg_channels:
+                    return f"{self.awg_channels[ch]['phase']:.1f}"
+                return "0.0"
+
+            # Pulse duty cycle queries
+            if match := re.match(r"C(\d+):BSWV\?\s*DUTY", upper):
+                ch = int(match.group(1))
+                if ch in self.awg_channels:
+                    return f"{self.awg_channels[ch]['pulse_duty']:.1f}"
+                return "50.0"
+            if match := re.match(r"SOUR(\d+):FUNC:PULS:DCYC\?", upper):
+                ch = int(match.group(1))
+                if ch in self.awg_channels:
+                    return f"{self.awg_channels[ch]['pulse_duty']:.1f}"
+                return "50.0"
+
+            # Ramp symmetry queries
+            if match := re.match(r"C(\d+):BSWV\?\s*SYM", upper):
+                ch = int(match.group(1))
+                if ch in self.awg_channels:
+                    return f"{self.awg_channels[ch]['ramp_symmetry']:.1f}"
+                return "50.0"
+            if match := re.match(r"SOUR(\d+):FUNC:RAMP:SYMM\?", upper):
+                ch = int(match.group(1))
+                if ch in self.awg_channels:
+                    return f"{self.awg_channels[ch]['ramp_symmetry']:.1f}"
+                return "50.0"
+
+            # Output state queries: C1:OUTP? (Siglent) or OUTP1? (generic)
+            if match := re.match(r"C(\d+):OUTP\?", upper):
+                ch = int(match.group(1))
+                if ch in self.awg_channels:
+                    return "ON" if self.awg_channels[ch]["enabled"] else "OFF"
+                return "OFF"
+            if match := re.match(r"OUTP(\d+)\?", upper):
+                ch = int(match.group(1))
+                if ch in self.awg_channels:
+                    return "ON" if self.awg_channels[ch]["enabled"] else "OFF"
+                return "OFF"
 
         # Power supply queries
         if self.psu_mode:

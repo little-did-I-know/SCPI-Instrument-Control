@@ -10,6 +10,9 @@ include docs/VISUAL_MEASUREMENTS.md
 include docs/SCREENSHOT_GUIDE.md
 include docs/SDS800XHD_Series_ProgrammingGuide_EN11G.pdf
 
+# Include resources (logos, icons)
+recursive-include resources *.png *.ico *.icns
+
 # Include examples
 recursive-include examples *.py
 recursive-include examples *.md
