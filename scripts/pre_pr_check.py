@@ -122,7 +122,7 @@ def check_formatting(auto_fix: bool = False) -> bool:
 
     if auto_fix:
         print("  Auto-fixing formatting issues...")
-        success, _ = run_command(["black", "--line-length", "200", "siglent/", "tests/", "examples/"])
+        success, _ = run_command(["black", "--line-length", "200", "scpi_control/", "tests/", "examples/"])
         if success:
             print_success("Code formatted successfully")
             return True
@@ -130,7 +130,7 @@ def check_formatting(auto_fix: bool = False) -> bool:
             print_error("Failed to format code")
             return False
     else:
-        success, output = run_command(["black", "--check", "--line-length", "200", "siglent/", "tests/", "examples/"], check=False, capture=True)
+        success, output = run_command(["black", "--check", "--line-length", "200", "scpi_control/", "tests/", "examples/"], check=False, capture=True)
 
         if success:
             print_success("All files properly formatted")
@@ -148,7 +148,7 @@ def check_imports(auto_fix: bool = False) -> bool:
 
     if auto_fix:
         print("  Auto-fixing import order...")
-        success, _ = run_command(["isort", "--profile", "black", "--line-length", "200", "siglent/", "tests/", "examples/"])
+        success, _ = run_command(["isort", "--profile", "black", "--line-length", "200", "scpi_control/", "tests/", "examples/"])
         if success:
             print_success("Imports sorted successfully")
             return True
@@ -156,7 +156,7 @@ def check_imports(auto_fix: bool = False) -> bool:
             print_warning("isort not installed (pip install isort)")
             return True  # Don't fail on this
     else:
-        success, _ = run_command(["isort", "--check-only", "--profile", "black", "--line-length", "200", "siglent/", "tests/", "examples/"], check=False)
+        success, _ = run_command(["isort", "--check-only", "--profile", "black", "--line-length", "200", "scpi_control/", "tests/", "examples/"], check=False)
 
         if success:
             print_success("Import order correct")
@@ -170,7 +170,7 @@ def check_linting() -> bool:
     """Check code quality with flake8."""
     print_step("Running linter (flake8)...")
 
-    success, output = run_command(["flake8", "siglent/", "--max-line-length=200", "--extend-ignore=E203,W503"], check=False, capture=True)
+    success, output = run_command(["flake8", "scpi_control/", "--max-line-length=200", "--extend-ignore=E203,W503"], check=False, capture=True)
 
     if success:
         print_success("No linting issues found")
@@ -185,7 +185,7 @@ def check_security() -> bool:
     """Run security checks with bandit."""
     print_step("Running security checks (bandit)...")
 
-    success, output = run_command(["bandit", "-r", "siglent/", "-ll"], check=False, capture=True)  # Low-low severity
+    success, output = run_command(["bandit", "-r", "scpi_control/", "-ll"], check=False, capture=True)  # Low-low severity
 
     if success or "No issues identified" in output:
         print_success("No security issues found")

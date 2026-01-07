@@ -3,7 +3,7 @@
 
 This script handles version bumping across the codebase:
 - Updates pyproject.toml
-- Updates siglent/__init__.py
+- Updates scpi_control/__init__.py
 - Updates CHANGELOG.md with new version header
 
 Usage:
@@ -19,6 +19,11 @@ import sys
 from datetime import date
 from pathlib import Path
 from typing import Optional, Tuple
+
+# Fix Windows console encoding for Unicode characters
+if sys.platform == 'win32':
+    import io
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
 
 
 def get_current_version(file_path: Path, pattern: str) -> Optional[str]:
@@ -56,9 +61,9 @@ def check_version_consistency() -> Optional[str]:
         r'^version\s*=\s*"([^"]+)"'
     )
 
-    # Check siglent/__init__.py
+    # Check scpi_control/__init__.py
     init_version = get_current_version(
-        root_dir / "siglent" / "__init__.py",
+        root_dir / "scpi_control" / "__init__.py",
         r'^__version__\s*=\s*"([^"]+)"'
     )
 
@@ -69,7 +74,7 @@ def check_version_consistency() -> Optional[str]:
     if pyproject_version != init_version:
         print(f"ERROR: Version mismatch detected!")
         print(f"  pyproject.toml: {pyproject_version}")
-        print(f"  siglent/__init__.py: {init_version}")
+        print(f"  scpi_control/__init__.py: {init_version}")
         return None
 
     return pyproject_version
@@ -361,7 +366,7 @@ def main():
     print(f"\nReady to bump version from {current_version} to {new_version}")
     print("This will update:")
     print("  - pyproject.toml")
-    print("  - siglent/__init__.py")
+    print("  - scpi_control/__init__.py")
     print("  - CHANGELOG.md")
     response = input("\nProceed with version bump? (y/N): ").strip().lower()
     if response != 'y':
@@ -377,9 +382,9 @@ def main():
     if not success:
         return 1
 
-    # Update siglent/__init__.py
+    # Update scpi_control/__init__.py
     success = update_file(
-        root_dir / "siglent" / "__init__.py",
+        root_dir / "scpi_control" / "__init__.py",
         r'^__version__\s*=\s*"([^"]+)"',
         new_version
     )

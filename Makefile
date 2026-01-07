@@ -17,7 +17,7 @@ test:  ## Run tests
 	python -m pytest tests/ -v
 
 test-cov:  ## Run tests with coverage report
-	python -m pytest tests/ --cov=siglent --cov-report=html --cov-report=term-missing --cov-report=xml -v
+	python -m pytest tests/ --cov=scpi_control --cov-report=html --cov-report=term-missing --cov-report=xml -v
 	@echo "Coverage report generated in htmlcov/index.html"
 	@echo "Coverage XML generated in coverage.xml"
 
@@ -26,7 +26,7 @@ test-fast:  ## Run tests in parallel (faster)
 
 test-exceptions:  ## Test exception handling and imports
 	@echo "Testing exception imports and backward compatibility..."
-	@python -c "from siglent.exceptions import SiglentConnectionError, SiglentTimeoutError, CommandError, SiglentError; from siglent.exceptions import ConnectionError, TimeoutError; assert ConnectionError is SiglentConnectionError; assert TimeoutError is SiglentTimeoutError; print('✓ New exception names: OK'); print('✓ Backward compatibility aliases: OK'); print('✓ All exception imports: PASSED')"
+	@python -c "from scpi_control.exceptions import SiglentConnectionError, SiglentTimeoutError, CommandError, SiglentError; from scpi_control.exceptions import ConnectionError, TimeoutError; assert ConnectionError is SiglentConnectionError; assert TimeoutError is SiglentTimeoutError; print('✓ New exception names: OK'); print('✓ Backward compatibility aliases: OK'); print('✓ All exception imports: PASSED')"
 	@echo "\nRunning exception-related tests..."
 	@python -m pytest tests/ -k "exception or error or connection or timeout" -v --tb=short || echo "Note: Some tests may not exist yet"
 
@@ -53,12 +53,12 @@ codecov-report:  ## Generate coverage report and upload to Codecov
 	@echo "\n✓ Coverage report generated and uploaded"
 
 lint:  ## Run all linting checks
-	black --check --line-length 200 siglent/ tests/ examples/
-	flake8 siglent/ --max-line-length=200
+	black --check --line-length 200 scpi_control/ tests/ examples/
+	flake8 scpi_control/ --max-line-length=200
 	@echo "✓ All linting checks passed"
 
 format:  ## Auto-format code with Black
-	black --line-length 200 siglent/ tests/ examples/
+	black --line-length 200 scpi_control/ tests/ examples/
 	@echo "✓ Code formatted"
 
 clean:  ## Remove build artifacts and cache files
@@ -194,7 +194,7 @@ gui:  ## Launch the GUI application
 	siglent-gui
 
 version:  ## Show package version
-	@python -c "import siglent; print(f'Siglent-Oscilloscope v{siglent.__version__}')"
+	@python -c "import scpi_control; print(f'SCPI-Instrument-Control v{scpi_control.__version__}')"
 
 # Development helpers
 .PHONY: dev-setup dev-test dev-watch
@@ -215,7 +215,7 @@ dev-test:  ## Run tests in watch mode (requires pytest-watch)
 
 dev-watch:  ## Watch for changes and auto-format (requires watchdog)
 	pip install watchdog
-	watchmedo shell-command --patterns="*.py" --recursive --command='make format' siglent/
+	watchmedo shell-command --patterns="*.py" --recursive --command='make format' scpi_control/
 
 # Version management
 .PHONY: version-bump bump-major bump-minor bump-patch

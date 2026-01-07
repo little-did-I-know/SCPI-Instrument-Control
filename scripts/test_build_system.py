@@ -85,7 +85,7 @@ def check_project_structure():
     ]
 
     required_dirs = [
-        "siglent/gui",
+        "scpi_control/gui",
         "resources",
         ".github/workflows",
     ]
@@ -154,7 +154,7 @@ def check_spec_file():
     checks = {
         "Analysis(": "Analysis configuration",
         "EXE(": "EXE configuration",
-        "siglent/gui/app.py": "Entry point script",
+        "scpi_control/gui/app.py": "Entry point script",
         "hiddenimports": "Hidden imports list",
     }
 
@@ -219,7 +219,7 @@ def check_entry_point():
     """Verify the GUI entry point exists and is importable."""
     print_header("Checking GUI Entry Point")
 
-    entry_script = Path("siglent/gui/app.py")
+    entry_script = Path("scpi_control/gui/app.py")
 
     if not entry_script.exists():
         print_error(f"Entry point not found: {entry_script}")
