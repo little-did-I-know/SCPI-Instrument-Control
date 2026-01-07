@@ -2,7 +2,7 @@
 
 Automated measurements (frequency, voltage, timing)
 
-::: siglent.measurement
+::: scpi_control.measurement
     options:
       show_root_heading: false
       show_source: true

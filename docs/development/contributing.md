@@ -418,7 +418,7 @@ For features that are innovative but need user feedback before stabilization:
 # siglent/power_supply.py (experimental module)
 import warnings
 warnings.warn(
-    "siglent.power_supply is experimental. API may change.",
+    "scpi_control.power_supply is experimental. API may change.",
     FutureWarning
 )
 ```

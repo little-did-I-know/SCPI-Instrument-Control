@@ -2,7 +2,7 @@
 
 Trigger configuration and modes
 
-::: siglent.trigger
+::: scpi_control.trigger
     options:
       show_root_heading: false
       show_source: true

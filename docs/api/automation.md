@@ -2,7 +2,7 @@
 
 High-level automation and data collection
 
-::: siglent.automation
+::: scpi_control.automation
     options:
       show_root_heading: false
       show_source: true

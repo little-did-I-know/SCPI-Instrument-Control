@@ -465,7 +465,7 @@ from unittest.mock import Mock, patch, MagicMock
 
 def test_network_request():
     """Test network request with mock."""
-    with patch('siglent.connection.socket.socket') as mock_socket:
+    with patch('scpi_control.connection.socket.socket') as mock_socket:
         # Configure mock
         mock_sock = MagicMock()
         mock_socket.return_value = mock_sock
@@ -502,7 +502,7 @@ pip install pytest-mock
 def test_with_mocker(mocker):
     """Test using pytest-mock."""
     # Mock method
-    mock_send = mocker.patch('siglent.connection.SocketConnection.send')
+    mock_send = mocker.patch('scpi_control.connection.SocketConnection.send')
     mock_send.return_value = "OK"
 
     # Test

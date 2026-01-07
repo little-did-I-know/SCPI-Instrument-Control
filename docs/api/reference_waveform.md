@@ -2,7 +2,7 @@
 
 Reference waveform management
 
-::: siglent.reference_waveform
+::: scpi_control.reference_waveform
     options:
       show_root_heading: false
       show_source: true

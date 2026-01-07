@@ -2,7 +2,7 @@
 
 Channel configuration and control
 
-::: siglent.channel
+::: scpi_control.channel
     options:
       show_root_heading: false
       show_source: true

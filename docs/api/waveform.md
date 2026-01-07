@@ -2,7 +2,7 @@
 
 Waveform acquisition and data handling
 
-::: siglent.waveform
+::: scpi_control.waveform
     options:
       show_root_heading: false
       show_source: true

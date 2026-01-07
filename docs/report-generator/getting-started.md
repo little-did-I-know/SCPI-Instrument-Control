@@ -61,7 +61,7 @@ All dependencies are installed automatically with `pip install -e ".[report-gene
 siglent-report-generator
 
 # Method 2: Using Python module
-python -m siglent.report_generator.app
+python -m scpi_control.report_generator.app
 ```
 
 ### Standalone Executable

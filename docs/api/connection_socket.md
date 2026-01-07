@@ -2,7 +2,7 @@
 
 TCP/IP socket communication
 
-::: siglent.connection.socket
+::: scpi_control.connection.socket
     options:
       show_root_heading: false
       show_source: true

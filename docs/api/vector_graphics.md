@@ -2,7 +2,7 @@
 
 XY mode vector graphics generation
 
-::: siglent.vector_graphics
+::: scpi_control.vector_graphics
     options:
       show_root_heading: false
       show_source: true

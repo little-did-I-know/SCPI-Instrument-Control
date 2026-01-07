@@ -58,7 +58,7 @@ pip install -e ".[all]"
 siglent-report-generator
 
 # Or using Python module
-python -m siglent.report_generator.app
+python -m scpi_control.report_generator.app
 ```
 
 ### Your First Report

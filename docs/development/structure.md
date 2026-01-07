@@ -199,7 +199,7 @@ gui/
 ```bash
 siglent-gui
 # Defined in pyproject.toml:
-# siglent-gui = "siglent.gui.app:main"
+# siglent-gui = "scpi_control.gui.app:main"
 ```
 
 ## Test Suite (`tests/`)
@@ -476,7 +476,7 @@ dependencies = ["numpy>=1.24.0", ...]
 gui = ["PyQt6>=6.6.0", ...]
 
 [project.scripts]
-siglent-gui = "siglent.gui.app:main"
+siglent-gui = "scpi_control.gui.app:main"
 ```
 
 ### Development Tools
@@ -679,7 +679,7 @@ with Oscilloscope('192.168.1.100') as scope:
 
 **Model-View-Controller (MVC):**
 
-- **Model**: `siglent.oscilloscope` (core library)
+- **Model**: `scpi_control.oscilloscope` (core library)
 - **View**: `gui/widgets/` (Qt widgets)
 - **Controller**: `gui/main_window.py` (coordination)
 
@@ -943,7 +943,7 @@ def function(arg1: str, arg2: int) -> bool:
 
 | Command       | Module            | Function |
 | ------------- | ----------------- | -------- |
-| `siglent-gui` | `siglent.gui.app` | `main()` |
+| `siglent-gui` | `scpi_control.gui.app` | `main()` |
 
 ## Next Steps
 
