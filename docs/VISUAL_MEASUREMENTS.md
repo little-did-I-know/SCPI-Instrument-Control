@@ -41,7 +41,7 @@ The visual measurement system allows you to interactively measure signal propert
 1. **Install with GUI support**:
 
    ```bash
-   pip install "Siglent-Oscilloscope[gui]"
+   pip install "SCPI-Instrument-Control[gui]"
    ```
 
 2. **Connect to oscilloscope**:
@@ -564,8 +564,8 @@ Workflow:
 **Programmatic Control** (future enhancement):
 
 ```python
-from siglent.gui.widgets.visual_measurement_panel import VisualMeasurementPanel
-from siglent.measurement_config import MeasurementConfigSet
+from scpi_control.gui.widgets.visual_measurement_panel import VisualMeasurementPanel
+from scpi_control.measurement_config import MeasurementConfigSet
 
 # Load configuration
 config = MeasurementConfigSet.load_from_file("test_suite.json")
@@ -627,7 +627,7 @@ results = panel.get_all_measurements()
 
 For issues, questions, or feature requests:
 
-- GitHub Issues: https://github.com/little-did-I-know/Siglent-Oscilloscope/issues
+- GitHub Issues: https://github.com/little-did-I-know/SCPI-Instrument-Control/issues
 - Documentation: README.md
 - Examples: `examples/` directory
 

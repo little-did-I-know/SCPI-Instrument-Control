@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: pypi
-      url: https://pypi.org/project/Siglent-Oscilloscope/
+      url: https://pypi.org/project/SCPI-Instrument-Control/
     permissions:
       id-token: write
 

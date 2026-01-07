@@ -80,7 +80,7 @@ Note: `--extra-index-url` is needed because dependencies (PyQt6, numpy, matplotl
 
 ```python
 # Test import
-from siglent import Oscilloscope
+from scpi_control import Oscilloscope
 print(Oscilloscope.__module__)
 
 # Test GUI command

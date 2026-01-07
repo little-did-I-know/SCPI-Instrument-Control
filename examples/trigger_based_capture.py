@@ -5,7 +5,7 @@ and capture waveforms when they occur. This is useful for capturing
 sporadic events or signals that meet specific criteria.
 """
 
-from siglent.automation import DataCollector, TriggerWaitCollector
+from scpi_control.automation import DataCollector, TriggerWaitCollector
 
 # Replace with your oscilloscope's IP address
 SCOPE_IP = "192.168.1.100"

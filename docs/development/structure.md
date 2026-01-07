@@ -7,7 +7,7 @@ This guide explains the organization of the Siglent Oscilloscope Control library
 The project follows a standard Python package structure with clear separation of concerns:
 
 ```
-Siglent-Oscilloscope/
+SCPI-Instrument-Control/
 ├── siglent/              # Main package (core library)
 ├── tests/                # Test suite
 ├── docs/                 # Documentation
@@ -393,7 +393,7 @@ Usage:
     python capture_waveform.py
 """
 
-from siglent import Oscilloscope
+from scpi_control import Oscilloscope
 
 # Connect to oscilloscope
 with Oscilloscope('192.168.1.100') as scope:
@@ -468,7 +468,7 @@ scripts/
 
 ```toml
 [project]
-name = "Siglent-Oscilloscope"
+name = "SCPI-Instrument-Control"
 version = "0.3.0"
 dependencies = ["numpy>=1.24.0", ...]
 

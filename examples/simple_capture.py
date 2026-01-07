@@ -4,7 +4,7 @@ This example shows how to capture a single waveform from one or more channels
 and save it to a file.
 """
 
-from siglent.automation import DataCollector
+from scpi_control.automation import DataCollector
 
 # Replace with your oscilloscope's IP address
 SCOPE_IP = "192.168.1.100"

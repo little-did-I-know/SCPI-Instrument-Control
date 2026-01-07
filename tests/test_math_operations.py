@@ -3,8 +3,8 @@
 import numpy as np
 import pytest
 
-from siglent.math_channel import MathChannel, MathOperations
-from siglent.waveform import WaveformData
+from scpi_control.math_channel import MathChannel, MathOperations
+from scpi_control.waveform import WaveformData
 
 
 @pytest.fixture

@@ -28,7 +28,7 @@ What actually happened.
 
 ```python
 # Minimal code to reproduce the issue
-from siglent import Oscilloscope
+from scpi_control import Oscilloscope
 
 scope = Oscilloscope('192.168.1.100')
 # ...

@@ -195,7 +195,7 @@ make version-bump
 Output:
 ```
 ============================================================
-Siglent-Oscilloscope Version Bump Script
+SCPI-Instrument-Control Version Bump Script
 ============================================================
 
 [1/5] Checking version consistency...

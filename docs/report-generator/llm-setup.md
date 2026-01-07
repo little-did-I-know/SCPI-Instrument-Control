@@ -468,4 +468,4 @@ When using AI features, the following data is sent:
 
 - **Create Templates** - Save AI-enhanced report configurations in the [Template Guide](templates.md)
 - **Learn the API** - Automate AI analysis in the [API Reference](api-reference.md)
-- **Get Help** - Ask on [GitHub Discussions](https://github.com/little-did-I-know/Siglent-Oscilloscope/discussions)
+- **Get Help** - Ask on [GitHub Discussions](https://github.com/little-did-I-know/SCPI-Instrument-Control/discussions)

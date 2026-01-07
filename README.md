@@ -1,18 +1,20 @@
-# Siglent Oscilloscope Control
+# SCPI Instrument Control
 
-[![CI](https://github.com/little-did-I-know/Siglent-Oscilloscope/actions/workflows/ci.yml/badge.svg)](https://github.com/little-did-I-know/Siglent-Oscilloscope/actions/workflows/ci.yml)
-[![codecov](https://codecov.io/gh/little-did-I-know/Siglent-Oscilloscope/branch/main/graph/badge.svg)](https://codecov.io/gh/little-did-I-know/Siglent-Oscilloscope)
-[![PyPI version](https://img.shields.io/pypi/v/Siglent-Oscilloscope.svg)](https://pypi.org/project/Siglent-Oscilloscope/)
-[![PyPI Downloads](https://img.shields.io/pypi/dm/Siglent-Oscilloscope.svg)](https://pypi.org/project/Siglent-Oscilloscope/)
-[![Python Version](https://img.shields.io/pypi/pyversions/Siglent-Oscilloscope)](https://pypi.org/project/Siglent-Oscilloscope/)
+> **📦 Package Renamed!** This project was formerly known as `Siglent-Oscilloscope`. See the [Migration Guide](#migration-guide) below for updating your code.
+
+[![CI](https://github.com/little-did-I-know/SCPI-Instrument-Control/actions/workflows/ci.yml/badge.svg)](https://github.com/little-did-I-know/SCPI-Instrument-Control/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/little-did-I-know/SCPI-Instrument-Control/branch/main/graph/badge.svg)](https://codecov.io/gh/little-did-I-know/SCPI-Instrument-Control)
+[![PyPI version](https://img.shields.io/pypi/v/SCPI-Instrument-Control.svg)](https://pypi.org/project/SCPI-Instrument-Control/)
+[![PyPI Downloads](https://img.shields.io/pypi/dm/SCPI-Instrument-Control.svg)](https://pypi.org/project/SCPI-Instrument-Control/)
+[![Python Version](https://img.shields.io/pypi/pyversions/SCPI-Instrument-Control)](https://pypi.org/project/SCPI-Instrument-Control/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
-[![GitHub issues](https://img.shields.io/github/issues/little-did-I-know/Siglent-Oscilloscope)](https://github.com/little-did-I-know/Siglent-Oscilloscope/issues)
-[![GitHub stars](https://img.shields.io/github/stars/little-did-I-know/Siglent-Oscilloscope)](https://github.com/little-did-I-know/Siglent-Oscilloscope/stargazers)
-[![GitHub last commit](https://img.shields.io/github/last-commit/little-did-I-know/Siglent-Oscilloscope)](https://github.com/little-did-I-know/Siglent-Oscilloscope/commits/main)
+[![GitHub issues](https://img.shields.io/github/issues/little-did-I-know/SCPI-Instrument-Control)](https://github.com/little-did-I-know/SCPI-Instrument-Control/issues)
+[![GitHub stars](https://img.shields.io/github/stars/little-did-I-know/SCPI-Instrument-Control)](https://github.com/little-did-I-know/SCPI-Instrument-Control/stargazers)
+[![GitHub last commit](https://img.shields.io/github/last-commit/little-did-I-know/SCPI-Instrument-Control)](https://github.com/little-did-I-know/SCPI-Instrument-Control/commits/main)
 [![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-Support-yellow.svg?style=flat&logo=buy-me-a-coffee)](https://buymeacoffee.com/little.did.i.know)
 
-A professional Python package for controlling Siglent oscilloscopes via Ethernet/LAN. Features both a comprehensive programmatic API and a high-performance PyQt6-based GUI application with real-time visualization.
+A universal Python library for controlling SCPI-compatible test equipment via Ethernet/LAN. Supports oscilloscopes, function generators (AWGs), and power supplies with a comprehensive programmatic API and high-performance PyQt6-based GUI application.
 
 ## Features
 
@@ -46,9 +48,9 @@ A professional Python package for controlling Siglent oscilloscopes via Ethernet
 
 ```python
 # Install report generator dependencies
-# pip install "Siglent-Oscilloscope[report-generator]"
+# pip install "SCPI-Instrument-Control[report-generator]"
 
-from siglent.report_generator import ReportGenerator, PDFGenerator, MarkdownGenerator
+from scpi_control.report_generator import ReportGenerator, PDFGenerator, MarkdownGenerator
 from pathlib import Path
 
 # Create a report generator
@@ -110,10 +112,10 @@ Use your oscilloscope as a vector display by generating waveforms for XY mode:
 
 ```python
 # Install the fun extras
-# pip install "Siglent-Oscilloscope[fun]"
+# pip install "SCPI-Instrument-Control[fun]"
 
-from siglent import Oscilloscope
-from siglent.vector_graphics import Shape
+from scpi_control import Oscilloscope
+from scpi_control.vector_graphics import Shape
 
 scope = Oscilloscope('192.168.1.100')
 scope.connect()
@@ -137,23 +139,23 @@ See `examples/vector_graphics_xy_mode.py` for more demos including animations an
 ### From PyPI (recommended)
 
 ```bash
-pip install Siglent-Oscilloscope
+pip install SCPI-Instrument-Control
 ```
 
 To include optional features, use extras:
 
 ```bash
 # GUI application with PyQt6
-pip install "Siglent-Oscilloscope[gui]"
+pip install "SCPI-Instrument-Control[gui]"
 
 # Automated report generation (PDF/Markdown with AI analysis)
-pip install "Siglent-Oscilloscope[report-generator]"
+pip install "SCPI-Instrument-Control[report-generator]"
 
 # Vector graphics and XY mode (draw shapes on scope!)
-pip install "Siglent-Oscilloscope[fun]"
+pip install "SCPI-Instrument-Control[fun]"
 
 # Everything
-pip install "Siglent-Oscilloscope[all]"
+pip install "SCPI-Instrument-Control[all]"
 ```
 
 **Note**: The `siglent-gui` command includes automatic dependency checking. If you try to run the GUI without the required packages, you'll receive a clear error message with installation instructions. Missing optional dependencies (like PyQtGraph for high-performance live view) will trigger warnings but allow the GUI to launch.
@@ -161,8 +163,8 @@ pip install "Siglent-Oscilloscope[all]"
 ### From source
 
 ```bash
-git clone git@github.com:little-did-I-know/Siglent-Oscilloscope.git
-cd siglent
+git clone git@github.com:little-did-I-know/SCPI-Instrument-Control.git
+cd SCPI-Instrument-Control
 pip install -e .
 ```
 
@@ -189,12 +191,110 @@ twine check dist/*
 
 The `twine check` command validates the built distributions, including the long description rendered from `README.md`, before upload.
 
+## Migration Guide
+
+**v1.0.0** introduces a package rename from `Siglent-Oscilloscope` to `SCPI-Instrument-Control` to better reflect the expanded capabilities of this library.
+
+### For Existing Users
+
+If you're upgrading from the old `siglent` package:
+
+#### 1. Update Your Installation
+
+**Uninstall the old package** (if installed):
+
+```bash
+pip uninstall siglent
+```
+
+**Install the new package**:
+
+```bash
+pip install SCPI-Instrument-Control
+```
+
+Or with extras:
+
+```bash
+pip install "SCPI-Instrument-Control[gui]"
+pip install "SCPI-Instrument-Control[all]"
+```
+
+#### 2. Update Your Import Statements
+
+**Old imports** (deprecated but still work):
+
+```python
+from siglent import Oscilloscope, PowerSupply, FunctionGenerator
+from siglent.gui.app import main
+from siglent.waveform import Waveform
+```
+
+**New imports** (recommended):
+
+```python
+from scpi_control import Oscilloscope, PowerSupply, FunctionGenerator
+from scpi_control.gui.app import main
+from scpi_control.waveform import Waveform
+```
+
+#### 3. Backward Compatibility
+
+**Good news**: The old `import siglent` syntax still works! A compatibility shim automatically redirects to `scpi_control`.
+
+However, you'll see a `DeprecationWarning` encouraging you to update your code:
+
+```
+DeprecationWarning: The 'siglent' package name is deprecated and will be removed in v2.0.0.
+Please update your imports to use 'scpi_control' instead.
+```
+
+**The compatibility layer will be removed in v2.0.0**, so please migrate your code when convenient.
+
+#### 4. Command-Line Tools
+
+The CLI commands remain **unchanged** for convenience:
+
+```bash
+siglent-gui                    # Still works!
+siglent-report-generator       # Still works!
+```
+
+No changes needed to scripts or automation that invoke these commands.
+
+#### 5. What Changed
+
+| Old | New | Status |
+|-----|-----|--------|
+| PyPI package: `siglent` | PyPI package: `SCPI-Instrument-Control` | **Changed** |
+| `import siglent` | `import scpi_control` | **Recommended** |
+| `siglent-gui` command | `siglent-gui` command | **Unchanged** |
+| `siglent-report-generator` command | `siglent-report-generator` command | **Unchanged** |
+
+#### 6. Why the Rename?
+
+This library has grown significantly beyond its original focus on Siglent oscilloscopes:
+
+- **Multi-Instrument Support**: Oscilloscopes, power supplies, and function generators
+- **Multi-Vendor Support**: Works with any SCPI-compatible equipment (not just Siglent)
+- **Universal Protocol**: Based on industry-standard SCPI commands
+
+The new name better represents what the library does: **control any SCPI-compatible test equipment**.
+
+### Need Help?
+
+If you encounter any migration issues:
+
+- Check the [CHANGELOG.md](CHANGELOG.md) for detailed v1.0.0 release notes
+- [Open an issue](https://github.com/little-did-I-know/SCPI-Instrument-Control/issues) on GitHub
+- Review the updated [examples/](examples/) directory for new usage patterns
+
 ## Quick Start
 
 ### Programmatic Usage
 
 ```python
-from siglent import Oscilloscope
+from scpi_control import Oscilloscope
 
 # Connect to oscilloscope
 scope = Oscilloscope('192.168.1.100')
@@ -224,7 +324,7 @@ siglent-gui
 Or from Python:
 
 ```python
-from siglent.gui.app import main
+from scpi_control.gui.app import main
 main()
 ```
 
@@ -264,7 +364,7 @@ To find your oscilloscope's IP address:
 
 ## GUI Application Overview
 
-The Siglent Oscilloscope Control GUI provides a comprehensive interface for controlling your oscilloscope, capturing waveforms, and performing measurements.
+The SCPI Instrument Control GUI provides a comprehensive interface for controlling your oscilloscope, capturing waveforms, and performing measurements.
 
 > **Note**: Screenshots can be captured following the guide in [`docs/SCREENSHOT_GUIDE.md`](docs/SCREENSHOT_GUIDE.md). This provides visual documentation of all GUI features.
 
@@ -415,7 +515,7 @@ Frequency domain analysis:
 
 ### Vector Graphics 🎨 (XY Mode)
 
-> **Requires**: `pip install "Siglent-Oscilloscope[fun]"`
+> **Requires**: `pip install "SCPI-Instrument-Control[fun]"`
 
 Turn your oscilloscope into a vector display by generating waveforms for XY mode!
 
@@ -496,7 +596,7 @@ See `examples/vector_graphics_xy_mode.py` for programmatic usage and animation e
 ### Oscilloscope
 
 ```python
-from siglent import Oscilloscope
+from scpi_control import Oscilloscope
 
 # Connect
 scope = Oscilloscope('192.168.1.100', port=5024, timeout=5.0)
@@ -579,7 +679,7 @@ measurements = scope.measurement.measure_all(1)
 For advanced data collection workflows, use the high-level automation API:
 
 ```python
-from siglent.automation import DataCollector
+from scpi_control.automation import DataCollector
 
 # Simple capture with automatic analysis
 with DataCollector('192.168.1.100') as collector:
@@ -623,7 +723,7 @@ collector.start_continuous_capture(
 **Event-based trigger capture:**
 
 ```python
-from siglent.automation import TriggerWaitCollector
+from scpi_control.automation import TriggerWaitCollector
 
 with TriggerWaitCollector('192.168.1.100') as tc:
     # Configure trigger
@@ -690,8 +790,8 @@ Contributions are welcome! Please read our [Contributing Guide](CONTRIBUTING.md)
 
 ```bash
 # Clone and setup
-git clone https://github.com/little-did-I-know/Siglent-Oscilloscope.git
-cd Siglent-Oscilloscope
+git clone https://github.com/little-did-I-know/SCPI-Instrument-Control.git
+cd SCPI-Instrument-Control
 
 # Install development environment
 make dev-setup
@@ -710,8 +810,8 @@ See our [Code of Conduct](CODE_OF_CONDUCT.md) and [Security Policy](SECURITY.md)
 
 ## Community and Support
 
-- **Issues**: [Report bugs or request features](https://github.com/little-did-I-know/Siglent-Oscilloscope/issues)
-- **Discussions**: [Ask questions and share ideas](https://github.com/little-did-I-know/Siglent-Oscilloscope/discussions)
+- **Issues**: [Report bugs or request features](https://github.com/little-did-I-know/SCPI-Instrument-Control/issues)
+- **Discussions**: [Ask questions and share ideas](https://github.com/little-did-I-know/SCPI-Instrument-Control/discussions)
 - **Security**: See our [Security Policy](SECURITY.md) for reporting vulnerabilities
 
 ## Resources

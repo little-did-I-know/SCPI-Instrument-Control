@@ -24,10 +24,10 @@ from pathlib import Path
 
 import numpy as np
 
-from siglent.report_generator.generators.markdown_generator import MarkdownReportGenerator
-from siglent.report_generator.generators.pdf_generator import PDFReportGenerator
-from siglent.report_generator.models.report_data import ReportMetadata, TestReport, TestSection, WaveformData
-from siglent.report_generator.utils.waveform_analyzer import WaveformAnalyzer
+from scpi_control.report_generator.generators.markdown_generator import MarkdownReportGenerator
+from scpi_control.report_generator.generators.pdf_generator import PDFReportGenerator
+from scpi_control.report_generator.models.report_data import ReportMetadata, TestReport, TestSection, WaveformData
+from scpi_control.report_generator.utils.waveform_analyzer import WaveformAnalyzer
 
 
 def generate_test_square_wave(slope: float = 0, noise: float = 0.01):

@@ -9,7 +9,7 @@ Fast Fourier Transform (FFT) analysis converts time-domain signals to frequency 
 ### Basic FFT
 
 ```python
-from siglent import Oscilloscope
+from scpi_control import Oscilloscope
 
 with Oscilloscope('192.168.1.100') as scope:
     # Capture waveform
@@ -219,7 +219,7 @@ The automation module provides high-level classes for common data collection sce
 Simplified interface for waveform capture:
 
 ```python
-from siglent.automation import DataCollector
+from scpi_control.automation import DataCollector
 
 with DataCollector('192.168.1.100') as collector:
     # Capture single acquisition from multiple channels
@@ -243,7 +243,7 @@ with DataCollector('192.168.1.100') as collector:
 Wait for specific trigger events:
 
 ```python
-from siglent.automation import TriggerWaitCollector
+from scpi_control.automation import TriggerWaitCollector
 
 with TriggerWaitCollector('192.168.1.100') as tc:
     # Configure trigger
@@ -269,7 +269,7 @@ with TriggerWaitCollector('192.168.1.100') as tc:
 ### Batch Data Collection
 
 ```python
-from siglent.automation import DataCollector
+from scpi_control.automation import DataCollector
 
 with DataCollector('192.168.1.100') as collector:
     # Configure oscilloscope
@@ -341,7 +341,7 @@ Save and load reference waveforms in oscilloscope memory.
 ### Save Reference Waveform
 
 ```python
-from siglent.reference_waveform import save_reference
+from scpi_control.reference_waveform import save_reference
 
 # Capture current waveform
 waveform = scope.get_waveform(1)
@@ -356,7 +356,7 @@ print("Reference waveform saved to RefA")
 ### Load Reference Waveform
 
 ```python
-from siglent.reference_waveform import load_reference
+from scpi_control.reference_waveform import load_reference
 
 # Load reference from oscilloscope
 ref_waveform = load_reference(scope, ref_number=1)  # RefA
@@ -377,7 +377,7 @@ Draw shapes and graphics using XY mode (requires 'fun' extras).
 ### Installation
 
 ```bash
-pip install "Siglent-Oscilloscope[fun]"
+pip install "SCPI-Instrument-Control[fun]"
 ```
 
 ### Enable XY Mode
@@ -397,7 +397,7 @@ with Oscilloscope('192.168.1.100') as scope:
 ### Draw Shapes
 
 ```python
-from siglent.vector_graphics import Shape
+from scpi_control.vector_graphics import Shape
 
 # Create shapes
 circle = Shape.circle(radius=0.8, center=(0, 0))
@@ -625,7 +625,7 @@ for i in range(100):
 ### Error Recovery
 
 ```python
-from siglent import SiglentTimeoutError, SiglentConnectionError
+from scpi_control import SiglentTimeoutError, SiglentConnectionError
 import time
 
 MAX_RETRIES = 3
@@ -654,8 +654,8 @@ for attempt in range(MAX_RETRIES):
 Here's a comprehensive example combining multiple advanced features:
 
 ```python
-from siglent import Oscilloscope
-from siglent.automation import DataCollector
+from scpi_control import Oscilloscope
+from scpi_control.automation import DataCollector
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -734,4 +734,4 @@ You've completed the User Guide! Here are some resources for further learning:
 - [API Reference](../api/oscilloscope.md) - Detailed API documentation
 - [Examples](../examples/beginner.md) - Real-world usage examples
 - [GUI Guide](../gui/overview.md) - Learn about the GUI application
-- [GitHub Repository](https://github.com/little-did-I-know/Siglent-Oscilloscope) - Source code and examples
+- [GitHub Repository](https://github.com/little-did-I-know/SCPI-Instrument-Control) - Source code and examples

@@ -4,8 +4,8 @@ from unittest.mock import MagicMock, Mock
 
 import pytest
 
-from siglent.exceptions import CommandError
-from siglent.trigger import Trigger
+from scpi_control.exceptions import CommandError
+from scpi_control.trigger import Trigger
 
 
 @pytest.fixture

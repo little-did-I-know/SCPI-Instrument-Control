@@ -3,10 +3,10 @@ import struct
 import numpy as np
 import pytest
 
-from siglent import exceptions
-from siglent.connection.mock import MockConnection
-from siglent.oscilloscope import Oscilloscope
-from siglent.waveform import Waveform
+from scpi_control import exceptions
+from scpi_control.connection.mock import MockConnection
+from scpi_control.oscilloscope import Oscilloscope
+from scpi_control.waveform import Waveform
 
 
 @pytest.mark.parametrize(

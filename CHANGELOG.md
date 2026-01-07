@@ -7,6 +7,158 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-01-06
+
+### ⚠️ MAJOR RELEASE - Package Renamed
+
+**This is a major release with a package rename.** The project has been renamed from `Siglent-Oscilloscope` to `SCPI-Instrument-Control` to better reflect its expanded capabilities beyond just Siglent oscilloscopes.
+
+### Breaking Changes
+
+- **PyPI Package Name**: `siglent` → `SCPI-Instrument-Control`
+- **Python Import Name**: `import siglent` → `import scpi_control` (recommended)
+- **Old import still works** with deprecation warning (will be removed in v2.0.0)
+
+### Added
+
+**Backward Compatibility Layer**
+- Created `siglent/` compatibility shim package
+- Old `import siglent` syntax still works with `DeprecationWarning`
+- Re-exports all `scpi_control` modules for seamless backward compatibility
+- Warning message guides users to migrate imports
+- Compatibility layer will be removed in v2.0.0
+
+**Migration Guide**
+- Comprehensive migration documentation in README.md
+- Step-by-step upgrade instructions
+- Comparison table showing what changed and what stayed the same
+- Code examples for old vs new import syntax
+- Explanation of why the rename was necessary
+
+### Changed
+
+**Package Structure**
+- Renamed `siglent/` directory to `scpi_control/` (preserving git history)
+- Updated all internal imports from `siglent.*` to `scpi_control.*`
+  - 192 import occurrences updated in `scpi_control/` modules
+  - All imports updated in `tests/` directory
+  - All imports updated in `examples/` directory
+- Package now reflects multi-instrument, multi-vendor capabilities
+
+**PyPI Metadata** (`pyproject.toml`)
+- Package name: `siglent` → `SCPI-Instrument-Control`
+- Version bump: `0.5.1` → `1.0.0` (major release)
+- Updated description to emphasize universal SCPI instrument control
+- Updated keywords to reflect multi-instrument support
+- Updated all URLs to point to new repository name
+  - Homepage, Repository, Issues, Documentation, Changelog
+
+**Documentation**
+- Updated README.md with new project name and branding
+- Added "Package Renamed" notice at top of README
+- Updated all badge URLs to reference new repository name
+- Updated installation commands to use `SCPI-Instrument-Control`
+- Changed GUI application overview section title
+- Updated git clone directory name in examples
+- Added comprehensive Migration Guide section with:
+  - Installation update instructions
+  - Import statement migration examples
+  - Backward compatibility explanation
+  - CLI command compatibility notice
+  - Comparison table of changes
+  - Rationale for the rename
+
+**Command-Line Tools** (No Changes)
+- `siglent-gui` command **unchanged** for convenience
+- `siglent-report-generator` command **unchanged**
+- No changes needed to scripts or automation using these commands
+
+### Why the Rename?
+
+This library has evolved significantly beyond its original Siglent oscilloscope focus:
+
+1. **Multi-Instrument Support**: Now supports oscilloscopes, power supplies, and function generators
+2. **Multi-Vendor Support**: Works with any SCPI-compatible equipment, not just Siglent
+3. **Universal Protocol**: Based on industry-standard SCPI commands (IEEE 488.2)
+
+The new name `SCPI-Instrument-Control` accurately represents what the library does: **control any SCPI-compatible test equipment**.
+
+### Migration Instructions
+
+#### For New Users
+
+```bash
+pip install SCPI-Instrument-Control
+pip install "SCPI-Instrument-Control[gui]"
+pip install "SCPI-Instrument-Control[all]"
+```
+
+```python
+from scpi_control import Oscilloscope, PowerSupply, FunctionGenerator
+```
+
+#### For Existing Users
+
+**Option 1: Update imports** (recommended)
+```bash
+pip uninstall siglent
+pip install SCPI-Instrument-Control
+```
+
+Change imports:
+```python
+# Old
+from siglent import Oscilloscope
+from siglent.gui.app import main
+
+# New
+from scpi_control import Oscilloscope
+from scpi_control.gui.app import main
+```
+
+**Option 2: Use compatibility layer** (temporary)
+```bash
+pip install SCPI-Instrument-Control
+```
+
+Keep old imports (will show `DeprecationWarning`):
+```python
+from siglent import Oscilloscope  # Still works, but deprecated
+```
+
+**Note**: The compatibility layer will be removed in v2.0.0. Please migrate when convenient.
+
+### Technical Details
+
+**Git History Preservation**
+- Used `git mv siglent/ scpi_control/` to preserve file history
+- All commit history for individual files maintained
+- No loss of attribution or change tracking
+
+**Import Updates**
+- Used automated find/replace for import statement updates
+- 192 occurrences in `scpi_control/` directory
+- All test files updated
+- All example files updated
+- No manual edits required for import changes
+
+**Compatibility Implementation**
+- `siglent/__init__.py` re-exports entire `scpi_control` module
+- Uses `warnings.warn()` with `DeprecationWarning` category
+- Warning includes migration instructions and timeline
+- `stacklevel=2` ensures warning points to user code, not library
+
+### Dependencies
+
+No dependency changes. All existing dependencies remain the same.
+
+### Deprecation Timeline
+
+- **v1.0.0** (2026-01-06): Old `import siglent` works with deprecation warning
+- **v2.0.0** (TBD): Compatibility layer removed, `import siglent` will fail
+
+Users have until v2.0.0 to migrate their imports.
+
 ## [0.5.1] - 2026-01-05
 
 ### Fixed

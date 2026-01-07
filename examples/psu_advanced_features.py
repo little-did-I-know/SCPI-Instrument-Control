@@ -10,8 +10,8 @@ Demonstrates:
 
 import time
 
-from siglent import PowerSupply, PSUDataLogger, TimedPSULogger
-from siglent.connection.mock import MockConnection
+from scpi_control import PowerSupply, PSUDataLogger, TimedPSULogger
+from scpi_control.connection.mock import MockConnection
 
 
 def demo_data_logging():

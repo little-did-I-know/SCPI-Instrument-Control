@@ -5,8 +5,8 @@ from unittest.mock import MagicMock, Mock, call, patch
 
 import pytest
 
-from siglent.connection.socket import SocketConnection
-from siglent.exceptions import ConnectionError, TimeoutError
+from scpi_control.connection.socket import SocketConnection
+from scpi_control.exceptions import ConnectionError, TimeoutError
 
 
 @pytest.fixture

@@ -17,18 +17,19 @@ def test_core_imports_without_gui(monkeypatch):
     monkeypatch.setattr(builtins, "__import__", _no_gui_import)
 
     modules = [
-        "siglent",
-        "siglent.oscilloscope",
-        "siglent.connection",
-        "siglent.connection.base",
-        "siglent.connection.socket",
-        "siglent.scpi_commands",
-        "siglent.waveform",
-        "siglent.math_channel",
-        "siglent.analysis",
-        "siglent.protocol_decode",
-        "siglent.protocol_decoders",
-        "siglent.reference_waveform",
+        "siglent",  # Test backward compatibility
+        "scpi_control",
+        "scpi_control.oscilloscope",
+        "scpi_control.connection",
+        "scpi_control.connection.base",
+        "scpi_control.connection.socket",
+        "scpi_control.scpi_commands",
+        "scpi_control.waveform",
+        "scpi_control.math_channel",
+        "scpi_control.analysis",
+        "scpi_control.protocol_decode",
+        "scpi_control.protocol_decoders",
+        "scpi_control.reference_waveform",
     ]
 
     for module in modules:

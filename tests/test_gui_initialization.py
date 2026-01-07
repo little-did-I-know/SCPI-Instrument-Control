@@ -19,7 +19,7 @@ def qapp():
 
 def test_main_window_creation(qapp):
     """Test that MainWindow can be created without errors."""
-    from siglent.gui.main_window import MainWindow
+    from scpi_control.gui.main_window import MainWindow
 
     # This should not raise any AttributeError
     window = MainWindow()
@@ -41,7 +41,7 @@ def test_main_window_creation(qapp):
 
 def test_waveform_display_creation(qapp):
     """Test that WaveformDisplay can be created."""
-    from siglent.gui.widgets.waveform_display import WaveformDisplay
+    from scpi_control.gui.widgets.waveform_display import WaveformDisplay
 
     display = WaveformDisplay()
     assert display is not None
@@ -52,7 +52,7 @@ def test_waveform_display_creation(qapp):
 
 def test_cursor_panel_creation(qapp):
     """Test that CursorPanel can be created."""
-    from siglent.gui.widgets.cursor_panel import CursorPanel
+    from scpi_control.gui.widgets.cursor_panel import CursorPanel
 
     panel = CursorPanel()
     assert panel is not None
@@ -62,7 +62,7 @@ def test_cursor_panel_creation(qapp):
 
 def test_math_panel_creation(qapp):
     """Test that MathPanel can be created."""
-    from siglent.gui.widgets.math_panel import MathPanel
+    from scpi_control.gui.widgets.math_panel import MathPanel
 
     panel = MathPanel()
     assert panel is not None
@@ -72,7 +72,7 @@ def test_math_panel_creation(qapp):
 
 def test_fft_display_creation(qapp):
     """Test that FFTDisplay can be created."""
-    from siglent.gui.widgets.fft_display import FFTDisplay
+    from scpi_control.gui.widgets.fft_display import FFTDisplay
 
     display = FFTDisplay()
     assert display is not None
@@ -81,7 +81,7 @@ def test_fft_display_creation(qapp):
 
 def test_reference_panel_creation(qapp):
     """Test that ReferencePanel can be created."""
-    from siglent.gui.widgets.reference_panel import ReferencePanel
+    from scpi_control.gui.widgets.reference_panel import ReferencePanel
 
     panel = ReferencePanel()
     assert panel is not None
@@ -91,7 +91,7 @@ def test_reference_panel_creation(qapp):
 
 def test_protocol_decode_panel_creation(qapp):
     """Test that ProtocolDecodePanel can be created."""
-    from siglent.gui.widgets.protocol_decode_panel import ProtocolDecodePanel
+    from scpi_control.gui.widgets.protocol_decode_panel import ProtocolDecodePanel
 
     panel = ProtocolDecodePanel()
     assert panel is not None

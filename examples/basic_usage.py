@@ -4,7 +4,7 @@ This script demonstrates how to connect to an oscilloscope,
 configure channels and trigger, and perform basic operations.
 """
 
-from siglent import Oscilloscope
+from scpi_control import Oscilloscope
 
 # Replace with your oscilloscope's IP address
 SCOPE_IP = "192.168.1.100"

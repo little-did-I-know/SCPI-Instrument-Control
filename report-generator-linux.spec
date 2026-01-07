@@ -76,7 +76,7 @@ hiddenimports += [
 
 # Analysis
 a = Analysis(
-    ['siglent/report_generator/app.py'],
+    ['scpi_control/report_generator/app.py'],
     pathex=[],
     binaries=[],
     datas=datas,

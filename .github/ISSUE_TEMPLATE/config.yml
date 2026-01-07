@@ -1,8 +1,8 @@
 blank_issues_enabled: true
 contact_links:
   - name: Question or Discussion
-    url: https://github.com/little-did-I-know/Siglent-Oscilloscope/discussions
+    url: https://github.com/little-did-I-know/SCPI-Instrument-Control/discussions
     about: Ask questions or discuss ideas with the community
   - name: Documentation
-    url: https://github.com/little-did-I-know/Siglent-Oscilloscope#readme
+    url: https://github.com/little-did-I-know/SCPI-Instrument-Control#readme
     about: Check the README for usage guides and examples

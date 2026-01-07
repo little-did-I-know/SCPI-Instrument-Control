@@ -144,8 +144,8 @@ tests/
 tests/test_example.py
 """
 import pytest
-from siglent import Oscilloscope
-from siglent.connection import MockConnection
+from scpi_control import Oscilloscope
+from scpi_control.connection import MockConnection
 
 
 def test_basic_connection():
@@ -183,8 +183,8 @@ def test_channel_enable():
 tests/conftest.py
 """
 import pytest
-from siglent import Oscilloscope
-from siglent.connection import MockConnection
+from scpi_control import Oscilloscope
+from scpi_control.connection import MockConnection
 
 
 @pytest.fixture
@@ -257,7 +257,7 @@ def test_trigger_modes(mock_scope, trigger_mode):
 
 ```python
 import pytest
-from siglent.exceptions import SiglentConnectionError, CommandError
+from scpi_control.exceptions import SiglentConnectionError, CommandError
 
 
 def test_connection_timeout():
@@ -400,7 +400,7 @@ pytest -m "not hardware and not gui and not slow"
 The project provides a MockConnection for testing without hardware:
 
 ```python
-from siglent.connection import MockConnection
+from scpi_control.connection import MockConnection
 
 # Create mock connection
 mock = MockConnection()
@@ -523,8 +523,8 @@ def test_with_mocker(mocker):
 ```python
 import pytest
 import numpy as np
-from siglent import Oscilloscope
-from siglent.connection import MockConnection
+from scpi_control import Oscilloscope
+from scpi_control.connection import MockConnection
 
 
 @pytest.fixture(scope="session")
@@ -659,7 +659,7 @@ def test_button_click(qtbot):
 @pytest.mark.gui
 def test_main_window(qtbot, mock_scope):
     """Test main window."""
-    from siglent.gui.main_window import MainWindow
+    from scpi_control.gui.main_window import MainWindow
 
     window = MainWindow(scope=mock_scope)
     qtbot.addWidget(window)
@@ -1111,7 +1111,7 @@ tests/test_module.py
 Tests for module functionality.
 """
 import pytest
-from siglent import Module
+from scpi_control import Module
 
 
 class TestModule:

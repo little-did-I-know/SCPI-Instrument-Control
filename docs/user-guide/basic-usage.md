@@ -9,7 +9,7 @@ This guide covers the fundamental concepts and patterns for using the Siglent Os
 The simplest way to connect is by creating an `Oscilloscope` instance with the IP address:
 
 ```python
-from siglent import Oscilloscope
+from scpi_control import Oscilloscope
 
 # Create instance
 scope = Oscilloscope('192.168.1.100')
@@ -29,7 +29,7 @@ scope.disconnect()
 The recommended approach is using a context manager, which automatically handles connection and disconnection:
 
 ```python
-from siglent import Oscilloscope
+from scpi_control import Oscilloscope
 
 with Oscilloscope('192.168.1.100') as scope:
     # Connection happens automatically
@@ -379,7 +379,7 @@ The library provides high-level methods for most operations. Only use direct SCP
 ### Common Exceptions
 
 ```python
-from siglent import (
+from scpi_control import (
     SiglentConnectionError,
     SiglentTimeoutError,
     InvalidParameterError,
@@ -407,7 +407,7 @@ finally:
 ### Recommended Pattern
 
 ```python
-from siglent import Oscilloscope
+from scpi_control import Oscilloscope
 
 try:
     with Oscilloscope('192.168.1.100') as scope:
@@ -425,7 +425,7 @@ except Exception as e:
 Here's a complete example putting it all together:
 
 ```python
-from siglent import Oscilloscope
+from scpi_control import Oscilloscope
 
 # Configuration
 SCOPE_IP = '192.168.1.100'

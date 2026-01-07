@@ -1,6 +1,6 @@
 import pytest
 
-from siglent.trigger import Trigger
+from scpi_control.trigger import Trigger
 
 
 class FakeScope:

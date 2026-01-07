@@ -59,7 +59,7 @@ Siglent/
 
 ## What Gets Installed
 
-When users install the package via `pip install Siglent-Oscilloscope`, they get:
+When users install the package via `pip install SCPI-Instrument-Control`, they get:
 
 **Code:**
 
@@ -85,7 +85,7 @@ When users install the package via `pip install Siglent-Oscilloscope`, they get:
 
 ### siglent/
 
-The main package containing all the production code. This is what gets imported when users run `import siglent`.
+The main package containing all the production code. This is what gets imported when users run `import scpi_control`.
 
 **Key modules:**
 

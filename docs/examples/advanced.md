@@ -43,7 +43,7 @@ using matplotlib.
 import matplotlib.pyplot as plt
 import numpy as np
 
-from siglent.automation import DataCollector
+from scpi_control.automation import DataCollector
 
 # Replace with your oscilloscope's IP address
 SCOPE_IP = "192.168.1.100"
@@ -273,7 +273,7 @@ This example demonstrates how to use the oscilloscope as a vector display
 by generating waveforms for XY mode.
 
 REQUIREMENTS:
-    - Install fun extras: pip install "Siglent-Oscilloscope[fun]"
+    - Install fun extras: pip install "SCPI-Instrument-Control[fun]"
     - External AWG/DAC to feed signals into scope channels
       OR use scope's built-in AWG if available
     - Oscilloscope channels connected to AWG outputs
@@ -294,8 +294,8 @@ import time
 
 import numpy as np
 
-from siglent import Oscilloscope
-from siglent.vector_graphics import Shape, VectorDisplay
+from scpi_control import Oscilloscope
+from scpi_control.vector_graphics import Shape, VectorDisplay
 
 # Configuration
 SCOPE_IP = "192.168.1.100"
@@ -440,7 +440,7 @@ def main():
     t = np.linspace(0, np.pi, 200)
     mouth_x = 0.5 * np.cos(t)
     mouth_y = -0.2 + 0.3 * np.sin(t)
-    from siglent.vector_graphics import VectorPath
+    from scpi_control.vector_graphics import VectorPath
 
     mouth = VectorPath(x=mouth_x, y=mouth_y, connected=False)
 
@@ -490,7 +490,7 @@ if __name__ == "__main__":
             print("Vector graphics features require additional packages.")
             print()
             print("Install with:")
-            print('  pip install "Siglent-Oscilloscope[fun]"')
+            print('  pip install "SCPI-Instrument-Control[fun]"')
             print()
             print("This will install:")
             print("  - shapely (geometric operations)")

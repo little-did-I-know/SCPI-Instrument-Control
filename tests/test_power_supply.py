@@ -2,10 +2,10 @@
 
 import pytest
 
-from siglent import PowerSupply
-from siglent.connection.mock import MockConnection
-from siglent.psu_models import OutputSpec, PSUCapability, create_generic_psu_capability, detect_psu_from_idn
-from siglent.psu_scpi_commands import PSUSCPICommandSet
+from scpi_control import PowerSupply
+from scpi_control.connection.mock import MockConnection
+from scpi_control.psu_models import OutputSpec, PSUCapability, create_generic_psu_capability, detect_psu_from_idn
+from scpi_control.psu_scpi_commands import PSUSCPICommandSet
 
 
 class TestPSUModels:
@@ -510,7 +510,7 @@ class TestDataLogging:
 
     def test_psu_data_logger_basic(self, mock_psu, tmp_path):
         """Test basic PSU data logger."""
-        from siglent import PSUDataLogger
+        from scpi_control import PSUDataLogger
 
         log_file = tmp_path / "test_log.csv"
         logger = PSUDataLogger(mock_psu, str(log_file))
@@ -539,7 +539,7 @@ class TestDataLogging:
 
     def test_psu_data_logger_context_manager(self, mock_psu, tmp_path):
         """Test PSU data logger as context manager."""
-        from siglent import PSUDataLogger
+        from scpi_control import PSUDataLogger
 
         log_file = tmp_path / "test_log_context.csv"
 
@@ -553,7 +553,7 @@ class TestDataLogging:
 
     def test_psu_data_logger_selective_outputs(self, mock_psu, tmp_path):
         """Test logging only specific outputs."""
-        from siglent import PSUDataLogger
+        from scpi_control import PSUDataLogger
 
         log_file = tmp_path / "test_log_selective.csv"
 
@@ -574,7 +574,7 @@ class TestDataLogging:
         """Test timed PSU logger."""
         import time
 
-        from siglent import TimedPSULogger
+        from scpi_control import TimedPSULogger
 
         log_file = tmp_path / "test_timed_log.csv"
 
@@ -601,7 +601,7 @@ class TestDataLogging:
         """Test timed PSU logger as context manager."""
         import time
 
-        from siglent import TimedPSULogger
+        from scpi_control import TimedPSULogger
 
         log_file = tmp_path / "test_timed_context.csv"
 

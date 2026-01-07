@@ -4,8 +4,8 @@ from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
-from siglent.exceptions import CommandError
-from siglent.measurement import Measurement
+from scpi_control.exceptions import CommandError
+from scpi_control.measurement import Measurement
 
 
 @pytest.fixture

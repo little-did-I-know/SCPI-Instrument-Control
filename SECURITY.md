@@ -2,7 +2,7 @@
 
 ## Supported Versions
 
-We actively support the following versions of Siglent-Oscilloscope with security updates:
+We actively support the following versions of SCPI-Instrument-Control with security updates:
 
 | Version | Supported          |
 | ------- | ------------------ |
@@ -11,7 +11,7 @@ We actively support the following versions of Siglent-Oscilloscope with security
 
 ## Reporting a Vulnerability
 
-We take the security of Siglent-Oscilloscope seriously. If you believe you have found a security vulnerability, please report it to us as described below.
+We take the security of SCPI-Instrument-Control seriously. If you believe you have found a security vulnerability, please report it to us as described below.
 
 ### How to Report a Security Vulnerability
 
@@ -20,7 +20,7 @@ We take the security of Siglent-Oscilloscope seriously. If you believe you have 
 Instead, please report them via one of the following methods:
 
 1. **GitHub Security Advisories** (Preferred)
-   - Go to the [Security tab](https://github.com/little-did-I-know/Siglent-Oscilloscope/security) of this repository
+   - Go to the [Security tab](https://github.com/little-did-I-know/SCPI-Instrument-Control/security) of this repository
    - Click "Report a vulnerability"
    - Fill out the form with details about the vulnerability
 
@@ -58,7 +58,7 @@ After you submit a vulnerability report, you can expect:
 
 ## Security Best Practices for Users
 
-When using Siglent-Oscilloscope, we recommend the following security practices:
+When using SCPI-Instrument-Control, we recommend the following security practices:
 
 ### Network Security
 
@@ -159,7 +159,7 @@ We request that you:
 
 Security updates will be released as patch versions (e.g., 0.2.5 → 0.2.6) and will be:
 
-- Announced in the [GitHub Security Advisories](https://github.com/little-did-I-know/Siglent-Oscilloscope/security/advisories)
+- Announced in the [GitHub Security Advisories](https://github.com/little-did-I-know/SCPI-Instrument-Control/security/advisories)
 - Documented in the [CHANGELOG.md](CHANGELOG.md)
 - Tagged with `[SECURITY]` prefix in release notes
 

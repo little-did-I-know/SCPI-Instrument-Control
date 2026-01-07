@@ -2,8 +2,8 @@ import socket
 
 import pytest
 
-from siglent import exceptions
-from siglent.connection.socket import SocketConnection
+from scpi_control import exceptions
+from scpi_control.connection.socket import SocketConnection
 
 
 class FakeSocket:
@@ -40,7 +40,7 @@ class FakeSocket:
 
 def test_socket_write_timeout_has_command_and_host(monkeypatch):
     fake = FakeSocket(send_exception=socket.timeout("timed out"))
-    monkeypatch.setattr("siglent.connection.socket.socket.socket", lambda *_args, **_kwargs: fake)
+    monkeypatch.setattr("scpi_control.connection.socket.socket.socket", lambda *_args, **_kwargs: fake)
 
     conn = SocketConnection("1.2.3.4", port=1111, timeout=0.1)
     conn.connect()
@@ -56,7 +56,7 @@ def test_socket_write_timeout_has_command_and_host(monkeypatch):
 
 def test_socket_read_error_has_command_and_host(monkeypatch):
     fake = FakeSocket(recv_exception=socket.error("boom"))
-    monkeypatch.setattr("siglent.connection.socket.socket.socket", lambda *_args, **_kwargs: fake)
+    monkeypatch.setattr("scpi_control.connection.socket.socket.socket", lambda *_args, **_kwargs: fake)
 
     conn = SocketConnection("5.6.7.8", port=2222, timeout=0.1)
     conn.connect()

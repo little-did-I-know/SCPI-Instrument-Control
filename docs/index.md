@@ -84,13 +84,13 @@ This library provides comprehensive control for Siglent oscilloscopes via SCPI o
 Install the base package:
 
 ```bash
-pip install Siglent-Oscilloscope
+pip install SCPI-Instrument-Control
 ```
 
 Or install with all features:
 
 ```bash
-pip install "Siglent-Oscilloscope[all]"
+pip install "SCPI-Instrument-Control[all]"
 ```
 
 See the [Installation Guide](getting-started/installation.md) for more options.
@@ -98,7 +98,7 @@ See the [Installation Guide](getting-started/installation.md) for more options.
 ## Quick Example
 
 ```python
-from siglent import Oscilloscope
+from scpi_control import Oscilloscope
 
 # Connect to oscilloscope
 scope = Oscilloscope('192.168.1.100')
@@ -166,8 +166,8 @@ Detailed API documentation
 
 ## Community & Support
 
-- **GitHub Issues**: [Report bugs or request features](https://github.com/little-did-I-know/Siglent-Oscilloscope/issues)
-- **Discussions**: [Ask questions and share ideas](https://github.com/little-did-I-know/Siglent-Oscilloscope/discussions)
+- **GitHub Issues**: [Report bugs or request features](https://github.com/little-did-I-know/SCPI-Instrument-Control/issues)
+- **Discussions**: [Ask questions and share ideas](https://github.com/little-did-I-know/SCPI-Instrument-Control/discussions)
 - **Contributing**: [Contribution guidelines](development/contributing.md)
 
 ## License

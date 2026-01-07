@@ -3,8 +3,8 @@
 import numpy as np
 import pytest
 
-from siglent.protocol_decoders import I2CDecoder, SPIDecoder, UARTDecoder
-from siglent.waveform import WaveformData
+from scpi_control.protocol_decoders import I2CDecoder, SPIDecoder, UARTDecoder
+from scpi_control.waveform import WaveformData
 
 
 @pytest.fixture

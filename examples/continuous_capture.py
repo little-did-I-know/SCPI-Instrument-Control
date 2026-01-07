@@ -5,7 +5,7 @@ period of time. This is useful for monitoring signals, collecting statistics,
 or capturing time-varying phenomena.
 """
 
-from siglent.automation import DataCollector
+from scpi_control.automation import DataCollector
 
 # Replace with your oscilloscope's IP address
 SCOPE_IP = "192.168.1.100"

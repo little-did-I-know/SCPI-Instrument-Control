@@ -13,12 +13,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `ConnectionError` renamed to `SiglentConnectionError` to avoid shadowing Python's built-in `ConnectionError`
   - `TimeoutError` renamed to `SiglentTimeoutError` to avoid shadowing Python's built-in `TimeoutError`
   - **Migration Guide:**
-    - Update imports: `from siglent.exceptions import SiglentConnectionError, SiglentTimeoutError`
+    - Update imports: `from scpi_control.exceptions import SiglentConnectionError, SiglentTimeoutError`
     - Update exception handling: `except (SiglentConnectionError, SiglentTimeoutError) as e:`
     - Backward compatibility aliases provided for transition period (will be removed in v1.0.0)
-    - If you use `from siglent import ConnectionError`, update to `from siglent import SiglentConnectionError`
+    - If you use `from scpi_control import ConnectionError`, update to `from scpi_control import SiglentConnectionError`
   - **Why:** Prevents naming conflicts with Python built-ins, improves code clarity, follows best practices
-  - **Impact:** All code that imports or catches `ConnectionError` or `TimeoutError` from siglent.exceptions needs updating
+  - **Impact:** All code that imports or catches `ConnectionError` or `TimeoutError` from scpi_control.exceptions needs updating
 
 ### Added
 
@@ -155,7 +155,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.2.6] - 2025-12-31
 
-See [full changelog on GitHub](https://github.com/little-did-I-know/Siglent-Oscilloscope/blob/main/CHANGELOG.md) for detailed version history.
+See [full changelog on GitHub](https://github.com/little-did-I-know/SCPI-Instrument-Control/blob/main/CHANGELOG.md) for detailed version history.
 
 Previous releases include:
 
@@ -168,4 +168,4 @@ Previous releases include:
 - **v0.2.0**: High-performance live view with PyQtGraph, visual measurement system
 - **v0.1.0**: Initial release with basic SCPI control and GUI
 
-[View full changelog](https://github.com/little-did-I-know/Siglent-Oscilloscope/blob/main/CHANGELOG.md)
+[View full changelog](https://github.com/little-did-I-know/SCPI-Instrument-Control/blob/main/CHANGELOG.md)

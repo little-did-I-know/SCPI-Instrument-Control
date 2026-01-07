@@ -13,8 +13,8 @@ Supports:
     - TCP/IP (VXI-11 or raw socket)
 """
 
-from siglent import PowerSupply
-from siglent.connection import VISAConnection, find_siglent_devices, list_visa_resources
+from scpi_control import PowerSupply
+from scpi_control.connection import VISAConnection, find_siglent_devices, list_visa_resources
 
 
 def discover_devices():
@@ -251,7 +251,7 @@ def main():
 if __name__ == "__main__":
     # Check if PyVISA is available
     try:
-        from siglent.connection import VISAConnection
+        from scpi_control.connection import VISAConnection
 
         main()
     except ImportError:

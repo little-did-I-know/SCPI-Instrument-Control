@@ -1,36 +1,35 @@
-"""Siglent Oscilloscope Control Package
+"""Backward compatibility module for the 'siglent' package name.
 
-This package provides programmatic control for Siglent oscilloscopes and power supplies
-via Ethernet/LAN connection.
+DEPRECATED: This module provides backward compatibility for code using 'import siglent'.
 
-For high-level automation and data collection, see the automation module:
-    from siglent.automation import DataCollector, TriggerWaitCollector
+The package has been renamed to 'scpi_control' to better reflect its capabilities:
+- SCPI Instrument Control (scpi_control) supports oscilloscopes, power supplies,
+  and function generators from Siglent and other SCPI-compatible manufacturers.
 
-For power supply control:
-    from siglent import PowerSupply
+Migration Guide:
+    Old import (deprecated):
+        from siglent import Oscilloscope, PowerSupply, FunctionGenerator
 
-For automated test report generation:
-    from siglent.report_generator import ReportGenerator
+    New import (recommended):
+        from scpi_control import Oscilloscope, PowerSupply, FunctionGenerator
+
+This compatibility module will be removed in v2.0.0.
+For more information, see: https://github.com/little-did-I-know/SCPI-Instrument-Control
 """
 
-__version__ = "0.5.1"
+import warnings
 
-from siglent.exceptions import CommandError, SiglentConnectionError, SiglentError, SiglentTimeoutError
-from siglent.oscilloscope import Oscilloscope
+warnings.warn(
+    "The 'siglent' package name is deprecated and will be removed in v2.0.0.\n"
+    "Please update your imports to use 'scpi_control' instead:\n\n"
+    "  Old: from siglent import Oscilloscope, PowerSupply, FunctionGenerator\n"
+    "  New: from scpi_control import Oscilloscope, PowerSupply, FunctionGenerator\n\n"
+    "PyPI package name: pip install SCPI-Instrument-Control\n"
+    "See migration guide: https://github.com/little-did-I-know/SCPI-Instrument-Control",
+    DeprecationWarning,
+    stacklevel=2,
+)
 
-# Power supply support (stable as of v0.5.0)
-from siglent.power_supply import PowerSupply
-from siglent.psu_data_logger import PSUDataLogger, TimedPSULogger
-
-__all__ = [
-    # Core features
-    "Oscilloscope",
-    "SiglentError",
-    "SiglentConnectionError",
-    "SiglentTimeoutError",
-    "CommandError",
-    # Power supply features
-    "PowerSupply",
-    "PSUDataLogger",
-    "TimedPSULogger",
-]
+# Re-export everything from the new package for backward compatibility
+from scpi_control import *  # noqa: F401, F403
+from scpi_control import __version__, __all__  # noqa: F401

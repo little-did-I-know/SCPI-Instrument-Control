@@ -1,7 +1,7 @@
 import pytest
 
-from siglent.automation import DataCollector, TriggerWaitCollector
-from siglent.connection.mock import MockConnection
+from scpi_control.automation import DataCollector, TriggerWaitCollector
+from scpi_control.connection.mock import MockConnection
 
 
 class FakeTime:
@@ -36,7 +36,7 @@ def collector(mock_connection):
 
 def test_capture_single_uses_channel_enabled_and_waveform_acquire(monkeypatch, collector):
     fake_time = FakeTime()
-    monkeypatch.setattr("siglent.automation.time", fake_time)
+    monkeypatch.setattr("scpi_control.automation.time", fake_time)
 
     waveforms = collector.capture_single([1, 2])
 
@@ -47,7 +47,7 @@ def test_capture_single_uses_channel_enabled_and_waveform_acquire(monkeypatch, c
 
 def test_batch_capture_applies_timebase_and_scale(monkeypatch, collector):
     fake_time = FakeTime()
-    monkeypatch.setattr("siglent.automation.time", fake_time)
+    monkeypatch.setattr("scpi_control.automation.time", fake_time)
 
     progress_updates = []
 
@@ -69,7 +69,7 @@ def test_batch_capture_applies_timebase_and_scale(monkeypatch, collector):
 
 def test_start_continuous_capture_uses_trigger_mode(monkeypatch, collector):
     fake_time = FakeTime(step=0.01)
-    monkeypatch.setattr("siglent.automation.time", fake_time)
+    monkeypatch.setattr("scpi_control.automation.time", fake_time)
 
     captures = collector.start_continuous_capture(
         channels=[1],
@@ -95,7 +95,7 @@ def test_trigger_wait_collector_waits_for_stop(monkeypatch):
     collector.collector.connect()
 
     fake_time = FakeTime()
-    monkeypatch.setattr("siglent.automation.time", fake_time)
+    monkeypatch.setattr("scpi_control.automation.time", fake_time)
 
     waveforms = collector.wait_for_trigger([1], max_wait=0.5, save_on_trigger=False)
 

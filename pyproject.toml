@@ -3,13 +3,13 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "Siglent-Oscilloscope"
-version = "0.5.1"
-description = "Python library for Siglent oscilloscope and power supply control via SCPI over Ethernet/LAN. Oscilloscope support: SDS800XHD, SDS1000X-E, SDS2000X Plus, SDS5000X with waveform capture, measurements, FFT analysis, and PyQt6 GUI. Power supply support: SPD3303X series with programmatic control, data logging, and automation. Automated test report generation with AI analysis."
+name = "SCPI-Instrument-Control"
+version = "1.0.0"
+description = "Universal Python library for controlling SCPI-compatible test equipment via Ethernet/LAN. Supports oscilloscopes (Siglent SDS series, generic SCPI scopes), function generators/AWGs (Siglent SDG series, generic SCPI AWGs), and power supplies (Siglent SPD series, generic SCPI PSUs). Features include waveform capture, measurements, FFT analysis, PyQt6 GUI, automated report generation with AI analysis, and comprehensive SCPI command abstraction."
 readme = { file = "README.md", content-type = "text/markdown" }
 requires-python = ">=3.8"
 license = { text = "MIT" }
-keywords = ["siglent", "oscilloscope", "power supply", "SDS", "SPD", "SCPI", "test equipment", "instrumentation", "measurement", "waveform", "automation", "data acquisition", "lab automation", "PyQt6", "GUI", "FFT", "protocol decoder", "I2C", "SPI", "UART", "real-time", "visualization", "PSU", "voltage", "current"]
+keywords = ["SCPI", "instrument control", "test equipment", "oscilloscope", "function generator", "AWG", "power supply", "PSU", "siglent", "SDS", "SDG", "SPD", "IEEE 488.2", "waveform", "signal generator", "laboratory", "automation", "measurement", "data acquisition", "lab automation", "PyQt6", "GUI", "FFT", "protocol decoder", "I2C", "SPI", "UART", "visualization", "voltage", "current", "frequency", "waveform generator", "waveform", "test equipment", "lab equipment"]
 authors = [
     {name = "Robin Mumm"}
 ]
@@ -17,9 +17,10 @@ maintainers = [
     {name = "little-did-I-know"}
 ]
 classifiers = [
-    "Development Status :: 4 - Beta",
+    "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Science/Research",
     "Intended Audience :: Developers",
+    "Intended Audience :: Manufacturing",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.8",
@@ -44,11 +45,11 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/little-did-I-know/Siglent-Oscilloscope"
-Documentation = "https://little-did-I-know.github.io/Siglent-Oscilloscope/"
-Repository = "https://github.com/little-did-I-know/Siglent-Oscilloscope"
-Issues = "https://github.com/little-did-I-know/Siglent-Oscilloscope/issues"
-Changelog = "https://github.com/little-did-I-know/Siglent-Oscilloscope/blob/main/CHANGELOG.md"
+Homepage = "https://github.com/little-did-I-know/SCPI-Instrument-Control"
+Documentation = "https://little-did-I-know.github.io/SCPI-Instrument-Control/"
+Repository = "https://github.com/little-did-I-know/SCPI-Instrument-Control"
+Issues = "https://github.com/little-did-I-know/SCPI-Instrument-Control/issues"
+Changelog = "https://github.com/little-did-I-know/SCPI-Instrument-Control/blob/main/CHANGELOG.md"
 
 [project.optional-dependencies]
 dev = [

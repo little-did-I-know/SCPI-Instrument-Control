@@ -29,7 +29,7 @@ Think of templates as "test procedures" - they ensure consistency across multipl
 ### Basic Template
 
 ```python
-from siglent.report_generator.models.template import (
+from scpi_control.report_generator.models.template import (
     ReportTemplate,
     SectionTemplate,
     BrandingTemplate
@@ -153,7 +153,7 @@ SectionTemplate(
 ### Creating Criteria Sets
 
 ```python
-from siglent.report_generator.models.criteria import (
+from scpi_control.report_generator.models.criteria import (
     CriteriaSet,
     MeasurementCriteria,
     ComparisonType
@@ -301,7 +301,7 @@ for result in results:
 ### Company Branding
 
 ```python
-from siglent.report_generator.models.template import BrandingTemplate
+from scpi_control.report_generator.models.template import BrandingTemplate
 
 branding = BrandingTemplate(
     company_name="Acme Test Laboratory",
@@ -336,12 +336,12 @@ Here's a complete template for power supply testing:
 
 ```python
 from pathlib import Path
-from siglent.report_generator.models.template import (
+from scpi_control.report_generator.models.template import (
     ReportTemplate,
     SectionTemplate,
     BrandingTemplate
 )
-from siglent.report_generator.models.criteria import (
+from scpi_control.report_generator.models.criteria import (
     CriteriaSet,
     MeasurementCriteria,
     ComparisonType
@@ -476,8 +476,8 @@ print(f"Template saved: {template.name} v{template.version}")
 ### Load and Apply
 
 ```python
-from siglent.report_generator.models.template import ReportTemplate
-from siglent.report_generator.models.report_data import TestReport, ReportMetadata
+from scpi_control.report_generator.models.template import ReportTemplate
+from scpi_control.report_generator.models.report_data import TestReport, ReportMetadata
 
 # Load template
 template = ReportTemplate.load(Path("templates/5v_power_supply.json"))
@@ -682,4 +682,4 @@ assert logo_path.exists(), "Logo not found"
 
 - **Learn the API** - See [API Reference](api-reference.md) for programmatic use
 - **See Examples** - Check `examples/report_generation_example.py`
-- **Get Help** - Ask on [GitHub Discussions](https://github.com/little-did-I-know/Siglent-Oscilloscope/discussions)
+- **Get Help** - Ask on [GitHub Discussions](https://github.com/little-did-I-know/SCPI-Instrument-Control/discussions)

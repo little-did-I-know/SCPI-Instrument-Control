@@ -13,7 +13,7 @@ pyvisa_available = False
 try:
     import pyvisa
 
-    from siglent.connection.visa_connection import VISAConnection, list_visa_resources
+    from scpi_control.connection.visa_connection import VISAConnection, list_visa_resources
 
     pyvisa_available = True
 except ImportError:
@@ -26,13 +26,13 @@ class TestVISAConnectionImport:
 
     def test_import_visa_connection(self):
         """Test VISAConnection import."""
-        from siglent.connection import VISAConnection
+        from scpi_control.connection import VISAConnection
 
         assert VISAConnection is not None
 
     def test_import_utilities(self):
         """Test utility function imports."""
-        from siglent.connection import find_siglent_devices, list_visa_resources
+        from scpi_control.connection import find_siglent_devices, list_visa_resources
 
         assert list_visa_resources is not None
         assert find_siglent_devices is not None
@@ -132,7 +132,7 @@ class TestVISAConnectionMocked:
 
     def test_write_without_connection(self):
         """Test write raises error when not connected."""
-        from siglent.exceptions import SiglentConnectionError
+        from scpi_control.exceptions import SiglentConnectionError
 
         conn = VISAConnection("USB0::0xF4EC::0xEE38::SPD3X::INSTR")
 
@@ -141,7 +141,7 @@ class TestVISAConnectionMocked:
 
     def test_query_without_connection(self):
         """Test query raises error when not connected."""
-        from siglent.exceptions import SiglentConnectionError
+        from scpi_control.exceptions import SiglentConnectionError
 
         conn = VISAConnection("USB0::0xF4EC::0xEE38::SPD3X::INSTR")
 
@@ -150,7 +150,7 @@ class TestVISAConnectionMocked:
 
     def test_write_non_ascii_command(self, mock_resource_manager, mock_visa_resource):
         """Test write raises error for non-ASCII commands."""
-        from siglent.exceptions import CommandError
+        from scpi_control.exceptions import CommandError
 
         with patch("pyvisa.ResourceManager", return_value=mock_resource_manager):
             conn = VISAConnection("USB0::0xF4EC::0xEE38::SPD3X::INSTR")
@@ -161,7 +161,7 @@ class TestVISAConnectionMocked:
 
     def test_query_timeout(self, mock_resource_manager, mock_visa_resource):
         """Test query timeout raises SiglentTimeoutError."""
-        from siglent.exceptions import SiglentTimeoutError
+        from scpi_control.exceptions import SiglentTimeoutError
 
         mock_visa_resource.query.side_effect = pyvisa.errors.VisaIOError(-1073807339)  # Timeout error
 
@@ -194,7 +194,7 @@ class TestVISAUtilities:
 
     def test_find_siglent_devices(self):
         """Test finding Siglent devices."""
-        from siglent.connection.visa_connection import find_siglent_devices
+        from scpi_control.connection.visa_connection import find_siglent_devices
 
         mock_instr = MagicMock()
         mock_instr.query.return_value = "Siglent Technologies,SPD3303X,SPD3X123,V1.0"
@@ -218,7 +218,7 @@ class TestVISAConnectionWithoutPyVISA:
     def test_import_fails_gracefully(self):
         """Test that connection module imports even without pyvisa."""
         # This should not raise an error
-        from siglent import connection
+        from scpi_control import connection
 
         assert connection is not None
 
@@ -226,7 +226,7 @@ class TestVISAConnectionWithoutPyVISA:
         """Test VISAConnection is None in __all__ if pyvisa not installed."""
         # The connection module should still be importable
         try:
-            from siglent.connection import VISAConnection
+            from scpi_control.connection import VISAConnection
 
             # If we can import it, pyvisa is available
             assert VISAConnection is not None

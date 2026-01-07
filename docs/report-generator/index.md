@@ -150,7 +150,7 @@ export_pdf(report, f"service_{customer_id}.pdf")
 - **AI Setup** - See the [LLM Setup Tutorial](llm-setup.md)
 - **Templates** - See the [Template Guide](templates.md)
 - **API** - See the [API Reference](api-reference.md)
-- **Issues** - Report bugs on [GitHub Issues](https://github.com/little-did-I-know/Siglent-Oscilloscope/issues)
+- **Issues** - Report bugs on [GitHub Issues](https://github.com/little-did-I-know/SCPI-Instrument-Control/issues)
 
 ## What's Next?
 

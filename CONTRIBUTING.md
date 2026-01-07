@@ -23,12 +23,12 @@ This project adheres to a Code of Conduct. By participating, you are expected to
 1. **Fork the repository** on GitHub
 2. **Clone your fork** locally:
    ```bash
-   git clone https://github.com/YOUR_USERNAME/Siglent-Oscilloscope.git
-   cd Siglent-Oscilloscope
+   git clone https://github.com/YOUR_USERNAME/SCPI-Instrument-Control.git
+   cd SCPI-Instrument-Control
    ```
 3. **Add the upstream repository**:
    ```bash
-   git remote add upstream https://github.com/little-did-I-know/Siglent-Oscilloscope.git
+   git remote add upstream https://github.com/little-did-I-know/SCPI-Instrument-Control.git
    ```
 
 ## Development Setup
@@ -61,7 +61,7 @@ black --check siglent/ tests/ examples/
 flake8 siglent/
 
 # Try importing the package
-python -c "from siglent import Oscilloscope; print('Success!')"
+python -c "from scpi_control import Oscilloscope; print('Success!')"
 ```
 
 ## How to Contribute
@@ -168,7 +168,7 @@ Example test:
 
 ```python
 import pytest
-from siglent import Oscilloscope
+from scpi_control import Oscilloscope
 
 def test_channel_configuration():
     """Test channel configuration parsing."""
@@ -419,7 +419,7 @@ Enable debug logging:
 import logging
 logging.basicConfig(level=logging.DEBUG)
 
-from siglent import Oscilloscope
+from scpi_control import Oscilloscope
 scope = Oscilloscope('192.168.1.100')
 # Debug output will show SCPI commands
 ```

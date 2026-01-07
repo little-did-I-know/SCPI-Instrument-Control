@@ -17,23 +17,23 @@ from pathlib import Path
 
 import numpy as np
 
-from siglent.report_generator.generators.markdown_generator import MarkdownReportGenerator
-from siglent.report_generator.models.criteria import ComparisonType, CriteriaSet, MeasurementCriteria
-from siglent.report_generator.models.report_data import MeasurementResult, ReportMetadata, TestReport, TestSection, WaveformData
+from scpi_control.report_generator.generators.markdown_generator import MarkdownReportGenerator
+from scpi_control.report_generator.models.criteria import ComparisonType, CriteriaSet, MeasurementCriteria
+from scpi_control.report_generator.models.report_data import MeasurementResult, ReportMetadata, TestReport, TestSection, WaveformData
 
 # Import PDF generator if available
 try:
-    from siglent.report_generator.generators.pdf_generator import PDFReportGenerator
+    from scpi_control.report_generator.generators.pdf_generator import PDFReportGenerator
 
     PDF_AVAILABLE = True
 except ImportError:
     print("Warning: reportlab not installed - PDF generation will be skipped")
     PDF_AVAILABLE = False
 
-from siglent.report_generator.llm.analyzer import ReportAnalyzer
+from scpi_control.report_generator.llm.analyzer import ReportAnalyzer
 
 # Import LLM components if you want AI features
-from siglent.report_generator.llm.client import LLMClient, LLMConfig
+from scpi_control.report_generator.llm.client import LLMClient, LLMConfig
 
 
 def create_sample_waveform() -> WaveformData:

@@ -8,17 +8,17 @@ First, install the library:
 
 === "Basic (Programmatic Only)"
 `bash
-    pip install Siglent-Oscilloscope
+    pip install SCPI-Instrument-Control
     `
 
 === "With GUI"
 `bash
-    pip install "Siglent-Oscilloscope[gui]"
+    pip install "SCPI-Instrument-Control[gui]"
     `
 
 === "Everything"
 `bash
-    pip install "Siglent-Oscilloscope[all]"
+    pip install "SCPI-Instrument-Control[all]"
     `
 
 ## Your First Script
@@ -26,7 +26,7 @@ First, install the library:
 Here's a simple script to connect and capture a waveform:
 
 ```python
-from siglent import Oscilloscope
+from scpi_control import Oscilloscope
 
 # Connect to oscilloscope (replace with your IP)
 scope = Oscilloscope('192.168.1.100')
@@ -93,7 +93,7 @@ The GUI provides:
 ### Save a Waveform
 
 ```python
-from siglent import Oscilloscope
+from scpi_control import Oscilloscope
 
 scope = Oscilloscope('192.168.1.100')
 scope.connect()
@@ -141,7 +141,7 @@ for name, value in measurements.items():
 Use the context manager for automatic connection handling:
 
 ```python
-from siglent import Oscilloscope
+from scpi_control import Oscilloscope
 
 with Oscilloscope('192.168.1.100') as scope:
     # Connection is automatic
@@ -156,7 +156,7 @@ with Oscilloscope('192.168.1.100') as scope:
 For data collection tasks, use the automation classes:
 
 ```python
-from siglent.automation import DataCollector
+from scpi_control.automation import DataCollector
 
 # Automated data collection
 with DataCollector('192.168.1.100') as collector:
@@ -173,7 +173,7 @@ with DataCollector('192.168.1.100') as collector:
 !!! tip "Learn More" - [Connection Setup](connection.md) - Configure network and connection settings - [Basic Usage](../user-guide/basic-usage.md) - Detailed usage guide - [Waveform Capture](../user-guide/waveform-capture.md) - Advanced capture techniques - [Measurements](../user-guide/measurements.md) - All measurement types - [GUI Guide](../gui/overview.md) - GUI application features
 
 !!! example "Examples"
-Check out the [examples directory](https://github.com/little-did-I-know/Siglent-Oscilloscope/tree/main/examples) for more code samples:
+Check out the [examples directory](https://github.com/little-did-I-know/SCPI-Instrument-Control/tree/main/examples) for more code samples:
 
     - Basic oscilloscope control
     - Waveform capture and export

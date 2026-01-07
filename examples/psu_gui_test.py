@@ -8,9 +8,9 @@ import sys
 
 from PyQt6.QtWidgets import QApplication, QMessageBox
 
-from siglent import PowerSupply
-from siglent.connection.mock import MockConnection
-from siglent.gui.main_window import MainWindow
+from scpi_control import PowerSupply
+from scpi_control.connection.mock import MockConnection
+from scpi_control.gui.main_window import MainWindow
 
 
 def test_psu_gui_with_mock():

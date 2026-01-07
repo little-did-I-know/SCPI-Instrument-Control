@@ -81,7 +81,7 @@ body:
     id: package-version
     attributes:
       label: Package Version
-      description: What version of Siglent-Oscilloscope?
+      description: What version of SCPI-Instrument-Control?
       placeholder: e.g., 0.2.5
     validations:
       required: true

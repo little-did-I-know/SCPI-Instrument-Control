@@ -25,8 +25,8 @@ import time
 
 import numpy as np
 
-from siglent import Oscilloscope
-from siglent.vector_graphics import Shape, VectorDisplay
+from scpi_control import Oscilloscope
+from scpi_control.vector_graphics import Shape, VectorDisplay
 
 # Configuration
 SCOPE_IP = "192.168.1.100"
@@ -171,7 +171,7 @@ def main():
     t = np.linspace(0, np.pi, 200)
     mouth_x = 0.5 * np.cos(t)
     mouth_y = -0.2 + 0.3 * np.sin(t)
-    from siglent.vector_graphics import VectorPath
+    from scpi_control.vector_graphics import VectorPath
 
     mouth = VectorPath(x=mouth_x, y=mouth_y, connected=False)
 

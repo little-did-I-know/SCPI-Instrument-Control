@@ -21,7 +21,7 @@ The trigger monitors a signal and starts waveform capture when specific conditio
 Automatically triggers even without a valid trigger event:
 
 ```python
-from siglent import Oscilloscope
+from scpi_control import Oscilloscope
 
 with Oscilloscope('192.168.1.100') as scope:
     # Set to AUTO mode
@@ -396,7 +396,7 @@ else:
 ### Example 1: Stable Frequency Measurement
 
 ```python
-from siglent import Oscilloscope
+from scpi_control import Oscilloscope
 
 with Oscilloscope('192.168.1.100') as scope:
     # Configure for stable triggering
@@ -498,7 +498,7 @@ elif status == "Trig'd":
 ### Example 5: Multi-Event Capture
 
 ```python
-from siglent.automation import TriggerWaitCollector
+from scpi_control.automation import TriggerWaitCollector
 
 # Capture 10 trigger events
 with TriggerWaitCollector('192.168.1.100') as tc:
@@ -641,7 +641,7 @@ while True:
 ## Complete Triggering Example
 
 ```python
-from siglent import Oscilloscope
+from scpi_control import Oscilloscope
 import time
 import numpy as np
 

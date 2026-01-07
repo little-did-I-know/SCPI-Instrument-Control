@@ -1,9 +1,9 @@
-site_name: Siglent Oscilloscope Control
-site_description: Python library for controlling Siglent oscilloscopes via SCPI over Ethernet
+site_name: SCPI Instrument Control
+site_description: Universal Python library for controlling SCPI-compatible test equipment (oscilloscopes, function generators, power supplies) via Ethernet/LAN
 site_author: Robin Mumm
-site_url: https://siglent-oscilloscope.readthedocs.io
-repo_url: https://github.com/little-did-I-know/Siglent-Oscilloscope
-repo_name: little-did-I-know/Siglent-Oscilloscope
+site_url: https://little-did-I-know.github.io/SCPI-Instrument-Control/
+repo_url: https://github.com/little-did-I-know/SCPI-Instrument-Control
+repo_name: little-did-I-know/SCPI-Instrument-Control
 edit_uri: edit/main/docs/
 
 theme:
@@ -44,9 +44,9 @@ extra:
     provider: mike
   social:
     - icon: fontawesome/brands/github
-      link: https://github.com/little-did-I-know/Siglent-Oscilloscope
+      link: https://github.com/little-did-I-know/SCPI-Instrument-Control
     - icon: fontawesome/brands/python
-      link: https://pypi.org/project/Siglent-Oscilloscope/
+      link: https://pypi.org/project/SCPI-Instrument-Control/
 
 markdown_extensions:
   - abbr
@@ -164,6 +164,6 @@ nav:
       - Security: about/security.md
 
 watch:
-  - siglent/
+  - scpi_control/
   - docs/
   - mkdocs.yml

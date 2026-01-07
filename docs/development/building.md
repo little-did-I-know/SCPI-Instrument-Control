@@ -64,8 +64,8 @@ brew install python git make
 ### Clone Repository
 
 ```bash
-git clone https://github.com/little-did-I-know/Siglent-Oscilloscope.git
-cd Siglent-Oscilloscope
+git clone https://github.com/little-did-I-know/SCPI-Instrument-Control.git
+cd SCPI-Instrument-Control
 ```
 
 ### Development Setup
@@ -578,7 +578,7 @@ make docs-deploy
 1. Generates documentation from code
 2. Builds MkDocs site
 3. Pushes to `gh-pages` branch
-4. Documentation live at: `https://little-did-I-know.github.io/Siglent-Oscilloscope/`
+4. Documentation live at: `https://little-did-I-know.github.io/SCPI-Instrument-Control/`
 
 ### Documentation Structure
 
@@ -670,7 +670,7 @@ make publish-test
 **Verify:**
 
 ```bash
-pip install -i https://test.pypi.org/simple/ Siglent-Oscilloscope
+pip install -i https://test.pypi.org/simple/ SCPI-Instrument-Control
 ```
 
 ### Publish to PyPI
@@ -746,7 +746,7 @@ __version__ = "0.3.0"
 
 ```bash
 make version
-# Output: Siglent-Oscilloscope v0.3.0
+# Output: SCPI-Instrument-Control v0.3.0
 ```
 
 ### Version Scheme
@@ -808,7 +808,7 @@ make publish       # Upload to PyPI
 
 **5. Create GitHub release:**
 
-- Go to: https://github.com/little-did-I-know/Siglent-Oscilloscope/releases
+- Go to: https://github.com/little-did-I-know/SCPI-Instrument-Control/releases
 - Click "Create a new release"
 - Select tag: `v0.4.0`
 - Title: `Release 0.4.0`

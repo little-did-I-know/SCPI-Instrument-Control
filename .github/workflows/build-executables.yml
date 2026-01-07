@@ -317,12 +317,12 @@ jobs:
 
             Install via pip:
             ```bash
-            pip install Siglent-Oscilloscope==${{ steps.get_version.outputs.version }}
+            pip install SCPI-Instrument-Control==${{ steps.get_version.outputs.version }}
             ```
 
             Or upgrade:
             ```bash
-            pip install --upgrade Siglent-Oscilloscope
+            pip install --upgrade SCPI-Instrument-Control
             ```
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -13,7 +13,7 @@ block_cipher = None
 
 # Get version from package or environment
 def get_version():
-    """Get version from siglent package or environment variable."""
+    """Get version from scpi_control package or environment variable."""
     # Try environment variable first (set by CI)
     version = os.environ.get('APP_VERSION')
     if version:
@@ -21,8 +21,8 @@ def get_version():
 
     # Try importing from package
     try:
-        import siglent
-        return siglent.__version__
+        import scpi_control
+        return scpi_control.__version__
     except:
         return "0.0.0"
 
@@ -48,7 +48,7 @@ if icon_file and not Path(icon_file).exists():
     icon_file = None
 
 a = Analysis(
-    ['siglent/gui/app.py'],
+    ['scpi_control/gui/app.py'],
     pathex=[],
     binaries=[],
     datas=[
@@ -85,12 +85,12 @@ a = Analysis(
         'PIL',
         'PIL.Image',
         'svgpathtools',
-        # Siglent package modules
-        'siglent',
-        'siglent.gui',
-        'siglent.gui.widgets',
-        'siglent.gui.utils',
-        'siglent.protocol_decoders',
+        # SCPI Control package modules
+        'scpi_control',
+        'scpi_control.gui',
+        'scpi_control.gui.widgets',
+        'scpi_control.gui.utils',
+        'scpi_control.protocol_decoders',
     ],
     hookspath=[],
     hooksconfig={},

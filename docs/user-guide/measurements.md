@@ -11,7 +11,7 @@ The oscilloscope can perform automated measurements directly on waveforms withou
 The library provides convenience methods for common measurements:
 
 ```python
-from siglent import Oscilloscope
+from scpi_control import Oscilloscope
 
 with Oscilloscope('192.168.1.100') as scope:
     # Configure channel
@@ -361,7 +361,7 @@ for ch, meas in all_measurements.items():
 ## Measurement Error Handling
 
 ```python
-from siglent import CommandError, InvalidParameterError
+from scpi_control import CommandError, InvalidParameterError
 
 try:
     freq = scope.measurement.measure_frequency(1)
@@ -392,7 +392,7 @@ else:
 Here's a complete example that measures and logs parameters:
 
 ```python
-from siglent import Oscilloscope
+from scpi_control import Oscilloscope
 import time
 import csv
 

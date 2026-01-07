@@ -20,7 +20,7 @@ The GUI application offers an alternative to programmatic control with:
 
 ```bash
 # Install with GUI support
-pip install "Siglent-Oscilloscope[gui]"
+pip install "SCPI-Instrument-Control[gui]"
 ```
 
 This installs:
@@ -36,7 +36,7 @@ If you want to try the GUI with minimal dependencies:
 
 ```bash
 # Basic installation (no GUI extras)
-pip install Siglent-Oscilloscope
+pip install SCPI-Instrument-Control
 
 # GUI will work but with warnings about missing optional features
 ```
@@ -49,7 +49,7 @@ For all features including vector graphics:
 
 ```bash
 # Everything
-pip install "Siglent-Oscilloscope[all]"
+pip install "SCPI-Instrument-Control[all]"
 ```
 
 ## Launching the GUI
@@ -63,7 +63,7 @@ siglent-gui
 ### From Python
 
 ```python
-from siglent.gui.app import main
+from scpi_control.gui.app import main
 main()
 ```
 
@@ -401,7 +401,7 @@ If PyQtGraph is not available, the GUI falls back to matplotlib:
 python -c "import PyQt6; print('PyQt6 OK')"
 
 # Reinstall GUI extras
-pip install --force-reinstall "Siglent-Oscilloscope[gui]"
+pip install --force-reinstall "SCPI-Instrument-Control[gui]"
 ```
 
 ### Poor Performance
@@ -411,7 +411,7 @@ pip install --force-reinstall "Siglent-Oscilloscope[gui]"
 pip install pyqtgraph
 
 # Or install full GUI package
-pip install --upgrade "Siglent-Oscilloscope[gui]"
+pip install --upgrade "SCPI-Instrument-Control[gui]"
 ```
 
 ### Connection Issues
@@ -445,4 +445,4 @@ Now that you understand the GUI overview, explore specific features:
 - [User Guide](../user-guide/basic-usage.md) - Programmatic API usage
 - [Examples](../examples/beginner.md) - Code examples
 - [API Reference](../api/oscilloscope.md) - Detailed API docs
-- [GitHub Issues](https://github.com/little-did-I-know/Siglent-Oscilloscope/issues) - Report bugs or request features
+- [GitHub Issues](https://github.com/little-did-I-know/SCPI-Instrument-Control/issues) - Report bugs or request features

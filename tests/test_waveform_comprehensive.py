@@ -6,8 +6,8 @@ from unittest.mock import MagicMock, Mock, mock_open, patch
 import numpy as np
 import pytest
 
-from siglent.exceptions import CommandError
-from siglent.waveform import Waveform, WaveformData
+from scpi_control.exceptions import CommandError
+from scpi_control.waveform import Waveform, WaveformData
 
 
 class TestWaveformData:

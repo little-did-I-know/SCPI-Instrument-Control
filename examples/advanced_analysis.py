@@ -8,7 +8,7 @@ using matplotlib.
 import matplotlib.pyplot as plt
 import numpy as np
 
-from siglent.automation import DataCollector
+from scpi_control.automation import DataCollector
 
 # Replace with your oscilloscope's IP address
 SCOPE_IP = "192.168.1.100"

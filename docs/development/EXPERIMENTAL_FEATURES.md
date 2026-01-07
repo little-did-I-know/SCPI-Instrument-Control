@@ -73,10 +73,10 @@ experimental = [
 
 ```bash
 # Install experimental feature
-pip install "Siglent-Oscilloscope[power-supply-beta]"
+pip install "SCPI-Instrument-Control[power-supply-beta]"
 
 # Install all experimental features
-pip install "Siglent-Oscilloscope[experimental]"
+pip install "SCPI-Instrument-Control[experimental]"
 ```
 
 ### 2. Module-Level Warnings
@@ -93,7 +93,7 @@ This module is experimental and may change significantly in future releases.
 API stability is not guaranteed. Use in production at your own risk.
 
 To use this feature:
-    pip install "Siglent-Oscilloscope[power-supply-beta]"
+    pip install "SCPI-Instrument-Control[power-supply-beta]"
 """
 
 import warnings
@@ -163,7 +163,7 @@ def experimental(message: str = None) -> Callable:
 **Usage:**
 
 ```python
-from siglent.utils.experimental import experimental
+from scpi_control.utils.experimental import experimental
 
 class Oscilloscope:
     @experimental("Power analysis features are experimental")
@@ -223,7 +223,7 @@ class FeatureFlags:
 
 # Usage in code
 if FeatureFlags.is_enabled('power_supply'):
-    from siglent.power_supply import PowerSupply
+    from scpi_control.power_supply import PowerSupply
 ```
 
 **Enable via environment:**
@@ -321,7 +321,7 @@ Document experimental feature installation clearly:
 
 ```bash
 # Install with experimental power supply support
-pip install "Siglent-Oscilloscope[power-supply-beta]"
+pip install "SCPI-Instrument-Control[power-supply-beta]"
 ```
 ````
 
@@ -329,7 +329,7 @@ pip install "Siglent-Oscilloscope[power-supply-beta]"
 import warnings
 warnings.filterwarnings('default', category=FutureWarning)
 
-from siglent.power_supply import PowerSupply  # Shows experimental warning
+from scpi_control.power_supply import PowerSupply  # Shows experimental warning
 
 psu = PowerSupply('192.168.1.101')
 # ... use at your own risk
@@ -337,7 +337,7 @@ psu = PowerSupply('192.168.1.101')
 
 **Stability**: This feature is experimental. API may change in any release.
 
-**Feedback**: Please report issues and suggestions at [GitHub Issues](https://github.com/little-did-I-know/Siglent-Oscilloscope/issues)
+**Feedback**: Please report issues and suggestions at [GitHub Issues](https://github.com/little-did-I-know/SCPI-Instrument-Control/issues)
 
 ````
 
@@ -407,7 +407,7 @@ def list_experimental_features() -> List[Dict]:
             'name': f.name,
             'description': f.description,
             'available': f.is_available(),
-            'install': f'pip install "Siglent-Oscilloscope[{f.install_extra}]"' if f.install_extra else None,
+            'install': f'pip install "SCPI-Instrument-Control[{f.install_extra}]"' if f.install_extra else None,
             'since': f.since_version,
         }
         for f in EXPERIMENTAL_FEATURES
@@ -417,7 +417,7 @@ def list_experimental_features() -> List[Dict]:
 **Usage:**
 
 ```python
-from siglent.experimental import list_experimental_features
+from scpi_control.experimental import list_experimental_features
 
 features = list_experimental_features()
 for f in features:
@@ -446,7 +446,7 @@ Power Supply Control Module (EXPERIMENTAL)
 
 Installation
 ------------
-pip install "Siglent-Oscilloscope[power-supply-beta]"
+pip install "SCPI-Instrument-Control[power-supply-beta]"
 
 Stability Timeline
 ------------------
@@ -455,11 +455,11 @@ Stability Timeline
 
 Feedback
 --------
-Report issues at: https://github.com/little-did-I-know/Siglent-Oscilloscope/issues
+Report issues at: https://github.com/little-did-I-know/SCPI-Instrument-Control/issues
 
 Example
 -------
->>> from siglent.power_supply import PowerSupply
+>>> from scpi_control.power_supply import PowerSupply
 >>> psu = PowerSupply('192.168.1.101')
 >>> psu.connect()
 """
@@ -504,7 +504,7 @@ Document experimental features clearly:
   - SPD3303X series support
   - Channel voltage/current control
   - Output enable/disable
-  - Installation: `pip install "Siglent-Oscilloscope[power-supply-beta]"`
+  - Installation: `pip install "SCPI-Instrument-Control[power-supply-beta]"`
   - Seeking feedback before v0.5.0 stable release
   - See: `docs/development/EXPERIMENTAL_FEATURES.md`
 ```
@@ -522,7 +522,7 @@ Create documentation in `docs/experimental/`:
 
 **Introduced**: v0.4.0-beta.1
 **Target Stable Release**: v0.5.0
-**Feedback**: [GitHub Issues #42](https://github.com/little-did-I-know/Siglent-Oscilloscope/issues/42)
+**Feedback**: [GitHub Issues #42](https://github.com/little-did-I-know/SCPI-Instrument-Control/issues/42)
 
 ## Overview
 
@@ -553,7 +553,7 @@ We need your input to stabilize this feature:
 - What API changes would improve usability?
 - What hardware have you tested?
 
-Please comment on [Issue #42](https://github.com/little-did-I-know/Siglent-Oscilloscope/issues/42).
+Please comment on [Issue #42](https://github.com/little-did-I-know/SCPI-Instrument-Control/issues/42).
 ```
 
 ## User Communication
@@ -598,7 +598,7 @@ warnings.warn(
     "  • Has limited testing and validation\n"
     "  • Is NOT recommended for production use\n"
     "\n"
-    "Give feedback: https://github.com/little-did-I-know/Siglent-Oscilloscope/issues/42\n"
+    "Give feedback: https://github.com/little-did-I-know/SCPI-Instrument-Control/issues/42\n"
     "Documentation: docs/development/EXPERIMENTAL_FEATURES.md\n"
     "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n",
     FutureWarning,
@@ -620,7 +620,7 @@ Tag experimental releases clearly:
 **Power Supply Control** 🔬
 
 - NEW: `siglent.power_supply` module for SPD3303X series
-- Install: `pip install "Siglent-Oscilloscope[power-supply-beta]"`
+- Install: `pip install "SCPI-Instrument-Control[power-supply-beta]"`
 - **Status**: Beta - API may change, seeking feedback
 - **Docs**: See `docs/experimental/power-supply.md`
 
@@ -652,7 +652,7 @@ Experimental features must meet minimum testing standards before inclusion:
 # tests/experimental/test_power_supply.py
 
 import pytest
-from siglent.power_supply import PowerSupply
+from scpi_control.power_supply import PowerSupply
 
 
 class TestPowerSupplyExperimental:
@@ -816,7 +816,7 @@ power-supply = ["pyvisa>=1.14.0"]  # Stable optional feature
 
 - **Power Supply Control** (`siglent.power_supply`)
   - API is now stable and follows semantic versioning
-  - Install: `pip install "Siglent-Oscilloscope[power-supply]"` (dropped "-beta")
+  - Install: `pip install "SCPI-Instrument-Control[power-supply]"` (dropped "-beta")
   - Full documentation: [docs/user-guide/power-supply.md](docs/user-guide/power-supply.md)
   - Migration guide for beta users: no API changes required
 ```
@@ -900,7 +900,7 @@ Power Supply Control (EXPERIMENTAL)
 This module provides control for Siglent SPD3303X series power supplies.
 
 ⚠️ EXPERIMENTAL: API may change in future releases
-Installation: pip install "Siglent-Oscilloscope[power-supply-beta]"
+Installation: pip install "SCPI-Instrument-Control[power-supply-beta]"
 """
 
 import warnings
@@ -912,8 +912,8 @@ warnings.warn(
     stacklevel=2
 )
 
-from siglent.connection.socket import SocketConnection
-from siglent.exceptions import SiglentConnectionError, CommandError
+from scpi_control.connection.socket import SocketConnection
+from scpi_control.exceptions import SiglentConnectionError, CommandError
 
 
 class PowerSupply:
@@ -928,7 +928,7 @@ class PowerSupply:
     Target Stable: v0.5.0
 
     Example:
-        >>> from siglent.power_supply import PowerSupply
+        >>> from scpi_control.power_supply import PowerSupply
         >>> psu = PowerSupply('192.168.1.101')
         >>> psu.connect()
         >>> psu.set_voltage(1, 5.0)  # Channel 1, 5V
@@ -948,7 +948,7 @@ class PowerSupply:
 ```python
 # siglent/oscilloscope.py
 
-from siglent.utils.experimental import experimental
+from scpi_control.utils.experimental import experimental
 
 
 class Oscilloscope:
@@ -994,8 +994,8 @@ class Oscilloscope:
 ```python
 # my_script.py
 
-from siglent import Oscilloscope
-from siglent.config import FeatureFlags
+from scpi_control import Oscilloscope
+from scpi_control.config import FeatureFlags
 
 # Enable experimental power analysis
 FeatureFlags.enable('power_analysis')
@@ -1026,7 +1026,7 @@ python my_script.py
 ```python
 import pytest
 from unittest.mock import Mock, patch
-from siglent.power_supply import PowerSupply
+from scpi_control.power_supply import PowerSupply
 
 
 @pytest.mark.experimental
@@ -1116,4 +1116,4 @@ pytest -m "not experimental"
 | Dedicated docs       | User guidance        | `docs/experimental/*.md`        |
 | Test markers         | Isolated testing     | `@pytest.mark.experimental`     |
 
-**Questions?** Open a discussion at [GitHub Discussions](https://github.com/little-did-I-know/Siglent-Oscilloscope/discussions)
+**Questions?** Open a discussion at [GitHub Discussions](https://github.com/little-did-I-know/SCPI-Instrument-Control/discussions)

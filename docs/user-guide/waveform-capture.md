@@ -9,7 +9,7 @@ This guide covers advanced waveform acquisition techniques, data handling, and s
 The simplest way to capture a waveform:
 
 ```python
-from siglent import Oscilloscope
+from scpi_control import Oscilloscope
 
 with Oscilloscope('192.168.1.100') as scope:
     # Configure channel
@@ -313,7 +313,7 @@ else:
 Use the automation module for complex capture scenarios:
 
 ```python
-from siglent.automation import DataCollector
+from scpi_control.automation import DataCollector
 
 with DataCollector('192.168.1.100') as collector:
     # Capture single waveform from multiple channels
@@ -337,7 +337,7 @@ with DataCollector('192.168.1.100') as collector:
 For event-driven capture:
 
 ```python
-from siglent.automation import TriggerWaitCollector
+from scpi_control.automation import TriggerWaitCollector
 
 with TriggerWaitCollector('192.168.1.100') as tc:
     # Configure trigger
@@ -458,7 +458,7 @@ time_dec = waveform.time[::factor][:len(voltage_dec)]
 Save a waveform to the oscilloscope's internal memory as a reference:
 
 ```python
-from siglent.reference_waveform import save_reference
+from scpi_control.reference_waveform import save_reference
 
 # Capture current waveform
 waveform = scope.get_waveform(1)
@@ -472,7 +472,7 @@ save_reference(scope, waveform, ref_number=1)
 ### Load Reference Waveform
 
 ```python
-from siglent.reference_waveform import load_reference
+from scpi_control.reference_waveform import load_reference
 
 # Load reference waveform from oscilloscope
 ref_waveform = load_reference(scope, ref_number=1)
@@ -532,7 +532,7 @@ waveform = scope.get_waveform(1)
 Here's a complete waveform capture, processing, and visualization example:
 
 ```python
-from siglent import Oscilloscope
+from scpi_control import Oscilloscope
 import numpy as np
 import matplotlib.pyplot as plt
 

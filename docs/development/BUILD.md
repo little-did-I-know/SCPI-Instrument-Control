@@ -58,7 +58,7 @@ usually means:
 2. The shell (especially PowerShell) did not expand the `dist/*.whl` glob. Use the
    PowerShell example above so pip receives the actual wheel file path.
 
-Note: PyPI normalizes "Siglent-Oscilloscope" to "siglent_oscilloscope" in filenames.
+Note: PyPI normalizes "SCPI-Instrument-Control" to "siglent_oscilloscope" in filenames.
 
 ## Verify Package Contents
 
@@ -74,7 +74,7 @@ tar -tzf dist/siglent_oscilloscope-0.1.0.tar.gz
 
 ```python
 # After installation
-python -c "from siglent import Oscilloscope; print(Oscilloscope.__version__)"
+python -c "from scpi_control import Oscilloscope; print(Oscilloscope.__version__)"
 
 # Test GUI command
 siglent-gui --help

@@ -11,7 +11,7 @@ For USB support:
     pip install "Siglent-Oscilloscope[usb]"
 """
 
-from siglent import PowerSupply
+from scpi_control import PowerSupply
 
 
 def main():

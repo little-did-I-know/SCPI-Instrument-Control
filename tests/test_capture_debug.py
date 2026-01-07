@@ -13,7 +13,7 @@ logging.basicConfig(level=logging.DEBUG, format="%(asctime)s - %(name)s - %(leve
 
 logger = logging.getLogger(__name__)
 
-from siglent import Oscilloscope
+from scpi_control import Oscilloscope
 
 
 def test_channel_state(scope_ip: str):

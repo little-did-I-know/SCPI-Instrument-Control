@@ -42,7 +42,7 @@ timebase and voltage scale settings. This is useful for characterizing
 signals at different time scales or for automated testing.
 """
 
-from siglent.automation import DataCollector
+from scpi_control.automation import DataCollector
 
 # Replace with your oscilloscope's IP address
 SCOPE_IP = "192.168.1.100"
@@ -129,7 +129,7 @@ period of time. This is useful for monitoring signals, collecting statistics,
 or capturing time-varying phenomena.
 """
 
-from siglent.automation import DataCollector
+from scpi_control.automation import DataCollector
 
 # Replace with your oscilloscope's IP address
 SCOPE_IP = "192.168.1.100"
@@ -226,7 +226,7 @@ import time
 import matplotlib.animation as animation
 import matplotlib.pyplot as plt
 
-from siglent import Oscilloscope
+from scpi_control import Oscilloscope
 
 # Replace with your oscilloscope's IP address
 SCOPE_IP = "192.168.1.100"
@@ -386,7 +386,7 @@ and capture waveforms when they occur. This is useful for capturing
 sporadic events or signals that meet specific criteria.
 """
 
-from siglent.automation import DataCollector, TriggerWaitCollector
+from scpi_control.automation import DataCollector, TriggerWaitCollector
 
 # Replace with your oscilloscope's IP address
 SCOPE_IP = "192.168.1.100"

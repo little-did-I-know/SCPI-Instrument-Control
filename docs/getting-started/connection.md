@@ -47,7 +47,7 @@ The Siglent Oscilloscope Control library communicates with oscilloscopes using t
 
 - Network interface (Ethernet or WiFi)
 - Python 3.8 or later installed
-- Siglent library installed: `pip install Siglent-Oscilloscope`
+- Siglent library installed: `pip install SCPI-Instrument-Control`
 
 **Network:**
 
@@ -60,13 +60,13 @@ The Siglent Oscilloscope Control library communicates with oscilloscopes using t
 **Python Packages:**
 
 ```bash
-pip install Siglent-Oscilloscope
+pip install SCPI-Instrument-Control
 ```
 
 **Optional for GUI:**
 
 ```bash
-pip install "Siglent-Oscilloscope[gui]"
+pip install "SCPI-Instrument-Control[gui]"
 ```
 
 **Network Tools (for troubleshooting):**
@@ -117,7 +117,7 @@ nmap -p 5024 192.168.1.0/24
 **Using Siglent Discovery Tool:**
 
 ```python
-from siglent.discovery import find_oscilloscopes
+from scpi_control.discovery import find_oscilloscopes
 
 # Scan network for Siglent devices
 scopes = find_oscilloscopes()
@@ -239,7 +239,7 @@ sudo ufw allow from 192.168.1.100 to any port 5024
 **Basic Connection:**
 
 ```python
-from siglent import Oscilloscope
+from scpi_control import Oscilloscope
 
 # Connect to oscilloscope
 scope = Oscilloscope('192.168.1.100')
@@ -255,7 +255,7 @@ scope.close()
 **Using Context Manager (Recommended):**
 
 ```python
-from siglent import Oscilloscope
+from scpi_control import Oscilloscope
 
 with Oscilloscope('192.168.1.100') as scope:
     print(f"Connected to {scope.model}")
@@ -323,7 +323,7 @@ nc -zv 192.168.1.100 5024
 **Python Test:**
 
 ```python
-from siglent import Oscilloscope
+from scpi_control import Oscilloscope
 
 try:
     with Oscilloscope('192.168.1.100', timeout=5) as scope:
@@ -344,7 +344,7 @@ except Exception as e:
 **Measure Latency:**
 
 ```python
-from siglent import Oscilloscope
+from scpi_control import Oscilloscope
 import time
 
 with Oscilloscope('192.168.1.100') as scope:
@@ -366,7 +366,7 @@ with Oscilloscope('192.168.1.100') as scope:
 **Transfer Speed:**
 
 ```python
-from siglent import Oscilloscope
+from scpi_control import Oscilloscope
 import time
 
 with Oscilloscope('192.168.1.100') as scope:
@@ -394,7 +394,7 @@ with Oscilloscope('192.168.1.100') as scope:
 **Save Multiple Scopes:**
 
 ```python
-from siglent import ConnectionManager
+from scpi_control import ConnectionManager
 
 # Create connection manager
 manager = ConnectionManager()
@@ -433,7 +433,7 @@ for name, config in manager.profiles.items():
 **Connect to Multiple Scopes:**
 
 ```python
-from siglent import Oscilloscope
+from scpi_control import Oscilloscope
 
 # Connect to two oscilloscopes
 scope1 = Oscilloscope('192.168.1.100')
@@ -454,7 +454,7 @@ scope2.close()
 **Using Context Managers:**
 
 ```python
-from siglent import Oscilloscope
+from scpi_control import Oscilloscope
 
 with Oscilloscope('192.168.1.100') as scope1, \
      Oscilloscope('192.168.1.101') as scope2:
@@ -528,7 +528,7 @@ vncviewer 192.168.1.100:5900
 **Python VNC Access:**
 
 ```python
-from siglent import Oscilloscope
+from scpi_control import Oscilloscope
 
 with Oscilloscope('192.168.1.100') as scope:
     # Capture oscilloscope screen via VNC
@@ -779,7 +779,7 @@ ssh -L 5024:192.168.1.100:5024 user@lab-server.com
 
 # On your local machine
 python3
->>> from siglent import Oscilloscope
+>>> from scpi_control import Oscilloscope
 >>> scope = Oscilloscope('localhost')  # Connects through tunnel
 ```
 
@@ -796,7 +796,7 @@ python3
 
 ```python
 # After VPN connected
-from siglent import Oscilloscope
+from scpi_control import Oscilloscope
 
 # Use oscilloscope's IP on lab network
 scope = Oscilloscope('10.0.50.100')
@@ -831,7 +831,7 @@ Always use `with` statements to ensure connections are closed properly:
 
 !!! tip "Handle Connection Errors"
 ```python
-from siglent import Oscilloscope
+from scpi_control import Oscilloscope
 import time
 
     def connect_with_retry(ip, max_retries=3):
@@ -973,7 +973,7 @@ traceroute 192.168.1.100
 
 ```python
 # Basic connection
-from siglent import Oscilloscope
+from scpi_control import Oscilloscope
 scope = Oscilloscope('192.168.1.100')
 
 # With timeout

@@ -13,10 +13,10 @@ pip install -e ".[report-generator]"
 ```python
 from pathlib import Path
 from datetime import datetime
-from siglent.report_generator.models.report_data import (
+from scpi_control.report_generator.models.report_data import (
     TestReport, ReportMetadata, WaveformData, MeasurementResult, TestSection
 )
-from siglent.report_generator.generators.pdf_generator import PDFReportGenerator
+from scpi_control.report_generator.generators.pdf_generator import PDFReportGenerator
 
 # Create metadata
 metadata = ReportMetadata(
@@ -163,7 +163,7 @@ Load waveforms from files.
 #### `WaveformLoader`
 
 ```python
-from siglent.report_generator.utils.waveform_loader import WaveformLoader
+from scpi_control.report_generator.utils.waveform_loader import WaveformLoader
 
 # Load single file (auto-detects format)
 waveforms = WaveformLoader.load(Path("data.npz"))
@@ -187,7 +187,7 @@ Generate reports in various formats.
 #### `PDFReportGenerator`
 
 ```python
-from siglent.report_generator.generators.pdf_generator import PDFReportGenerator
+from scpi_control.report_generator.generators.pdf_generator import PDFReportGenerator
 
 generator = PDFReportGenerator(
     page_size=letter,  # or A4
@@ -202,7 +202,7 @@ success = generator.generate(report, Path("output.pdf"))
 #### `MarkdownReportGenerator`
 
 ```python
-from siglent.report_generator.generators.markdown_generator import MarkdownReportGenerator
+from scpi_control.report_generator.generators.markdown_generator import MarkdownReportGenerator
 
 generator = MarkdownReportGenerator(
     include_plots=True,
@@ -219,7 +219,7 @@ Pass/fail criteria system.
 #### `MeasurementCriteria`
 
 ```python
-from siglent.report_generator.models.criteria import (
+from scpi_control.report_generator.models.criteria import (
     MeasurementCriteria, ComparisonType
 )
 
@@ -250,7 +250,7 @@ print(result.message)  # "Value 1005 is within range [990, 1010]"
 #### `CriteriaSet`
 
 ```python
-from siglent.report_generator.models.criteria import CriteriaSet
+from scpi_control.report_generator.models.criteria import CriteriaSet
 
 criteria_set = CriteriaSet(
     name="Power Supply Test",
@@ -278,7 +278,7 @@ Template system for reusable configurations.
 #### `ReportTemplate`
 
 ```python
-from siglent.report_generator.models.template import ReportTemplate
+from scpi_control.report_generator.models.template import ReportTemplate
 
 # Create new template
 template = ReportTemplate(
@@ -304,7 +304,7 @@ AI/LLM integration.
 #### `LLMClient`
 
 ```python
-from siglent.report_generator.llm.client import LLMClient, LLMConfig
+from scpi_control.report_generator.llm.client import LLMClient, LLMConfig
 
 # Create config
 config = LLMConfig.create_ollama_config(model="llama3.2")
@@ -337,7 +337,7 @@ for chunk in client.stream_chat(messages):
 High-level AI analysis functions.
 
 ```python
-from siglent.report_generator.llm.analyzer import ReportAnalyzer
+from scpi_control.report_generator.llm.analyzer import ReportAnalyzer
 
 analyzer = ReportAnalyzer(llm_client)
 
@@ -366,13 +366,13 @@ from pathlib import Path
 from datetime import datetime
 import numpy as np
 
-from siglent.report_generator.models.report_data import *
-from siglent.report_generator.models.criteria import *
-from siglent.report_generator.models.template import *
-from siglent.report_generator.utils.waveform_loader import WaveformLoader
-from siglent.report_generator.generators.pdf_generator import PDFReportGenerator
-from siglent.report_generator.llm.client import LLMClient, LLMConfig
-from siglent.report_generator.llm.analyzer import ReportAnalyzer
+from scpi_control.report_generator.models.report_data import *
+from scpi_control.report_generator.models.criteria import *
+from scpi_control.report_generator.models.template import *
+from scpi_control.report_generator.utils.waveform_loader import WaveformLoader
+from scpi_control.report_generator.generators.pdf_generator import PDFReportGenerator
+from scpi_control.report_generator.llm.client import LLMClient, LLMConfig
+from scpi_control.report_generator.llm.analyzer import ReportAnalyzer
 
 
 def generate_automated_report(waveform_files, output_path):
@@ -477,7 +477,7 @@ if success:
 ## Error Handling
 
 ```python
-from siglent.report_generator.exceptions import *
+from scpi_control.report_generator.exceptions import *
 
 try:
     waveforms = WaveformLoader.load(Path("data.npz"))

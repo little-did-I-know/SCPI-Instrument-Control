@@ -65,7 +65,7 @@ When PyQtGraph is installed, the GUI automatically uses it for optimal performan
 
 ```bash
 # Install for high-performance Live View
-pip install "Siglent-Oscilloscope[gui]"
+pip install "SCPI-Instrument-Control[gui]"
 ```
 
 **Benefits:**

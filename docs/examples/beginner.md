@@ -41,7 +41,7 @@ This script demonstrates how to connect to an oscilloscope,
 configure channels and trigger, and perform basic operations.
 """
 
-from siglent import Oscilloscope
+from scpi_control import Oscilloscope
 
 # Replace with your oscilloscope's IP address
 SCOPE_IP = "192.168.1.100"
@@ -155,7 +155,7 @@ on oscilloscope channels.
 
 import time
 
-from siglent import Oscilloscope
+from scpi_control import Oscilloscope
 
 # Replace with your oscilloscope's IP address
 SCOPE_IP = "192.168.1.100"
@@ -282,7 +282,7 @@ This example shows how to capture a single waveform from one or more channels
 and save it to a file.
 """
 
-from siglent.automation import DataCollector
+from scpi_control.automation import DataCollector
 
 # Replace with your oscilloscope's IP address
 SCOPE_IP = "192.168.1.100"
@@ -361,7 +361,7 @@ the oscilloscope and save it to a file.
 
 import matplotlib.pyplot as plt
 
-from siglent import Oscilloscope
+from scpi_control import Oscilloscope
 
 # Replace with your oscilloscope's IP address
 SCOPE_IP = "192.168.1.100"

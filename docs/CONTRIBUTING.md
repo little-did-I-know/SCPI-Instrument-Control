@@ -65,7 +65,7 @@ This installs the package in editable mode with development dependencies.
 4. **Verify installation**
 
 ```bash
-python -c "from siglent import Oscilloscope; print('Success!')"
+python -c "from scpi_control import Oscilloscope; print('Success!')"
 ```
 
 5. **Build and validate distributions (for releases)**

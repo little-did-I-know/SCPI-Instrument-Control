@@ -517,7 +517,7 @@ If you encounter issues building executables:
 
 1. Check this documentation
 2. Review [PyInstaller troubleshooting](https://pyinstaller.org/en/stable/when-things-go-wrong.html)
-3. Search existing [GitHub Issues](https://github.com/little-did-I-know/Siglent-Oscilloscope/issues)
+3. Search existing [GitHub Issues](https://github.com/little-did-I-know/SCPI-Instrument-Control/issues)
 4. Create a new issue with:
    - Your OS and Python version
    - Full error message

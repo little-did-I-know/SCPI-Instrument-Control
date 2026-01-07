@@ -22,7 +22,7 @@ Describe how you envision this feature working.
 
 ```python
 # Show how the feature might be used
-from siglent import Oscilloscope
+from scpi_control import Oscilloscope
 
 scope = Oscilloscope('192.168.1.100')
 # Example of the proposed feature

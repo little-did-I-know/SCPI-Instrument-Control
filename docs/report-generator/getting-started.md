@@ -418,5 +418,5 @@ Now that you have the basics:
 
 - **Documentation** - You're reading it!
 - **Examples** - See `examples/report_generation_example.py`
-- **Issues** - Report bugs on [GitHub](https://github.com/little-did-I-know/Siglent-Oscilloscope/issues)
+- **Issues** - Report bugs on [GitHub](https://github.com/little-did-I-know/SCPI-Instrument-Control/issues)
 - **Discussions** - Ask questions on GitHub Discussions

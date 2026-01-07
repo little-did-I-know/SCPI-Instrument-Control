@@ -27,7 +27,7 @@ Vector graphics mode uses the oscilloscope's XY display mode to draw shapes, pat
 Vector graphics features require the 'fun' extras package:
 
 ```bash
-pip install "Siglent-Oscilloscope[fun]"
+pip install "SCPI-Instrument-Control[fun]"
 ```
 
 **Dependencies:**

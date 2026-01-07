@@ -22,7 +22,7 @@ Describe what you've already tried or researched.
 
 ```python
 # Show what you're trying to do
-from siglent import Oscilloscope
+from scpi_control import Oscilloscope
 
 scope = Oscilloscope('192.168.1.100')
 # ...

@@ -14,7 +14,7 @@ This page describes how to install the Siglent Oscilloscope Control library.
 Install the base package using pip:
 
 ```bash
-pip install Siglent-Oscilloscope
+pip install SCPI-Instrument-Control
 ```
 
 This provides the core functionality for programmatic control.
@@ -28,7 +28,7 @@ The library provides several optional feature sets that can be installed as need
 For the PyQt6-based graphical interface:
 
 ```bash
-pip install "Siglent-Oscilloscope[gui]"
+pip install "SCPI-Instrument-Control[gui]"
 ```
 
 **Includes:**
@@ -42,7 +42,7 @@ pip install "Siglent-Oscilloscope[gui]"
 For advanced data export formats:
 
 ```bash
-pip install "Siglent-Oscilloscope[hdf5]"
+pip install "SCPI-Instrument-Control[hdf5]"
 ```
 
 **Includes:**
@@ -54,7 +54,7 @@ pip install "Siglent-Oscilloscope[hdf5]"
 For XY mode vector graphics and shapes:
 
 ```bash
-pip install "Siglent-Oscilloscope[fun]"
+pip install "SCPI-Instrument-Control[fun]"
 ```
 
 **Includes:**
@@ -68,7 +68,7 @@ pip install "Siglent-Oscilloscope[fun]"
 Install everything:
 
 ```bash
-pip install "Siglent-Oscilloscope[all]"
+pip install "SCPI-Instrument-Control[all]"
 ```
 
 ## Development Installation
@@ -77,8 +77,8 @@ For contributing to the project:
 
 ```bash
 # Clone the repository
-git clone https://github.com/little-did-I-know/Siglent-Oscilloscope.git
-cd Siglent-Oscilloscope
+git clone https://github.com/little-did-I-know/SCPI-Instrument-Control.git
+cd SCPI-Instrument-Control
 
 # Install in editable mode with development dependencies
 pip install -e ".[dev]"
@@ -102,7 +102,7 @@ To build the documentation locally:
 
 ```bash
 # Install documentation dependencies
-pip install "Siglent-Oscilloscope[docs]"
+pip install "SCPI-Instrument-Control[docs]"
 
 # Serve documentation locally
 mkdocs serve
@@ -115,11 +115,11 @@ Then open http://127.0.0.1:8000 in your browser.
 Verify your installation:
 
 ```python
-import siglent
+import scpi_control
 print(siglent.__version__)
 
 # Test connection (replace with your oscilloscope IP)
-from siglent import Oscilloscope
+from scpi_control import Oscilloscope
 scope = Oscilloscope('192.168.1.100')
 scope.connect()
 print(scope.identify())
@@ -184,7 +184,7 @@ python --version
 pip --version
 
 # Install in the correct environment
-python -m pip install Siglent-Oscilloscope
+python -m pip install SCPI-Instrument-Control
 ```
 
 ### GUI Missing Dependencies
@@ -194,7 +194,7 @@ python -m pip install Siglent-Oscilloscope
 **Solution**: Install the GUI extras:
 
 ```bash
-pip install "Siglent-Oscilloscope[gui]"
+pip install "SCPI-Instrument-Control[gui]"
 ```
 
 ### Connection Refused
@@ -242,6 +242,6 @@ sudo usermod -a -G dialout $USER
 
 If you encounter issues not covered here:
 
-- Check the [GitHub Issues](https://github.com/little-did-I-know/Siglent-Oscilloscope/issues)
-- Ask in [Discussions](https://github.com/little-did-I-know/Siglent-Oscilloscope/discussions)
+- Check the [GitHub Issues](https://github.com/little-did-I-know/SCPI-Instrument-Control/issues)
+- Ask in [Discussions](https://github.com/little-did-I-know/SCPI-Instrument-Control/discussions)
 - Report bugs with detailed error messages and Python version
