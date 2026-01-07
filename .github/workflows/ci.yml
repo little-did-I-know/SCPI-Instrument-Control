@@ -26,14 +26,14 @@ jobs:
 
       - name: Check code formatting with Black
         run: |
-          black --check --line-length 200 siglent/ examples/
+          black --check --line-length 200 scpi_control/ examples/
 
       - name: Lint with flake8
         run: |
           # Stop the build if there are Python syntax errors or undefined names
-          flake8 siglent/ --count --select=E9,F63,F7,F82 --show-source --statistics
+          flake8 scpi_control/ --count --select=E9,F63,F7,F82 --show-source --statistics
           # Exit-zero treats all errors as warnings
-          flake8 siglent/ --count --exit-zero --max-line-length=200 --statistics
+          flake8 scpi_control/ --count --exit-zero --max-line-length=200 --statistics
 
   build:
     name: Build Package
@@ -115,11 +115,11 @@ jobs:
       - name: Test import
         run: |
           python -c "from scpi_control import Oscilloscope; print('Import successful')"
-          python -c "import scpi_control; print('Version:', siglent.__version__)"
+          python -c "import scpi_control; print('Version:', scpi_control.__version__)"
 
       - name: Test CLI command availability
         run: |
-          python -m pip show siglent-oscilloscope
+          python -m pip show SCPI-Instrument-Control
           which siglent-gui || where siglent-gui || echo "CLI command check"
 
   test:
@@ -145,7 +145,7 @@ jobs:
 
       - name: Run tests with coverage
         run: |
-          pytest tests/ --cov=siglent --cov-report=xml --cov-report=term-missing -v
+          pytest tests/ --cov=scpi_control --cov-report=xml --cov-report=term-missing -v
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v5
@@ -180,7 +180,7 @@ jobs:
 
       - name: Run security linter (Bandit)
         run: |
-          bandit -r siglent/ -ll || echo "Bandit scan completed"
+          bandit -r scpi_control/ -ll || echo "Bandit scan completed"
 
   publish-test:
     name: Publish to TestPyPI
