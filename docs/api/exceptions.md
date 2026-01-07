@@ -2,7 +2,7 @@
 
 Custom exception classes
 
-::: siglent.exceptions
+::: scpi_control.exceptions
     options:
       show_root_heading: false
       show_source: true

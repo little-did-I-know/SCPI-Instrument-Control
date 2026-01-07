@@ -2,7 +2,7 @@
 
 Oscilloscope model capabilities and registry
 
-::: siglent.models
+::: scpi_control.models
     options:
       show_root_heading: false
       show_source: true

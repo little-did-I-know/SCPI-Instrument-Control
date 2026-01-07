@@ -2,7 +2,7 @@
 
 Signal analysis (FFT, THD, SNR)
 
-::: siglent.analysis
+::: scpi_control.analysis
     options:
       show_root_heading: false
       show_source: true

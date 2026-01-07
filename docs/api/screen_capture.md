@@ -2,7 +2,7 @@
 
 Screenshot capture functionality
 
-::: siglent.screen_capture
+::: scpi_control.screen_capture
     options:
       show_root_heading: false
       show_source: true

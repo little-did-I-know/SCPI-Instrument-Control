@@ -2,7 +2,7 @@
 
 Main oscilloscope control class for SCPI communication
 
-::: siglent.oscilloscope
+::: scpi_control.oscilloscope
     options:
       show_root_heading: false
       show_source: true

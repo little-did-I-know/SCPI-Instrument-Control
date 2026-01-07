@@ -2,7 +2,7 @@
 
 Math channel operations and expressions
 
-::: siglent.math_channel
+::: scpi_control.math_channel
     options:
       show_root_heading: false
       show_source: true

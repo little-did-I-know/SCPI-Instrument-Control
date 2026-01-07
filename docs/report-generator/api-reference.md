@@ -44,7 +44,7 @@ generator.generate(report, Path("report.pdf"))
 
 ## Core Modules
 
-### `siglent.report_generator.models.report_data`
+### `scpi_control.report_generator.models.report_data`
 
 Data structures for reports.
 
@@ -156,7 +156,7 @@ TestReport(
 - `calculate_overall_result()` - Determine PASS/FAIL
 - `to_dict()` - Convert to dictionary
 
-### `siglent.report_generator.utils.waveform_loader`
+### `scpi_control.report_generator.utils.waveform_loader`
 
 Load waveforms from files.
 
@@ -180,7 +180,7 @@ all_waveforms = WaveformLoader.load_multiple(filepaths)
 - `.mat` - MATLAB file
 - `.h5`, `.hdf5` - HDF5
 
-### `siglent.report_generator.generators`
+### `scpi_control.report_generator.generators`
 
 Generate reports in various formats.
 
@@ -212,7 +212,7 @@ generator = MarkdownReportGenerator(
 success = generator.generate(report, Path("output.md"))
 ```
 
-### `siglent.report_generator.models.criteria`
+### `scpi_control.report_generator.models.criteria`
 
 Pass/fail criteria system.
 
@@ -271,7 +271,7 @@ for result in results:
     print(result)  # [PASS] or [FAIL] with details
 ```
 
-### `siglent.report_generator.models.template`
+### `scpi_control.report_generator.models.template`
 
 Template system for reusable configurations.
 
@@ -297,7 +297,7 @@ template = ReportTemplate.load(Path("my_template.json"))
 template = ReportTemplate.create_default_template()
 ```
 
-### `siglent.report_generator.llm`
+### `scpi_control.report_generator.llm`
 
 AI/LLM integration.
 

@@ -43,7 +43,7 @@ This project follows a code of conduct that all contributors are expected to adh
 1. **Fork and clone the repository**
 
 ```bash
-git clone https://github.com/siglent-control/siglent.git
+git clone https://github.com/little-did-I-know/SCPI-Instrument-Control.git
 cd siglent
 ```
 
@@ -205,7 +205,7 @@ Use absolute imports for clarity.
 
 ### Error Handling
 
-- Use custom exceptions from `siglent.exceptions`
+- Use custom exceptions from `scpi_control.exceptions`
 - Provide clear error messages
 - Log errors appropriately
 - Don't silently catch exceptions

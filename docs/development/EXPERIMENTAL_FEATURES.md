@@ -99,7 +99,7 @@ To use this feature:
 import warnings
 
 warnings.warn(
-    "siglent.power_supply is experimental and may change in future releases. "
+    "scpi_control.power_supply is experimental and may change in future releases. "
     "See docs/development/EXPERIMENTAL_FEATURES.md for details.",
     FutureWarning,
     stacklevel=2
@@ -385,14 +385,14 @@ class ExperimentalFeature:
 EXPERIMENTAL_FEATURES = [
     ExperimentalFeature(
         name="power_supply",
-        module="siglent.power_supply",
+        module="scpi_control.power_supply",
         description="Power supply control (SPD3303X series)",
         install_extra="power-supply-beta",
         since_version="0.4.0-beta.1",
     ),
     ExperimentalFeature(
         name="pattern_generator",
-        module="siglent.pattern_generator",
+        module="scpi_control.pattern_generator",
         description="Pattern/function generator support",
         install_extra="pattern-gen-beta",
         since_version="0.5.0-alpha.1",
@@ -499,7 +499,7 @@ Document experimental features clearly:
 
 ### Added (EXPERIMENTAL)
 
-- **Power Supply Control** (`siglent.power_supply` module)
+- **Power Supply Control** (`scpi_control.power_supply` module)
   - ⚠️ EXPERIMENTAL: API unstable, may change without warning
   - SPD3303X series support
   - Channel voltage/current control
@@ -591,7 +591,7 @@ warnings.warn(
     "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
     "⚠️  EXPERIMENTAL FEATURE WARNING\n"
     "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-    "You are using siglent.power_supply, an EXPERIMENTAL feature.\n"
+    "You are using scpi_control.power_supply, an EXPERIMENTAL feature.\n"
     "\n"
     "This feature:\n"
     "  • May change or be removed in any release\n"
@@ -619,7 +619,7 @@ Tag experimental releases clearly:
 
 **Power Supply Control** 🔬
 
-- NEW: `siglent.power_supply` module for SPD3303X series
+- NEW: `scpi_control.power_supply` module for SPD3303X series
 - Install: `pip install "SCPI-Instrument-Control[power-supply-beta]"`
 - **Status**: Beta - API may change, seeking feedback
 - **Docs**: See `docs/experimental/power-supply.md`
@@ -814,7 +814,7 @@ power-supply = ["pyvisa>=1.14.0"]  # Stable optional feature
 
 ### Graduated from Experimental to Stable ✅
 
-- **Power Supply Control** (`siglent.power_supply`)
+- **Power Supply Control** (`scpi_control.power_supply`)
   - API is now stable and follows semantic versioning
   - Install: `pip install "SCPI-Instrument-Control[power-supply]"` (dropped "-beta")
   - Full documentation: [docs/user-guide/power-supply.md](docs/user-guide/power-supply.md)
@@ -906,7 +906,7 @@ Installation: pip install "SCPI-Instrument-Control[power-supply-beta]"
 import warnings
 
 warnings.warn(
-    "siglent.power_supply is experimental. API may change. "
+    "scpi_control.power_supply is experimental. API may change. "
     "See docs/experimental/power-supply.md",
     FutureWarning,
     stacklevel=2
@@ -1035,7 +1035,7 @@ class TestPowerSupplyBasic:
 
     def test_connection(self):
         """Test power supply connection."""
-        with patch('siglent.power_supply.SocketConnection') as mock_conn:
+        with patch('scpi_control.power_supply.SocketConnection') as mock_conn:
             psu = PowerSupply('192.168.1.101')
             psu.connect()
             mock_conn.return_value.connect.assert_called_once()
@@ -1047,7 +1047,7 @@ class TestPowerSupplyBasic:
     ])
     def test_set_voltage(self, channel, voltage):
         """Test setting voltage on different channels."""
-        with patch('siglent.power_supply.SocketConnection'):
+        with patch('scpi_control.power_supply.SocketConnection'):
             psu = PowerSupply('192.168.1.101')
             psu.connect()
 

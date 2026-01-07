@@ -116,7 +116,7 @@ Verify your installation:
 
 ```python
 import scpi_control
-print(siglent.__version__)
+print(scpi_control.__version__)
 
 # Test connection (replace with your oscilloscope IP)
 from scpi_control import Oscilloscope
