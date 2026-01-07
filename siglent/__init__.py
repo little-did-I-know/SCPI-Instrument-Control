@@ -27,7 +27,7 @@ warnings.warn(
     "PyPI package name: pip install SCPI-Instrument-Control\n"
     "See migration guide: https://github.com/little-did-I-know/SCPI-Instrument-Control",
     DeprecationWarning,
-    stacklevel=2
+    stacklevel=2,
 )
 
 # Re-export everything from the new package for backward compatibility
