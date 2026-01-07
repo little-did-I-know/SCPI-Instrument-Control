@@ -38,9 +38,7 @@ class AWGOutput:
         self._channel_num = spec.channel_num
 
         if not 1 <= self._channel_num <= 4:
-            raise exceptions.InvalidParameterError(
-                f"Invalid channel number: {self._channel_num}. Must be 1-4."
-            )
+            raise exceptions.InvalidParameterError(f"Invalid channel number: {self._channel_num}. Must be 1-4.")
 
     # --- Waveform Function Control ---
 
@@ -69,13 +67,9 @@ class AWGOutput:
         waveform_upper = waveform.upper()
 
         if waveform_upper not in valid_waveforms:
-            raise exceptions.InvalidParameterError(
-                f"Invalid waveform: {waveform}. Must be one of {valid_waveforms}"
-            )
+            raise exceptions.InvalidParameterError(f"Invalid waveform: {waveform}. Must be one of {valid_waveforms}")
 
-        cmd = self._awg._get_command(
-            "set_function", ch=self._channel_num, function=waveform_upper
-        )
+        cmd = self._awg._get_command("set_function", ch=self._channel_num, function=waveform_upper)
         self._awg.write(cmd)
         logger.info(f"Channel {self._channel_num} waveform set to {waveform_upper}")
 
@@ -111,14 +105,9 @@ class AWGOutput:
             InvalidParameterError: If frequency exceeds maximum for this channel
         """
         if not 0 < freq_hz <= self._spec.max_frequency:
-            raise exceptions.InvalidParameterError(
-                f"Frequency {freq_hz}Hz exceeds maximum {self._spec.max_frequency}Hz "
-                f"for channel {self._channel_num}"
-            )
+            raise exceptions.InvalidParameterError(f"Frequency {freq_hz}Hz exceeds maximum {self._spec.max_frequency}Hz " f"for channel {self._channel_num}")
 
-        cmd = self._awg._get_command(
-            "set_frequency", ch=self._channel_num, frequency=freq_hz
-        )
+        cmd = self._awg._get_command("set_frequency", ch=self._channel_num, frequency=freq_hz)
         self._awg.write(cmd)
         logger.info(f"Channel {self._channel_num} frequency set to {freq_hz}Hz")
 
@@ -154,15 +143,9 @@ class AWGOutput:
             InvalidParameterError: If amplitude exceeds limits for this channel
         """
         if not self._spec.min_amplitude <= vpp <= self._spec.max_amplitude:
-            raise exceptions.InvalidParameterError(
-                f"Amplitude {vpp}Vpp outside range "
-                f"[{self._spec.min_amplitude}, {self._spec.max_amplitude}]Vpp "
-                f"for channel {self._channel_num}"
-            )
+            raise exceptions.InvalidParameterError(f"Amplitude {vpp}Vpp outside range " f"[{self._spec.min_amplitude}, {self._spec.max_amplitude}]Vpp " f"for channel {self._channel_num}")
 
-        cmd = self._awg._get_command(
-            "set_amplitude", ch=self._channel_num, amplitude=vpp
-        )
+        cmd = self._awg._get_command("set_amplitude", ch=self._channel_num, amplitude=vpp)
         self._awg.write(cmd)
         logger.info(f"Channel {self._channel_num} amplitude set to {vpp}Vpp")
 
@@ -198,14 +181,9 @@ class AWGOutput:
             InvalidParameterError: If offset exceeds limits for this channel
         """
         if abs(volts) > self._spec.max_offset:
-            raise exceptions.InvalidParameterError(
-                f"Offset {volts}V exceeds maximum {self._spec.max_offset}V "
-                f"for channel {self._channel_num}"
-            )
+            raise exceptions.InvalidParameterError(f"Offset {volts}V exceeds maximum {self._spec.max_offset}V " f"for channel {self._channel_num}")
 
-        cmd = self._awg._get_command(
-            "set_offset", ch=self._channel_num, offset=volts
-        )
+        cmd = self._awg._get_command("set_offset", ch=self._channel_num, offset=volts)
         self._awg.write(cmd)
         logger.info(f"Channel {self._channel_num} offset set to {volts}V")
 
@@ -241,13 +219,9 @@ class AWGOutput:
             InvalidParameterError: If phase is outside valid range
         """
         if not 0 <= degrees <= 360:
-            raise exceptions.InvalidParameterError(
-                f"Phase {degrees} degrees must be between 0 and 360"
-            )
+            raise exceptions.InvalidParameterError(f"Phase {degrees} degrees must be between 0 and 360")
 
-        cmd = self._awg._get_command(
-            "set_phase", ch=self._channel_num, phase=degrees
-        )
+        cmd = self._awg._get_command("set_phase", ch=self._channel_num, phase=degrees)
         self._awg.write(cmd)
         logger.info(f"Channel {self._channel_num} phase set to {degrees} degrees")
 
@@ -281,13 +255,9 @@ class AWGOutput:
             state: True to enable output, False to disable
         """
         state_str = "ON" if state else "OFF"
-        cmd = self._awg._get_command(
-            "set_output", ch=self._channel_num, state=state_str
-        )
+        cmd = self._awg._get_command("set_output", ch=self._channel_num, state=state_str)
         self._awg.write(cmd)
-        logger.info(
-            f"Channel {self._channel_num} {'enabled' if state else 'disabled'}"
-        )
+        logger.info(f"Channel {self._channel_num} {'enabled' if state else 'disabled'}")
 
     def enable(self) -> None:
         """Enable output (turn on)."""
@@ -310,10 +280,7 @@ class AWGOutput:
             NotImplementedError: If current waveform is not PULSE
         """
         if self.function != "PULSE":
-            logger.warning(
-                "Duty cycle only applicable to PULSE waveform, "
-                f"current: {self.function}"
-            )
+            logger.warning("Duty cycle only applicable to PULSE waveform, " f"current: {self.function}")
 
         cmd = self._awg._get_command("get_pulse_duty", ch=self._channel_num)
         response = self._awg.query(cmd)
@@ -330,13 +297,9 @@ class AWGOutput:
             InvalidParameterError: If duty cycle is outside valid range
         """
         if not 0 < percent < 100:
-            raise exceptions.InvalidParameterError(
-                f"Duty cycle {percent}% must be between 0 and 100"
-            )
+            raise exceptions.InvalidParameterError(f"Duty cycle {percent}% must be between 0 and 100")
 
-        cmd = self._awg._get_command(
-            "set_pulse_duty", ch=self._channel_num, duty=percent
-        )
+        cmd = self._awg._get_command("set_pulse_duty", ch=self._channel_num, duty=percent)
         self._awg.write(cmd)
         logger.info(f"Channel {self._channel_num} duty cycle set to {percent}%")
 
@@ -353,10 +316,7 @@ class AWGOutput:
             NotImplementedError: If current waveform is not RAMP
         """
         if self.function != "RAMP":
-            logger.warning(
-                "Symmetry only applicable to RAMP waveform, "
-                f"current: {self.function}"
-            )
+            logger.warning("Symmetry only applicable to RAMP waveform, " f"current: {self.function}")
 
         cmd = self._awg._get_command("get_ramp_symmetry", ch=self._channel_num)
         response = self._awg.query(cmd)
@@ -373,13 +333,9 @@ class AWGOutput:
             InvalidParameterError: If symmetry is outside valid range
         """
         if not 0 <= percent <= 100:
-            raise exceptions.InvalidParameterError(
-                f"Symmetry {percent}% must be between 0 and 100"
-            )
+            raise exceptions.InvalidParameterError(f"Symmetry {percent}% must be between 0 and 100")
 
-        cmd = self._awg._get_command(
-            "set_ramp_symmetry", ch=self._channel_num, symmetry=percent
-        )
+        cmd = self._awg._get_command("set_ramp_symmetry", ch=self._channel_num, symmetry=percent)
         self._awg.write(cmd)
         logger.info(f"Channel {self._channel_num} symmetry set to {percent}%")
 
@@ -397,14 +353,9 @@ class AWGOutput:
         self.frequency = frequency
         self.amplitude = amplitude
         self.offset = offset
-        logger.info(
-            f"Channel {self._channel_num} configured: "
-            f"SINE {frequency}Hz, {amplitude}Vpp, {offset}V offset"
-        )
+        logger.info(f"Channel {self._channel_num} configured: " f"SINE {frequency}Hz, {amplitude}Vpp, {offset}V offset")
 
-    def configure_square(
-        self, frequency: float, amplitude: float, offset: float = 0.0
-    ):
+    def configure_square(self, frequency: float, amplitude: float, offset: float = 0.0):
         """Configure square wave with specified parameters.
 
         Args:
@@ -416,10 +367,7 @@ class AWGOutput:
         self.frequency = frequency
         self.amplitude = amplitude
         self.offset = offset
-        logger.info(
-            f"Channel {self._channel_num} configured: "
-            f"SQUARE {frequency}Hz, {amplitude}Vpp, {offset}V offset"
-        )
+        logger.info(f"Channel {self._channel_num} configured: " f"SQUARE {frequency}Hz, {amplitude}Vpp, {offset}V offset")
 
     def configure_pulse(
         self,
@@ -441,10 +389,7 @@ class AWGOutput:
         self.amplitude = amplitude
         self.offset = offset
         self.pulse_duty_cycle = duty_cycle
-        logger.info(
-            f"Channel {self._channel_num} configured: "
-            f"PULSE {frequency}Hz, {amplitude}Vpp, {duty_cycle}% duty, {offset}V offset"
-        )
+        logger.info(f"Channel {self._channel_num} configured: " f"PULSE {frequency}Hz, {amplitude}Vpp, {duty_cycle}% duty, {offset}V offset")
 
     def configure_ramp(
         self,
@@ -466,10 +411,7 @@ class AWGOutput:
         self.amplitude = amplitude
         self.offset = offset
         self.ramp_symmetry = symmetry
-        logger.info(
-            f"Channel {self._channel_num} configured: "
-            f"RAMP {frequency}Hz, {amplitude}Vpp, {symmetry}% symmetry, {offset}V offset"
-        )
+        logger.info(f"Channel {self._channel_num} configured: " f"RAMP {frequency}Hz, {amplitude}Vpp, {symmetry}% symmetry, {offset}V offset")
 
     # --- Helper Methods ---
 
@@ -556,12 +498,6 @@ class AWGOutput:
         """String representation."""
         try:
             config = self.get_configuration()
-            return (
-                f"Ch{self._channel_num}("
-                f"enabled={config['enabled']}, "
-                f"{config['function']}, "
-                f"{config['frequency']/1e3:.1f}kHz, "
-                f"{config['amplitude']:.2f}Vpp)"
-            )
+            return f"Ch{self._channel_num}(" f"enabled={config['enabled']}, " f"{config['function']}, " f"{config['frequency']/1e3:.1f}kHz, " f"{config['amplitude']:.2f}Vpp)"
         except Exception:
             return f"Ch{self._channel_num}"

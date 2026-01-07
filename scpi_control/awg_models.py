@@ -52,10 +52,7 @@ class AWGCapability:
 
     def __str__(self) -> str:
         """String representation of AWG capability."""
-        return (
-            f"{self.manufacturer} {self.model_name} "
-            f"({self.num_channels} channels, {self.scpi_variant})"
-        )
+        return f"{self.manufacturer} {self.model_name} " f"({self.num_channels} channels, {self.scpi_variant})"
 
 
 # AWG Model Registry - Add new models here
@@ -204,28 +201,19 @@ def detect_awg_from_idn(idn_string: str) -> AWGCapability:
     for registered_model, capability in AWG_MODEL_REGISTRY.items():
         normalized_registered = re.sub(r"[\s\-_]", "", registered_model).upper()
         if normalized_model == normalized_registered:
-            logger.info(
-                f"Fuzzy match found: {model_from_idn} -> {registered_model}"
-            )
+            logger.info(f"Fuzzy match found: {model_from_idn} -> {registered_model}")
             return capability
 
     # Try partial matching for Siglent models
     if "Siglent" in manufacturer and "SDG" in model_from_idn.upper():
         for registered_model, capability in AWG_MODEL_REGISTRY.items():
             # Check if registry key is contained in model name
-            if (
-                registered_model.replace(" ", "").upper()
-                in model_from_idn.replace(" ", "").upper()
-            ):
-                logger.info(
-                    f"Partial match found: {model_from_idn} -> {registered_model}"
-                )
+            if registered_model.replace(" ", "").upper() in model_from_idn.replace(" ", "").upper():
+                logger.info(f"Partial match found: {model_from_idn} -> {registered_model}")
                 return capability
 
     # Model not found - create a generic fallback capability
-    logger.warning(
-        f"Model '{model_from_idn}' not in registry, using generic SCPI profile"
-    )
+    logger.warning(f"Model '{model_from_idn}' not in registry, using generic SCPI profile")
     return create_generic_awg_capability(idn_string)
 
 
@@ -253,11 +241,7 @@ def create_generic_awg_capability(idn_string: str) -> AWGCapability:
         model_name=model,
         manufacturer=manufacturer,
         num_channels=1,  # Conservative default
-        channel_specs=[
-            ChannelSpec(
-                1, 10e6, 10.0, 0.01, 5.0, 1e-6, 0.001
-            )  # 10MHz, 10Vpp typical
-        ],
+        channel_specs=[ChannelSpec(1, 10e6, 10.0, 0.01, 5.0, 1e-6, 0.001)],  # 10MHz, 10Vpp typical
         sample_rate=100e6,  # 100 MSa/s typical
         waveform_length=8192,  # 8k points typical
         has_modulation=False,  # Conservative - don't assume
@@ -290,8 +274,4 @@ def get_models_by_manufacturer(manufacturer: str) -> List[AWGCapability]:
     Returns:
         List of AWGCapability objects for models from that manufacturer
     """
-    return [
-        cap
-        for cap in AWG_MODEL_REGISTRY.values()
-        if cap.manufacturer.lower() == manufacturer.lower()
-    ]
+    return [cap for cap in AWG_MODEL_REGISTRY.values() if cap.manufacturer.lower() == manufacturer.lower()]

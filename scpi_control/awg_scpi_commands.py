@@ -145,9 +145,7 @@ class AWGSCPICommandSet:
                 try:
                     return template.format(**kwargs)
                 except KeyError as e:
-                    raise ValueError(
-                        f"Missing required parameter for command '{command_name}': {e}"
-                    )
+                    raise ValueError(f"Missing required parameter for command '{command_name}': {e}")
 
         # Fall back to generic SCPI commands
         if command_name in self.GENERIC_COMMANDS:
@@ -155,14 +153,10 @@ class AWGSCPICommandSet:
             try:
                 return template.format(**kwargs)
             except KeyError as e:
-                raise ValueError(
-                    f"Missing required parameter for command '{command_name}': {e}"
-                )
+                raise ValueError(f"Missing required parameter for command '{command_name}': {e}")
 
         # Command not found in any set
-        raise KeyError(
-            f"Unknown command: '{command_name}' for variant '{self.variant}'"
-        )
+        raise KeyError(f"Unknown command: '{command_name}' for variant '{self.variant}'")
 
     def supports_command(self, command_name: str) -> bool:
         """Check if a command is supported by this variant.
@@ -173,10 +167,7 @@ class AWGSCPICommandSet:
         Returns:
             True if command is supported, False otherwise
         """
-        if (
-            self.variant == "siglent_sdg"
-            and command_name in self.SIGLENT_SDG_OVERRIDES
-        ):
+        if self.variant == "siglent_sdg" and command_name in self.SIGLENT_SDG_OVERRIDES:
             return True
         return command_name in self.GENERIC_COMMANDS
 

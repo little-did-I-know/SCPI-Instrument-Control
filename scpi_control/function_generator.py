@@ -111,19 +111,14 @@ class FunctionGenerator:
         try:
             idn_string = self.identify()
             self._device_info = self._parse_idn(idn_string)
-            logger.info(
-                f"Connected to: {self._device_info.get('manufacturer', 'Unknown')} "
-                f"{self._device_info.get('model', 'Unknown')}"
-            )
+            logger.info(f"Connected to: {self._device_info.get('manufacturer', 'Unknown')} " f"{self._device_info.get('model', 'Unknown')}")
 
             # Detect model capability
             self.model_capability = detect_awg_from_idn(idn_string)
             logger.info(f"Model capability: {self.model_capability}")
 
             # Initialize SCPI command set for this model
-            self._scpi_commands = AWGSCPICommandSet(
-                self.model_capability.scpi_variant
-            )
+            self._scpi_commands = AWGSCPICommandSet(self.model_capability.scpi_variant)
             logger.info(f"Using SCPI variant: {self.model_capability.scpi_variant}")
 
             # Create channels dynamically based on model capability
@@ -131,16 +126,12 @@ class FunctionGenerator:
 
             # Update device info with capability information
             self._device_info["manufacturer"] = self.model_capability.manufacturer
-            self._device_info["num_channels"] = str(
-                self.model_capability.num_channels
-            )
+            self._device_info["num_channels"] = str(self.model_capability.num_channels)
 
         except Exception as e:
             logger.error(f"Failed to identify device or initialize: {e}")
             self.disconnect()
-            raise exceptions.SiglentConnectionError(
-                f"Connected but failed to identify device: {e}"
-            )
+            raise exceptions.SiglentConnectionError(f"Connected but failed to identify device: {e}")
 
     def disconnect(self) -> None:
         """Close connection to the function generator."""
@@ -280,9 +271,7 @@ class FunctionGenerator:
         based on the number of channels supported by the model.
         """
         if self.model_capability is None:
-            raise RuntimeError(
-                "Model capability not initialized. Call connect() first."
-            )
+            raise RuntimeError("Model capability not initialized. Call connect() first.")
 
         num_channels = self.model_capability.num_channels
         logger.info(f"Creating {num_channels} channel(s)")
@@ -348,9 +337,7 @@ class FunctionGenerator:
             >>> cmd = awg._get_command("set_frequency", ch=1, frequency=1000.0)
         """
         if self._scpi_commands is None:
-            raise RuntimeError(
-                "SCPI commands not initialized. Call connect() first."
-            )
+            raise RuntimeError("SCPI commands not initialized. Call connect() first.")
 
         return self._scpi_commands.get_command(command_name, **kwargs)
 
