@@ -12,7 +12,7 @@ from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QAction
 from PyQt6.QtWidgets import QFileDialog, QGroupBox, QHBoxLayout, QInputDialog, QMainWindow, QMessageBox, QProgressDialog, QPushButton, QSplitter, QStatusBar, QTabWidget, QVBoxLayout, QWidget
 
-from scpi_control import Oscilloscope, PowerSupply
+from scpi_control import DataLogger, Oscilloscope, PowerSupply
 from scpi_control.exceptions import SiglentConnectionError, SiglentError
 
 # Try to use PyQtGraph for high-performance plotting, fallback to matplotlib
@@ -39,6 +39,7 @@ from scpi_control.gui.widgets.math_panel import MathPanel
 from scpi_control.gui.widgets.measurement_panel import MeasurementPanel
 from scpi_control.gui.widgets.protocol_decode_panel import ProtocolDecodePanel
 from scpi_control.gui.widgets.psu_control import PSUControl
+from scpi_control.gui.widgets.data_logger_control import DataLoggerControl
 from scpi_control.gui.widgets.reference_panel import ReferencePanel
 from scpi_control.gui.widgets.terminal_widget import TerminalWidget
 from scpi_control.gui.widgets.timebase_control import TimebaseControl
@@ -59,6 +60,7 @@ class MainWindow(QMainWindow):
 
         self.scope: Optional[Oscilloscope] = None
         self.psu: Optional[PowerSupply] = None
+        self.daq: Optional[DataLogger] = None
         self.is_live_view = False
         self.live_view_worker: Optional[LiveViewWorker] = None
         self.capture_worker: Optional[WaveformCaptureWorker] = None
@@ -85,6 +87,7 @@ class MainWindow(QMainWindow):
         self.reference_panel: Optional[ReferencePanel] = None
         self.protocol_decode_panel: Optional[ProtocolDecodePanel] = None
         self.psu_control: Optional[PSUControl] = None
+        self.data_logger_control: Optional[DataLoggerControl] = None
         self.terminal_widget: Optional[TerminalWidget] = None
 
         # VNC window (separate window)
@@ -235,6 +238,11 @@ class MainWindow(QMainWindow):
         self.psu_control = PSUControl()
         self.tabs.addTab(self.psu_control, "Power Supply")
 
+        # Data Logger tab
+        self.data_logger_control = DataLoggerControl()
+        self.data_logger_control.error_occurred.connect(self._on_daq_error)
+        self.tabs.addTab(self.data_logger_control, "Data Logger")
+
         layout.addWidget(self.tabs)
 
         return panel
@@ -288,6 +296,18 @@ class MainWindow(QMainWindow):
         psu_disconnect_action = QAction("Disconnect Po&wer Supply", self)
         psu_disconnect_action.triggered.connect(self._on_psu_disconnect)
         file_menu.addAction(psu_disconnect_action)
+
+        file_menu.addSeparator()
+
+        # Data Logger/DAQ menu items
+        daq_connect_action = QAction("Connect to &Data Logger...", self)
+        daq_connect_action.setShortcut("Ctrl+L")
+        daq_connect_action.triggered.connect(self._on_daq_connect)
+        file_menu.addAction(daq_connect_action)
+
+        daq_disconnect_action = QAction("Disconnect Data Lo&gger", self)
+        daq_disconnect_action.triggered.connect(self._on_daq_disconnect)
+        file_menu.addAction(daq_disconnect_action)
 
         file_menu.addSeparator()
 
@@ -691,6 +711,95 @@ class MainWindow(QMainWindow):
             logger.info("Disconnected from power supply")
         else:
             QMessageBox.warning(self, "Not Connected", "No power supply connected")
+
+    def _on_daq_connect(self):
+        """Handle DAQ/Data Logger connect action."""
+        # Get IP address from user
+        ip, ok = QInputDialog.getText(
+            self,
+            "Connect to Data Logger",
+            "Enter data logger IP address:",
+            text="192.168.1.100",
+        )
+
+        if ok and ip:
+            self._connect_to_daq(ip)
+
+    def _connect_to_daq(self, ip: str, port: int = 5024):
+        """Connect to data logger at specified IP and port.
+
+        Args:
+            ip: IP address or hostname
+            port: TCP port (default: 5024)
+        """
+        try:
+            self.statusBar().showMessage(f"Connecting to DAQ at {ip}...")
+            self.daq = DataLogger(ip, port)
+            self.daq.connect()
+
+            device_info = self.daq.device_info
+            model = device_info.get("model", "Unknown") if device_info else "Unknown"
+            manufacturer = device_info.get("manufacturer", "Unknown") if device_info else "Unknown"
+
+            # Pass DAQ reference to control widget
+            self.data_logger_control.set_daq(self.daq)
+
+            # Create detailed status message with model capability info
+            if self.daq.model_capability:
+                cap = self.daq.model_capability
+                channels = cap.get_all_channels()
+                status_msg = f"DAQ Connected: {model} | " f"{len(channels)} channels | {ip}"
+                info_msg = f"Successfully connected to data logger:\n\n" f"Manufacturer: {manufacturer}\n" f"Model: {model}\n" f"Channels: {len(channels)}\n" f"IP Address: {ip}"
+            else:
+                status_msg = f"DAQ Connected to {model} at {ip}"
+                info_msg = f"Successfully connected to {model}\nIP: {ip}"
+
+            self.statusBar().showMessage(status_msg)
+            QMessageBox.information(self, "DAQ Connected", info_msg)
+            logger.info(f"Connected to data logger at {ip}")
+
+            # Switch to Data Logger tab
+            for i in range(self.tabs.count()):
+                if self.tabs.tabText(i) == "Data Logger":
+                    self.tabs.setCurrentIndex(i)
+                    break
+
+        except (SiglentConnectionError, SiglentError) as e:
+            self.statusBar().showMessage("DAQ connection failed")
+            QMessageBox.critical(
+                self,
+                "DAQ Connection Error",
+                f"Failed to connect to data logger:\n{str(e)}",
+            )
+            logger.error(f"DAQ connection failed: {e}")
+            self.daq = None
+
+    def _on_daq_disconnect(self):
+        """Handle DAQ disconnect action."""
+        if self.daq:
+            self.daq.disconnect()
+            self.daq = None
+
+            # Clear DAQ reference from control widget
+            self.data_logger_control.set_daq(None)
+
+            self.statusBar().showMessage("DAQ Disconnected")
+            logger.info("Disconnected from data logger")
+        else:
+            QMessageBox.warning(self, "Not Connected", "No data logger connected")
+
+    def _on_daq_error(self, error_info: dict):
+        """Handle DAQ error from data logger control.
+
+        Args:
+            error_info: Error information dictionary
+        """
+        error_msg = error_info.get("message", "Unknown error")
+        logger.error(f"DAQ error: {error_msg}")
+
+        # Show detailed error dialog
+        dialog = DetailedErrorDialog(error_info, self)
+        dialog.exec()
 
     def _on_run(self):
         """Handle run action."""
@@ -1601,5 +1710,14 @@ class MainWindow(QMainWindow):
         # Disconnect from scope
         if self.scope:
             self.scope.disconnect()
+
+        # Disconnect from PSU
+        if self.psu:
+            self.psu.disconnect()
+
+        # Disconnect from DAQ
+        if self.daq:
+            self.data_logger_control.set_daq(None)  # Stop any running acquisition
+            self.daq.disconnect()
 
         event.accept()

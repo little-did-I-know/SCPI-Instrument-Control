@@ -45,6 +45,10 @@ class MockConnection(BaseConnection):
         awg_mode: bool = False,
         awg_idn: str = "Siglent Technologies,SDG1032X,SDG1XXXXX,2.01.01.37R1",
         awg_channels: Optional[Dict[int, Dict[str, any]]] = None,
+        # Data acquisition (DAQ) parameters
+        daq_mode: bool = False,
+        daq_idn: str = "Keysight Technologies,34970A,MY12345678,A.01.02",
+        daq_readings: str = "1.234,2.345,3.456",
     ):
         super().__init__(host, port, timeout)
         channels = channel_states.keys() if channel_states else range(1, 3)
@@ -111,6 +115,12 @@ class MockConnection(BaseConnection):
                 "ramp_symmetry": 50.0,
             },
         }
+
+        # Data acquisition (DAQ) mode
+        self.daq_mode = daq_mode
+        self.daq_idn = daq_idn
+        self.daq_readings = daq_readings
+        self.daq_scan_list = []
 
     def connect(self) -> None:
         """Mark the connection as established."""
@@ -365,12 +375,34 @@ class MockConnection(BaseConnection):
         upper = command.upper()
 
         if upper == "*IDN?":
-            if self.awg_mode:
+            if self.daq_mode:
+                return self.daq_idn
+            elif self.awg_mode:
                 return self.awg_idn
             elif self.psu_mode:
                 return self.psu_idn
             else:
                 return self.idn
+
+        # Data acquisition (DAQ) queries
+        if self.daq_mode:
+            # Return configured readings for any measurement/read/fetch query
+            if any(kw in upper for kw in ["READ?", "FETC?", "MEAS:", "R?"]):
+                return self.daq_readings
+
+            # Scan list query
+            if "ROUT:SCAN?" in upper:
+                if self.daq_scan_list:
+                    return f"(@{','.join(str(ch) for ch in self.daq_scan_list)})"
+                return "(@)"
+
+            # Data points query
+            if "DATA:POIN?" in upper:
+                return str(len(self.daq_readings.split(",")))
+
+            # Error query
+            if "SYST:ERR?" in upper:
+                return '+0,"No error"'
 
         # Function generator (AWG) queries
         if self.awg_mode:
