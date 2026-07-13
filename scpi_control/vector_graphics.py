@@ -413,6 +413,7 @@ class VectorDisplay:
             self._scope.write(f"C{self.ch_y}:CPL DC")
 
             # Set trigger to AUTO mode
+            # legacy-dialect command; vector graphics is not dialect-routed yet
             self._scope.write("TRIG_MODE AUTO")
 
             # TODO: Enable XY mode (command may vary by model)

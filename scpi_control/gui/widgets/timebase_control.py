@@ -171,13 +171,9 @@ class TimebaseControl(QWidget):
             return
 
         try:
-            # Query time scale (TDIV)
-            tdiv_str = self.scope.query("TDIV?")
-            # Response may include echo like "TDIV 1.0E-06S"
-            if " " in tdiv_str:
-                tdiv_str = tdiv_str.split(" ", 1)[1]
-            tdiv_str = tdiv_str.replace("S", "").strip()
-            tdiv = float(tdiv_str)
+            # Query time scale through the dialect-routed timebase property
+            # (legacy-dialect commands here regressed the GUI on modern scopes; see task-8 sweep)
+            tdiv = self.scope.timebase
 
             # Find matching index
             for i, scale in enumerate(self.TIME_SCALES):
@@ -248,7 +244,7 @@ class TimebaseControl(QWidget):
 
         try:
             scale = self.TIME_SCALES[index]
-            self.scope.write(f"TDIV {scale}")
+            self.scope.timebase = scale
             logger.info(f"Time/div: {self._format_time_scale(scale)}")
 
             # Refresh sample rate and memory depth
