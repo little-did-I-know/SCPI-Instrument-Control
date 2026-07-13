@@ -85,6 +85,34 @@ def test_start_continuous_capture_uses_trigger_mode(monkeypatch, collector):
     assert connection.waveform_requests == [1] * len(captures)
 
 
+def test_wait_for_trigger_honors_user_configured_normal_mode(monkeypatch):
+    # In NORMAL mode the scope re-arms after every trigger and reports
+    # "Trig'd" rather than "Stop", so the status sequence never contains "Stop"
+    connection = MockConnection(
+        channel_states={1: True},
+        trigger_status=["Ready", "Ready", "Trig'd"],
+        sample_rate=1_000.0,
+    )
+    collector = TriggerWaitCollector("mock", connection=connection)
+    collector.collector.connect()
+
+    fake_time = FakeTime()
+    monkeypatch.setattr("scpi_control.automation.time", fake_time)
+
+    # Reproduce issue: configure NORMAL trigger before waiting
+    collector.collector.scope.trigger.set_mode("NORMAL")
+    collector.collector.scope.trigger.set_source("C1")
+    collector.collector.scope.trigger.set_slope("NEG")
+
+    waveforms = collector.wait_for_trigger([1], max_wait=0.5, save_on_trigger=False)
+
+    collector.collector.disconnect()
+
+    assert waveforms is not None
+    assert connection.trigger_mode == "NORM"
+    assert "TRIG_MODE SINGLE" not in connection.writes
+
+
 def test_trigger_wait_collector_waits_for_stop(monkeypatch):
     connection = MockConnection(
         channel_states={1: True},
