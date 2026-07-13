@@ -478,3 +478,14 @@ class TestReadRawIeeeBlock:
         conn.connect()
 
         assert conn.read_raw() == blob
+
+    def test_no_extra_recv_when_terminator_arrives_with_payload(self, mock_socket):
+        # Payload and trailing terminator arrive in one chunk: no extra recv
+        blob = b"C1:WF DAT2,#9000000020" + b"A" * 20 + b"\n\n"
+        mock_socket.recv.side_effect = [blob]
+
+        conn = SocketConnection("192.168.1.100")
+        conn.connect()
+
+        assert conn.read_raw() == blob
+        assert mock_socket.recv.call_count == 1

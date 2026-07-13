@@ -202,7 +202,11 @@ class SocketConnection(BaseConnection):
         Once a '#<n><length>' header is seen, reads exactly the declared
         number of bytes (plus the trailing terminator when present) instead
         of draining until the line goes idle. Responses without a block
-        header keep the legacy idle-drain behavior.
+        header keep the legacy idle-drain behavior. A headerless response
+        shorter than 128 bytes is indistinguishable from a block header that
+        has not arrived yet, so it is returned only after the full connection
+        timeout elapses - an accepted trade-off so slow scopes that pause
+        between the command echo and the block header are not truncated.
 
         Raises:
             SiglentTimeoutError: If no data arrives at all, or the line
@@ -237,7 +241,11 @@ class SocketConnection(BaseConnection):
                         self._socket.settimeout(0.5)
 
                 if expected_total is not None and len(data) >= expected_total:
-                    data += self._drain_terminator()
+                    if len(data) == expected_total:
+                        # Terminator not seen yet; grab it so callers get the same
+                        # trailing bytes the legacy drain produced. When surplus
+                        # already arrived, skip the extra recv entirely.
+                        data += self._drain_terminator()
                     return data
         except socket.error as e:
             if not isinstance(e, socket.timeout):
@@ -259,7 +267,9 @@ class SocketConnection(BaseConnection):
         """
         idx = data.find(b"#")
         if idx == -1:
-            # Command echo prefixes are short; if no '#' this deep in, there is no block
+            # Command echo prefixes are short; if no '#' this deep in, there is no block.
+            # Below 128 bytes we keep waiting on the full timeout rather than risk
+            # truncating a split header.
             return None, len(data) >= 128
         if len(data) < idx + 2:
             return None, False  # '#' seen, digit count not yet arrived
