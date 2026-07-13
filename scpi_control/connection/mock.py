@@ -64,6 +64,8 @@ class MockConnection(BaseConnection):
         self.trigger_mode = "STOP"
         self.trigger_type = "EDGE"
         self.trigger_source = "C1"
+        self.trigger_slope = "POS"
+        self.trigger_coupling = "DC"
         self.trigger_level: Dict[int, float] = {ch: 0.0 for ch in channels}
         self.trigger_status: List[str] = trigger_status[:] if trigger_status else ["Stop"]
 
@@ -338,6 +340,10 @@ class MockConnection(BaseConnection):
             trig_type, _, source = params.split(",")
             self.trigger_type = trig_type.strip().upper()
             self.trigger_source = source.strip().upper()
+        elif match := re.match(r"C(\d+):TRSL\s+(\w+)", command, re.IGNORECASE):
+            self.trigger_slope = match.group(2).upper()
+        elif match := re.match(r"C(\d+):TRCP\s+(\w+)", command, re.IGNORECASE):
+            self.trigger_coupling = match.group(2).upper()
         elif command.upper() == "ARM":
             # Simulate an acquisition that will eventually stop when no custom sequence is provided
             if len(self.trigger_status) <= 1:
@@ -615,6 +621,12 @@ class MockConnection(BaseConnection):
         if match := re.match(r"C(\d+):TRLV\?", command, re.IGNORECASE):
             channel = int(match.group(1))
             return f"C{channel}:TRLV {_format_scientific(self.trigger_level.get(channel, 0.0), 'V')}"
+
+        if re.match(r"C(\d+):TRSL\?", command, re.IGNORECASE):
+            return self.trigger_slope
+
+        if re.match(r"C(\d+):TRCP\?", command, re.IGNORECASE):
+            return self.trigger_coupling
 
         if upper == "TDIV?":
             return f"TDIV {_format_scientific(self.timebase, 'S')}"

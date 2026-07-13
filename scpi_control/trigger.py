@@ -4,6 +4,7 @@ import logging
 from typing import TYPE_CHECKING, Literal, Optional, Union
 
 from scpi_control import exceptions
+from scpi_control.scpi_commands import coupling_from_wire, coupling_to_wire, mode_from_wire, mode_to_wire, normalize_status, slope_from_wire, slope_to_wire
 
 if TYPE_CHECKING:
     from scpi_control.oscilloscope import Oscilloscope
@@ -42,14 +43,34 @@ class Trigger:
         return channel
 
     @property
+    def _dialect(self) -> str:
+        """Wire dialect of the parent scope; defaults to legacy before connect."""
+        return getattr(self._scope, "dialect", None) or "legacy"
+
+    def _cmd(self, name: str, **kwargs) -> str:
+        return self._scope._get_command(name, **kwargs)
+
+    @staticmethod
+    def _parse_float_response(response: str) -> float:
+        """Parse a numeric response, tolerating echoes and a V unit suffix."""
+        token = response.strip().split()[-1] if response.strip() else ""
+        return float(token.replace("V", "").replace("v", ""))
+
+    @property
     def mode(self) -> str:
         """Get trigger mode.
 
         Returns:
             Trigger mode: 'AUTO', 'NORM', 'SINGLE', or 'STOP'
         """
-        response = self._scope.query("TRIG_MODE?")
-        return response.strip().upper()
+        if self._dialect == "modern":
+            # Modern scopes have no STOP mode token; a stopped scope is
+            # detected via the acquisition status (guide p.483)
+            status = normalize_status(self._scope.query(self._cmd("get_acq_status")))
+            if status == "STOP":
+                return "STOP"
+        response = self._scope.query(self._cmd("get_trigger_mode"))
+        return mode_from_wire(self._dialect, response)
 
     @mode.setter
     def mode(self, mode: TriggerModeType) -> None:
@@ -66,7 +87,10 @@ class Trigger:
         if mode not in ["AUTO", "NORM", "SINGLE", "STOP"]:
             raise exceptions.InvalidParameterError(f"Invalid trigger mode: {mode}. Must be AUTO, NORM, SINGLE, or STOP.")
 
-        self._scope.write(f"TRIG_MODE {mode}")
+        if mode == "STOP":
+            self._scope.write(self._cmd("stop"))
+        else:
+            self._scope.write(self._cmd("set_trigger_mode", mode=mode_to_wire(self._dialect, mode)))
         logger.info(f"Trigger mode set to {mode}")
 
     def set_mode(self, mode: TriggerModeType) -> None:
@@ -91,7 +115,7 @@ class Trigger:
 
     def force(self) -> None:
         """Force a trigger event immediately."""
-        self._scope.write("FRTR")
+        self._scope.write(self._cmd("force_trigger"))
         logger.info("Trigger forced")
 
     @property
@@ -101,7 +125,9 @@ class Trigger:
         Returns:
             Trigger source (e.g., 'C1', 'C2', 'C3', 'C4', 'EX', 'EX5', 'LINE')
         """
-        response = self._scope.query("TRIG_SELECT?")
+        if self._dialect == "modern":
+            return self._scope.query(self._cmd("get_trigger_source")).strip()
+        response = self._scope.query(self._cmd("get_trigger_select"))
         # Response format typically: "EDGE,SR,C1,..."
         parts = response.split(",")
         if len(parts) >= 3:
@@ -121,11 +147,12 @@ class Trigger:
         if channel not in valid_sources:
             raise exceptions.InvalidParameterError(f"Invalid trigger source: {channel}. Must be one of {valid_sources}.")
 
-        # Get current trigger type to preserve it
-        current_type = self.trigger_type
-
-        # Set trigger with new source
-        self._scope.write(f"TRIG_SELECT {current_type},SR,{channel}")
+        if self._dialect == "modern":
+            self._scope.write(self._cmd("set_trigger_source", src=channel))
+        else:
+            # Get current trigger type to preserve it
+            current_type = self.trigger_type
+            self._scope.write(self._cmd("set_trigger_select", type=current_type, src=channel))
         logger.info(f"Trigger source set to {channel}")
 
     def set_source(self, channel: Union[int, str]) -> None:
@@ -139,11 +166,13 @@ class Trigger:
         Returns:
             Trigger type: 'EDGE', 'SLEW', 'GLIT', 'INTV', 'RUNT', 'PATTERN', etc.
         """
-        response = self._scope.query("TRIG_SELECT?")
+        if self._dialect == "modern":
+            return self._scope.query(self._cmd("get_trigger_type")).strip().upper()
+        response = self._scope.query(self._cmd("get_trigger_select"))
         # Response format: "EDGE,SR,C1,..."
         parts = response.split(",")
-        if len(parts) >= 1:
-            return parts[0].strip()
+        if len(parts) >= 1 and parts[0].strip():
+            return parts[0].strip().split()[-1].upper()  # tolerates a residual 'TRSE ' echo
         return "EDGE"
 
     @trigger_type.setter
@@ -159,11 +188,12 @@ class Trigger:
         if trig_type not in valid_types:
             raise exceptions.InvalidParameterError(f"Invalid trigger type: {trig_type}. Must be one of {valid_types}.")
 
-        # Get current source to preserve it
-        current_source = self.source
-
-        # Set trigger with new type
-        self._scope.write(f"TRIG_SELECT {trig_type},SR,{current_source}")
+        if self._dialect == "modern":
+            self._scope.write(self._cmd("set_trigger_type", type=trig_type))
+        else:
+            # Get current source to preserve it
+            current_source = self.source
+            self._scope.write(self._cmd("set_trigger_select", type=trig_type, src=current_source))
         logger.info(f"Trigger type set to {trig_type}")
 
     def set_edge_trigger(self, source: str = "C1", slope: str = "POS") -> None:
@@ -174,9 +204,11 @@ class Trigger:
             slope: Trigger slope - 'POS' (rising), 'NEG' (falling) (default: 'POS')
         """
         source = source.upper()
-        slope = slope.upper()
-
-        self._scope.write(f"TRIG_SELECT EDGE,SR,{source}")
+        if self._dialect == "modern":
+            self._scope.write(self._cmd("set_trigger_type", type="EDGE"))
+            self._scope.write(self._cmd("set_trigger_source", src=source))
+        else:
+            self._scope.write(self._cmd("set_trigger_select", type="EDGE", src=source))
         self.slope = slope
         logger.info(f"Edge trigger configured: source={source}, slope={slope}")
 
@@ -187,18 +219,11 @@ class Trigger:
         Returns:
             Trigger level in volts
         """
-        # Get current source
+        if self._dialect == "modern":
+            return self._parse_float_response(self._scope.query(self._cmd("get_trigger_level")))
         source = self.source
         if source.startswith("C"):
-            # Channel trigger - query channel trigger level
-            response = self._scope.query(f"{source}:TRLV?")
-            # Response may include echo like "C1:TRLV 0.0E+00V"
-            if ":" in response:
-                response = response.split(":", 1)[1]
-            if " " in response:
-                response = response.split(" ", 1)[1]
-            value = response.replace("V", "").strip()
-            return float(value)
+            return self._parse_float_response(self._scope.query(self._cmd("get_trigger_level", src=source)))
         return 0.0
 
     @level.setter
@@ -208,10 +233,13 @@ class Trigger:
         Args:
             voltage: Trigger level in volts
         """
-        # Set for current source
+        if self._dialect == "modern":
+            self._scope.write(self._cmd("set_trigger_level", level=voltage))
+            logger.info(f"Trigger level set to {voltage}V")
+            return
         source = self.source
         if source.startswith("C"):
-            self._scope.write(f"{source}:TRLV {voltage}")
+            self._scope.write(self._cmd("set_trigger_level", src=source, level=voltage))
             logger.info(f"Trigger level set to {voltage}V on {source}")
         else:
             logger.warning(f"Cannot set trigger level for source {source}")
@@ -228,8 +256,10 @@ class Trigger:
         Returns:
             Trigger slope: 'POS', 'NEG', or 'WINDOW'
         """
-        response = self._scope.query("TRIG_SLOPE?")
-        return response.strip().upper()
+        if self._dialect == "modern":
+            return slope_from_wire("modern", self._scope.query(self._cmd("get_trigger_slope")))
+        source = self.source
+        return slope_from_wire("legacy", self._scope.query(self._cmd("get_trigger_slope", src=source)))
 
     @slope.setter
     def slope(self, slope: TriggerSlopeType) -> None:
@@ -238,12 +268,15 @@ class Trigger:
         Args:
             slope: 'POS' (rising edge), 'NEG' (falling edge), 'WINDOW' (either)
         """
-        slope = slope.upper()
-        if slope not in ["POS", "NEG", "WINDOW"]:
-            raise exceptions.InvalidParameterError(f"Invalid trigger slope: {slope}. Must be POS, NEG, or WINDOW.")
-
-        self._scope.write(f"TRIG_SLOPE {slope}")
-        logger.info(f"Trigger slope set to {slope}")
+        # NOTE: WINDOW maps to the modern ALTernate slope, which triggers on
+        # alternating edges rather than either edge - approximate parity only
+        wire = slope_to_wire(self._dialect, slope)
+        if self._dialect == "modern":
+            self._scope.write(self._cmd("set_trigger_slope", slope=wire))
+        else:
+            source = self.source
+            self._scope.write(self._cmd("set_trigger_slope", src=source, slope=wire))
+        logger.info(f"Trigger slope set to {slope.upper()}")
 
     def set_slope(self, slope: TriggerSlopeType) -> None:
         """Convenience wrapper to set trigger slope."""
@@ -256,8 +289,10 @@ class Trigger:
         Returns:
             Coupling: 'DC', 'AC', 'HFREJ', 'LFREJ'
         """
-        response = self._scope.query("TRIG_COUPLING?")
-        return response.strip().upper()
+        if self._dialect == "modern":
+            return self._scope.query(self._cmd("get_trigger_coupling")).strip().upper()
+        source = self.source
+        return self._scope.query(self._cmd("get_trigger_coupling", src=source)).strip().split()[-1].upper()
 
     @coupling.setter
     def coupling(self, coupling: TriggerCouplingType) -> None:
@@ -270,9 +305,16 @@ class Trigger:
         if coupling not in ["DC", "AC", "HFREJ", "LFREJ"]:
             raise exceptions.InvalidParameterError(f"Invalid trigger coupling: {coupling}. Must be DC, AC, HFREJ, or LFREJ.")
 
-        self._scope.write(f"TRIG_COUPLING {coupling}")
+        if self._dialect == "modern":
+            # Modern wire tokens spell out the reject modes (guide p.486)
+            wire = {"HFREJ": "HFREJect", "LFREJ": "LFREJect"}.get(coupling, coupling)
+            self._scope.write(self._cmd("set_trigger_coupling", coupling=wire))
+        else:
+            source = self.source
+            self._scope.write(self._cmd("set_trigger_coupling", src=source, coupling=coupling))
         logger.info(f"Trigger coupling set to {coupling}")
 
+    # NOTE: TRIG_DELAY is legacy-only and actually controls trigger delay, not holdoff (AUDIT M4); routing deferred to a trigger-rework follow-up.
     @property
     def holdoff(self) -> float:
         """Get trigger holdoff time.
