@@ -66,6 +66,7 @@ class DataCollector:
         port: int = 5025,
         timeout: float = 5.0,
         connection: Optional[BaseConnection] = None,
+        dialect: Optional[str] = None,
     ):
         """Initialize data collector.
 
@@ -74,8 +75,9 @@ class DataCollector:
             port: TCP port for SCPI communication (default: 5025, the Siglent raw SCPI socket; 5024 is the telnet-style port with prompts and is not recommended)
             timeout: Command timeout in seconds (default: 5.0)
             connection: Optional connection implementation (e.g., MockConnection for offline tests)
+            dialect: Optional SCPI dialect override passed to Oscilloscope ("legacy" or "modern"; None auto-detects)
         """
-        self.scope = Oscilloscope(host, port, timeout, connection=connection)
+        self.scope = Oscilloscope(host, port, timeout, connection=connection, dialect=dialect)
         self._connected = False
 
     def connect(self) -> None:
@@ -475,6 +477,7 @@ class TriggerWaitCollector:
         port: int = 5025,
         timeout: float = 5.0,
         connection: Optional[BaseConnection] = None,
+        dialect: Optional[str] = None,
     ):
         """Initialize trigger wait collector.
 
@@ -483,8 +486,9 @@ class TriggerWaitCollector:
             port: TCP port for SCPI communication (default: 5025, the Siglent raw SCPI socket; 5024 is the telnet-style port with prompts and is not recommended)
             timeout: Command timeout in seconds
             connection: Optional connection implementation (e.g., MockConnection for offline tests)
+            dialect: Optional SCPI dialect override passed to Oscilloscope ("legacy" or "modern"; None auto-detects)
         """
-        self.collector = DataCollector(host, port, timeout, connection=connection)
+        self.collector = DataCollector(host, port, timeout, connection=connection, dialect=dialect)
 
     def __enter__(self):
         """Context manager entry."""

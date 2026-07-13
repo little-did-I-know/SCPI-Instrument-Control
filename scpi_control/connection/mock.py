@@ -70,10 +70,15 @@ class MockConnection(BaseConnection):
 
         self.sample_rate = sample_rate
         self.timebase = timebase
-        self.trigger_mode = "STOP"
         self.trigger_type = "EDGE"
         self.trigger_source = "C1"
-        self.trigger_slope = "POS"
+        if self.scope_dialect == "modern":
+            # Initial wire tokens must be modern vocabulary (guide p.482, p.494)
+            self.trigger_mode = "AUTO"
+            self.trigger_slope = "RISing"
+        else:
+            self.trigger_mode = "STOP"
+            self.trigger_slope = "POS"
         self.trigger_coupling = "DC"
         self.trigger_level: Dict[int, float] = {ch: 0.0 for ch in channels}
         self.trigger_status: List[str] = trigger_status[:] if trigger_status else ["Stop"]

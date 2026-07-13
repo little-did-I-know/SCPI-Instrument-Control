@@ -46,3 +46,14 @@ def test_invalid_dialect_rejected_at_init():
 def test_dialect_is_none_before_connect():
     scope = Oscilloscope("mock", connection=MockConnection("mock"))
     assert scope.dialect is None
+
+
+def test_datacollector_forwards_dialect_override():
+    from scpi_control.automation import DataCollector
+
+    conn = MockConnection("mock", idn=MODERN_IDN)
+    dc = DataCollector("mock", connection=conn, dialect="legacy")
+    dc.connect()
+    assert dc.scope.dialect == "legacy"
+    assert "CHDR OFF" in conn.writes
+    dc.disconnect()

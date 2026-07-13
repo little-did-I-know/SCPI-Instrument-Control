@@ -169,8 +169,8 @@ class Waveform:
         Returns:
             Voltage scale in V/div
         """
-        command = f"{channel}:VDIV?"
-        response = self._scope.query(self._scope._get_command("get_voltage_div", ch=int(channel[1])))
+        command = self._scope._get_command("get_voltage_div", ch=int(channel[1]))
+        response = self._scope.query(command)
         logger.debug(f"Voltage scale response: '{response}'")
 
         return self._parse_value_with_units(response, ("V",), "voltage scale", command=command)
@@ -184,8 +184,8 @@ class Waveform:
         Returns:
             Voltage offset in volts
         """
-        command = f"{channel}:OFST?"
-        response = self._scope.query(self._scope._get_command("get_voltage_offset", ch=int(channel[1])))
+        command = self._scope._get_command("get_voltage_offset", ch=int(channel[1]))
+        response = self._scope.query(command)
         logger.debug(f"Voltage offset response: '{response}'")
 
         return self._parse_value_with_units(response, ("V",), "voltage offset", command=command)
@@ -196,8 +196,8 @@ class Waveform:
         Returns:
             Timebase in seconds/division
         """
-        command = "TDIV?"
-        response = self._scope.query(self._scope._get_command("get_time_div"))
+        command = self._scope._get_command("get_time_div")
+        response = self._scope.query(command)
         logger.debug(f"Timebase response: '{response}'")
 
         return self._parse_value_with_units(response, ("S",), "timebase", command=command)
@@ -208,8 +208,8 @@ class Waveform:
         Returns:
             Sample rate in samples/second
         """
-        command = "SARA?"
-        response = self._scope.query(self._scope._get_command("get_sample_rate"))
+        command = self._scope._get_command("get_sample_rate")
+        response = self._scope.query(command)
         logger.debug(f"Sample rate response: '{response}'")
 
         return self._parse_value_with_units(response, ("SA/S", "SPS"), "sample rate", command=command)

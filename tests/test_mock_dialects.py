@@ -56,6 +56,11 @@ class TestModernResponses:
         assert conn.query(":TRIGger:STATus?") == "Ready"
         assert conn.query(":TRIGger:STATus?") == "Stop"
 
+    def test_initial_state_is_modern_vocabulary(self):
+        conn = make(MODERN_IDN, trigger_status=["Ready"])
+        assert conn.query(":TRIGger:EDGE:SLOPe?") == "RISing"
+        assert conn.query(":TRIGger:MODE?") == "AUTO"
+
 
 class TestLegacyResponses:
     def setup_method(self):
