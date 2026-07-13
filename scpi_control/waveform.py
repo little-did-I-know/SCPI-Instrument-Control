@@ -165,7 +165,7 @@ class Waveform:
             Voltage scale in V/div
         """
         command = f"{channel}:VDIV?"
-        response = self._scope.query(command)
+        response = self._scope.query(self._scope._get_command("get_voltage_div", ch=int(channel[1])))
         logger.debug(f"Voltage scale response: '{response}'")
 
         return self._parse_value_with_units(response, ("V",), "voltage scale", command=command)
@@ -180,7 +180,7 @@ class Waveform:
             Voltage offset in volts
         """
         command = f"{channel}:OFST?"
-        response = self._scope.query(command)
+        response = self._scope.query(self._scope._get_command("get_voltage_offset", ch=int(channel[1])))
         logger.debug(f"Voltage offset response: '{response}'")
 
         return self._parse_value_with_units(response, ("V",), "voltage offset", command=command)
@@ -192,7 +192,7 @@ class Waveform:
             Timebase in seconds/division
         """
         command = "TDIV?"
-        response = self._scope.query(command)
+        response = self._scope.query(self._scope._get_command("get_time_div"))
         logger.debug(f"Timebase response: '{response}'")
 
         return self._parse_value_with_units(response, ("S",), "timebase", command=command)
@@ -204,7 +204,7 @@ class Waveform:
             Sample rate in samples/second
         """
         command = "SARA?"
-        response = self._scope.query(command)
+        response = self._scope.query(self._scope._get_command("get_sample_rate"))
         logger.debug(f"Sample rate response: '{response}'")
 
         return self._parse_value_with_units(response, ("SA/S", "SPS"), "sample rate", command=command)

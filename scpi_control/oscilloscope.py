@@ -14,7 +14,7 @@ from scpi_control.connection import BaseConnection, SocketConnection
 from scpi_control.math_channel import MathChannel
 from scpi_control.measurement import Measurement
 from scpi_control.models import ModelCapability, detect_model_from_idn
-from scpi_control.scpi_commands import SCPICommandSet
+from scpi_control.scpi_commands import SCPICommandSet, normalize_status
 from scpi_control.screen_capture import ScreenCapture
 from scpi_control.trigger import Trigger
 from scpi_control.waveform import Waveform, WaveformData
@@ -287,33 +287,46 @@ class Oscilloscope:
         self.write("*CLS")
 
     def get_error(self) -> str:
-        """Get the last error from the error queue.
+        """Unsupported: neither Siglent scope dialect documents an error-queue query.
 
-        Returns:
-            Error string (format: "code,description")
+        Legacy scopes use CMR?/EXR? registers; the modern programming guide
+        documents no error queue at all. The old SYST:ERR? implementation
+        always timed out on real hardware.
         """
-        return self.query("SYST:ERR?")
+        raise NotImplementedError("No SCPI error-queue query exists on either Siglent scope dialect (legacy scopes expose CMR?/EXR? registers instead).")
 
     def wait_complete(self) -> None:
         """Wait for all pending operations to complete."""
         self.query("*OPC?")
 
     def trigger_single(self) -> None:
-        """Set trigger mode to single and force a trigger."""
-        self.write("TRIG_MODE SINGLE")
-        self.write("ARM")
+        """Arm a one-shot (single) acquisition."""
+        if self.dialect == "modern":
+            # SINGle self-arms on the modern dialect; there is no ARM command (guide p.482)
+            self.write(self._get_command("set_trigger_mode", mode="SINGle"))
+        else:
+            self.write(self._get_command("set_trigger_mode", mode="SINGLE"))
+            self.write(self._get_command("arm_trigger"))
 
     def trigger_force(self) -> None:
         """Force a trigger event."""
-        self.write("FRTR")
+        self.write(self._get_command("force_trigger"))
 
     def run(self) -> None:
-        """Start acquisition (set to AUTO trigger mode)."""
-        self.write("TRIG_MODE AUTO")
+        """Start acquisition."""
+        self.write(self._get_command("run"))
 
     def stop(self) -> None:
         """Stop acquisition."""
-        self.write("STOP")
+        self.write(self._get_command("stop"))
+
+    def acquisition_status(self) -> str:
+        """Query the acquisition state, normalized across dialects.
+
+        Returns:
+            One of 'ARM', 'READY', 'AUTO', 'TRIGD', 'STOP', 'ROLL'.
+        """
+        return normalize_status(self.query(self._get_command("get_acq_status")))
 
     @property
     def timebase(self) -> float:
@@ -323,7 +336,7 @@ class Oscilloscope:
     @timebase.setter
     def timebase(self, seconds_per_div: float) -> None:
         """Set timebase (seconds/division)."""
-        self.write(f"TDIV {seconds_per_div}")
+        self.write(self._get_command("set_time_div", tdiv=seconds_per_div))
 
     def set_timebase(self, seconds_per_div: float) -> None:
         """Set timebase (alias for timebase setter)."""
@@ -331,7 +344,7 @@ class Oscilloscope:
 
     def auto_setup(self) -> None:
         """Perform automatic setup."""
-        self.write("ASET")
+        self.write(self._get_command("auto_setup"))
 
     def get_waveform(self, channel: int) -> WaveformData:
         """Acquire waveform data from a channel.

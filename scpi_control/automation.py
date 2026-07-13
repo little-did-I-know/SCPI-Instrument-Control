@@ -532,24 +532,22 @@ class TriggerWaitCollector:
             ...         print("Trigger captured!")
         """
         # Honor a user-configured NORMAL trigger mode; otherwise arm a
-        # one-shot SINGLE acquisition.
-        mode_response = self.collector.scope.trigger.mode
-        current_mode = mode_response.split()[-1] if mode_response.split() else ""
+        # one-shot SINGLE acquisition. trigger.mode is dialect-normalized.
+        current_mode = self.collector.scope.trigger.mode
 
         if current_mode == "NORM":
             # NORMAL mode re-arms after every trigger and never reports
-            # "Stop", so watch for the trigger event itself.
-            done_states = {"TRIG'D", "STOP"}
+            # STOP, so watch for the trigger event itself.
+            done_states = {"TRIGD", "STOP"}
         else:
             self.collector.scope.trigger_single()
             done_states = {"STOP"}
 
         start_time = time.time()
         while (time.time() - start_time) < max_wait:
-            # Check trigger status
-            status = self.collector.scope.query(":TRIG:STAT?").strip()
+            status = self.collector.scope.acquisition_status()
 
-            if status.upper() in done_states:
+            if status in done_states:
                 # Trigger occurred, capture waveform
                 logger.info("Trigger detected!")
                 waveforms = {}

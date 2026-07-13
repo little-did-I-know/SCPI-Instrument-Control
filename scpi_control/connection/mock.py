@@ -348,9 +348,10 @@ class MockConnection(BaseConnection):
         elif match := re.match(r"C(\d+):TRCP\s+(\w+)", command, re.IGNORECASE):
             self.trigger_coupling = match.group(2).upper()
         elif command.upper() == "ARM":
-            # Simulate an acquisition that will eventually stop when no custom sequence is provided
+            # Simulate an acquisition that will eventually stop when no custom sequence is provided.
+            # Status vocabulary matches real hardware: Ready while armed, Stop when done.
             if len(self.trigger_status) <= 1:
-                self.trigger_status = ["Run", "Stop"]
+                self.trigger_status = ["Ready", "Stop"]
         elif match := re.match(r"C(\d+):TRLV\s+(.+)", command, re.IGNORECASE):
             channel = int(match.group(1))
             self.trigger_level[channel] = float(match.group(2))
@@ -597,6 +598,11 @@ class MockConnection(BaseConnection):
                 return "CV"
 
         if upper in {":TRIG:STAT?", "TRIG:STAT?"}:
+            if len(self.trigger_status) > 1:
+                return self.trigger_status.pop(0)
+            return self.trigger_status[0]
+
+        if upper == "SAST?":
             if len(self.trigger_status) > 1:
                 return self.trigger_status.pop(0)
             return self.trigger_status[0]

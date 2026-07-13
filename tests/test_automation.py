@@ -116,7 +116,7 @@ def test_wait_for_trigger_honors_user_configured_normal_mode(monkeypatch):
 def test_trigger_wait_collector_waits_for_stop(monkeypatch):
     connection = MockConnection(
         channel_states={1: True},
-        trigger_status=["Run", "Run", "Stop"],
+        trigger_status=["Ready", "Ready", "Stop"],  # real SAST? never reports "Run"; Ready is the armed state
         sample_rate=1_000.0,
     )
     collector = TriggerWaitCollector("mock", connection=connection)
@@ -132,4 +132,4 @@ def test_trigger_wait_collector_waits_for_stop(monkeypatch):
     assert waveforms is not None
     assert connection.waveform_requests == [1]
     assert "ARM" in connection.writes
-    assert connection.queries.count(":TRIG:STAT?") >= 1
+    assert connection.queries.count("SAST?") >= 1
