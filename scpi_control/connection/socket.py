@@ -11,12 +11,12 @@ from scpi_control.connection.base import BaseConnection
 class SocketConnection(BaseConnection):
     """TCP socket connection for SCPI commands over Ethernet."""
 
-    def __init__(self, host: str, port: int = 5024, timeout: float = 5.0):
+    def __init__(self, host: str, port: int = 5025, timeout: float = 5.0):
         """Initialize socket connection.
 
         Args:
             host: IP address or hostname of the oscilloscope
-            port: TCP port number (default: 5024 for Siglent SCPI)
+            port: TCP port number (default: 5025, the Siglent raw SCPI socket; 5024 is the telnet-style port with prompts and is not recommended)
             timeout: Command timeout in seconds (default: 5.0)
         """
         super().__init__(host, port, timeout)

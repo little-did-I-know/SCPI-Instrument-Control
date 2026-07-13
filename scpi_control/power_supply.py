@@ -61,7 +61,7 @@ class PowerSupply:
     def __init__(
         self,
         host: str,
-        port: int = 5024,
+        port: int = 5025,
         timeout: float = 5.0,
         connection: Optional[BaseConnection] = None,
     ):
@@ -69,7 +69,7 @@ class PowerSupply:
 
         Args:
             host: IP address or hostname of the power supply
-            port: TCP port for SCPI communication (default: 5024)
+            port: TCP port for SCPI communication (default: 5025, the Siglent raw SCPI socket; 5024 is the telnet-style port with prompts and is not recommended)
             timeout: Command timeout in seconds (default: 5.0)
             connection: Optional custom connection object (uses SocketConnection if None)
 

@@ -63,7 +63,7 @@ class DataCollector:
     def __init__(
         self,
         host: str,
-        port: int = 5024,
+        port: int = 5025,
         timeout: float = 5.0,
         connection: Optional[BaseConnection] = None,
     ):
@@ -71,7 +71,7 @@ class DataCollector:
 
         Args:
             host: IP address or hostname of the oscilloscope
-            port: TCP port for SCPI communication (default: 5024)
+            port: TCP port for SCPI communication (default: 5025, the Siglent raw SCPI socket; 5024 is the telnet-style port with prompts and is not recommended)
             timeout: Command timeout in seconds (default: 5.0)
             connection: Optional connection implementation (e.g., MockConnection for offline tests)
         """
@@ -472,7 +472,7 @@ class TriggerWaitCollector:
     def __init__(
         self,
         host: str,
-        port: int = 5024,
+        port: int = 5025,
         timeout: float = 5.0,
         connection: Optional[BaseConnection] = None,
     ):
@@ -480,7 +480,7 @@ class TriggerWaitCollector:
 
         Args:
             host: IP address or hostname of the oscilloscope
-            port: TCP port for SCPI communication
+            port: TCP port for SCPI communication (default: 5025, the Siglent raw SCPI socket; 5024 is the telnet-style port with prompts and is not recommended)
             timeout: Command timeout in seconds
             connection: Optional connection implementation (e.g., MockConnection for offline tests)
         """

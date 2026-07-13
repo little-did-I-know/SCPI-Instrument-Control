@@ -27,7 +27,7 @@ class TestSocketConnectionInit:
         """Test initialization with default port."""
         conn = SocketConnection("192.168.1.100")
         assert conn.host == "192.168.1.100"
-        assert conn.port == 5024
+        assert conn.port == 5025
         assert conn.timeout == 5.0
 
     def test_init_custom_port(self):
@@ -50,7 +50,7 @@ class TestSocketConnect:
         conn.connect()
 
         assert conn._connected is True
-        mock_socket.connect.assert_called_once_with(("192.168.1.100", 5024))
+        mock_socket.connect.assert_called_once_with(("192.168.1.100", 5025))
         mock_socket.settimeout.assert_called()
 
     def test_connect_failure(self, mock_socket):
