@@ -1,6 +1,8 @@
 """Tests for socket connection module."""
 
 import socket
+import threading
+import time
 from unittest.mock import MagicMock, Mock, call, patch
 
 import pytest
@@ -370,3 +372,50 @@ class TestSocketStringRepresentation:
         conn = SocketConnection("192.168.1.100")
         assert "SocketConnection" in repr(conn)
         assert "192.168.1.100" in repr(conn)
+
+
+class TestSocketThreadSafety:
+    """Test that concurrent SCPI exchanges cannot interleave."""
+
+    def test_connection_exposes_reentrant_lock(self, mock_socket):
+        conn = SocketConnection("192.168.1.100")
+        # Reentrant: acquiring twice from the same thread must not deadlock
+        with conn.lock:
+            with conn.lock:
+                pass
+
+    def test_query_is_atomic_under_concurrency(self, mock_socket):
+        # Q1's send is slow; without a lock, thread 2 completes its write and
+        # steals Q1's response off the wire. With the lock, each query's
+        # write+read pair is atomic and both threads get their own response.
+        responses = {b"Q1?\n": b"R1\n", b"Q2?\n": b"R2\n"}
+        pending = []
+
+        def fake_sendall(data):
+            pending.append(data)
+            if data == b"Q1?\n":
+                time.sleep(0.1)
+
+        def fake_recv(size):
+            return responses[pending.pop(0)]
+
+        mock_socket.sendall.side_effect = fake_sendall
+        mock_socket.recv.side_effect = fake_recv
+
+        conn = SocketConnection("192.168.1.100")
+        conn.connect()
+
+        results = {}
+
+        def do_query(cmd):
+            results[cmd] = conn.query(cmd)
+
+        t1 = threading.Thread(target=do_query, args=("Q1?",))
+        t2 = threading.Thread(target=do_query, args=("Q2?",))
+        t1.start()
+        time.sleep(0.02)  # ensure t1 is inside its slow sendall first
+        t2.start()
+        t1.join()
+        t2.join()
+
+        assert results == {"Q1?": "R1", "Q2?": "R2"}

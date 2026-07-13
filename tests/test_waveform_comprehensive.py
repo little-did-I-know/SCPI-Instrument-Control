@@ -58,6 +58,9 @@ def mock_scope():
     scope.send_command = Mock()
     scope.query = Mock()
     scope.query_binary = Mock()
+    # Configure the lock to support context manager protocol
+    scope._connection.lock.__enter__ = Mock(return_value=None)
+    scope._connection.lock.__exit__ = Mock(return_value=None)
     return scope
 
 
