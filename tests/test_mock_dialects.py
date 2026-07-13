@@ -50,6 +50,12 @@ class TestModernResponses:
         self.conn.write("TDIV 0.001")
         assert "TDIV 0.001" in self.conn.writes
 
+    def test_single_arming_uses_real_status_vocabulary(self):
+        conn = make(MODERN_IDN)
+        conn.write(":TRIGger:MODE SINGle")
+        assert conn.query(":TRIGger:STATus?") == "Ready"
+        assert conn.query(":TRIGger:STATus?") == "Stop"
+
 
 class TestLegacyResponses:
     def setup_method(self):

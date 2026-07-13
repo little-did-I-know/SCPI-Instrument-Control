@@ -345,7 +345,8 @@ class MockConnection(BaseConnection):
             if match := re.match(r":TRIGger:MODE\s+(\w+)", command, re.IGNORECASE):
                 self.trigger_mode = match.group(1)  # stored as wire token, e.g. "NORMal" (guide p.482)
                 if match.group(1).upper() == "SINGLE" and len(self.trigger_status) <= 1:
-                    self.trigger_status = ["Run", "Stop"]
+                    # Status vocabulary matches real hardware: Ready while armed, Stop when done (same rule as the legacy ARM handler)
+                    self.trigger_status = ["Ready", "Stop"]
                 return
             if re.match(r":TRIGger:RUN$", command, re.IGNORECASE):
                 self.trigger_mode = "AUTO"
