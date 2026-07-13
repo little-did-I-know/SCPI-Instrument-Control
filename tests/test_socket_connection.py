@@ -419,3 +419,62 @@ class TestSocketThreadSafety:
         t2.join()
 
         assert results == {"Q1?": "R1", "Q2?": "R2"}
+
+
+class TestReadRawIeeeBlock:
+    """read_raw(None) must honor the IEEE 488.2 definite-length header."""
+
+    def test_reads_exactly_declared_block_length(self, mock_socket):
+        # "C1:WF DAT2," prefix (11 bytes) + "#9" + 9-digit length (20) + payload
+        part1 = b"C1:WF DAT2,#9000000020" + b"A" * 10
+        part2 = b"B" * 10
+        mock_socket.recv.side_effect = [part1, part2, b"\n\n", socket.timeout()]
+
+        conn = SocketConnection("192.168.1.100")
+        conn.connect()
+        data = conn.read_raw()
+
+        assert data == part1 + part2 + b"\n\n"
+        # The block path must never fall back to the legacy 0.5s idle drain
+        assert call(0.5) not in mock_socket.settimeout.call_args_list
+
+    def test_header_split_across_chunks(self, mock_socket):
+        part1 = b"C1:WF DAT2,#"
+        part2 = b"9000000005HELLO\n\n"
+        mock_socket.recv.side_effect = [part1, part2, socket.timeout()]
+
+        conn = SocketConnection("192.168.1.100")
+        conn.connect()
+        data = conn.read_raw()
+
+        assert data == part1 + part2
+
+    def test_stall_mid_block_raises_timeout(self, mock_socket):
+        # Header declares 100 bytes but the line goes silent after 10
+        mock_socket.recv.side_effect = [b"C1:WF DAT2,#9000000100" + b"A" * 10, socket.timeout()]
+
+        conn = SocketConnection("192.168.1.100")
+        conn.connect()
+
+        with pytest.raises(TimeoutError):
+            conn.read_raw()
+
+    def test_no_data_at_all_raises_timeout(self, mock_socket):
+        # Previously returned b"" silently; an empty line is now an error
+        mock_socket.recv.side_effect = [socket.timeout()]
+
+        conn = SocketConnection("192.168.1.100")
+        conn.connect()
+
+        with pytest.raises(TimeoutError):
+            conn.read_raw()
+
+    def test_headerless_response_still_drains_on_idle(self, mock_socket):
+        # Responses without a '#' block keep the legacy idle-drain behavior
+        blob = bytes([0, 127, 255, 128, 64] * 200)  # 1000 bytes, no b"#"
+        mock_socket.recv.side_effect = [blob, socket.timeout()]
+
+        conn = SocketConnection("192.168.1.100")
+        conn.connect()
+
+        assert conn.read_raw() == blob

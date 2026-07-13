@@ -2,7 +2,7 @@
 
 import socket
 import time
-from typing import Optional
+from typing import Optional, Tuple
 
 from scpi_control import exceptions
 from scpi_control.connection.base import BaseConnection
@@ -190,24 +190,101 @@ class SocketConnection(BaseConnection):
                         remaining -= len(chunk)
                     return data
                 else:
-                    # Read all available data
-                    data = b""
-                    self._socket.settimeout(0.5)  # Short timeout for binary reads
-                    try:
-                        while True:
-                            chunk = self._socket.recv(self._buffer_size)
-                            if not chunk:
-                                break
-                            data += chunk
-                    except socket.timeout:
-                        pass  # Expected when no more data
-                    finally:
-                        self._socket.settimeout(self.timeout)  # Restore timeout
-                    return data
+                    return self._read_ieee_block()
             except socket.error as e:
                 self._connected = False
                 command_context = f" after '{self._last_command}'" if self._last_command else ""
                 raise exceptions.SiglentConnectionError(f"Read error from {self.host}:{self.port}{command_context}: {e}")
+
+    def _read_ieee_block(self) -> bytes:
+        """Read a response that may carry an IEEE 488.2 definite-length block.
+
+        Once a '#<n><length>' header is seen, reads exactly the declared
+        number of bytes (plus the trailing terminator when present) instead
+        of draining until the line goes idle. Responses without a block
+        header keep the legacy idle-drain behavior.
+
+        Raises:
+            SiglentTimeoutError: If no data arrives at all, or the line
+                stalls before the declared byte count is received.
+        """
+        data = b""
+        expected_total: Optional[int] = None
+        header_absent = False
+
+        try:
+            while True:
+                try:
+                    chunk = self._socket.recv(self._buffer_size)
+                except socket.timeout:
+                    command_context = f"for '{self._last_command}' " if self._last_command else ""
+                    if expected_total is not None:
+                        raise exceptions.SiglentTimeoutError(f"Binary read stalled {command_context}(received {len(data)} of {expected_total} declared bytes) from {self.host}:{self.port}")
+                    if data:
+                        # Headerless response finished (line went idle)
+                        return data
+                    raise exceptions.SiglentTimeoutError(f"Binary read timeout {command_context}- no data received from {self.host}:{self.port}")
+
+                if not chunk:
+                    return data  # Peer closed the connection
+
+                data += chunk
+
+                if expected_total is None and not header_absent:
+                    expected_total, header_absent = self._parse_block_total(data)
+                    if header_absent:
+                        # Legacy path: no way to know the length, drain until idle
+                        self._socket.settimeout(0.5)
+
+                if expected_total is not None and len(data) >= expected_total:
+                    data += self._drain_terminator()
+                    return data
+        except socket.error as e:
+            if not isinstance(e, socket.timeout):
+                self._connected = False
+                command_context = f" after '{self._last_command}'" if self._last_command else ""
+                raise exceptions.SiglentConnectionError(f"Read error from {self.host}:{self.port}{command_context}: {e}")
+            raise
+        finally:
+            self._socket.settimeout(self.timeout)
+
+    def _parse_block_total(self, data: bytes) -> Tuple[Optional[int], bool]:
+        """Locate an IEEE 488.2 block header and compute the total response size.
+
+        Returns:
+            (total_bytes, header_absent): total_bytes is prefix + '#' + digit
+            count + length digits + payload, or None if the header has not
+            fully arrived yet. header_absent is True when the response is
+            judged to have no definite-length block at all.
+        """
+        idx = data.find(b"#")
+        if idx == -1:
+            # Command echo prefixes are short; if no '#' this deep in, there is no block
+            return None, len(data) >= 128
+        if len(data) < idx + 2:
+            return None, False  # '#' seen, digit count not yet arrived
+        digit_char = data[idx + 1 : idx + 2]
+        if not digit_char.isdigit() or digit_char == b"0":
+            # '#0' (indefinite length) or stray '#': not a definite-length block
+            return None, True
+        num_digits = int(digit_char)
+        if len(data) < idx + 2 + num_digits:
+            return None, False  # Length field not yet complete
+        length_field = data[idx + 2 : idx + 2 + num_digits]
+        if not length_field.isdigit():
+            return None, True
+        payload_length = int(length_field)
+        return idx + 2 + num_digits + payload_length, False
+
+    def _drain_terminator(self) -> bytes:
+        """Opportunistically read the trailing terminator ("\\n\\n") after a block."""
+        self._socket.settimeout(0.05)
+        try:
+            return self._socket.recv(2)
+        except socket.timeout:
+            return b""
+        finally:
+            self._socket.settimeout(self.timeout)
 
     def __repr__(self) -> str:
         """String representation of connection."""
