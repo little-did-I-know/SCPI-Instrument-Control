@@ -157,7 +157,7 @@ class Oscilloscope:
             logger.info(f"Model capability: {self.model_capability}")
 
             # Initialize SCPI command set for this model
-            self._scpi_commands = SCPICommandSet(self.model_capability.scpi_variant)
+            self._scpi_commands = SCPICommandSet(getattr(self.model_capability, "dialect", "legacy"), self.model_capability.scpi_variant)
             logger.info(f"Using SCPI variant: {self.model_capability.scpi_variant}")
 
             # Create channels dynamically based on model capability
