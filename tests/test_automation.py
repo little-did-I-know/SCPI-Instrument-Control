@@ -42,7 +42,7 @@ def test_capture_single_uses_channel_enabled_and_waveform_acquire(monkeypatch, c
 
     assert list(waveforms.keys()) == [1]
     assert collector.scope._connection.waveform_requests == [1]
-    assert collector.scope._connection.writes[:3] == ["TRIG_MODE SINGLE", "ARM", "C1:WF? DAT2"]
+    assert collector.scope._connection.writes[:4] == ["CHDR OFF", "TRIG_MODE SINGLE", "ARM", "C1:WF? DAT2"]
 
 
 def test_batch_capture_applies_timebase_and_scale(monkeypatch, collector):

@@ -50,6 +50,7 @@ class Oscilloscope:
         port: int = 5025,
         timeout: float = 5.0,
         connection: Optional[BaseConnection] = None,
+        dialect: Optional[str] = None,
     ):
         """Initialize oscilloscope connection.
 
@@ -58,6 +59,10 @@ class Oscilloscope:
             port: TCP port for SCPI communication (default: 5025, the Siglent raw SCPI socket; 5024 is the telnet-style port with prompts and is not recommended)
             timeout: Command timeout in seconds (default: 5.0)
             connection: Optional custom connection object (uses SocketConnection if None)
+            dialect: Optional SCPI dialect override - "legacy" or "modern".
+                     None (default) auto-detects from the model registry.
+                     Use "legacy" if a modern-generation scope misbehaves on
+                     the colon-form commands.
 
         Note:
             Channels are created dynamically after connection based on model capabilities.
@@ -66,6 +71,11 @@ class Oscilloscope:
         self.host = host
         self.port = port
         self.timeout = timeout
+
+        if dialect not in (None, "legacy", "modern"):
+            raise exceptions.InvalidParameterError(f"Invalid dialect: {dialect}. Must be 'legacy', 'modern', or None for auto-detect.")
+        self._dialect_override = dialect
+        self.dialect: Optional[str] = None
 
         # Create connection
         if connection is not None:
@@ -156,9 +166,15 @@ class Oscilloscope:
             self.model_capability = detect_model_from_idn(idn_string)
             logger.info(f"Model capability: {self.model_capability}")
 
-            # Initialize SCPI command set for this model
-            self._scpi_commands = SCPICommandSet(getattr(self.model_capability, "dialect", "legacy"), self.model_capability.scpi_variant)
-            logger.info(f"Using SCPI variant: {self.model_capability.scpi_variant}")
+            # Resolve wire dialect: explicit override > model registry > legacy
+            self.dialect = self._dialect_override or getattr(self.model_capability, "dialect", "legacy")
+            self._scpi_commands = SCPICommandSet(self.dialect, self.model_capability.scpi_variant)
+            logger.info(f"Using SCPI dialect: {self.dialect} (variant: {self.model_capability.scpi_variant})")
+
+            # Legacy scopes echo command headers by default; turn that off so
+            # every response arrives as a bare value
+            if self.dialect == "legacy":
+                self.write("CHDR OFF")
 
             # Create channels dynamically based on model capability
             self._create_channels()
@@ -183,6 +199,7 @@ class Oscilloscope:
         self._device_info = None
         self.model_capability = None
         self._scpi_commands = None
+        self.dialect = None
 
         # Remove dynamically created channels
         for i in range(1, 5):  # Check all possible channels
