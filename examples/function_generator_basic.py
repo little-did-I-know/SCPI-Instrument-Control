@@ -11,7 +11,7 @@ Supported models:
 Requirements:
 - Function generator connected to network
 - IP address configured on generator
-- Default SCPI port: 5024
+- Default SCPI port: 5025
 
 Usage:
     python function_generator_basic.py --ip 192.168.1.100
@@ -32,7 +32,7 @@ def main():
     """Main function to demonstrate AWG control."""
     parser = argparse.ArgumentParser(description="Control Siglent Function Generator")
     parser.add_argument("--ip", type=str, default="192.168.1.100", help="Function generator IP address")
-    parser.add_argument("--port", type=int, default=5024, help="SCPI port (default: 5024)")
+    parser.add_argument("--port", type=int, default=5025, help="SCPI port (default: 5025)")
     args = parser.parse_args()
 
     logger.info(f"Connecting to function generator at {args.ip}:{args.port}")

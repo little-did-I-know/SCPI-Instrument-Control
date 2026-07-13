@@ -1,5 +1,6 @@
 """Abstract base class for oscilloscope connections."""
 
+import threading
 from abc import ABC, abstractmethod
 from typing import Optional, Union
 
@@ -19,6 +20,9 @@ class BaseConnection(ABC):
         self.port = port
         self.timeout = timeout
         self._connected = False
+        # Reentrant so query() can hold it across its own write()/read() calls.
+        # Callers doing compound exchanges (write + read_raw) must hold it too.
+        self.lock = threading.RLock()
 
     @abstractmethod
     def connect(self) -> None:

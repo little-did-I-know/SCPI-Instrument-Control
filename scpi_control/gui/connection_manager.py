@@ -23,12 +23,12 @@ class ConnectionManager:
         self.settings = QSettings("Siglent", "OscilloscopeControl")
         logger.info("Connection manager initialized")
 
-    def add_connection(self, host: str, port: int = 5024, model_name: Optional[str] = None) -> None:
+    def add_connection(self, host: str, port: int = 5025, model_name: Optional[str] = None) -> None:
         """Add a connection to the recent connections list.
 
         Args:
             host: IP address or hostname
-            port: TCP port (default: 5024)
+            port: TCP port (default: 5025, the Siglent raw SCPI socket; 5024 is the telnet-style port with prompts and is not recommended)
             model_name: Optional model name (e.g., "SDS824X HD")
         """
         # Get existing connections
@@ -77,12 +77,12 @@ class ConnectionManager:
         self.settings.setValue("recent_connections", [])
         logger.info("Cleared all recent connections")
 
-    def remove_connection(self, host: str, port: int = 5024) -> None:
+    def remove_connection(self, host: str, port: int = 5025) -> None:
         """Remove a specific connection from recent list.
 
         Args:
             host: IP address or hostname
-            port: TCP port
+            port: TCP port (default: 5025, the Siglent raw SCPI socket; 5024 is the telnet-style port with prompts and is not recommended)
         """
         recent = self.get_recent_connections()
         recent = [conn for conn in recent if not (conn["host"] == host and conn["port"] == port)]
@@ -102,7 +102,7 @@ class ConnectionManager:
         self,
         name: str,
         host: str,
-        port: int = 5024,
+        port: int = 5025,
         model_name: Optional[str] = None,
         notes: Optional[str] = None,
     ) -> None:
@@ -111,7 +111,7 @@ class ConnectionManager:
         Args:
             name: Profile name
             host: IP address or hostname
-            port: TCP port
+            port: TCP port (default: 5025, the Siglent raw SCPI socket; 5024 is the telnet-style port with prompts and is not recommended)
             model_name: Optional model name
             notes: Optional notes about this connection
         """
@@ -181,7 +181,7 @@ class ConnectionManager:
             Formatted string for display
         """
         host = connection.get("host", "Unknown")
-        port = connection.get("port", 5024)
+        port = connection.get("port", 5025)
         model = connection.get("model_name", "Unknown")
 
         # Parse timestamp if available

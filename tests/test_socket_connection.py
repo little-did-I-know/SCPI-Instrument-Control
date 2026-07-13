@@ -1,6 +1,8 @@
 """Tests for socket connection module."""
 
 import socket
+import threading
+import time
 from unittest.mock import MagicMock, Mock, call, patch
 
 import pytest
@@ -25,7 +27,7 @@ class TestSocketConnectionInit:
         """Test initialization with default port."""
         conn = SocketConnection("192.168.1.100")
         assert conn.host == "192.168.1.100"
-        assert conn.port == 5024
+        assert conn.port == 5025
         assert conn.timeout == 5.0
 
     def test_init_custom_port(self):
@@ -48,7 +50,7 @@ class TestSocketConnect:
         conn.connect()
 
         assert conn._connected is True
-        mock_socket.connect.assert_called_once_with(("192.168.1.100", 5024))
+        mock_socket.connect.assert_called_once_with(("192.168.1.100", 5025))
         mock_socket.settimeout.assert_called()
 
     def test_connect_failure(self, mock_socket):
@@ -370,3 +372,120 @@ class TestSocketStringRepresentation:
         conn = SocketConnection("192.168.1.100")
         assert "SocketConnection" in repr(conn)
         assert "192.168.1.100" in repr(conn)
+
+
+class TestSocketThreadSafety:
+    """Test that concurrent SCPI exchanges cannot interleave."""
+
+    def test_connection_exposes_reentrant_lock(self, mock_socket):
+        conn = SocketConnection("192.168.1.100")
+        # Reentrant: acquiring twice from the same thread must not deadlock
+        with conn.lock:
+            with conn.lock:
+                pass
+
+    def test_query_is_atomic_under_concurrency(self, mock_socket):
+        # Q1's send is slow; without a lock, thread 2 completes its write and
+        # steals Q1's response off the wire. With the lock, each query's
+        # write+read pair is atomic and both threads get their own response.
+        responses = {b"Q1?\n": b"R1\n", b"Q2?\n": b"R2\n"}
+        pending = []
+
+        def fake_sendall(data):
+            pending.append(data)
+            if data == b"Q1?\n":
+                time.sleep(0.1)
+
+        def fake_recv(size):
+            return responses[pending.pop(0)]
+
+        mock_socket.sendall.side_effect = fake_sendall
+        mock_socket.recv.side_effect = fake_recv
+
+        conn = SocketConnection("192.168.1.100")
+        conn.connect()
+
+        results = {}
+
+        def do_query(cmd):
+            results[cmd] = conn.query(cmd)
+
+        t1 = threading.Thread(target=do_query, args=("Q1?",))
+        t2 = threading.Thread(target=do_query, args=("Q2?",))
+        t1.start()
+        time.sleep(0.02)  # ensure t1 is inside its slow sendall first
+        t2.start()
+        t1.join()
+        t2.join()
+
+        assert results == {"Q1?": "R1", "Q2?": "R2"}
+
+
+class TestReadRawIeeeBlock:
+    """read_raw(None) must honor the IEEE 488.2 definite-length header."""
+
+    def test_reads_exactly_declared_block_length(self, mock_socket):
+        # "C1:WF DAT2," prefix (11 bytes) + "#9" + 9-digit length (20) + payload
+        part1 = b"C1:WF DAT2,#9000000020" + b"A" * 10
+        part2 = b"B" * 10
+        mock_socket.recv.side_effect = [part1, part2, b"\n\n", socket.timeout()]
+
+        conn = SocketConnection("192.168.1.100")
+        conn.connect()
+        data = conn.read_raw()
+
+        assert data == part1 + part2 + b"\n\n"
+        # The block path must never fall back to the legacy 0.5s idle drain
+        assert call(0.5) not in mock_socket.settimeout.call_args_list
+
+    def test_header_split_across_chunks(self, mock_socket):
+        part1 = b"C1:WF DAT2,#"
+        part2 = b"9000000005HELLO\n\n"
+        mock_socket.recv.side_effect = [part1, part2, socket.timeout()]
+
+        conn = SocketConnection("192.168.1.100")
+        conn.connect()
+        data = conn.read_raw()
+
+        assert data == part1 + part2
+
+    def test_stall_mid_block_raises_timeout(self, mock_socket):
+        # Header declares 100 bytes but the line goes silent after 10
+        mock_socket.recv.side_effect = [b"C1:WF DAT2,#9000000100" + b"A" * 10, socket.timeout()]
+
+        conn = SocketConnection("192.168.1.100")
+        conn.connect()
+
+        with pytest.raises(TimeoutError):
+            conn.read_raw()
+
+    def test_no_data_at_all_raises_timeout(self, mock_socket):
+        # Previously returned b"" silently; an empty line is now an error
+        mock_socket.recv.side_effect = [socket.timeout()]
+
+        conn = SocketConnection("192.168.1.100")
+        conn.connect()
+
+        with pytest.raises(TimeoutError):
+            conn.read_raw()
+
+    def test_headerless_response_still_drains_on_idle(self, mock_socket):
+        # Responses without a '#' block keep the legacy idle-drain behavior
+        blob = bytes([0, 127, 255, 128, 64] * 200)  # 1000 bytes, no b"#"
+        mock_socket.recv.side_effect = [blob, socket.timeout()]
+
+        conn = SocketConnection("192.168.1.100")
+        conn.connect()
+
+        assert conn.read_raw() == blob
+
+    def test_no_extra_recv_when_terminator_arrives_with_payload(self, mock_socket):
+        # Payload and trailing terminator arrive in one chunk: no extra recv
+        blob = b"C1:WF DAT2,#9000000020" + b"A" * 20 + b"\n\n"
+        mock_socket.recv.side_effect = [blob]
+
+        conn = SocketConnection("192.168.1.100")
+        conn.connect()
+
+        assert conn.read_raw() == blob
+        assert mock_socket.recv.call_count == 1

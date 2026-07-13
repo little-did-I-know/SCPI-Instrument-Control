@@ -123,12 +123,12 @@ class Waveform:
         timebase = self._get_timebase()
         sample_rate = self._get_sample_rate()
 
-        # Request waveform data
+        # Request waveform data; hold the connection lock so no other thread
+        # can slip a query between the command and its binary response
         waveform_command = f"{ch}:WF? DAT2"  # DAT2 is binary format
-        self._scope.write(waveform_command)
-
-        # Read waveform data header and data
-        raw_data = self._scope.read_raw()
+        with self._scope._connection.lock:
+            self._scope.write(waveform_command)
+            raw_data = self._scope.read_raw()
 
         # Parse waveform data
         voltage_data = self._parse_waveform(raw_data, format, waveform_command)

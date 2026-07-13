@@ -527,7 +527,7 @@ class MainWindow(QMainWindow):
             connection: Connection dictionary with host and port
         """
         host = connection.get("host")
-        port = connection.get("port", 5024)
+        port = connection.get("port", 5025)
 
         if host:
             self._connect_to_scope(host, port)
@@ -558,12 +558,12 @@ class MainWindow(QMainWindow):
         if ok and ip:
             self._connect_to_scope(ip)
 
-    def _connect_to_scope(self, ip: str, port: int = 5024):
+    def _connect_to_scope(self, ip: str, port: int = 5025):
         """Connect to oscilloscope at specified IP and port.
 
         Args:
             ip: IP address or hostname
-            port: TCP port (default: 5024)
+            port: TCP port (default: 5025, the Siglent raw SCPI socket; 5024 is the telnet-style port with prompts and is not recommended)
         """
         try:
             self.statusBar().showMessage(f"Connecting to {ip}...")
@@ -647,12 +647,12 @@ class MainWindow(QMainWindow):
         if ok and ip:
             self._connect_to_psu(ip)
 
-    def _connect_to_psu(self, ip: str, port: int = 5024):
+    def _connect_to_psu(self, ip: str, port: int = 5025):
         """Connect to power supply at specified IP and port.
 
         Args:
             ip: IP address or hostname
-            port: TCP port (default: 5024)
+            port: TCP port (default: 5025, the Siglent raw SCPI socket; 5024 is the telnet-style port with prompts and is not recommended)
         """
         try:
             self.statusBar().showMessage(f"Connecting to PSU at {ip}...")
@@ -725,12 +725,12 @@ class MainWindow(QMainWindow):
         if ok and ip:
             self._connect_to_daq(ip)
 
-    def _connect_to_daq(self, ip: str, port: int = 5024):
+    def _connect_to_daq(self, ip: str, port: int = 5025):
         """Connect to data logger at specified IP and port.
 
         Args:
             ip: IP address or hostname
-            port: TCP port (default: 5024)
+            port: TCP port (default: 5025, the Siglent raw SCPI socket; 5024 is the telnet-style port with prompts and is not recommended)
         """
         try:
             self.statusBar().showMessage(f"Connecting to DAQ at {ip}...")

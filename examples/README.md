@@ -245,7 +245,7 @@ with DataCollector('192.168.1.100') as collector:
 ## Tips
 
 - Make sure your oscilloscope is connected to the same network as your computer
-- Ensure the SCPI port (5024) is accessible
+- Ensure the SCPI port (5025) is accessible
 - Some commands may vary slightly between oscilloscope models - refer to your programming manual
 - Enable at least one channel before capturing waveforms
 - Use AUTO trigger mode for continuous acquisition
