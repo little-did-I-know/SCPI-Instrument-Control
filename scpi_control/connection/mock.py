@@ -58,6 +58,7 @@ class MockConnection(BaseConnection):
         self._voltage_scales: Dict[int, float] = {ch: voltage_scales.get(ch, 1.0) if voltage_scales else 1.0 for ch in channels}
         self._voltage_offsets: Dict[int, float] = {ch: voltage_offsets.get(ch, 0.0) if voltage_offsets else 0.0 for ch in channels}
         self._waveform_payloads: Dict[int, bytes] = {ch: (waveform_payloads.get(ch, bytes([0, 25, 50, 75])) if waveform_payloads else bytes([0, 25, 50, 75])) for ch in channels}
+        self._channel_coupling: Dict[int, str] = {ch: "D1M" for ch in channels}
 
         self.sample_rate = sample_rate
         self.timebase = timebase
@@ -333,6 +334,8 @@ class MockConnection(BaseConnection):
         elif match := re.match(r"C(\d+):TRA\s+(ON|OFF)", command, re.IGNORECASE):
             channel = int(match.group(1))
             self._channel_enabled[channel] = match.group(2).upper() == "ON"
+        elif match := re.match(r"C(\d+):CPL\s+(\w+)", command, re.IGNORECASE):
+            self._channel_coupling[int(match.group(1))] = match.group(2).upper()
         elif command.upper().startswith("TRIG_MODE "):
             self.trigger_mode = command.split(" ", 1)[1].upper()
         elif command.upper().startswith("TRIG_SELECT "):
@@ -617,6 +620,9 @@ class MockConnection(BaseConnection):
         if match := re.match(r"C(\d+):TRA\?", command, re.IGNORECASE):
             channel = int(match.group(1))
             return "ON" if self._channel_enabled.get(channel, True) else "OFF"
+
+        if match := re.match(r"C(\d+):CPL\?", command, re.IGNORECASE):
+            return self._channel_coupling.get(int(match.group(1)), "D1M")
 
         if match := re.match(r"C(\d+):TRLV\?", command, re.IGNORECASE):
             channel = int(match.group(1))

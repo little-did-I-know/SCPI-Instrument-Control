@@ -6,15 +6,13 @@ import pytest
 
 from scpi_control.channel import Channel
 from scpi_control.exceptions import CommandError
+from tests.dialect_helpers import make_dialect_scope
 
 
 @pytest.fixture
 def mock_scope():
     """Create a mock oscilloscope for testing."""
-    scope = Mock()
-    scope.write = Mock()
-    scope.query = Mock()
-    return scope
+    return make_dialect_scope("legacy")
 
 
 @pytest.fixture
@@ -125,12 +123,14 @@ class TestCoupling:
     def test_set_coupling_dc(self, channel, mock_scope):
         """Test setting DC coupling."""
         channel.coupling = "DC"
-        mock_scope.write.assert_called_once_with("C1:CPL DC")
+        # legacy wire tokens; the API still speaks DC/AC/GND (AUDIT M9)
+        mock_scope.write.assert_called_once_with("C1:CPL D1M")
 
     def test_set_coupling_ac(self, channel, mock_scope):
         """Test setting AC coupling."""
         channel.coupling = "AC"
-        mock_scope.write.assert_called_once_with("C1:CPL AC")
+        # legacy wire tokens; the API still speaks DC/AC/GND (AUDIT M9)
+        mock_scope.write.assert_called_once_with("C1:CPL A1M")
 
     def test_set_coupling_ground(self, channel, mock_scope):
         """Test setting GND coupling."""
@@ -145,11 +145,12 @@ class TestCoupling:
     def test_coupling_property_setter(self, channel, mock_scope):
         """Test coupling property setter."""
         channel.coupling = "AC"
-        mock_scope.write.assert_called_once_with("C1:CPL AC")
+        # legacy wire tokens; the API still speaks DC/AC/GND (AUDIT M9)
+        mock_scope.write.assert_called_once_with("C1:CPL A1M")
 
     def test_coupling_property_getter(self, channel, mock_scope):
         """Test coupling property getter."""
-        mock_scope.query.return_value = "DC"
+        mock_scope.query.return_value = "D1M"
         assert channel.coupling == "DC"
 
 
@@ -217,7 +218,7 @@ class TestChannelConfiguration:
         # Setup mock responses
         mock_scope.query.side_effect = [
             "C1:TRA ON",  # enabled
-            "DC",  # coupling
+            "D1M",  # coupling
             "1.000E+00V",  # voltage_scale
             "0.000E+00V",  # voltage_offset
             "10",  # probe_ratio
@@ -240,7 +241,7 @@ class TestChannelConfiguration:
         """Test getting configuration of disabled channel."""
         mock_scope.query.side_effect = [
             "C1:TRA OFF",  # enabled
-            "AC",  # coupling
+            "A1M",  # coupling
             "2.000E+00V",  # voltage_scale
             "1.000E+00V",  # voltage_offset
             "1",  # probe_ratio
@@ -261,13 +262,13 @@ class TestChannelStringRepresentation:
     def test_str(self, channel, mock_scope):
         """Test string representation."""
         # Mock the query responses for get_configuration
-        mock_scope.query.side_effect = ["C1:TRA ON", "DC", "1.0E+00V", "0.0E+00V", "10", "OFF", "V"]
+        mock_scope.query.side_effect = ["C1:TRA ON", "D1M", "1.0E+00V", "0.0E+00V", "10", "OFF", "V"]
         assert "Channel1" in repr(channel)
 
     def test_repr(self, channel, mock_scope):
         """Test repr."""
         # Mock the query responses for get_configuration
-        mock_scope.query.side_effect = ["C1:TRA ON", "DC", "1.0E+00V", "0.0E+00V", "10", "OFF", "V"]
+        mock_scope.query.side_effect = ["C1:TRA ON", "D1M", "1.0E+00V", "0.0E+00V", "10", "OFF", "V"]
         assert "Channel1" in repr(channel)
 
 
@@ -288,7 +289,64 @@ class TestMultipleChannels:
         assert mock_scope.write.call_args[0][0] == "C2:VDIV 2.0"
 
         ch3.coupling = "AC"
-        assert mock_scope.write.call_args[0][0] == "C3:CPL AC"
+        # legacy wire tokens; the API still speaks DC/AC/GND (AUDIT M9)
+        assert mock_scope.write.call_args[0][0] == "C3:CPL A1M"
 
         ch4.voltage_offset = 0.5
         assert mock_scope.write.call_args[0][0] == "C4:OFST 0.5"
+
+
+class TestChannelModernDialect:
+    def setup_method(self):
+        self.scope = make_dialect_scope("modern")
+        self.channel = Channel(self.scope, 1)
+
+    def test_enable(self):
+        self.channel.enabled = True
+        self.scope.write.assert_called_once_with(":CHANnel1:SWITch ON")
+
+    def test_set_scale(self):
+        self.channel.voltage_scale = 0.5
+        self.scope.write.assert_called_once_with(":CHANnel1:SCALe 0.5")
+
+    def test_set_offset(self):
+        self.channel.voltage_offset = -1.0
+        self.scope.write.assert_called_once_with(":CHANnel1:OFFSet -1.0")
+
+    def test_coupling_passthrough(self):
+        self.channel.coupling = "AC"
+        self.scope.write.assert_called_once_with(":CHANnel1:COUPling AC")
+
+    def test_get_coupling(self):
+        self.scope.query.return_value = "GND"
+        assert self.channel.coupling == "GND"
+
+    def test_probe_ratio(self):
+        self.channel.probe_ratio = 10
+        self.scope.write.assert_called_once_with(":CHANnel1:PROBe VALue,10")
+
+    def test_bandwidth_limit_on_maps_to_20m(self):
+        self.channel.bandwidth_limit = "ON"
+        self.scope.write.assert_called_once_with(":CHANnel1:BWLimit 20M")
+
+    def test_bandwidth_limit_off_maps_to_full(self):
+        self.channel.bandwidth_limit = "OFF"
+        self.scope.write.assert_called_once_with(":CHANnel1:BWLimit FULL")
+
+    def test_get_bandwidth_limit_maps_back(self):
+        self.scope.query.return_value = "20M"
+        assert self.channel.bandwidth_limit == "ON"
+
+
+class TestChannelLegacyCouplingTokens:
+    def setup_method(self):
+        self.scope = make_dialect_scope("legacy")
+        self.channel = Channel(self.scope, 1)
+
+    def test_dc_maps_to_d1m(self):
+        self.channel.coupling = "DC"
+        self.scope.write.assert_called_once_with("C1:CPL D1M")
+
+    def test_get_coupling_maps_a1m_to_ac(self):
+        self.scope.query.return_value = "A1M"
+        assert self.channel.coupling == "AC"
