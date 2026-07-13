@@ -4,7 +4,7 @@ import logging
 from typing import TYPE_CHECKING, Literal, Optional, Union
 
 from scpi_control import exceptions
-from scpi_control.scpi_commands import coupling_from_wire, coupling_to_wire, mode_from_wire, mode_to_wire, normalize_status, slope_from_wire, slope_to_wire
+from scpi_control.scpi_commands import mode_from_wire, mode_to_wire, normalize_status, slope_from_wire, slope_to_wire
 
 if TYPE_CHECKING:
     from scpi_control.oscilloscope import Oscilloscope
@@ -290,7 +290,9 @@ class Trigger:
             Coupling: 'DC', 'AC', 'HFREJ', 'LFREJ'
         """
         if self._dialect == "modern":
-            return self._scope.query(self._cmd("get_trigger_coupling")).strip().upper()
+            token = self._scope.query(self._cmd("get_trigger_coupling")).strip().upper()
+            # Reverse of the setter's HFREJ->HFREJect mapping (guide p.486)
+            return {"HFREJECT": "HFREJ", "LFREJECT": "LFREJ"}.get(token, token)
         source = self.source
         return self._scope.query(self._cmd("get_trigger_coupling", src=source)).strip().split()[-1].upper()
 

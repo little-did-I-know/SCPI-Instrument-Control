@@ -341,6 +341,10 @@ class TestTriggerModernDialect:
         self.trigger.coupling = "AC"
         self.scope.write.assert_called_once_with(":TRIGger:EDGE:COUPling AC")
 
+    def test_get_coupling_maps_reject_tokens_back(self):
+        self.scope.query.return_value = "HFREJect"
+        assert self.trigger.coupling == "HFREJ"
+
     def test_force(self):
         self.trigger.force()
         self.scope.write.assert_called_once_with(":TRIGger:MODE FTRIG")
