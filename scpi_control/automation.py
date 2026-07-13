@@ -505,6 +505,11 @@ class TriggerWaitCollector:
     ) -> Optional[Dict[int, WaveformData]]:
         """Wait for a trigger event and capture waveform.
 
+        If the trigger mode has been set to NORMAL beforehand (e.g. via
+        ``trigger.set_mode('NORMAL')``), that mode is preserved and the wait
+        completes on the first trigger event. In any other mode, the scope is
+        switched to SINGLE and armed for a one-shot acquisition.
+
         Args:
             channels: List of channel numbers to capture
             max_wait: Maximum time to wait for trigger in seconds
@@ -526,16 +531,25 @@ class TriggerWaitCollector:
             ...     if data:
             ...         print("Trigger captured!")
         """
-        # Set to NORMAL trigger mode
-        self.collector.scope.trigger.mode = "NORM"
-        self.collector.scope.trigger_single()
+        # Honor a user-configured NORMAL trigger mode; otherwise arm a
+        # one-shot SINGLE acquisition.
+        mode_response = self.collector.scope.trigger.mode
+        current_mode = mode_response.split()[-1] if mode_response.split() else ""
+
+        if current_mode == "NORM":
+            # NORMAL mode re-arms after every trigger and never reports
+            # "Stop", so watch for the trigger event itself.
+            done_states = {"TRIG'D", "STOP"}
+        else:
+            self.collector.scope.trigger_single()
+            done_states = {"STOP"}
 
         start_time = time.time()
         while (time.time() - start_time) < max_wait:
             # Check trigger status
             status = self.collector.scope.query(":TRIG:STAT?").strip()
 
-            if status == "Stop":
+            if status.upper() in done_states:
                 # Trigger occurred, capture waveform
                 logger.info("Trigger detected!")
                 waveforms = {}
