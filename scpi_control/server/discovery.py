@@ -95,6 +95,10 @@ def _probe(address: str, port: int, connect_timeout: float, probe_timeout: float
     return {"address": address, "idn": idn, "manufacturer": manufacturer, "model": model, "dialect": dialect, "kind": kind}
 
 
+def _sort_key(entry):
+    return (entry["kind"] != "scope", ipaddress.ip_address(str(entry["address"])))
+
+
 def discover(
     cidr: Optional[str] = None,
     port: int = SCPI_PORT,
@@ -112,5 +116,5 @@ def discover(
         for found in pool.map(lambda address: _probe(address, port, connect_timeout, probe_timeout), targets):
             if found is not None:
                 results.append(found)
-    results.sort(key=lambda entry: (entry["kind"] != "scope", str(entry["address"])))
+    results.sort(key=_sort_key)
     return results

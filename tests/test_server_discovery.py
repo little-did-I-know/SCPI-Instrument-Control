@@ -142,3 +142,21 @@ class TestDiscover:
             results = discover(cidr="127.0.0.1/32", port=server.port, skip=frozenset({"127.0.0.1"}))
             assert results == []
             assert server.connections == 0
+
+
+def test_sort_key_orders_numerically_scopes_first():
+    from scpi_control.server.discovery import _sort_key
+
+    entries = [
+        {"address": "10.0.0.10", "kind": "psu"},
+        {"address": "10.0.0.9", "kind": "scope"},
+        {"address": "10.0.0.10", "kind": "scope"},
+        {"address": "10.0.0.2", "kind": "scope"},
+    ]
+    ordered = sorted(entries, key=_sort_key)
+    assert [(e["address"], e["kind"]) for e in ordered] == [
+        ("10.0.0.2", "scope"),
+        ("10.0.0.9", "scope"),
+        ("10.0.0.10", "scope"),
+        ("10.0.0.10", "psu"),
+    ]
