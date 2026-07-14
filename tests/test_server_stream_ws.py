@@ -7,6 +7,7 @@ import time
 import pytest
 
 fastapi = pytest.importorskip("fastapi")
+pytest.importorskip("httpx")  # fastapi.testclient needs it; raises RuntimeError (not ImportError) without it
 from fastapi.testclient import TestClient  # noqa: E402
 from starlette.websockets import WebSocketDisconnect  # noqa: E402
 

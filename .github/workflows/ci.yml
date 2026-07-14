@@ -145,7 +145,7 @@ jobs:
 
       - name: Install web extra (Python >= 3.9)
         if: matrix.python-version != '3.8'
-        run: pip install -e ".[web]"
+        run: pip install -e ".[web]" httpx  # httpx: required by fastapi.testclient
 
       - name: Run tests with coverage
         run: |
