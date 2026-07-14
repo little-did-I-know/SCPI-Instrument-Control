@@ -1,3 +1,4 @@
+import { ConnectDialog } from "./features/connect/ConnectDialog";
 import { StatusIndicator } from "./ds/StatusIndicator";
 import { useSession } from "./store/session";
 
@@ -13,7 +14,9 @@ export default function App() {
           <StatusIndicator state={status} />
         </span>
       </header>
-      <main style={{ flex: 1, padding: "var(--space-3)", color: "var(--lc-text)" }}>Connect an instrument to begin.</main>
+      <main style={{ flex: 1, padding: "var(--space-3)", color: "var(--lc-text)" }}>
+        {session === null && <ConnectDialog onConnected={(s) => useSession.getState().setSession(s)} />}
+      </main>
     </div>
   );
 }
