@@ -212,6 +212,46 @@ class TestCapture:
         assert client.get("/api/sessions/{0}/scope/capture.csv?channels=banana".format(sid)).status_code == 400
 
 
+class TestDiscoverEndpoint:
+    def test_discover_finds_fake_instrument(self, client, monkeypatch):
+        from scpi_control.server import discovery
+        from tests.test_server_discovery import FakeScpiServer
+
+        with FakeScpiServer() as server:
+            monkeypatch.setattr(discovery, "SCPI_PORT", server.port)
+            response = client.get("/api/discover?cidr=127.0.0.1/32")
+        assert response.status_code == 200
+        entries = response.json()
+        assert len(entries) == 1
+        entry = entries[0]
+        assert entry["address"] == "127.0.0.1"
+        assert entry["model"] == "SDS1104X-E"
+        assert entry["kind"] == "scope"
+        assert entry["connected"] is False
+
+    def test_discover_invalid_cidr_is_400(self, client):
+        assert client.get("/api/discover?cidr=banana").status_code == 400
+        assert client.get("/api/discover?cidr=10.0.0.0/8").status_code == 400
+
+    def test_discover_merges_connected_session_without_probing(self, client, monkeypatch):
+        from scpi_control.server import discovery
+        from tests.test_server_discovery import FakeScpiServer
+
+        body = create_mock_session(client)
+        session = client.app.state.manager.get(body["id"])
+        session.address = "127.0.0.1"  # simulate a real networked instrument held by the gateway
+        with FakeScpiServer() as server:
+            monkeypatch.setattr(discovery, "SCPI_PORT", server.port)
+            response = client.get("/api/discover?cidr=127.0.0.1/32")
+            assert server.connections == 0  # held address must never be probed
+        entries = response.json()
+        assert len(entries) == 1
+        entry = entries[0]
+        assert entry["connected"] is True
+        assert entry["session_id"] == body["id"]
+        assert entry["model"] == "SDS1104X-E"
+
+
 def test_cli_parses_defaults(monkeypatch):
     import scpi_control.server.__main__ as cli
 

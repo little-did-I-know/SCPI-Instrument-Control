@@ -32,6 +32,7 @@ def create_app(manager: Optional[SessionManager] = None) -> FastAPI:
     app = FastAPI(title="SCPI Instrument Control Gateway", lifespan=lifespan)
     app.state.manager = manager
 
+    from scpi_control.server.api import discovery as discovery_api
     from scpi_control.server.api import scope as scope_api
     from scpi_control.server.api import sessions as sessions_api
     from scpi_control.server.api import stream as stream_api
@@ -39,6 +40,7 @@ def create_app(manager: Optional[SessionManager] = None) -> FastAPI:
     app.include_router(sessions_api.router, prefix="/api")
     app.include_router(scope_api.router, prefix="/api")
     app.include_router(stream_api.router, prefix="/api")
+    app.include_router(discovery_api.router, prefix="/api")
 
     @app.exception_handler(InvalidParameterError)
     async def _invalid_parameter(request: Request, exc: InvalidParameterError):
