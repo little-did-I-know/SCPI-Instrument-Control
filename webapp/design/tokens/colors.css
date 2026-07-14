@@ -1,0 +1,67 @@
+/* SCPI Instrument Control — Color System
+ *
+ * Two coexisting surfaces:
+ *   1. Native desktop chrome  — light Qt widgets (window, panels, forms).
+ *   2. The scope canvas       — dark instrument display (waveforms, terminal,
+ *                               live readouts). This is the brand's signature.
+ *
+ * All hex values are lifted verbatim from the PyQt6 source (setStyleSheet /
+ * pg.mkPen / QColor calls). Do not round them.
+ */
+:root {
+  /* ---- Light desktop chrome (native Qt) ---- */
+  --app-bg: #f3f3f3;          /* main window background */
+  --surface: #ffffff;          /* input fields, cards, table body */
+  --surface-subtle: #f0f0f0;   /* info banners, inactive tabs */
+  --surface-alt: #fafafa;      /* alternating light rows */
+  --border: #cfcfcf;           /* default control border */
+  --border-strong: #a0a0a0;    /* group frames, hover borders */
+  --divider: #e2e2e2;
+
+  --text-primary: #1a1a1a;
+  --text-secondary: #555555;
+  --text-muted: #888888;       /* hints, instruction labels (#888) */
+  --text-faint: #666666;
+
+  /* ---- Oscilloscope channel colors (control-label / classic scope) ---- */
+  --ch1: #FFD700;              /* Yellow / Gold */
+  --ch2: #00CED1;              /* Cyan */
+  --ch3: #FF1493;              /* Deep Pink / Magenta */
+  --ch4: #00FF00;              /* Green */
+  --ch5: #FF6347;              /* Tomato (DAQ) */
+  --ch6: #9370DB;              /* Medium Purple (DAQ) */
+  --ch7: #20B2AA;              /* Light Sea Green (DAQ) */
+  --ch8: #FF8C00;              /* Dark Orange (DAQ) */
+
+  /* ---- Waveform trace colors (vibrant, rendered on scope canvas) ---- */
+  --trace1: #FFDC32;           /* rgb(255,220,50)  bright yellow */
+  --trace2: #40E0D0;           /* rgb(64,224,208)  turquoise */
+  --trace3: #FF69B4;           /* rgb(255,105,180) hot pink */
+  --trace4: #32FF64;           /* rgb(50,255,100)  bright green */
+  --trace-reference: #FFA500;  /* rgb(255,165,0)   orange dashed overlay */
+  --trace-difference: #FF1493; /* rgb(255,20,147)  difference trace */
+
+  /* ---- Semantic action colors ---- */
+  --success: #4CAF50;          /* Connect / OK */
+  --success-hover: #45a049;
+  --success-pressed: #3d8b40;
+  --danger: #f44336;           /* Disconnect / Clear / errors */
+  --danger-hover: #da190b;
+  --danger-pressed: #c1170a;
+  --critical: #DC143C;         /* All-Outputs-OFF safety */
+  --critical-hover: #B22222;
+  --warning: #FFA500;          /* Constant-Current (CC) mode */
+  --info: #2196F3;             /* metrics / CPU label */
+
+  /* ---- Live readout ---- */
+  --readout: #00ff00;          /* measured V / I / W value text */
+  --readout-mode: #FFD700;     /* CV/CC mode label (idle gold) */
+
+  /* ---- Semantic aliases (prefer these in app code) ---- */
+  --text-body: var(--text-primary);
+  --text-label: var(--text-secondary);
+  --surface-card: var(--surface);
+  --border-control: var(--border);
+  --btn-primary-bg: var(--success);
+  --btn-danger-bg: var(--danger);
+}

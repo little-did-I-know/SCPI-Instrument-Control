@@ -609,6 +609,18 @@ built-in mock (`mock: true`) for hardware-free use. The API is documented at
   instruments on port 5025 and lists them with model and dialect — handy when
   DHCP moves your instruments around.
 
+### Browser UI
+
+```bash
+make webapp-install       # once
+make webapp-build         # build the UI into the server
+scpi-web --host 0.0.0.0   # serve API + UI on one port
+```
+
+Open `http://<gateway-pc>:8765`. For UI development, run `scpi-web` in one
+terminal and `cd webapp/app && npm run dev` in another — Vite proxies `/api`
+(HTTP and WebSocket) to the gateway with hot reload.
+
 ## API Documentation
 
 ### Oscilloscope

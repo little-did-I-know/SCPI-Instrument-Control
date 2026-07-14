@@ -4,10 +4,9 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Optional
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.concurrency import run_in_threadpool
-from fastapi.responses import JSONResponse
-from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse, JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from scpi_control.exceptions import InvalidParameterError, SiglentError, SiglentTimeoutError
@@ -68,6 +67,21 @@ def create_app(manager: Optional[SessionManager] = None) -> FastAPI:
         return JSONResponse(status_code=exc.status_code, content={"error": "HTTPException", "detail": exc.detail}, headers=getattr(exc, "headers", None))
 
     if STATIC_DIR.is_dir():
-        app.mount("/", StaticFiles(directory=str(STATIC_DIR), html=True), name="frontend")
+        index_file = STATIC_DIR / "index.html"
+        static_root = STATIC_DIR.resolve()
+
+        # Catch-all GET, registered LAST so every API route wins. Serves a real
+        # file when one exists (JS/CSS/assets), otherwise index.html so client
+        # routes deep-link. /api/* keeps the JSON {error, detail} 404 shape.
+        @app.get("/{full_path:path}", include_in_schema=False)
+        async def spa(full_path: str):
+            if full_path.startswith("api/"):
+                raise HTTPException(status_code=404, detail="unknown path /{0}".format(full_path))
+            candidate = (STATIC_DIR / full_path).resolve()
+            # Guard against path traversal (e.g. "%2e%2e/secret.txt") escaping
+            # STATIC_DIR: only serve the resolved candidate if it's still inside.
+            if full_path and candidate.is_file() and candidate.is_relative_to(static_root):
+                return FileResponse(str(candidate))
+            return FileResponse(str(index_file))
 
     return app

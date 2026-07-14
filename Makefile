@@ -1,4 +1,4 @@
-.PHONY: help install install-dev install-all test test-cov test-fast test-exceptions codecov-install codecov-upload codecov-report lint format clean build publish build-exe build-exe-clean build-exe-test install-pyinstaller test-build-system docs docs-generate docs-examples docs-api docs-serve docs-deploy pre-commit pre-commit-branch pre-pr pre-pr-fast pre-pr-fix version-bump bump-major bump-minor bump-patch
+.PHONY: help install install-dev install-all test test-cov test-fast test-exceptions codecov-install codecov-upload codecov-report lint format clean build publish build-exe build-exe-clean build-exe-test install-pyinstaller test-build-system docs docs-generate docs-examples docs-api docs-serve docs-deploy pre-commit pre-commit-branch pre-pr pre-pr-fast pre-pr-fix version-bump bump-major bump-minor bump-patch webapp-install webapp-build
 
 help:  ## Show this help message
 	@echo "Available commands:"
@@ -195,6 +195,16 @@ gui:  ## Launch the GUI application
 
 web-server:  ## Run the web gateway (dev, mock-friendly)
 	python -m scpi_control.server --port 8765
+
+webapp-install:  ## Install webapp dependencies
+	cd webapp/app && npm install
+
+webapp-build:  ## Build the webapp into the server's static dir
+	cd webapp/app && npm run build
+	rm -rf scpi_control/server/static
+	mkdir -p scpi_control/server/static
+	cp -r webapp/app/dist/* scpi_control/server/static/
+	@echo "✓ Webapp built into scpi_control/server/static/"
 
 version:  ## Show package version
 	@python -c "import scpi_control; print(f'SCPI-Instrument-Control v{scpi_control.__version__}')"

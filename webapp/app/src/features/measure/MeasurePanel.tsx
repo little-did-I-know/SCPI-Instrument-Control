@@ -1,0 +1,126 @@
+import { useRef, useState } from "react";
+import { ApiError, api } from "../../api/client";
+import type { ChannelState } from "../../api/types";
+import { Checkbox } from "../../ds/Checkbox";
+import { DataTable } from "../../ds/DataTable";
+import { GroupBox } from "../../ds/GroupBox";
+import { useSession } from "../../store/session";
+
+// Stable reference: zustand v5 hands the selector straight to useSyncExternalStore
+// with no memoization, so a fresh `{}` per snapshot would loop forever while scope is null.
+const NO_CHANNELS: Record<string, ChannelState> = {};
+
+const TYPES = ["PKPK", "AMPL", "MEAN", "RMS", "FREQ", "PER", "MAX", "MIN"];
+
+type Selection = { channel: number; mtype: string };
+
+export function MeasurePanel() {
+  const session = useSession((s) => s.session);
+  const channels = useSession((s) => s.scope?.channels ?? NO_CHANNELS);
+  // s.measurements is already a stable array reference in the store — select it
+  // directly (no `?? []` fallback, which would fabricate a new array every render).
+  const measurements = useSession((s) => s.measurements);
+  const [error, setError] = useState<string | null>(null);
+  // No local mirror of the selection — the server owns it. But the stream alone cannot carry it:
+  // the backend only broadcasts measurements while its list is NON-empty
+  // (sessions.py: `if self.measurements and self._poll_count % N == 0`), so once you deselect the
+  // last one the store keeps the final streamed values forever. Falling back to the store there
+  // would re-check the box and resurrect the measurement on the next full-replacement PUT.
+  //
+  // The PUT response IS server truth (scope.py echoes the stored list), so we settle to it.
+  // Precedence: in-flight optimistic > last acknowledged > streamed values.
+  const [pending, setPending] = useState<Selection[] | null>(null);
+  const [acked, setAcked] = useState<Selection[] | null>(null);
+  // Monotonic request id: a slow PUT must never settle the selection after a newer toggle
+  // superseded it, or both boxes flap to unchecked and the next click drops them server-side.
+  const requestId = useRef(0);
+
+  const selected: Selection[] = pending ?? acked ?? measurements.map((m) => ({ channel: m.channel, mtype: m.mtype }));
+  const isChecked = (channel: number, mtype: string) =>
+    selected.some((s) => s.channel === channel && s.mtype === mtype);
+
+  const channelNumbers = Object.keys(channels)
+    .map(Number)
+    .filter((n) => channels[String(n)]?.enabled)
+    .sort((a, b) => a - b);
+
+  async function toggle(channel: number, mtype: string) {
+    if (!session) return;
+    const next = isChecked(channel, mtype)
+      ? selected.filter((s) => !(s.channel === channel && s.mtype === mtype))
+      : [...selected, { channel, mtype }];
+    const id = ++requestId.current;
+    setPending(next);
+    setError(null);
+    try {
+      const result = await api.setMeasurements(session.id, next);
+      if (id === requestId.current) {
+        setAcked(result.measurements); // durable across the empty-list broadcast gap
+        setPending(null);
+      }
+      // else: stale response, a newer toggle is in flight — it will settle the selection
+    } catch (err) {
+      if (id === requestId.current) {
+        setError(err instanceof ApiError ? err.detail : String(err));
+        setPending(null); // failed: fall back to the last known truth
+      }
+    }
+  }
+
+  // Only render values for measurements that are actually selected — a deselected one lingers in
+  // the store (no empty-list broadcast) and would otherwise keep showing a stale row.
+  const rows = measurements
+    .filter((m) => isChecked(m.channel, m.mtype))
+    .map((m) => [`C${m.channel}`, m.mtype, m.value === null ? "--" : m.value.toFixed(3)]);
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
+      <GroupBox title="Measurements">
+        {channelNumbers.length === 0 && (
+          <div style={{ color: "var(--lc-muted)", fontSize: "var(--text-sm)" }}>No channels enabled.</div>
+        )}
+        <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+          {channelNumbers.map((n) => (
+            <div key={n}>
+              <div style={{ fontWeight: "var(--weight-bold)", color: `var(--ch${n})`, marginBottom: "4px" }}>{`C${n}`}</div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 14px" }}>
+                {TYPES.map((mtype) => (
+                  <Checkbox
+                    key={mtype}
+                    aria-label={`${mtype} C${n}`}
+                    label={mtype}
+                    checked={isChecked(n, mtype)}
+                    onChange={() => toggle(n, mtype)}
+                  />
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </GroupBox>
+
+      {selected.length === 0 && (
+        <div style={{ color: "var(--lc-muted)", fontSize: "var(--text-sm)" }}>
+          Select a measurement above to see live values.
+        </div>
+      )}
+
+      {session?.dialect === "modern" && (
+        <div style={{ color: "var(--lc-muted)", fontSize: "var(--text-sm)" }}>
+          Measurements are unavailable on modern-dialect scopes.
+        </div>
+      )}
+
+      <DataTable
+        columns={["Ch", "Measurement", { label: "Value", align: "right", mono: true }]}
+        rows={rows}
+      />
+
+      {error && (
+        <div role="alert" style={{ padding: "8px 10px", borderRadius: "var(--radius-sm)", background: "color-mix(in srgb, var(--danger) 12%, transparent)", color: "var(--danger)", fontSize: "var(--text-sm)" }}>
+          {error}
+        </div>
+      )}
+    </div>
+  );
+}

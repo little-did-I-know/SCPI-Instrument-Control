@@ -1,0 +1,39 @@
+/* SCPI Instrument Control — Scope Canvas Tokens
+ *
+ * The dark instrument surface used for the waveform display, terminal output,
+ * live-data plots and readout panels. Background is GitHub-dark (#0d1117), the
+ * value chosen in waveform_display_pg.py. Grid/axis colors are the muted GitHub
+ * palette; readout text is bright to read at a glance across a lab bench.
+ */
+:root {
+  /* Backgrounds (darkest → lightest) */
+  --scope-canvas: #0d1117;     /* plot / waveform background */
+  --scope-panel: #1e1e1e;      /* terminal & data-plot background */
+  --scope-surface: #2d2d2d;    /* dark table body / raised panel */
+  --scope-row-alt: #353535;    /* alternating dark rows */
+  --scope-header: #404040;     /* dark table header */
+
+  /* Borders */
+  --scope-border: #30363d;     /* grid lines, axis lines */
+  --scope-border-2: #404040;   /* panel border */
+  --scope-border-3: #505050;   /* table gridline / header edge */
+  --scope-border-soft: #444444;/* separators inside panels */
+
+  /* Text on dark */
+  --scope-text: #e6edf3;       /* primary axis title / labels */
+  --scope-text-body: #d4d4d4;  /* terminal body text */
+  --scope-text-muted: #8b949e; /* muted axis ticks / secondary */
+  --scope-text-faint: #888888;
+
+  /* Terminal syntax palette (VS Code dark derived) */
+  --term-command: #569cd6;     /* echoed command ("> *IDN?") */
+  --term-response: #4ec9b0;    /* query response / cmd keyword */
+  --term-ok: #4CAF50;          /* OK / connected banner */
+  --term-error: #f44336;       /* error lines */
+  --term-muted: #888888;       /* system notices */
+
+  /* Grid geometry (matches scope face: 14 x 10 divisions) */
+  --grid-divs-x: 14;   /* @kind other */
+  --grid-divs-y: 10;   /* @kind other */
+  --grid-alpha: 0.2;   /* @kind other */
+}

@@ -1,0 +1,72 @@
+/* SCPI Instrument Control — Console Theme (modern dark shell)
+ *
+ * An additive, opt-in theme that extends the brand's dark scope canvas to the
+ * whole application chrome — a cohesive "instrument console" look. Values stay
+ * within the existing scope palette (GitHub-dark family) so nothing goes
+ * off-brand; they just raise contrast and elevation for a modern feel.
+ *
+ * Use by setting data-theme="console" on a shell root (or read the vars
+ * directly). Pairs with the channel-colour language and mono readouts.
+ */
+:root {
+  /* Console surfaces (darkest shell → raised panel → control) */
+  --console-bg: #0b0e14;          /* app shell background */
+  --console-panel: #12161f;       /* rails, cards, header/footer */
+  --console-panel-2: #171c27;     /* nested / raised surface */
+  --console-control: #1b212e;     /* inputs, secondary buttons */
+  --console-control-hover: #232a3a;
+
+  /* Console borders + hairlines */
+  --console-border: #232a36;      /* default hairline */
+  --console-border-strong: #313a4a;
+  --console-divider: #1a202b;
+
+  /* Console text */
+  --console-text: #e8edf5;        /* primary */
+  --console-text-2: #aab4c4;      /* secondary */
+  --console-muted: #6b7688;       /* tertiary / captions */
+
+  /* Emphasis — a single cool accent for focus/active, distinct from the
+     semantic action greens/reds so hierarchy stays legible. */
+  --console-accent: #38bdf8;      /* active tab / focus ring / selection */
+  --console-accent-soft: rgba(56, 189, 248, 0.14);
+
+  /* Elevation for the modern look — soft, dark, never heavy. */
+  --console-elev-1: 0 1px 0 rgba(255,255,255,0.03), 0 1px 3px rgba(0,0,0,0.45);
+  --console-elev-2: 0 2px 6px rgba(0,0,0,0.5), 0 8px 24px rgba(0,0,0,0.35);
+
+  /* Radius bumped one notch vs. native Qt for a softer, current feel
+     (still restrained — not web-slop). */
+  --console-radius: 8px;
+  --console-radius-sm: 6px;
+}
+
+/* ---- Light console (DEFAULT modern shell) ----
+ * A bright, elevated lab interface: soft off-white shell, white raised panels,
+ * cool hairline borders, gentle shadows and channel-colour accents doing the
+ * emphasis. This is the default modern treatment; the dark --console-* set
+ * above is the opt-in alternate. */
+:root {
+  --lc-bg: #eef2f7;              /* app shell (soft cool off-white) */
+  --lc-panel: #ffffff;          /* raised cards / rails / header */
+  --lc-panel-2: #f4f7fb;        /* nested / inset surface */
+  --lc-control: #ffffff;        /* inputs */
+  --lc-control-hover: #f4f7fb;
+
+  --lc-border: #dde4ee;         /* default hairline */
+  --lc-border-strong: #c3cddc;  /* control / hover border */
+  --lc-divider: #eaeff5;
+
+  --lc-text: #10161f;           /* primary ink */
+  --lc-text-2: #56606f;         /* secondary */
+  --lc-muted: #8a94a3;          /* captions / tertiary */
+
+  --lc-accent: #1f7ae0;         /* active tab / focus ring */
+  --lc-accent-soft: rgba(31, 122, 224, 0.12);
+
+  --lc-elev-1: 0 1px 2px rgba(16, 22, 31, 0.06), 0 1px 3px rgba(16, 22, 31, 0.08);
+  --lc-elev-2: 0 4px 12px rgba(16, 22, 31, 0.08), 0 12px 28px rgba(16, 22, 31, 0.10);
+
+  --lc-radius: 10px;
+  --lc-radius-sm: 7px;
+}
