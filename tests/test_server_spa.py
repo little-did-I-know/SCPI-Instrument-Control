@@ -52,3 +52,21 @@ def test_no_static_build_still_boots():
     with TestClient(create_app(manager)) as client:
         assert client.get("/api/sessions").status_code == 200
     manager.close_all()
+
+
+def test_encoded_traversal_is_contained(tmp_path, monkeypatch):
+    # secret lives OUTSIDE the served static dir
+    secret = tmp_path / "secret.txt"
+    secret.write_text("TOP SECRET", encoding="utf-8")
+    static_dir = tmp_path / "static"
+    static_dir.mkdir()
+    (static_dir / "index.html").write_text("<!doctype html><title>gateway</title>", encoding="utf-8")
+    monkeypatch.setattr(app_module, "STATIC_DIR", static_dir)
+    manager = SessionManager()
+    with TestClient(create_app(manager)) as client:
+        # Starlette decodes %2e%2e -> .. before the path param reaches the handler
+        for payload in ("/%2e%2e/secret.txt", "/../secret.txt", "/%2e%2e%2fsecret.txt"):
+            response = client.get(payload)
+            assert response.status_code in (200, 404), payload
+            assert "TOP SECRET" not in response.text, payload
+    manager.close_all()
