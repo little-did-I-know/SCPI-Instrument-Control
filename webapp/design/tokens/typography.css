@@ -1,0 +1,44 @@
+/* SCPI Instrument Control — Typography
+ *
+ * Two families, both mirroring the desktop app:
+ *   --font-ui   : the native Segoe UI (system-first, Source Sans 3 webfont
+ *                 stand-in for cross-platform specimens — flagged in readme).
+ *   --font-mono : Courier New — used for every numeric readout, SCPI terminal,
+ *                 FFT peak table and measured-value label in the source.
+ *
+ * Sizes track Qt point sizes used in the code (8pt / 9pt / 10pt / 11pt / 12pt),
+ * converted to px at the Qt default 96dpi (1pt ≈ 1.333px).
+ */
+:root {
+  --font-ui: "Segoe UI", "Source Sans 3", system-ui, -apple-system,
+             BlinkMacSystemFont, Roboto, sans-serif;
+  --font-mono: "Courier New", ui-monospace, "SF Mono", Menlo, monospace;
+
+  /* Font sizes (Qt pt → px) */
+  --text-2xs: 11px;   /*  8pt — example command lists */
+  --text-xs: 12px;    /*  9pt — hints, instruction labels, small tables */
+  --text-sm: 13px;    /* 10pt — control input text, terminal input */
+  --text-base: 14px;  /* default body */
+  --text-md: 15px;    /* 11pt — plot axis labels */
+  --text-lg: 16px;    /* 12pt — plot title, section headers */
+  --text-xl: 20px;    /* readout values */
+  --text-2xl: 28px;   /* hero instrument readout (e.g. "30.00 V") */
+
+  /* Weights */
+  --weight-normal: 400;
+  --weight-medium: 600;
+  --weight-bold: 700;
+
+  /* Line heights */
+  --leading-tight: 1.2;
+  --leading-normal: 1.45;
+  --leading-relaxed: 1.6;
+
+  /* Letter spacing */
+  --tracking-mono: 0.01em;
+  --tracking-label: 0.02em;
+
+  /* Semantic aliases */
+  --font-readout: var(--font-mono);
+  --font-terminal: var(--font-mono);
+}

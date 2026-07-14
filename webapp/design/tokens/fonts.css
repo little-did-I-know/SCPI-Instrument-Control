@@ -1,0 +1,9 @@
+/* SCPI Instrument Control — Webfonts
+ *
+ * The application is a native PyQt6 desktop app. Its UI font is the OS default
+ * "Segoe UI" (Windows), and its console/readout font is "Courier New".
+ * Neither ships a font file. For cross-platform specimen fidelity we load
+ * Source Sans 3 as a close stand-in for Segoe UI (SUBSTITUTION — flagged in
+ * readme.md). Courier New is near-universal and kept as-is.
+ */
+@import url('https://fonts.googleapis.com/css2?family=Source+Sans+3:ital,wght@0,400;0,600;0,700;1,400&display=swap');

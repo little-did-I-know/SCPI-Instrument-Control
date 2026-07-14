@@ -1,0 +1,10 @@
+/* SCPI Instrument Control — Design System
+ * Root stylesheet. Consumers link ONLY this file.
+ * This file is a manifest of @imports; add no rules here directly. */
+
+@import "tokens/fonts.css";
+@import "tokens/colors.css";
+@import "tokens/scope.css";
+@import "tokens/typography.css";
+@import "tokens/spacing.css";
+@import "tokens/theme-console.css";

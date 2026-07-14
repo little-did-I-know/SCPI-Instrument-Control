@@ -1,0 +1,47 @@
+/* SCPI Instrument Control — Spacing, Radius, Borders, Shadow
+ *
+ * The desktop app is dense and utilitarian. Layout margins are 5px
+ * (QVBoxLayout.setContentsMargins(5,5,5,5)); control padding 6px; buttons
+ * 6px 20px; safety button 10px. Radii are small (3px controls, 5px emphasis
+ * buttons). These tokens encode that measured density — do not inflate them.
+ */
+:root {
+  /* Spacing scale */
+  --space-0: 0;
+  --space-1: 2px;
+  --space-2: 4px;
+  --space-3: 5px;    /* Qt layout content margin */
+  --space-4: 6px;    /* control inner padding */
+  --space-5: 8px;
+  --space-6: 10px;   /* safety button / info banner padding */
+  --space-7: 12px;
+  --space-8: 16px;
+  --space-9: 20px;   /* button horizontal padding */
+  --space-10: 24px;
+  --space-12: 32px;
+
+  /* Radius */
+  --radius-none: 0;
+  --radius-sm: 3px;   /* default controls, inputs, buttons */
+  --radius-md: 5px;   /* emphasis / safety buttons */
+  --radius-lg: 8px;
+  --radius-pill: 999px;
+
+  /* Border widths */
+  --border-thin: 1px;
+  --border-thick: 2px;  /* focused input (2px solid) */
+
+  /* Elevation — the app is largely flat; shadows are reserved for
+     floating dialogs and dropdown popups only. */
+  --shadow-none: none;
+  --shadow-popup: 0 2px 8px rgba(0, 0, 0, 0.18);
+  --shadow-dialog: 0 8px 28px rgba(0, 0, 0, 0.28);
+
+  /* Control sizing */
+  --control-height: 28px;
+  --control-height-sm: 24px;
+  --toolbar-height: 44px;
+
+  /* Focus ring — uses the Connect green, as in the terminal input */
+  --focus-ring: var(--success);
+}
