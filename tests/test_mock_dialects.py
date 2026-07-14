@@ -77,3 +77,35 @@ class TestLegacyResponses:
     def test_unknown_query_times_out(self):
         with pytest.raises(TimeoutError):
             self.conn.query("BOGUS:QUERY?")
+
+
+def test_legacy_mock_answers_pava_measurements():
+    from scpi_control import Oscilloscope
+    from scpi_control.connection.mock import MockConnection
+
+    conn = MockConnection("mock", idn="Siglent Technologies,SDS1104X-E,MOCK0001,1.0.0.0", channel_states={1: True}, trigger_status=["Stop"], sample_rate=1_000.0, timebase=1e-3)
+    scope = Oscilloscope("mock", connection=conn)
+    scope.connect()
+    try:
+        for mtype in ("PKPK", "FREQ", "RMS", "MEAN", "PER", "MAX", "MIN"):
+            value = scope.measurement.measure(mtype, 1)
+            assert isinstance(value, float), mtype
+    finally:
+        scope.disconnect()
+
+
+def test_modern_mock_still_times_out_on_pava():
+    import pytest as _pytest
+
+    from scpi_control import Oscilloscope
+    from scpi_control.connection.mock import MockConnection
+    from scpi_control.exceptions import SiglentTimeoutError
+
+    conn = MockConnection("mock", idn="Siglent Technologies,SDS824X HD,MOCK0002,3.8.12", channel_states={1: True}, trigger_status=["Stop"], sample_rate=1_000.0, timebase=1e-3)
+    scope = Oscilloscope("mock", connection=conn)
+    scope.connect()
+    try:
+        with _pytest.raises(SiglentTimeoutError):
+            scope.measurement.measure("PKPK", 1)
+    finally:
+        scope.disconnect()

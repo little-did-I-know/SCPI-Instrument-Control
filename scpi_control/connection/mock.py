@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import re
-from typing import Dict, Iterable, List, Optional, Union
+from typing import Dict, Iterable, List, Optional, Tuple, Union
 
 from scpi_control import exceptions
 from scpi_control.connection.base import BaseConnection
@@ -18,6 +18,29 @@ def _format_scientific(value: float, unit: str) -> str:
 def _format_nr3(value: float) -> str:
     """Format a bare NR3 numeric value (no unit) as used by modern-dialect queries."""
     return f"{value:.2E}"
+
+
+# Canonical PAVA? measurement values for the legacy dialect (mirrors real
+# hardware where PAVA? is legacy-only; the modern dialect has no equivalent).
+_MOCK_PAVA_VALUES: Dict[str, Tuple[str, str]] = {
+    "PKPK": ("2.000E+00", "V"),
+    "MAX": ("1.000E+00", "V"),
+    "MIN": ("-1.000E+00", "V"),
+    "AMPL": ("2.000E+00", "V"),
+    "TOP": ("1.000E+00", "V"),
+    "BASE": ("-1.000E+00", "V"),
+    "CMEAN": ("0.000E+00", "V"),
+    "MEAN": ("0.000E+00", "V"),
+    "RMS": ("7.070E-01", "V"),
+    "CRMS": ("7.070E-01", "V"),
+    "FREQ": ("1.000E+03", "HZ"),
+    "PER": ("1.000E-03", "S"),
+    "RISE": ("3.500E-05", "S"),
+    "FALL": ("3.500E-05", "S"),
+    "WID": ("5.000E-04", "S"),
+    "NWID": ("5.000E-04", "S"),
+    "DUTY": ("5.000E+01", "%"),
+}
 
 
 class MockConnection(BaseConnection):
@@ -734,6 +757,14 @@ class MockConnection(BaseConnection):
 
             if upper == "TRIG_SELECT?":
                 return f"{self.trigger_type},SR,{self.trigger_source}"
+
+            if match := re.match(r"PAVA\?\s*(\w+)\s*,\s*C?(\d+)", command, re.IGNORECASE):
+                mtype = match.group(1).upper()
+                channel = match.group(2)
+                entry = _MOCK_PAVA_VALUES.get(mtype)
+                if entry is not None:
+                    value, unit = entry
+                    return f"PAVA {mtype},C{channel},{value}{unit}"
 
         if self.psu_mode or self.awg_mode or self.daq_mode:
             return ""

@@ -11,6 +11,7 @@ from scpi_control.server.sessions import MAX_FRAME_POINTS, InstrumentSession, _w
 from scpi_control.waveform import WaveformData
 
 LEGACY_IDN = "Siglent Technologies,SDS1104X-E,MOCK0001,1.0.0.0"
+MODERN_IDN = "Siglent Technologies,SDS824X HD,MOCK0002,3.8.12"
 
 
 def make_session(poll_interval=0.05, **conn_kwargs):
@@ -77,8 +78,10 @@ def test_no_poll_without_subscribers():
 
 
 def test_measurement_poll_reports_none_on_timeout():
-    # MockConnection has no PAVA? response by default -> SiglentTimeoutError -> value None
-    session = make_session()
+    # PAVA? is legacy-only; on a modern-dialect mock it still has no response ->
+    # SiglentTimeoutError -> value None. (The legacy mock now answers PAVA?, so a
+    # modern scope is used here to keep exercising the graceful-timeout path.)
+    session = make_session(idn=MODERN_IDN)
     try:
         session.set_measurements([(1, "PKPK")])
         msgs = collect(session, "measurements", n=1, timeout=8.0)
