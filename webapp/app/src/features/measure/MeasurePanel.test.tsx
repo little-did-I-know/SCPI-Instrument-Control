@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MeasurePanel } from "./MeasurePanel";
@@ -33,5 +33,48 @@ describe("MeasurePanel", () => {
 
     expect(screen.getByText("2.500")).toBeInTheDocument();
     expect(screen.getByText("--")).toBeInTheDocument();
+  });
+
+  it("keeps the server's selection after a remount instead of re-seeding stale local state", async () => {
+    const setMeasurements = vi.spyOn(api, "setMeasurements").mockResolvedValue({ measurements: [] });
+    // server truth: PKPK C1 is already active and streaming
+    useSession.getState().applyMeasurements([{ channel: 1, mtype: "PKPK", value: 2.5 }]);
+
+    const view = render(<MeasurePanel />);
+    expect(screen.getByLabelText("PKPK C1")).toBeInTheDocument();
+
+    // simulate a rail-tab switch away and back
+    view.unmount();
+    render(<MeasurePanel />);
+
+    // now toggle a DIFFERENT measurement — the PUT must preserve the server's existing PKPK C1
+    await userEvent.click(screen.getByLabelText("FREQ C1"));
+
+    await waitFor(() =>
+      expect(setMeasurements).toHaveBeenCalledWith("abc", [
+        { channel: 1, mtype: "PKPK" },
+        { channel: 1, mtype: "FREQ" },
+      ]),
+    );
+  });
+
+  // The remount test above only exercises the seed path (the store is already correct at mount).
+  // The selection must track the store on EVERY render: a measurement that arrives on the stream
+  // while the panel stays mounted must survive the next toggle's full-replacement PUT.
+  it("computes the PUT from the server's latest list, not a local mirror captured at mount", async () => {
+    const setMeasurements = vi.spyOn(api, "setMeasurements").mockResolvedValue({ measurements: [] });
+    render(<MeasurePanel />); // store starts with no measurements
+
+    // server truth arrives on the stream after mount (restored session / another client / late broadcast)
+    act(() => useSession.getState().applyMeasurements([{ channel: 1, mtype: "PKPK", value: 2.5 }]));
+
+    await userEvent.click(screen.getByLabelText("FREQ C1"));
+
+    await waitFor(() =>
+      expect(setMeasurements).toHaveBeenCalledWith("abc", [
+        { channel: 1, mtype: "PKPK" },
+        { channel: 1, mtype: "FREQ" },
+      ]),
+    );
   });
 });

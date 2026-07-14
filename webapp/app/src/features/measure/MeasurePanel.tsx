@@ -21,28 +21,36 @@ export function MeasurePanel() {
   // directly (no `?? []` fallback, which would fabricate a new array every render).
   const measurements = useSession((s) => s.measurements);
   const [error, setError] = useState<string | null>(null);
-  // Local selection state seeds from whatever the server already reports as active
-  // (e.g. after a reload) so the checkboxes aren't out of sync with the value table.
-  const [selected, setSelected] = useState<Selection[]>(() =>
-    measurements.map((m) => ({ channel: m.channel, mtype: m.mtype }))
-  );
+  // No local mirror of the selection: the server is the source of truth. A local copy seeded
+  // once at mount goes stale (the stream lags the PUT by up to a broadcast interval, and a rail
+  // tab switch unmounts us), and since PUT /measurements is a FULL REPLACEMENT the next toggle
+  // computed from a stale list would silently drop a measurement the server still has active.
+  // `pending` is only an optimistic overlay for the in-flight toggle, so the checkbox responds
+  // instantly; it clears when the PUT resolves and the streamed truth takes over again.
+  const [pending, setPending] = useState<Selection[] | null>(null);
+
+  const selected: Selection[] = pending ?? measurements.map((m) => ({ channel: m.channel, mtype: m.mtype }));
+  const isChecked = (channel: number, mtype: string) =>
+    selected.some((s) => s.channel === channel && s.mtype === mtype);
 
   const channelNumbers = Object.keys(channels)
     .map(Number)
     .filter((n) => channels[String(n)]?.enabled)
     .sort((a, b) => a - b);
 
-  async function toggle(channel: number, mtype: string, checked: boolean) {
-    const next = checked
-      ? [...selected, { channel, mtype }]
-      : selected.filter((item) => !(item.channel === channel && item.mtype === mtype));
-    setSelected(next);
+  async function toggle(channel: number, mtype: string) {
     if (!session) return;
+    const next = isChecked(channel, mtype)
+      ? selected.filter((s) => !(s.channel === channel && s.mtype === mtype))
+      : [...selected, { channel, mtype }];
+    setPending(next);
     setError(null);
     try {
       await api.setMeasurements(session.id, next);
     } catch (err) {
       setError(err instanceof ApiError ? err.detail : String(err));
+    } finally {
+      setPending(null); // fall back to the server's truth
     }
   }
 
@@ -68,8 +76,8 @@ export function MeasurePanel() {
                     key={mtype}
                     aria-label={`${mtype} C${n}`}
                     label={mtype}
-                    checked={selected.some((s) => s.channel === n && s.mtype === mtype)}
-                    onChange={(next) => toggle(n, mtype, next)}
+                    checked={isChecked(n, mtype)}
+                    onChange={() => toggle(n, mtype)}
                   />
                 ))}
               </div>
