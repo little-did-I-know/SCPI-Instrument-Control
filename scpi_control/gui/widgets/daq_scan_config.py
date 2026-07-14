@@ -130,8 +130,7 @@ class DAQScanConfig(QWidget):
 
         self.start_btn = QPushButton("Start Logging")
         self.start_btn.setMinimumHeight(40)
-        self.start_btn.setStyleSheet(
-            """
+        self.start_btn.setStyleSheet("""
             QPushButton {
                 background-color: #2e7d32;
                 color: white;
@@ -144,16 +143,14 @@ class DAQScanConfig(QWidget):
             QPushButton:disabled {
                 background-color: #555555;
             }
-        """
-        )
+        """)
         self.start_btn.clicked.connect(self._on_start_clicked)
         button_layout.addWidget(self.start_btn)
 
         self.stop_btn = QPushButton("Stop")
         self.stop_btn.setMinimumHeight(40)
         self.stop_btn.setEnabled(False)
-        self.stop_btn.setStyleSheet(
-            """
+        self.stop_btn.setStyleSheet("""
             QPushButton {
                 background-color: #c62828;
                 color: white;
@@ -166,8 +163,7 @@ class DAQScanConfig(QWidget):
             QPushButton:disabled {
                 background-color: #555555;
             }
-        """
-        )
+        """)
         self.stop_btn.clicked.connect(self._on_stop_clicked)
         button_layout.addWidget(self.stop_btn)
 

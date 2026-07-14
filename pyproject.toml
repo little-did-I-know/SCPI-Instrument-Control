@@ -137,7 +137,7 @@ where = ["."]
 include = ["siglent*", "scpi_control*"]
 
 [tool.black]
-line-length = 100
+line-length = 200
 target-version = ['py38', 'py39', 'py310', 'py311', "py312"]
 
 [tool.pytest.ini_options]

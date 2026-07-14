@@ -417,8 +417,7 @@ class MainWindow(QMainWindow):
 
         # Add styled connect/disconnect buttons that stand out
         connect_btn = QPushButton("Connect")
-        connect_btn.setStyleSheet(
-            """
+        connect_btn.setStyleSheet("""
             QPushButton {
                 background-color: #4CAF50;
                 color: white;
@@ -434,14 +433,12 @@ class MainWindow(QMainWindow):
             QPushButton:pressed {
                 background-color: #3d8b40;
             }
-        """
-        )
+        """)
         connect_btn.clicked.connect(self._on_connect)
         toolbar.addWidget(connect_btn)
 
         disconnect_btn = QPushButton("Disconnect")
-        disconnect_btn.setStyleSheet(
-            """
+        disconnect_btn.setStyleSheet("""
             QPushButton {
                 background-color: #f44336;
                 color: white;
@@ -457,8 +454,7 @@ class MainWindow(QMainWindow):
             QPushButton:pressed {
                 background-color: #c1170a;
             }
-        """
-        )
+        """)
         disconnect_btn.clicked.connect(self._on_disconnect)
         toolbar.addWidget(disconnect_btn)
 

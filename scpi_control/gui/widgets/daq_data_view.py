@@ -126,8 +126,7 @@ class DAQDataView(QWidget):
         # Data table
         self.data_table = QTableWidget()
         self.data_table.setAlternatingRowColors(True)
-        self.data_table.setStyleSheet(
-            """
+        self.data_table.setStyleSheet("""
             QTableWidget {
                 background-color: #2d2d2d;
                 alternate-background-color: #353535;
@@ -140,8 +139,7 @@ class DAQDataView(QWidget):
                 padding: 4px;
                 border: 1px solid #505050;
             }
-        """
-        )
+        """)
         splitter.addWidget(self.data_table)
 
         # Set splitter sizes (70% chart, 30% table)

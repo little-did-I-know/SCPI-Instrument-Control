@@ -142,8 +142,7 @@ class DAQAIPanel(QWidget):
         self.response_text = QTextEdit()
         self.response_text.setReadOnly(True)
         self.response_text.setPlaceholderText("AI analysis results will appear here...\n\n" "Connect to an AI provider and collect some data to get started.")
-        self.response_text.setStyleSheet(
-            """
+        self.response_text.setStyleSheet("""
             QTextEdit {
                 background-color: #1e1e1e;
                 color: #d4d4d4;
@@ -152,8 +151,7 @@ class DAQAIPanel(QWidget):
                 font-family: monospace;
                 font-size: 11px;
             }
-        """
-        )
+        """)
         layout.addWidget(self.response_text, stretch=1)
 
         # Chat input
