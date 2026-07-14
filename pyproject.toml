@@ -70,6 +70,10 @@ gui = [
     "PyQt6-WebEngine>=6.6.0",
     "pyqtgraph>=0.13.0",
 ]
+web = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+]
 fun = [
     "shapely>=2.0.0",
     "Pillow>=10.0.0",
