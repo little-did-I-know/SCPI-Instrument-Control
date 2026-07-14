@@ -7,7 +7,7 @@ import { api } from "../../api/client";
 afterEach(() => vi.restoreAllMocks());
 
 const DEVICE = { address: "192.168.1.50", idn: "Siglent Technologies,SDS824X HD,X,1", manufacturer: "Siglent Technologies", model: "SDS824X HD", dialect: "modern", kind: "scope", connected: false };
-const SESSION = { id: "abc", label: "bench", mock: false, address: "192.168.1.50", state: "connected", idn: DEVICE.idn, model: "SDS824X HD", dialect: "modern", num_channels: 4 };
+const SESSION = { id: "abc", label: "bench", mock: false, address: "192.168.1.50", state: "connected", idn: DEVICE.idn, model: "SDS824X HD", dialect: "modern", num_channels: 4, viewers: 0 };
 
 describe("ConnectDialog", () => {
   it("scans and connects to a discovered instrument", async () => {
@@ -46,7 +46,7 @@ describe("ConnectDialog", () => {
   });
 
   it("offers to resume an already-connected session on mount", async () => {
-    const existing = { id: "xyz", label: "bench", mock: false, address: "192.168.1.50", state: "connected", idn: "Siglent,SDS824X HD,1,1", model: "SDS824X HD", dialect: "modern", num_channels: 4 };
+    const existing = { id: "xyz", label: "bench", mock: false, address: "192.168.1.50", state: "connected", idn: "Siglent,SDS824X HD,1,1", model: "SDS824X HD", dialect: "modern", num_channels: 4, viewers: 0 };
     vi.spyOn(api, "listSessions").mockResolvedValue([existing]);
     vi.spyOn(api, "discover").mockResolvedValue([]);
     const onConnected = vi.fn();

@@ -26,6 +26,7 @@ async def discover_instruments(request: Request, cidr: Optional[str] = None):
             "kind": "scope",
             "connected": True,
             "session_id": s.id,
+            "viewers": s.viewers,
         }
         for s in sessions
     ]

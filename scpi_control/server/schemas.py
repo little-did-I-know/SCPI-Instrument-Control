@@ -26,6 +26,7 @@ class SessionOut(BaseModel):
     model: str
     dialect: str
     num_channels: int
+    viewers: int = 0
 
 
 class ChannelPatch(BaseModel):
@@ -76,4 +77,5 @@ def session_out(session) -> Dict[str, Any]:
         model=session.model,
         dialect=session.dialect,
         num_channels=session.num_channels,
+        viewers=session.viewers,
     ).model_dump()

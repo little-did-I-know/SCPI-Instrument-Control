@@ -270,6 +270,39 @@ class TestDiscoverEndpoint:
         assert addresses.index("127.0.0.1") < addresses.index("bench-scope.local")
 
 
+class TestViewers:
+    def test_new_session_reports_zero_viewers(self, client):
+        body = create_mock_session(client)
+        assert body["viewers"] == 0
+        got = client.get("/api/sessions/{0}".format(body["id"])).json()
+        assert got["viewers"] == 0
+
+    def test_viewers_counts_stream_subscribers(self, client):
+        body = create_mock_session(client)
+        session = client.app.state.manager.get(body["id"])
+        unsubscribe = session.subscribe(lambda message: None)
+        try:
+            assert session.viewers == 1
+            listed = client.get("/api/sessions").json()
+            assert listed[0]["viewers"] == 1
+        finally:
+            unsubscribe()
+        assert session.viewers == 0
+
+    def test_discover_connected_entry_includes_viewers(self, client, monkeypatch):
+        from scpi_control.server import discovery
+        from tests.test_server_discovery import FakeScpiServer
+
+        body = create_mock_session(client)
+        session = client.app.state.manager.get(body["id"])
+        session.address = "127.0.0.1"
+        with FakeScpiServer() as server:
+            monkeypatch.setattr(discovery, "SCPI_PORT", server.port)
+            entries = client.get("/api/discover?cidr=127.0.0.1/32").json()
+        connected = [e for e in entries if e.get("connected")]
+        assert connected and connected[0]["viewers"] == 0
+
+
 def test_cli_parses_defaults(monkeypatch):
     import scpi_control.server.__main__ as cli
 
