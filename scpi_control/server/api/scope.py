@@ -161,6 +161,44 @@ async def screenshot(session_id: str, request: Request):
     return Response(content=png, media_type="image/png", headers={"Content-Disposition": 'attachment; filename="{0}"'.format(filename)})
 
 
+def _waveform_json(channel, data, max_points):
+    voltage = data.voltage
+    time_axis = data.time
+    step = 1
+    if max_points is not None and max_points > 0 and len(voltage) > max_points:
+        step = -(-len(voltage) // max_points)  # ceiling division keeps len <= max_points
+    points = [float(v) for v in voltage[::step]]
+    t0 = float(time_axis[0]) if len(time_axis) else 0.0
+    dt = float(time_axis[1] - time_axis[0]) * step if len(time_axis) > 1 else 1.0
+    return {
+        "channel": channel,
+        "t0": t0,
+        "dt": dt,
+        "sample_rate": data.sample_rate,
+        "voltage_scale": data.voltage_scale,
+        "voltage_offset": data.voltage_offset,
+        "points": points,
+    }
+
+
+@router.get("/sessions/{session_id}/scope/waveform")
+async def waveform_json(session_id: str, request: Request, channels: str = "1", max_points: int = 0):
+    session = require_session(request, session_id)
+    try:
+        channel_list = sorted({int(c) for c in channels.split(",") if c.strip()})
+    except ValueError:
+        raise InvalidParameterError("channels must be a comma-separated list of integers")
+    if not channel_list:
+        raise InvalidParameterError("no channels requested")
+
+    def capture(scope):
+        return [(c, scope.get_waveform(c)) for c in channel_list]
+
+    captures = await run_job(session, capture)
+    cap = max_points if max_points > 0 else None
+    return {"channels": [_waveform_json(c, data, cap) for c, data in captures]}
+
+
 # NOTE: run_op's {op} path is a catch-all for POST /scope/*; any new specific
 # POST route under /scope must be registered ABOVE it or it will be shadowed.
 _RUN_OPS = {

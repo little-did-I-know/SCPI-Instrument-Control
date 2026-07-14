@@ -326,3 +326,28 @@ class TestScreenshot:
         assert response.headers["content-type"] == "image/png"
         assert response.content.startswith(b"\x89PNG\r\n\x1a\n")
         assert "attachment" in response.headers.get("content-disposition", "")
+
+
+class TestWaveformJson:
+    def test_waveform_json_full_resolution(self, client):
+        sid = create_mock_session(client)["id"]
+        response = client.get("/api/sessions/{0}/scope/waveform?channels=1".format(sid))
+        assert response.status_code == 200
+        body = response.json()
+        assert len(body["channels"]) == 1
+        ch = body["channels"][0]
+        assert ch["channel"] == 1
+        assert isinstance(ch["points"], list) and len(ch["points"]) > 0
+        assert isinstance(ch["points"][0], float)
+        assert ch["dt"] > 0
+
+    def test_waveform_json_decimates_to_max_points(self, client):
+        sid = create_mock_session(client)["id"]
+        full = client.get("/api/sessions/{0}/scope/waveform?channels=1".format(sid)).json()["channels"][0]["points"]
+        capped = client.get("/api/sessions/{0}/scope/waveform?channels=1&max_points=10".format(sid)).json()["channels"][0]["points"]
+        assert len(capped) <= 10
+        assert len(capped) <= len(full)
+
+    def test_waveform_json_bad_channels_is_400(self, client):
+        sid = create_mock_session(client)["id"]
+        assert client.get("/api/sessions/{0}/scope/waveform?channels=banana".format(sid)).status_code == 400
