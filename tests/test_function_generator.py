@@ -64,28 +64,16 @@ class TestAWGSCPICommandSet:
 
         assert cmd_set.get_command("identify") == "*IDN?"
         assert cmd_set.get_command("reset") == "*RST"
-        assert (
-            cmd_set.get_command("set_frequency", ch=1, frequency=1000.0)
-            == "SOUR1:FREQ 1000.0"
-        )
+        assert cmd_set.get_command("set_frequency", ch=1, frequency=1000.0) == "SOUR1:FREQ 1000.0"
         assert cmd_set.get_command("get_frequency", ch=1) == "SOUR1:FREQ?"
 
     def test_siglent_sdg_commands(self):
         """Test Siglent SDG command overrides."""
         cmd_set = AWGSCPICommandSet("siglent_sdg")
 
-        assert (
-            cmd_set.get_command("set_function", ch=1, function="SINE")
-            == "C1:BSWV WVTP,SINE"
-        )
-        assert (
-            cmd_set.get_command("set_frequency", ch=1, frequency=1000.0)
-            == "C1:BSWV FRQ,1000.0"
-        )
-        assert (
-            cmd_set.get_command("set_amplitude", ch=1, amplitude=5.0)
-            == "C1:BSWV AMP,5.0"
-        )
+        assert cmd_set.get_command("set_function", ch=1, function="SINE") == "C1:BSWV WVTP,SINE"
+        assert cmd_set.get_command("set_frequency", ch=1, frequency=1000.0) == "C1:BSWV FRQ,1000.0"
+        assert cmd_set.get_command("set_amplitude", ch=1, amplitude=5.0) == "C1:BSWV AMP,5.0"
         assert cmd_set.get_command("set_output", ch=1, state="ON") == "C1:OUTP ON"
 
     def test_fallback_to_generic(self):
@@ -266,9 +254,7 @@ class TestAWGOutput:
 
     def test_configure_pulse(self, mock_awg):
         """Test pulse wave configuration."""
-        mock_awg.channel1.configure_pulse(
-            frequency=1000.0, amplitude=5.0, duty_cycle=25.0
-        )
+        mock_awg.channel1.configure_pulse(frequency=1000.0, amplitude=5.0, duty_cycle=25.0)
 
         assert mock_awg.channel1.function == "PULSE"
         assert mock_awg.channel1.frequency == 1000.0
@@ -277,9 +263,7 @@ class TestAWGOutput:
 
     def test_configure_ramp(self, mock_awg):
         """Test ramp wave configuration."""
-        mock_awg.channel1.configure_ramp(
-            frequency=500.0, amplitude=2.0, symmetry=50.0
-        )
+        mock_awg.channel1.configure_ramp(frequency=500.0, amplitude=2.0, symmetry=50.0)
 
         assert mock_awg.channel1.function == "RAMP"
         assert mock_awg.channel1.frequency == 500.0
@@ -396,9 +380,7 @@ class TestGenericAWG:
 
     def test_generic_awg_basic_control(self):
         """Test basic control of generic AWG."""
-        conn = MockConnection(
-            awg_mode=True, awg_idn="Generic,AWG-1000,SERIAL,1.0"
-        )
+        conn = MockConnection(awg_mode=True, awg_idn="Generic,AWG-1000,SERIAL,1.0")
         awg = FunctionGenerator("mock", connection=conn)
         awg.connect()
 

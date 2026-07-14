@@ -41,8 +41,7 @@ class PSUControl(QWidget):
 
         # Safety: All Outputs OFF button
         all_off_btn = QPushButton("⚠ All Outputs OFF (Safety)")
-        all_off_btn.setStyleSheet(
-            """
+        all_off_btn.setStyleSheet("""
             QPushButton {
                 background-color: #DC143C;
                 color: white;
@@ -53,8 +52,7 @@ class PSUControl(QWidget):
             QPushButton:hover {
                 background-color: #B22222;
             }
-        """
-        )
+        """)
         all_off_btn.clicked.connect(self._on_all_off)
         layout.addWidget(all_off_btn)
 

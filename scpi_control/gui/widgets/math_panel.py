@@ -173,8 +173,7 @@ class MathPanel(QWidget):
         help_text = QTextEdit()
         help_text.setReadOnly(True)
         help_text.setMaximumHeight(150)
-        help_text.setHtml(
-            """
+        help_text.setHtml("""
 <b>Supported Operations:</b><br>
 <ul>
 <li><b>Basic:</b> C1 + C2, C1 - C2, C1 * C2, C1 / C2</li>
@@ -194,8 +193,7 @@ class MathPanel(QWidget):
 • Scaled sum: 2 * C1 + C2<br>
 • Power: C1 * C2 (voltage × current)<br>
 • Average: (C1 + C2) / 2 (not yet supported - use two steps)
-        """
-        )
+        """)
         layout.addWidget(help_text)
 
         return group
