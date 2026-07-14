@@ -134,3 +134,34 @@ class TestScopeEndpoints:
 
     def test_unknown_session_scope_call_is_404(self, client):
         assert client.get("/api/sessions/nope/scope/state").status_code == 404
+
+
+class TestTerminalAndMeasurements:
+    def test_command_query_returns_response(self, client):
+        sid = create_mock_session(client)["id"]
+        response = client.post("/api/sessions/{0}/scope/command".format(sid), json={"command": "*IDN?"})
+        assert response.status_code == 200
+        body = response.json()
+        assert body["command"] == "*IDN?"
+        assert "SDS1104X-E" in body["response"]
+
+    def test_command_write_returns_null_response(self, client):
+        sid = create_mock_session(client)["id"]
+        response = client.post("/api/sessions/{0}/scope/command".format(sid), json={"command": "TRMD AUTO"})
+        assert response.status_code == 200
+        assert response.json()["response"] is None
+
+    def test_unknown_query_times_out_as_504(self, client):
+        sid = create_mock_session(client)["id"]
+        response = client.post("/api/sessions/{0}/scope/command".format(sid), json={"command": "BOGUS?"})
+        assert response.status_code == 504
+
+    def test_put_measurements_validates(self, client):
+        sid = create_mock_session(client)["id"]
+        ok = client.put("/api/sessions/{0}/scope/measurements".format(sid), json=[{"channel": 1, "mtype": "PKPK"}, {"channel": 2, "mtype": "FREQ"}])
+        assert ok.status_code == 200
+        assert ok.json()["measurements"] == [{"channel": 1, "mtype": "PKPK"}, {"channel": 2, "mtype": "FREQ"}]
+        bad_type = client.put("/api/sessions/{0}/scope/measurements".format(sid), json=[{"channel": 1, "mtype": "NOPE"}])
+        assert bad_type.status_code == 400
+        bad_channel = client.put("/api/sessions/{0}/scope/measurements".format(sid), json=[{"channel": 9, "mtype": "PKPK"}])
+        assert bad_channel.status_code == 400

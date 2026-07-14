@@ -1,12 +1,12 @@
 # scpi_control/server/api/scope.py
 import asyncio
-from typing import Any, Callable
+from typing import Any, Callable, List
 
 from fastapi import APIRouter, Request
 
 from scpi_control.exceptions import InvalidParameterError
 from scpi_control.server.api.sessions import require_session
-from scpi_control.server.schemas import ALLOWED_COUPLING, ChannelPatch, TimebasePatch, TriggerPatch
+from scpi_control.server.schemas import ALLOWED_COUPLING, ALLOWED_MEASUREMENTS, ChannelPatch, CommandIn, MeasurementItem, TimebasePatch, TriggerPatch
 from scpi_control.server.sessions import InstrumentSession, read_state
 
 router = APIRouter(tags=["scope"])
@@ -84,6 +84,37 @@ async def patch_trigger(session_id: str, body: TriggerPatch, request: Request):
     return await mutate(session, apply)
 
 
+@router.post("/sessions/{session_id}/scope/command")
+async def send_command(session_id: str, body: CommandIn, request: Request):
+    session = require_session(request, session_id)
+    command = body.command.strip()
+    if not command:
+        raise InvalidParameterError("empty command")
+
+    def run(scope):
+        if command.endswith("?"):
+            return scope.query(command)
+        scope.write(command)
+        return None
+
+    response = await run_job(session, run)
+    return {"command": command, "response": response}
+
+
+@router.put("/sessions/{session_id}/scope/measurements")
+async def put_measurements(session_id: str, body: List[MeasurementItem], request: Request):
+    session = require_session(request, session_id)
+    for item in body:
+        if item.mtype.upper() not in ALLOWED_MEASUREMENTS:
+            raise InvalidParameterError("unknown measurement type: {0}".format(item.mtype))
+        if not 1 <= item.channel <= max(1, session.num_channels):
+            raise InvalidParameterError("channel {0} out of range".format(item.channel))
+    session.set_measurements([(item.channel, item.mtype.upper()) for item in body])
+    return {"measurements": [{"channel": c, "mtype": m} for c, m in session.measurements]}
+
+
+# NOTE: run_op's {op} path is a catch-all for POST /scope/*; any new specific
+# POST route under /scope must be registered ABOVE it or it will be shadowed.
 _RUN_OPS = {
     "run": lambda scope: scope.run(),
     "stop": lambda scope: scope.stop(),
