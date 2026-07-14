@@ -220,3 +220,40 @@ class InstrumentSession:
             self.publish({"type": "error", "detail": str(exc)})
             if not scope.is_connected:
                 self.state = "error"
+
+
+class SessionManager:
+    """Registry of live sessions. create() connects before registering."""
+
+    def __init__(self) -> None:
+        self._sessions: Dict[str, InstrumentSession] = {}
+        self._lock = threading.Lock()
+
+    def create(self, label: str, *, address: Optional[str] = None, port: int = 5025, mock: bool = False, model: Optional[str] = None, _connection=None) -> InstrumentSession:
+        session = InstrumentSession.open(label, address=address, port=port, mock=mock, model=model, _connection=_connection)
+        with self._lock:
+            self._sessions[session.id] = session
+        return session
+
+    def list(self) -> List[InstrumentSession]:
+        with self._lock:
+            return list(self._sessions.values())
+
+    def get(self, session_id: str) -> Optional[InstrumentSession]:
+        with self._lock:
+            return self._sessions.get(session_id)
+
+    def delete(self, session_id: str) -> bool:
+        with self._lock:
+            session = self._sessions.pop(session_id, None)
+        if session is None:
+            return False
+        session.close()
+        return True
+
+    def close_all(self) -> None:
+        with self._lock:
+            sessions = list(self._sessions.values())
+            self._sessions.clear()
+        for session in sessions:
+            session.close()

@@ -98,3 +98,36 @@ def test_open_failure_raises_and_leaves_no_thread():
         InstrumentSession.open("bad", mock=True, _connection=conn)
     time.sleep(0.1)
     assert threading.active_count() <= before + 1
+
+
+from scpi_control.server.sessions import SessionManager
+
+
+class TestSessionManager:
+    def _manager_with_one(self):
+        manager = SessionManager()
+        conn = MockConnection("mock", idn=LEGACY_IDN, channel_states={1: True}, trigger_status=["Stop"], sample_rate=1_000.0, timebase=1e-3)
+        session = manager.create("bench-1", mock=True, _connection=conn)
+        return manager, session
+
+    def test_create_registers_and_get_returns_it(self):
+        manager, session = self._manager_with_one()
+        try:
+            assert manager.get(session.id) is session
+            assert manager.list() == [session]
+        finally:
+            manager.close_all()
+
+    def test_delete_closes_and_removes(self):
+        manager, session = self._manager_with_one()
+        assert manager.delete(session.id) is True
+        assert session.state == "closed"
+        assert manager.get(session.id) is None
+        assert manager.delete("nope") is False
+
+    def test_failed_create_registers_nothing(self):
+        manager = SessionManager()
+        conn = FailingMock("mock", idn=LEGACY_IDN)  # FailingMock defined above in this file
+        with pytest.raises(SiglentError):
+            manager.create("bad", mock=True, _connection=conn)
+        assert manager.list() == []
