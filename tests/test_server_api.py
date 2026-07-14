@@ -181,6 +181,14 @@ class TestCapture:
         float(first[0])
         float(first[1])  # parseable numbers
 
+    def test_capture_csv_multi_channel(self, client):
+        sid = create_mock_session(client)["id"]
+        response = client.get("/api/sessions/{0}/scope/capture.csv?channels=1,2".format(sid))
+        assert response.status_code == 200
+        lines = response.text.strip().splitlines()
+        assert lines[0] == "time_s,C1_V,C2_V"
+        assert len(lines) > 10
+
     def test_capture_csv_bad_channels_param_is_400(self, client):
         sid = create_mock_session(client)["id"]
         assert client.get("/api/sessions/{0}/scope/capture.csv?channels=banana".format(sid)).status_code == 400
