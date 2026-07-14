@@ -96,7 +96,13 @@ def _probe(address: str, port: int, connect_timeout: float, probe_timeout: float
 
 
 def _sort_key(entry):
-    return (entry["kind"] != "scope", ipaddress.ip_address(str(entry["address"])))
+    address = str(entry["address"])
+    try:
+        numeric = int(ipaddress.ip_address(address))
+        return (entry["kind"] != "scope", 0, numeric, "")
+    except ValueError:
+        # hostname-addressed entries (connected sessions) sort after IP literals
+        return (entry["kind"] != "scope", 1, 0, address)
 
 
 def discover(

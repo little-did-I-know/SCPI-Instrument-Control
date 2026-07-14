@@ -160,3 +160,14 @@ def test_sort_key_orders_numerically_scopes_first():
         ("10.0.0.10", "scope"),
         ("10.0.0.10", "psu"),
     ]
+
+
+def test_sort_key_tolerates_hostnames():
+    from scpi_control.server.discovery import _sort_key
+
+    entries = [
+        {"address": "bench-scope.local", "kind": "scope"},
+        {"address": "10.0.0.2", "kind": "scope"},
+    ]
+    ordered = sorted(entries, key=_sort_key)
+    assert [e["address"] for e in ordered] == ["10.0.0.2", "bench-scope.local"]

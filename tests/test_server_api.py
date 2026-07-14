@@ -251,6 +251,23 @@ class TestDiscoverEndpoint:
         assert entry["session_id"] == body["id"]
         assert entry["model"] == "SDS1104X-E"
 
+    def test_discover_tolerates_hostname_session(self, client, monkeypatch):
+        from scpi_control.server import discovery
+        from tests.test_server_discovery import FakeScpiServer
+
+        body = create_mock_session(client)
+        session = client.app.state.manager.get(body["id"])
+        session.address = "bench-scope.local"
+        with FakeScpiServer() as server:
+            monkeypatch.setattr(discovery, "SCPI_PORT", server.port)
+            response = client.get("/api/discover?cidr=127.0.0.1/32")
+        assert response.status_code == 200
+        entries = response.json()
+        addresses = [e["address"] for e in entries]
+        assert "bench-scope.local" in addresses  # merged session present
+        assert "127.0.0.1" in addresses  # scan result present
+        assert addresses.index("127.0.0.1") < addresses.index("bench-scope.local")
+
 
 def test_cli_parses_defaults(monkeypatch):
     import scpi_control.server.__main__ as cli
