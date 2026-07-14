@@ -26,9 +26,10 @@ export function ScopeToolbar() {
     setError(null);
     try {
       await api.deleteSession(session.id);
+    } catch {
+      // already gone server-side (404) or unreachable — we're disconnecting locally regardless
+    } finally {
       useSession.getState().clearSession();
-    } catch (err) {
-      setError(err instanceof ApiError ? err.detail : String(err));
     }
   }
 

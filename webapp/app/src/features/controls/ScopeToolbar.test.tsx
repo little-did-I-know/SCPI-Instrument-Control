@@ -39,4 +39,13 @@ describe("ScopeToolbar", () => {
     await userEvent.click(screen.getByRole("button", { name: "Run" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("session abc is error");
   });
+
+  it("returns to disconnected even if the session is already gone (DELETE 404)", async () => {
+    const { ApiError } = await import("../../api/client");
+    vi.spyOn(api, "deleteSession").mockRejectedValue(new ApiError(404, "HTTPException", "unknown session abc"));
+    render(<ScopeToolbar />);
+    await userEvent.click(screen.getByRole("button", { name: /disconnect/i }));
+    await waitFor(() => expect(useSession.getState().session).toBeNull());
+    expect(useSession.getState().status).toBe("disconnected");
+  });
 });

@@ -44,4 +44,22 @@ describe("ConnectDialog", () => {
 
     expect(await screen.findByText(/connection refused/i)).toBeInTheDocument();
   });
+
+  it("offers to resume an already-connected session on mount", async () => {
+    const existing = { id: "xyz", label: "bench", mock: false, address: "192.168.1.50", state: "connected", idn: "Siglent,SDS824X HD,1,1", model: "SDS824X HD", dialect: "modern", num_channels: 4 };
+    vi.spyOn(api, "listSessions").mockResolvedValue([existing]);
+    vi.spyOn(api, "discover").mockResolvedValue([]);
+    const onConnected = vi.fn();
+    render(<ConnectDialog onConnected={onConnected} />);
+    await userEvent.click(await screen.findByRole("button", { name: /resume/i }));
+    expect(onConnected).toHaveBeenCalledWith(existing);
+  });
+
+  it("shows no resume section when there are no existing sessions", async () => {
+    vi.spyOn(api, "listSessions").mockResolvedValue([]);
+    render(<ConnectDialog onConnected={vi.fn()} />);
+    // give the mount effect a tick
+    await screen.findByRole("button", { name: /scan network/i });
+    expect(screen.queryByRole("button", { name: /resume/i })).toBeNull();
+  });
 });

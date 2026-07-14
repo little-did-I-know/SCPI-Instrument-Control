@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ApiError, api } from "../../api/client";
 import type { DiscoveredDevice, SessionInfo } from "../../api/types";
 import { Button } from "../../ds/Button";
@@ -12,6 +12,14 @@ export function ConnectDialog({ onConnected }: Props) {
   const [busy, setBusy] = useState(false);
   const [address, setAddress] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [existingSessions, setExistingSessions] = useState<SessionInfo[]>([]);
+
+  useEffect(() => {
+    api
+      .listSessions()
+      .then(setExistingSessions)
+      .catch(() => setExistingSessions([]));
+  }, []);
 
   async function scan() {
     setScanning(true);
@@ -39,6 +47,27 @@ export function ConnectDialog({ onConnected }: Props) {
 
   return (
     <div style={{ maxWidth: 620, margin: "48px auto", display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
+      {existingSessions.length > 0 && (
+        <GroupBox title="Resume a session">
+          <table style={{ width: "100%", fontSize: "var(--text-sm)", borderCollapse: "collapse" }}>
+            <tbody>
+              {existingSessions.map((s) => (
+                <tr key={s.id} style={{ borderTop: "1px solid var(--lc-border)" }}>
+                  <td style={{ padding: "6px 4px" }}>{s.label}</td>
+                  <td style={{ padding: "6px 4px" }}>{s.model}</td>
+                  <td style={{ padding: "6px 4px", fontFamily: "var(--font-mono)", color: "var(--lc-muted)" }}>{s.address ?? "mock"}</td>
+                  <td style={{ padding: "6px 4px", textAlign: "right" }}>
+                    <Button size="sm" variant="primary" onClick={() => onConnected(s)}>
+                      Resume
+                    </Button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </GroupBox>
+      )}
+
       <GroupBox title="Find an instrument">
         <div style={{ display: "flex", gap: "var(--space-2)", alignItems: "center", marginBottom: "var(--space-3)" }}>
           <Button onClick={scan} disabled={scanning}>
