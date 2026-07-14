@@ -37,6 +37,18 @@ describe("HomeScreen", () => {
     await screen.findByRole("button", { name: "Open SDS824X HD" });
   });
 
+  it("paints a real held session before the discover scan resolves", async () => {
+    const held: SessionInfo = { ...SESSION, id: "held1", address: "192.168.1.50", model: "SDS824X HD" };
+    vi.spyOn(api, "listSessions").mockResolvedValue([held]);
+    // discover is slow: resolves only when we let it
+    let resolveDiscover: (v: DiscoveredDevice[]) => void = () => {};
+    vi.spyOn(api, "discover").mockReturnValue(new Promise<DiscoveredDevice[]>((r) => { resolveDiscover = r; }));
+    render(<HomeScreen onConnected={vi.fn()} />);
+    // held session's Open button is present BEFORE discover resolves
+    expect(await screen.findByRole("button", { name: "Open SDS824X HD" })).toBeInTheDocument();
+    resolveDiscover([]);
+  });
+
   it("opens a held session, records it in recent, and calls onConnected", async () => {
     vi.spyOn(api, "listSessions").mockResolvedValue([SESSION]);
     vi.spyOn(api, "discover").mockResolvedValue([]);

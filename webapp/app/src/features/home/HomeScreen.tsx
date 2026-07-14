@@ -32,15 +32,17 @@ export function HomeScreen({ onConnected }: Props) {
     setError(null);
     try {
       const sessions = await api.listSessions();
-      const heldSeed = sessions.filter((s) => s.address === null).map(sessionAsDevice);
-      // seed the sessions zone immediately (mock-held sessions have no discover entry)
+      const heldSeed = sessions.map(sessionAsDevice); // ALL held sessions, real + mock
+      const heldAddrs = new Set(sessions.map((s) => s.address).filter((a): a is string => a !== null));
+      // seed the sessions zone immediately, before the slow discover scan resolves
       setDevices((prev) => {
-        const found = prev.filter((d) => !d.connected); // keep any prior fleet while re-scanning
-        return [...heldSeed, ...found];
+        // keep the prior available fleet, minus anything now held; prepend the held seed
+        const priorFleet = prev.filter((d) => !d.connected && !heldAddrs.has(d.address ?? ""));
+        return [...heldSeed, ...priorFleet];
       });
       const found = await api.discover();
-      const heldAddresses = new Set(found.filter((d) => d.connected).map((d) => d.address));
-      const heldFromSessions = sessions.filter((s) => !heldAddresses.has(s.address)).map(sessionAsDevice);
+      const foundHeld = new Set(found.filter((d) => d.connected).map((d) => d.address));
+      const heldFromSessions = sessions.filter((s) => !foundHeld.has(s.address)).map(sessionAsDevice);
       setDevices([...heldFromSessions, ...found]);
       setLastScanned("last scanned just now");
     } catch (err) {
