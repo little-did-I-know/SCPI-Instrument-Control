@@ -35,6 +35,29 @@ jobs:
           # Exit-zero treats all errors as warnings
           flake8 scpi_control/ --count --exit-zero --max-line-length=200 --statistics
 
+  frontend:
+    name: Frontend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: webapp/app
+
+      - name: Unit tests
+        run: npm test
+        working-directory: webapp/app
+
+      - name: Typecheck and build
+        run: npm run build
+        working-directory: webapp/app
+
   build:
     name: Build Package
     runs-on: ubuntu-latest
