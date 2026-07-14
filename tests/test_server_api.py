@@ -87,3 +87,50 @@ def test_models_endpoint_lists_registry(client):
     assert "SDS1104X-E" in names and "SDS824X HD" in names
     assert names == sorted(names)
     assert {"model_name", "series", "num_channels", "bandwidth_mhz", "dialect"} <= set(models[0])
+
+
+class TestScopeEndpoints:
+    def _session(self, client):
+        return create_mock_session(client)["id"]
+
+    def test_get_state(self, client):
+        sid = self._session(client)
+        state = client.get("/api/sessions/{0}/scope/state".format(sid)).json()
+        assert state["channels"]["1"]["enabled"] is True
+        assert state["trigger"]["mode"] in ("AUTO", "NORM", "SINGLE", "STOP")
+        assert isinstance(state["timebase"], float)
+
+    def test_patch_channel_applies_and_returns_state(self, client):
+        sid = self._session(client)
+        response = client.patch("/api/sessions/{0}/scope/channels/1".format(sid), json={"voltage_scale": 0.5, "coupling": "AC"})
+        assert response.status_code == 200
+        ch1 = response.json()["channels"]["1"]
+        assert ch1["voltage_scale"] == 0.5
+        assert ch1["coupling"] == "AC"
+
+    def test_patch_channel_invalid_coupling_is_400(self, client):
+        sid = self._session(client)
+        response = client.patch("/api/sessions/{0}/scope/channels/1".format(sid), json={"coupling": "BANANA"})
+        assert response.status_code == 400
+
+    def test_patch_timebase(self, client):
+        sid = self._session(client)
+        response = client.patch("/api/sessions/{0}/scope/timebase".format(sid), json={"timebase": 0.002})
+        assert response.status_code == 200
+        assert response.json()["timebase"] == 0.002
+
+    def test_patch_trigger_mode(self, client):
+        sid = self._session(client)
+        response = client.patch("/api/sessions/{0}/scope/trigger".format(sid), json={"mode": "SINGLE"})
+        assert response.status_code == 200
+        assert response.json()["trigger"]["mode"] == "SINGLE"
+
+    def test_run_stop_endpoints(self, client):
+        sid = self._session(client)
+        for op in ("run", "stop", "single", "auto"):
+            response = client.post("/api/sessions/{0}/scope/{1}".format(sid, op))
+            assert response.status_code == 200, (op, response.text)
+            assert "run_state" in response.json()
+
+    def test_unknown_session_scope_call_is_404(self, client):
+        assert client.get("/api/sessions/nope/scope/state").status_code == 404
