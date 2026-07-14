@@ -1,9 +1,11 @@
 """FastAPI app factory (requires the [web] extra; Python >= 3.9)."""
 
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Optional
 
 from fastapi import FastAPI, Request
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
@@ -19,8 +21,16 @@ def _error_response(status: int, exc: BaseException) -> JSONResponse:
 
 
 def create_app(manager: Optional[SessionManager] = None) -> FastAPI:
-    app = FastAPI(title="SCPI Instrument Control Gateway")
-    app.state.manager = manager if manager is not None else SessionManager()
+    manager = manager if manager is not None else SessionManager()
+
+    @asynccontextmanager
+    async def lifespan(app: FastAPI):
+        yield
+        # close_all() joins worker threads, so keep it off the event loop.
+        await run_in_threadpool(app.state.manager.close_all)
+
+    app = FastAPI(title="SCPI Instrument Control Gateway", lifespan=lifespan)
+    app.state.manager = manager
 
     from scpi_control.server.api import scope as scope_api
     from scpi_control.server.api import sessions as sessions_api
@@ -52,7 +62,8 @@ def create_app(manager: Optional[SessionManager] = None) -> FastAPI:
 
     @app.exception_handler(StarletteHTTPException)
     async def _http_error(request: Request, exc: StarletteHTTPException):
-        return JSONResponse(status_code=exc.status_code, content={"error": "HTTPException", "detail": exc.detail})
+        # Preserve headers Starlette attaches (e.g. Allow on a 405).
+        return JSONResponse(status_code=exc.status_code, content={"error": "HTTPException", "detail": exc.detail}, headers=getattr(exc, "headers", None))
 
     if STATIC_DIR.is_dir():
         app.mount("/", StaticFiles(directory=str(STATIC_DIR), html=True), name="frontend")

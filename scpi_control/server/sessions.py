@@ -10,11 +10,12 @@ import queue
 import threading
 import uuid
 from concurrent.futures import Future
+from concurrent.futures import TimeoutError as FuturesTimeoutError
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from scpi_control import Oscilloscope
 from scpi_control.connection.mock import MockConnection
-from scpi_control.exceptions import SiglentError
+from scpi_control.exceptions import SiglentConnectionError, SiglentError
 
 MAX_FRAME_POINTS = 2000
 MEASUREMENT_EVERY_N_POLLS = 4
@@ -123,6 +124,11 @@ class InstrumentSession:
         session._thread.start()
         try:
             session.submit(session._connect_job).result(timeout=30)
+        except FuturesTimeoutError:
+            # A hung connect leaves a worker parked on the socket; close then
+            # surface it as a domain error rather than a bare futures timeout.
+            session.close()
+            raise SiglentConnectionError("connect timed out")
         except BaseException:
             session.close()
             raise
@@ -152,6 +158,9 @@ class InstrumentSession:
         self._queue.put(_STOP)
         self._thread.join(timeout=timeout)
         self.state = "closed"
+        # Tell any live streams the session is gone. Publishing from the closing
+        # thread is safe: subscribers only schedule via call_soon_threadsafe.
+        self.publish({"type": "closed"})
 
     def subscribe(self, callback: Callable[[Dict[str, Any]], None]) -> Callable[[], None]:
         with self._subscribers_lock:
@@ -176,6 +185,12 @@ class InstrumentSession:
     def set_measurements(self, items: List[Tuple[int, str]]) -> None:
         self.measurements = list(items)
 
+    def _enter_error_state(self, detail: str) -> None:
+        """Flip to the terminal error state and tell the streams once."""
+        self.state = "error"
+        self.error_detail = detail
+        self.publish({"type": "error", "detail": detail})
+
     def _worker(self) -> None:
         while True:
             try:
@@ -192,6 +207,23 @@ class InstrumentSession:
                 future.set_result(fn(self._scope))
             except BaseException as exc:  # propagate everything to the caller
                 future.set_exception(exc)
+                # A SiglentError from a dropped wire is a session-fatal event:
+                # flip to "error" so REST mutations start returning 409.
+                if isinstance(exc, SiglentError) and not self._scope.is_connected:
+                    self._enter_error_state(str(exc))
+        # Drain jobs that raced in behind _STOP so their callers get a clean 409
+        # instead of an await that never resolves.
+        while True:
+            try:
+                item = self._queue.get_nowait()
+            except queue.Empty:
+                break
+            if item is _STOP:
+                continue
+            fn, future = item
+            if not future.set_running_or_notify_cancel():
+                continue
+            future.set_exception(SessionError("session {0} is closed".format(self.id)))
         try:
             self._scope.disconnect()
         except SiglentError:
@@ -202,6 +234,10 @@ class InstrumentSession:
             if not self._subscribers:
                 return
         if self.state != "connected":
+            return
+        if not self._scope.is_connected:
+            # The wire dropped while idle (no job in flight to surface it).
+            self._enter_error_state("connection lost")
             return
         self._poll_count += 1
         scope = self._scope

@@ -1,13 +1,15 @@
 """Worker-thread session core. No FastAPI dependency."""
 
+import concurrent.futures
 import threading
 import time
+from concurrent.futures import Future
 
 import pytest
 
 from scpi_control.connection.mock import MockConnection
-from scpi_control.exceptions import SiglentError
-from scpi_control.server.sessions import InstrumentSession, SessionError
+from scpi_control.exceptions import SiglentConnectionError, SiglentError
+from scpi_control.server.sessions import _STOP, InstrumentSession, SessionError
 
 LEGACY_IDN = "Siglent Technologies,SDS1104X-E,MOCK0001,1.0.0.0"
 
@@ -98,6 +100,106 @@ def test_open_failure_raises_and_leaves_no_thread():
         InstrumentSession.open("bad", mock=True, _connection=conn)
     time.sleep(0.1)
     assert threading.active_count() <= before + 1
+
+
+class KillableMock(MockConnection):
+    """A mock whose connection can be pulled mid-session, as if the wire dropped."""
+
+    def kill(self):
+        # Flip the connected flag; the base query()/write() then raise
+        # SiglentConnectionError for every subsequent call, like a dead socket.
+        self._connected = False
+
+
+def _killable_session():
+    conn = KillableMock("mock", idn=LEGACY_IDN, channel_states={1: True}, trigger_status=["Stop"], sample_rate=1_000.0, timebase=1e-3)
+    return InstrumentSession.open("bench-1", mock=True, _connection=conn), conn
+
+
+def _wait_for(predicate, timeout=5.0):
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        if predicate():
+            return True
+        time.sleep(0.02)
+    return predicate()
+
+
+class TestErrorState:
+    def test_dropped_connection_flips_to_error_and_blocks_mutations(self):
+        # Fix 3: a job that fails because the wire dropped must flip the session
+        # to "error" and make further submits raise SessionError (-> HTTP 409).
+        session, conn = _killable_session()
+        try:
+            conn.kill()
+            with pytest.raises(SiglentError):
+                session.submit(lambda scope: scope.identify()).result(timeout=5)
+            assert _wait_for(lambda: session.state == "error")
+            assert session.state == "error"
+            with pytest.raises(SessionError):
+                session.submit(lambda scope: scope.identify())
+        finally:
+            session.close()
+
+    def test_idle_poll_detects_dropped_connection(self):
+        # Fix 3: even with no job in flight, the poll loop must notice the drop.
+        session, conn = _killable_session()
+        try:
+            unsubscribe = session.subscribe(lambda msg: None)
+            conn.kill()
+            assert _wait_for(lambda: session.state == "error")
+            assert session.state == "error"
+            unsubscribe()
+        finally:
+            session.close()
+
+
+class TestCloseDrain:
+    def test_close_drains_jobs_stuck_behind_stop(self):
+        # Fix 4: a job that lands behind _STOP (submit/close race) must be failed
+        # with SessionError on drain, not left to hang forever.
+        session, _ = make_mock_session()
+        gate = threading.Event()
+        started = threading.Event()
+
+        def slow(scope):
+            started.set()
+            gate.wait(3.0)
+
+        session.submit(slow)
+        assert started.wait(2.0)  # worker is now busy holding the slow job
+        # Reproduce the race deterministically: _STOP ahead of a still-queued job.
+        orphan = Future()
+        session._queue.put(_STOP)
+        session._queue.put((lambda scope: "never runs", orphan))
+        gate.set()  # release the slow job -> worker hits _STOP, then drains
+        done, _ = concurrent.futures.wait([orphan], timeout=5)
+        assert orphan in done, "orphaned future hung instead of being drained"
+        with pytest.raises(SessionError):
+            orphan.result()
+        session.close()
+
+
+class TestCloseNotifiesStreams:
+    def test_close_publishes_closed_message(self):
+        # Fix 5 (sessions half): close() tells subscribers the session is gone.
+        session, _ = make_mock_session()
+        seen = []
+        session.subscribe(seen.append)
+        session.close()
+        assert any(m.get("type") == "closed" for m in seen)
+
+
+def test_open_connect_timeout_raises_connection_error(monkeypatch):
+    # Fix 8: a connect that never completes surfaces as SiglentConnectionError.
+    conn = MockConnection("mock", idn=LEGACY_IDN, channel_states={1: True}, trigger_status=["Stop"], sample_rate=1_000.0, timebase=1e-3)
+
+    def fake_result(self, timeout=None):
+        raise concurrent.futures.TimeoutError()
+
+    monkeypatch.setattr(concurrent.futures.Future, "result", fake_result)
+    with pytest.raises(SiglentConnectionError):
+        InstrumentSession.open("t", mock=True, _connection=conn)
 
 
 from scpi_control.server.sessions import SessionManager

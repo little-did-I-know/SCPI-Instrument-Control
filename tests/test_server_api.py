@@ -45,6 +45,24 @@ def test_wrong_method_405_shares_error_shape(client):
     assert set(body) == {"error", "detail"}
 
 
+def test_wrong_method_405_keeps_allow_header(client):
+    # Fix 7: the StarletteHTTPException handler must preserve the Allow header.
+    response = client.delete("/api/sessions")
+    assert response.status_code == 405
+    assert "allow" in {k.lower() for k in response.headers}
+
+
+def test_lifespan_shutdown_closes_sessions():
+    # Fix 6: leaving the app context (lifespan teardown) closes live sessions.
+    manager = SessionManager()
+    with TestClient(create_app(manager)) as client:
+        body = client.post("/api/sessions", json={"mock": True}).json()
+        session = manager.get(body["id"])
+        assert session.state == "connected"
+    # No explicit close_all() -> the lifespan teardown must have closed it.
+    assert session.state == "closed"
+
+
 def create_mock_session(client, model=None):
     payload = {"mock": True}
     if model:
