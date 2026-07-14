@@ -4,6 +4,7 @@ import type { RunOp } from "../../api/types";
 import { Button } from "../../ds/Button";
 import { Toolbar, ToolbarSeparator } from "../../ds/Toolbar";
 import { useSession } from "../../store/session";
+import { ExportButton } from "../export/ExportButton";
 
 export function ScopeToolbar() {
   const session = useSession((s) => s.session);
@@ -33,7 +34,14 @@ export function ScopeToolbar() {
 
   return (
     <div style={{ display: "flex", flexDirection: "column" }}>
-      <Toolbar right={<Button variant="danger" onClick={disconnect}>Disconnect</Button>}>
+      <Toolbar
+        right={
+          <>
+            <ExportButton />
+            <Button variant="danger" onClick={disconnect}>Disconnect</Button>
+          </>
+        }
+      >
         <Button variant="ghost" onClick={() => op("run")}>Run</Button>
         <Button variant="ghost" onClick={() => op("stop")}>Stop</Button>
         <Button variant="ghost" onClick={() => op("single")}>Single</Button>

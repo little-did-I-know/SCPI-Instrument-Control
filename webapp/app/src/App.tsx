@@ -4,6 +4,7 @@ import { ChannelsPanel } from "./features/controls/ChannelsPanel";
 import { ScopeToolbar } from "./features/controls/ScopeToolbar";
 import { TriggerPanel } from "./features/controls/TriggerPanel";
 import { MeasurePanel } from "./features/measure/MeasurePanel";
+import { ReadoutStrip } from "./features/readout/ReadoutStrip";
 import { TerminalPanel } from "./features/terminal/TerminalPanel";
 import { WaveformCanvas } from "./features/waveform/WaveformCanvas";
 import { StatusIndicator } from "./ds/StatusIndicator";
@@ -27,8 +28,9 @@ export default function App() {
           <StatusIndicator state={status} />
         </span>
       </header>
-      <main style={{ flex: 1, padding: "var(--space-3)", color: "var(--lc-text)", display: "flex", flexDirection: "column" }}>
+      <main style={{ flex: 1, padding: "var(--space-3)", color: "var(--lc-text)", display: "flex", flexDirection: "column", gap: "var(--space-3)", minHeight: 0 }}>
         {session === null && <ConnectDialog onConnected={(s) => useSession.getState().setSession(s)} />}
+        {session !== null && <ReadoutStrip />}
         {session !== null && (
           <div style={{ flex: 1, display: "flex", gap: "var(--space-3)", minHeight: 0 }}>
             <div style={{ width: "280px", flexShrink: 0, overflowY: "auto" }}>
