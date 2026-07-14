@@ -44,6 +44,8 @@ export function Tabs({
         role="tablist"
         style={{
           display: "inline-flex",
+          flexWrap: "wrap",
+          maxWidth: "100%",
           gap: "3px",
           padding: "4px",
           background: "var(--lc-panel-2)",
