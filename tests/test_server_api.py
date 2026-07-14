@@ -29,3 +29,17 @@ def test_unknown_session_is_404(client):
     assert response.status_code == 404
     body = response.json()
     assert body["error"] and body["detail"]
+
+
+def test_unmatched_route_404_shares_error_shape(client):
+    response = client.get("/api/definitely-not-a-route")
+    assert response.status_code == 404
+    body = response.json()
+    assert set(body) == {"error", "detail"}
+
+
+def test_wrong_method_405_shares_error_shape(client):
+    response = client.delete("/api/sessions")  # only GET/POST exist on this path
+    assert response.status_code == 405
+    body = response.json()
+    assert set(body) == {"error", "detail"}

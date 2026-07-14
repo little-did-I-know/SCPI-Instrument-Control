@@ -3,9 +3,10 @@
 from pathlib import Path
 from typing import Optional
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from scpi_control.exceptions import InvalidParameterError, SiglentError, SiglentTimeoutError
 from scpi_control.server.sessions import SessionError, SessionManager
@@ -49,8 +50,8 @@ def create_app(manager: Optional[SessionManager] = None) -> FastAPI:
     async def _siglent(request: Request, exc: SiglentError):
         return _error_response(500, exc)
 
-    @app.exception_handler(HTTPException)
-    async def _http_error(request: Request, exc: HTTPException):
+    @app.exception_handler(StarletteHTTPException)
+    async def _http_error(request: Request, exc: StarletteHTTPException):
         return JSONResponse(status_code=exc.status_code, content={"error": "HTTPException", "detail": exc.detail})
 
     if STATIC_DIR.is_dir():
