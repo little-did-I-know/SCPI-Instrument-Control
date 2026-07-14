@@ -6,15 +6,13 @@ import pytest
 
 from scpi_control.exceptions import CommandError
 from scpi_control.trigger import Trigger
+from tests.dialect_helpers import make_dialect_scope
 
 
 @pytest.fixture
 def mock_scope():
     """Create a mock oscilloscope for testing."""
-    scope = Mock()
-    scope.write = Mock()
-    scope.query = Mock()
-    return scope
+    return make_dialect_scope("legacy")
 
 
 @pytest.fixture
@@ -44,7 +42,8 @@ class TestTriggerMode:
     def test_set_mode_stop(self, trigger, mock_scope):
         """Test setting STOP trigger mode."""
         trigger.set_mode("STOP")
-        mock_scope.write.assert_called_with("TRIG_MODE STOP")
+        # STOP is routed through the dedicated legacy STOP command, not TRIG_MODE
+        mock_scope.write.assert_called_with("STOP")
 
     def test_set_mode_invalid(self, trigger, mock_scope):
         """Test setting invalid trigger mode."""
@@ -154,13 +153,17 @@ class TestTriggerSlope:
 
     def test_set_slope_positive(self, trigger, mock_scope):
         """Test setting positive (rising) edge."""
+        # routed per-source; bare TRIG_SLOPE/TRIG_COUPLING were invalid on hardware (AUDIT H1)
+        mock_scope.query.return_value = "EDGE,SR,C1"
         trigger.slope = "POS"
-        mock_scope.write.assert_called_with("TRIG_SLOPE POS")
+        mock_scope.write.assert_called_with("C1:TRSL POS")
 
     def test_set_slope_negative(self, trigger, mock_scope):
         """Test setting negative (falling) edge."""
+        # routed per-source; bare TRIG_SLOPE/TRIG_COUPLING were invalid on hardware (AUDIT H1)
+        mock_scope.query.return_value = "EDGE,SR,C1"
         trigger.slope = "NEG"
-        mock_scope.write.assert_called_with("TRIG_SLOPE NEG")
+        mock_scope.write.assert_called_with("C1:TRSL NEG")
 
     def test_set_slope_invalid(self, trigger, mock_scope):
         """Test setting invalid slope."""
@@ -169,14 +172,16 @@ class TestTriggerSlope:
 
     def test_slope_property_setter(self, trigger, mock_scope):
         """Test slope property setter."""
+        # routed per-source; bare TRIG_SLOPE/TRIG_COUPLING were invalid on hardware (AUDIT H1)
+        mock_scope.query.return_value = "EDGE,SR,C1"
         trigger.slope = "NEG"
-        mock_scope.write.assert_called_with("TRIG_SLOPE NEG")
+        mock_scope.write.assert_called_with("C1:TRSL NEG")
 
     def test_slope_property_getter(self, trigger, mock_scope):
         """Test slope property getter."""
-        mock_scope.query.return_value = "POS"
+        mock_scope.query.side_effect = ["EDGE,SR,C1", "POS"]
         assert trigger.slope == "POS"
-        mock_scope.query.assert_called_with("TRIG_SLOPE?")
+        mock_scope.query.assert_called_with("C1:TRSL?")
 
 
 class TestEdgeTrigger:
@@ -184,6 +189,8 @@ class TestEdgeTrigger:
 
     def test_set_edge_trigger_defaults(self, trigger, mock_scope):
         """Test setting edge trigger with default parameters."""
+        # slope setter now looks up the source; mock_scope reflects it as C1
+        mock_scope.query.return_value = "EDGE,SR,C1"
         trigger.set_edge_trigger(source="C1", slope="POS")
 
         calls = mock_scope.write.call_args_list
@@ -191,10 +198,12 @@ class TestEdgeTrigger:
         # Check that source and slope commands were sent
         commands = [call[0][0] for call in calls]
         assert any("TRIG_SELECT EDGE,SR,C1" in cmd for cmd in commands)
-        assert any("TRIG_SLOPE POS" in cmd for cmd in commands)
+        # routed per-source; bare TRIG_SLOPE/TRIG_COUPLING were invalid on hardware (AUDIT H1)
+        assert any("C1:TRSL POS" in cmd for cmd in commands)
 
     def test_set_edge_trigger_with_slope(self, trigger, mock_scope):
         """Test setting edge trigger with slope."""
+        mock_scope.query.return_value = "EDGE,SR,C1"
         trigger.set_edge_trigger(source="C1", slope="POS")
 
         # Should set source and slope
@@ -202,12 +211,15 @@ class TestEdgeTrigger:
 
     def test_set_edge_trigger_channel2(self, trigger, mock_scope):
         """Test setting edge trigger on channel 2."""
+        # slope setter now looks up the source; mock_scope reflects it as C2
+        mock_scope.query.return_value = "EDGE,SR,C2"
         trigger.set_edge_trigger(source="C2", slope="NEG")
 
         calls = mock_scope.write.call_args_list
         commands = [call[0][0] for call in calls]
         assert any("TRIG_SELECT EDGE,SR,C2" in cmd for cmd in commands)
-        assert any("TRIG_SLOPE NEG" in cmd for cmd in commands)
+        # routed per-source; bare TRIG_SLOPE/TRIG_COUPLING were invalid on hardware (AUDIT H1)
+        assert any("C2:TRSL NEG" in cmd for cmd in commands)
 
 
 class TestTriggerActions:
@@ -268,6 +280,8 @@ class TestMultipleTriggerSettings:
 
     def test_trigger_workflow(self, trigger, mock_scope):
         """Test a complete trigger configuration workflow."""
+        # slope setter now looks up the source; mock_scope reflects it as C2
+        mock_scope.query.return_value = "EDGE,SR,C2"
         # Configure edge trigger
         trigger.set_edge_trigger(source="C2", slope="NEG")
 
@@ -279,6 +293,81 @@ class TestMultipleTriggerSettings:
 
         # Verify commands were sent in sequence
         assert mock_scope.write.call_count >= 4
+
+
+class TestTriggerModernDialect:
+    def setup_method(self):
+        self.scope = make_dialect_scope("modern")
+        self.trigger = Trigger(self.scope)
+
+    def test_set_mode_normal(self):
+        self.trigger.mode = "NORM"
+        self.scope.write.assert_called_once_with(":TRIGger:MODE NORMal")
+
+    def test_set_mode_stop_uses_stop_command(self):
+        self.trigger.mode = "STOP"
+        self.scope.write.assert_called_once_with(":TRIGger:STOP")
+
+    def test_get_mode_normalizes_mixed_case(self):
+        self.scope.query.side_effect = ["Ready", "SINGle"]  # status first, then mode
+        assert self.trigger.mode == "SINGLE"
+
+    def test_get_mode_reports_stop_from_status(self):
+        self.scope.query.side_effect = ["Stop"]
+        assert self.trigger.mode == "STOP"
+
+    def test_set_source(self):
+        self.trigger.source = "C2"
+        self.scope.write.assert_called_once_with(":TRIGger:EDGE:SOURce C2")
+
+    def test_get_source(self):
+        self.scope.query.return_value = "C1"
+        assert self.trigger.source == "C1"
+        self.scope.query.assert_called_once_with(":TRIGger:EDGE:SOURce?")
+
+    def test_set_slope_maps_tokens(self):
+        self.trigger.slope = "NEG"
+        self.scope.write.assert_called_once_with(":TRIGger:EDGE:SLOPe FALLing")
+
+    def test_get_slope_maps_back(self):
+        self.scope.query.return_value = "RISing"
+        assert self.trigger.slope == "POS"
+
+    def test_set_level(self):
+        self.trigger.level = 0.5
+        self.scope.write.assert_called_once_with(":TRIGger:EDGE:LEVel 0.5")
+
+    def test_set_coupling(self):
+        self.trigger.coupling = "AC"
+        self.scope.write.assert_called_once_with(":TRIGger:EDGE:COUPling AC")
+
+    def test_get_coupling_maps_reject_tokens_back(self):
+        self.scope.query.return_value = "HFREJect"
+        assert self.trigger.coupling == "HFREJ"
+
+    def test_force(self):
+        self.trigger.force()
+        self.scope.write.assert_called_once_with(":TRIGger:MODE FTRIG")
+
+
+class TestTriggerLegacyRouted:
+    def setup_method(self):
+        self.scope = make_dialect_scope("legacy")
+        self.trigger = Trigger(self.scope)
+
+    def test_set_slope_is_per_source(self):
+        self.scope.query.return_value = "EDGE,SR,C1"
+        self.trigger.slope = "POS"
+        self.scope.write.assert_called_once_with("C1:TRSL POS")
+
+    def test_set_coupling_is_per_source(self):
+        self.scope.query.return_value = "EDGE,SR,C2"
+        self.trigger.coupling = "DC"
+        self.scope.write.assert_called_once_with("C2:TRCP DC")
+
+    def test_set_mode_passthrough(self):
+        self.trigger.mode = "NORM"
+        self.scope.write.assert_called_once_with("TRIG_MODE NORM")
 
 
 class TestTriggerStringRepresentation:

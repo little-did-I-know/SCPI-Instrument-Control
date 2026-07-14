@@ -7,11 +7,17 @@ from typing import Dict, Iterable, List, Optional, Union
 
 from scpi_control import exceptions
 from scpi_control.connection.base import BaseConnection
+from scpi_control.models import detect_model_from_idn
 
 
 def _format_scientific(value: float, unit: str) -> str:
     """Format a numeric value with a unit using Siglent-style scientific notation."""
     return f"{value:.2E}{unit}"
+
+
+def _format_nr3(value: float) -> str:
+    """Format a bare NR3 numeric value (no unit) as used by modern-dialect queries."""
+    return f"{value:.2E}"
 
 
 class MockConnection(BaseConnection):
@@ -54,16 +60,26 @@ class MockConnection(BaseConnection):
         channels = channel_states.keys() if channel_states else range(1, 3)
 
         self.idn = idn
+        # Personality: answer only the wire dialect this model actually speaks
+        self.scope_dialect = detect_model_from_idn(idn).dialect
         self._channel_enabled: Dict[int, bool] = {ch: channel_states.get(ch, True) if channel_states else True for ch in channels}
         self._voltage_scales: Dict[int, float] = {ch: voltage_scales.get(ch, 1.0) if voltage_scales else 1.0 for ch in channels}
         self._voltage_offsets: Dict[int, float] = {ch: voltage_offsets.get(ch, 0.0) if voltage_offsets else 0.0 for ch in channels}
         self._waveform_payloads: Dict[int, bytes] = {ch: (waveform_payloads.get(ch, bytes([0, 25, 50, 75])) if waveform_payloads else bytes([0, 25, 50, 75])) for ch in channels}
+        self._channel_coupling: Dict[int, str] = {ch: "D1M" for ch in channels}
 
         self.sample_rate = sample_rate
         self.timebase = timebase
-        self.trigger_mode = "STOP"
         self.trigger_type = "EDGE"
         self.trigger_source = "C1"
+        if self.scope_dialect == "modern":
+            # Initial wire tokens must be modern vocabulary (guide p.482, p.494)
+            self.trigger_mode = "AUTO"
+            self.trigger_slope = "RISing"
+        else:
+            self.trigger_mode = "STOP"
+            self.trigger_slope = "POS"
+        self.trigger_coupling = "DC"
         self.trigger_level: Dict[int, float] = {ch: 0.0 for ch in channels}
         self.trigger_status: List[str] = trigger_status[:] if trigger_status else ["Stop"]
 
@@ -312,6 +328,56 @@ class MockConnection(BaseConnection):
                 return
 
         # Oscilloscope commands
+        if self.scope_dialect == "modern":
+            if match := re.match(r":CHANnel(\d+):SWITch\s+(ON|OFF)", command, re.IGNORECASE):
+                self._channel_enabled[int(match.group(1))] = match.group(2).upper() == "ON"
+                return
+            if match := re.match(r":CHANnel(\d+):SCALe\s+(.+)", command, re.IGNORECASE):
+                ch = int(match.group(1))
+                self._voltage_scales[ch] = float(match.group(2))
+                self.scale_updates.setdefault(ch, []).append(float(match.group(2)))
+                return
+            if match := re.match(r":CHANnel(\d+):OFFSet\s+(.+)", command, re.IGNORECASE):
+                self._voltage_offsets[int(match.group(1))] = float(match.group(2))
+                return
+            if match := re.match(r":CHANnel(\d+):COUPling\s+(\w+)", command, re.IGNORECASE):
+                self._channel_coupling[int(match.group(1))] = match.group(2).upper()
+                return
+            if match := re.match(r":TIMebase:SCALe\s+(.+)", command, re.IGNORECASE):
+                self.timebase = float(match.group(1))
+                self.timebase_updates.append(self.timebase)
+                return
+            if match := re.match(r":TRIGger:MODE\s+(\w+)", command, re.IGNORECASE):
+                self.trigger_mode = match.group(1)  # stored as wire token, e.g. "NORMal" (guide p.482)
+                if match.group(1).upper() == "SINGLE" and len(self.trigger_status) <= 1:
+                    # Status vocabulary matches real hardware: Ready while armed, Stop when done (same rule as the legacy ARM handler)
+                    self.trigger_status = ["Ready", "Stop"]
+                return
+            if re.match(r":TRIGger:RUN$", command, re.IGNORECASE):
+                self.trigger_mode = "AUTO"
+                return
+            if re.match(r":TRIGger:STOP$", command, re.IGNORECASE):
+                if len(self.trigger_status) <= 1:
+                    self.trigger_status = ["Stop"]
+                return
+            if match := re.match(r":TRIGger:TYPE\s+(\w+)", command, re.IGNORECASE):
+                self.trigger_type = match.group(1).upper()
+                return
+            if match := re.match(r":TRIGger:EDGE:SOURce\s+(\w+)", command, re.IGNORECASE):
+                self.trigger_source = match.group(1).upper()
+                return
+            if match := re.match(r":TRIGger:EDGE:LEVel\s+(.+)", command, re.IGNORECASE):
+                self.trigger_level[1] = float(match.group(1))
+                return
+            if match := re.match(r":TRIGger:EDGE:SLOPe\s+(\w+)", command, re.IGNORECASE):
+                self.trigger_slope = match.group(1)  # wire token, e.g. "RISing" (guide p.494)
+                return
+            if match := re.match(r":TRIGger:EDGE:COUPling\s+(\w+)", command, re.IGNORECASE):
+                self.trigger_coupling = match.group(1)
+                return
+            # Unknown modern writes fall through and are merely recorded,
+            # mirroring real scopes which silently drop unknown commands
+
         if command.upper().startswith("TDIV "):
             value = command.split(" ", 1)[1]
             try:
@@ -331,6 +397,8 @@ class MockConnection(BaseConnection):
         elif match := re.match(r"C(\d+):TRA\s+(ON|OFF)", command, re.IGNORECASE):
             channel = int(match.group(1))
             self._channel_enabled[channel] = match.group(2).upper() == "ON"
+        elif match := re.match(r"C(\d+):CPL\s+(\w+)", command, re.IGNORECASE):
+            self._channel_coupling[int(match.group(1))] = match.group(2).upper()
         elif command.upper().startswith("TRIG_MODE "):
             self.trigger_mode = command.split(" ", 1)[1].upper()
         elif command.upper().startswith("TRIG_SELECT "):
@@ -338,10 +406,15 @@ class MockConnection(BaseConnection):
             trig_type, _, source = params.split(",")
             self.trigger_type = trig_type.strip().upper()
             self.trigger_source = source.strip().upper()
+        elif match := re.match(r"C(\d+):TRSL\s+(\w+)", command, re.IGNORECASE):
+            self.trigger_slope = match.group(2).upper()
+        elif match := re.match(r"C(\d+):TRCP\s+(\w+)", command, re.IGNORECASE):
+            self.trigger_coupling = match.group(2).upper()
         elif command.upper() == "ARM":
-            # Simulate an acquisition that will eventually stop when no custom sequence is provided
+            # Simulate an acquisition that will eventually stop when no custom sequence is provided.
+            # Status vocabulary matches real hardware: Ready while armed, Stop when done.
             if len(self.trigger_status) <= 1:
-                self.trigger_status = ["Run", "Stop"]
+                self.trigger_status = ["Ready", "Stop"]
         elif match := re.match(r"C(\d+):TRLV\s+(.+)", command, re.IGNORECASE):
             channel = int(match.group(1))
             self.trigger_level[channel] = float(match.group(2))
@@ -587,42 +660,87 @@ class MockConnection(BaseConnection):
                     return "CV"
                 return "CV"
 
-        if upper in {":TRIG:STAT?", "TRIG:STAT?"}:
-            if len(self.trigger_status) > 1:
-                return self.trigger_status.pop(0)
-            return self.trigger_status[0]
+        if self.scope_dialect == "modern":
+            if upper == ":TRIGGER:STATUS?":  # enum Arm|Ready|Auto|Trig'd|Stop|Roll, p.483
+                if len(self.trigger_status) > 1:
+                    return self.trigger_status.pop(0)
+                return self.trigger_status[0]
+            if upper == ":TRIGGER:MODE?":  # mixed-case wire token, e.g. "NORMal", p.482
+                return self.trigger_mode
+            if upper == ":TRIGGER:TYPE?":
+                return self.trigger_type
+            if upper == ":TRIGGER:EDGE:SOURCE?":  # bare token, p.495
+                return self.trigger_source
+            if upper == ":TRIGGER:EDGE:SLOPE?":  # wire token e.g. "RISing", p.494
+                return self.trigger_slope
+            if upper == ":TRIGGER:EDGE:COUPLING?":
+                return self.trigger_coupling
+            if upper == ":TRIGGER:EDGE:LEVEL?":  # bare NR3, p.492
+                return _format_nr3(self.trigger_level.get(1, 0.0))
+            if match := re.match(r":CHANNEL(\d+):SWITCH\?", upper):
+                return "ON" if self._channel_enabled.get(int(match.group(1)), True) else "OFF"
+            if match := re.match(r":CHANNEL(\d+):SCALE\?", upper):  # bare NR3, p.58
+                return _format_nr3(self._voltage_scales.get(int(match.group(1)), 1.0))
+            if match := re.match(r":CHANNEL(\d+):OFFSET\?", upper):  # bare NR3, p.56
+                return _format_nr3(self._voltage_offsets.get(int(match.group(1)), 0.0))
+            if match := re.match(r":CHANNEL(\d+):COUPLING\?", upper):  # DC|AC|GND, p.51
+                return self._channel_coupling.get(int(match.group(1)), "DC")
+            if upper == ":TIMEBASE:SCALE?":  # bare NR3, p.476
+                return _format_nr3(self.timebase)
+            if upper == ":ACQUIRE:SRATE?":  # bare NR3, p.46
+                return _format_nr3(self.sample_rate)
 
-        if upper == "TRIG_MODE?":
-            return self.trigger_mode
+        if self.scope_dialect == "legacy":
+            if match := re.match(r"C(\d+):VDIV\?", command, re.IGNORECASE):
+                channel = int(match.group(1))
+                value = self._voltage_scales.get(channel, 1.0)
+                return _format_scientific(value, "V")
 
-        if upper == "TRIG_SELECT?":
-            return f"{self.trigger_type},SR,{self.trigger_source}"
+            if match := re.match(r"C(\d+):OFST\?", command, re.IGNORECASE):
+                channel = int(match.group(1))
+                value = self._voltage_offsets.get(channel, 0.0)
+                return _format_scientific(value, "V")
 
-        if match := re.match(r"C(\d+):VDIV\?", command, re.IGNORECASE):
-            channel = int(match.group(1))
-            value = self._voltage_scales.get(channel, 1.0)
-            return f"C{channel}:VDIV {_format_scientific(value, 'V')}"
+            if match := re.match(r"C(\d+):TRA\?", command, re.IGNORECASE):
+                channel = int(match.group(1))
+                return "ON" if self._channel_enabled.get(channel, True) else "OFF"
 
-        if match := re.match(r"C(\d+):OFST\?", command, re.IGNORECASE):
-            channel = int(match.group(1))
-            value = self._voltage_offsets.get(channel, 0.0)
-            return f"C{channel}:OFST {_format_scientific(value, 'V')}"
+            if match := re.match(r"C(\d+):CPL\?", command, re.IGNORECASE):
+                return self._channel_coupling.get(int(match.group(1)), "D1M")
 
-        if match := re.match(r"C(\d+):TRA\?", command, re.IGNORECASE):
-            channel = int(match.group(1))
-            return "ON" if self._channel_enabled.get(channel, True) else "OFF"
+            if match := re.match(r"C(\d+):TRLV\?", command, re.IGNORECASE):
+                channel = int(match.group(1))
+                return _format_scientific(self.trigger_level.get(channel, 0.0), "V")
 
-        if match := re.match(r"C(\d+):TRLV\?", command, re.IGNORECASE):
-            channel = int(match.group(1))
-            return f"C{channel}:TRLV {_format_scientific(self.trigger_level.get(channel, 0.0), 'V')}"
+            if re.match(r"C(\d+):TRSL\?", command, re.IGNORECASE):
+                return self.trigger_slope
 
-        if upper == "TDIV?":
-            return f"TDIV {_format_scientific(self.timebase, 'S')}"
+            if re.match(r"C(\d+):TRCP\?", command, re.IGNORECASE):
+                return self.trigger_coupling
 
-        if upper == "SARA?":
-            return f"SARA {_format_scientific(self.sample_rate, 'SA/S')}"
+            if upper == "TDIV?":
+                return _format_scientific(self.timebase, "S")
 
-        return ""
+            if upper == "SARA?":
+                return _format_scientific(self.sample_rate, "Sa/s")
+
+            if upper == "SAST?":
+                if len(self.trigger_status) > 1:
+                    return self.trigger_status.pop(0)
+                return self.trigger_status[0]
+
+            if upper == "TRIG_MODE?":
+                return self.trigger_mode
+
+            if upper == "TRIG_SELECT?":
+                return f"{self.trigger_type},SR,{self.trigger_source}"
+
+        if self.psu_mode or self.awg_mode or self.daq_mode:
+            return ""
+
+        # Real scopes produce no response at all for unknown or wrong-dialect
+        # queries - the caller's read times out. Model that honestly.
+        raise exceptions.TimeoutError(f"MockConnection ({self.scope_dialect}) has no response for query: {command!r}")
 
     def query_many(self, commands: Iterable[str]) -> List[str]:
         """Convenience helper to query multiple commands sequentially."""

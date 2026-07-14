@@ -4,6 +4,7 @@ import logging
 from typing import TYPE_CHECKING, Literal, Optional
 
 from scpi_control import exceptions
+from scpi_control.scpi_commands import coupling_from_wire, coupling_to_wire
 
 if TYPE_CHECKING:
     from scpi_control.oscilloscope import Oscilloscope
@@ -36,13 +37,20 @@ class Channel:
             raise exceptions.InvalidParameterError(f"Invalid channel number: {channel_number}. Must be 1-4.")
 
     @property
+    def _dialect(self) -> str:
+        return getattr(self._scope, "dialect", None) or "legacy"
+
+    def _cmd(self, name: str, **kwargs) -> str:
+        return self._scope._get_command(name, **kwargs)
+
+    @property
     def enabled(self) -> bool:
         """Get channel display state.
 
         Returns:
             True if channel is displayed, False otherwise
         """
-        response = self._scope.query(f"{self._prefix}:TRA?")
+        response = self._scope.query(self._cmd("get_channel_display", ch=self._channel))
         # Response format: "C1:TRA ON" or "C1:TRA OFF"
         # Extract the last word
         return "ON" in response.upper()
@@ -55,7 +63,7 @@ class Channel:
             value: True to display channel, False to hide
         """
         state = "ON" if value else "OFF"
-        self._scope.write(f"{self._prefix}:TRA {state}")
+        self._scope.write(self._cmd("set_channel_display", ch=self._channel, state=state))
         logger.info(f"Channel {self._channel} {'enabled' if value else 'disabled'}")
 
     def enable(self) -> None:
@@ -73,8 +81,7 @@ class Channel:
         Returns:
             Coupling mode: 'DC', 'AC', or 'GND'
         """
-        response = self._scope.query(f"{self._prefix}:CPL?")
-        return response.upper().strip()
+        return coupling_from_wire(self._dialect, self._scope.query(self._cmd("get_coupling", ch=self._channel)))
 
     @coupling.setter
     def coupling(self, mode: CouplingType) -> None:
@@ -86,7 +93,7 @@ class Channel:
         mode = mode.upper()
         if mode not in ["DC", "AC", "GND"]:
             raise exceptions.InvalidParameterError(f"Invalid coupling mode: {mode}. Must be DC, AC, or GND.")
-        self._scope.write(f"{self._prefix}:CPL {mode}")
+        self._scope.write(self._cmd("set_coupling", ch=self._channel, coupling=coupling_to_wire(self._dialect, mode)))
         logger.info(f"Channel {self._channel} coupling set to {mode}")
 
     @property
@@ -96,7 +103,7 @@ class Channel:
         Returns:
             Voltage scale in volts/division
         """
-        response = self._scope.query(f"{self._prefix}:VDIV?")
+        response = self._scope.query(self._cmd("get_voltage_div", ch=self._channel))
         # Response may include echo like "C1:VDIV 1.0E+00V" or just "1.0E+00V"
         # Remove the echo prefix if present
         if ":" in response:
@@ -120,7 +127,7 @@ class Channel:
         """
         if volts_per_div <= 0:
             raise exceptions.InvalidParameterError(f"Voltage scale must be positive: {volts_per_div}")
-        self._scope.write(f"{self._prefix}:VDIV {volts_per_div}")
+        self._scope.write(self._cmd("set_voltage_div", ch=self._channel, vdiv=volts_per_div))
         logger.info(f"Channel {self._channel} scale set to {volts_per_div} V/div")
 
     def set_scale(self, volts_per_div: float) -> None:
@@ -138,7 +145,7 @@ class Channel:
         Returns:
             Offset voltage in volts
         """
-        response = self._scope.query(f"{self._prefix}:OFST?")
+        response = self._scope.query(self._cmd("get_voltage_offset", ch=self._channel))
         # Response may include echo like "C1:OFST 1.0E+00V"
         if ":" in response:
             response = response.split(":", 1)[1]
@@ -154,7 +161,7 @@ class Channel:
         Args:
             offset: Offset voltage in volts
         """
-        self._scope.write(f"{self._prefix}:OFST {offset}")
+        self._scope.write(self._cmd("set_voltage_offset", ch=self._channel, offset=offset))
         logger.info(f"Channel {self._channel} offset set to {offset} V")
 
     @property
@@ -164,7 +171,7 @@ class Channel:
         Returns:
             Probe ratio (e.g., 1.0 for 1X, 10.0 for 10X)
         """
-        response = self._scope.query(f"{self._prefix}:ATTN?")
+        response = self._scope.query(self._cmd("get_probe_ratio", ch=self._channel))
         # Response may include echo like "C1:ATTN 10"
         if ":" in response:
             response = response.split(":", 1)[1]
@@ -183,7 +190,7 @@ class Channel:
         """
         if ratio <= 0:
             raise exceptions.InvalidParameterError(f"Probe ratio must be positive: {ratio}")
-        self._scope.write(f"{self._prefix}:ATTN {ratio}")
+        self._scope.write(self._cmd("set_probe_ratio", ch=self._channel, ratio=ratio))
         logger.info(f"Channel {self._channel} probe ratio set to {ratio}X")
 
     @property
@@ -193,8 +200,11 @@ class Channel:
         Returns:
             Bandwidth limit: 'ON', 'OFF', or frequency limit
         """
-        response = self._scope.query(f"{self._prefix}:BWL?")
-        return response.upper().strip()
+        response = self._scope.query(self._cmd("get_bandwidth_limit", ch=self._channel)).strip().upper()
+        if self._dialect == "modern":
+            # Modern wire tokens are FULL/20M/200M; the API speaks ON/OFF
+            return "OFF" if response == "FULL" else "ON"
+        return response
 
     @bandwidth_limit.setter
     def bandwidth_limit(self, limit: BandwidthLimitType) -> None:
@@ -206,10 +216,11 @@ class Channel:
         limit = limit.upper()
         if limit not in ["ON", "OFF", "FULL"]:
             raise exceptions.InvalidParameterError(f"Invalid bandwidth limit: {limit}. Must be ON, OFF, or FULL.")
-        # Convert FULL to OFF for compatibility
-        if limit == "FULL":
-            limit = "OFF"
-        self._scope.write(f"{self._prefix}:BWL {limit}")
+        if self._dialect == "modern":
+            wire = "FULL" if limit in ("OFF", "FULL") else "20M"
+        else:
+            wire = "OFF" if limit == "FULL" else limit
+        self._scope.write(self._cmd("set_bandwidth_limit", ch=self._channel, limit=wire))
         logger.info(f"Channel {self._channel} bandwidth limit set to {limit}")
 
     @property
@@ -219,6 +230,7 @@ class Channel:
         Returns:
             Unit string (typically 'V' for volts)
         """
+        # legacy-only command; not routed
         response = self._scope.query(f"{self._prefix}:UNIT?")
         return response.strip()
 
@@ -241,7 +253,7 @@ class Channel:
         # For per-channel auto-scale, we might need to use different commands
         # This is a basic implementation that may need adjustment for SD824x
         logger.info(f"Auto-scaling channel {self._channel}")
-        self._scope.write("ASET")
+        self._scope.write(self._cmd("auto_setup"))
 
     def get_configuration(self) -> dict:
         """Get all channel configuration parameters.

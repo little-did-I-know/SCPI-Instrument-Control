@@ -42,7 +42,7 @@ def test_capture_single_uses_channel_enabled_and_waveform_acquire(monkeypatch, c
 
     assert list(waveforms.keys()) == [1]
     assert collector.scope._connection.waveform_requests == [1]
-    assert collector.scope._connection.writes[:3] == ["TRIG_MODE SINGLE", "ARM", "C1:WF? DAT2"]
+    assert collector.scope._connection.writes[:4] == ["CHDR OFF", "TRIG_MODE SINGLE", "ARM", "C1:WF? DAT2"]
 
 
 def test_batch_capture_applies_timebase_and_scale(monkeypatch, collector):
@@ -116,7 +116,7 @@ def test_wait_for_trigger_honors_user_configured_normal_mode(monkeypatch):
 def test_trigger_wait_collector_waits_for_stop(monkeypatch):
     connection = MockConnection(
         channel_states={1: True},
-        trigger_status=["Run", "Run", "Stop"],
+        trigger_status=["Ready", "Ready", "Stop"],  # real SAST? never reports "Run"; Ready is the armed state
         sample_rate=1_000.0,
     )
     collector = TriggerWaitCollector("mock", connection=connection)
@@ -132,4 +132,4 @@ def test_trigger_wait_collector_waits_for_stop(monkeypatch):
     assert waveforms is not None
     assert connection.waveform_requests == [1]
     assert "ARM" in connection.writes
-    assert connection.queries.count(":TRIG:STAT?") >= 1
+    assert connection.queries.count("SAST?") >= 1

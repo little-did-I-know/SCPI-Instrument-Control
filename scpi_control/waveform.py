@@ -97,6 +97,11 @@ class Waveform:
         """
         self._scope = oscilloscope
 
+    @property
+    def _dialect(self) -> str:
+        """Wire dialect of the parent scope; defaults to legacy before connect."""
+        return getattr(self._scope, "dialect", None) or "legacy"
+
     def acquire(self, channel: int, format: str = "BYTE") -> WaveformData:
         """Acquire waveform data from a channel.
 
@@ -164,7 +169,7 @@ class Waveform:
         Returns:
             Voltage scale in V/div
         """
-        command = f"{channel}:VDIV?"
+        command = self._scope._get_command("get_voltage_div", ch=int(channel[1]))
         response = self._scope.query(command)
         logger.debug(f"Voltage scale response: '{response}'")
 
@@ -179,7 +184,7 @@ class Waveform:
         Returns:
             Voltage offset in volts
         """
-        command = f"{channel}:OFST?"
+        command = self._scope._get_command("get_voltage_offset", ch=int(channel[1]))
         response = self._scope.query(command)
         logger.debug(f"Voltage offset response: '{response}'")
 
@@ -191,7 +196,7 @@ class Waveform:
         Returns:
             Timebase in seconds/division
         """
-        command = "TDIV?"
+        command = self._scope._get_command("get_time_div")
         response = self._scope.query(command)
         logger.debug(f"Timebase response: '{response}'")
 
@@ -203,7 +208,7 @@ class Waveform:
         Returns:
             Sample rate in samples/second
         """
-        command = "SARA?"
+        command = self._scope._get_command("get_sample_rate")
         response = self._scope.query(command)
         logger.debug(f"Sample rate response: '{response}'")
 
@@ -393,6 +398,19 @@ class Waveform:
                     return value
                 except ValueError as exc:
                     raise exceptions.CommandError(self._format_scope_error(f"Invalid {quantity} response: '{response}'", command)) from exc
+
+        # Modern-dialect numeric queries (:CHANnel:SCALe?, :CHANnel:OFFSet?,
+        # :TIMebase:SCALe?, :ACQuire:SRATe?) return a bare NR3 value with no
+        # unit suffix at all (guide pp.46,56,58,476); legacy always echoes a
+        # unit and keeps the strict check above (audit-pinned, see
+        # test_value_parsing_requires_units).
+        if self._dialect == "modern":
+            try:
+                value = float(cleaned)
+                logger.debug(f"Parsed {quantity}: {value} (bare NR3, modern dialect)")
+                return value
+            except ValueError:
+                pass
 
         expected = " or ".join(expected_units)
         raise exceptions.CommandError(self._format_scope_error(f"Invalid {quantity} response: '{response}' (expected units: {expected})", command))

@@ -27,6 +27,7 @@ class ModelCapability:
     has_protocol_decode: bool  # Supports protocol decode
     supported_decode_types: List[str]  # Supported protocol types (I2C, SPI, UART, CAN, etc.)
     scpi_variant: str  # SCPI command variant ("standard", "hd_series", "x_series", "plus_series")
+    dialect: str = "legacy"  # Wire dialect: "legacy" (TRIG_SELECT/TDIV era) or "modern" (colon-form :TRIGger/:TIMebase)
 
     def __str__(self) -> str:
         """String representation of model capability."""
@@ -48,6 +49,7 @@ MODEL_REGISTRY = {
         has_protocol_decode=True,
         supported_decode_types=["I2C", "SPI", "UART", "CAN", "LIN", "I2S"],
         scpi_variant="hd_series",
+        dialect="modern",
     ),  # 1 GSa/s  # 100 Mpts
     "SDS804X HD": ModelCapability(
         model_name="SDS804X HD",
@@ -61,6 +63,7 @@ MODEL_REGISTRY = {
         has_protocol_decode=True,
         supported_decode_types=["I2C", "SPI", "UART", "CAN", "LIN", "I2S"],
         scpi_variant="hd_series",
+        dialect="modern",
     ),
     # SDS1000X-E Series
     "SDS1104X-E": ModelCapability(
@@ -75,6 +78,7 @@ MODEL_REGISTRY = {
         has_protocol_decode=True,
         supported_decode_types=["I2C", "SPI", "UART", "RS232"],
         scpi_variant="x_series",
+        dialect="legacy",
     ),  # 14 Mpts
     "SDS1204X-E": ModelCapability(
         model_name="SDS1204X-E",
@@ -88,6 +92,7 @@ MODEL_REGISTRY = {
         has_protocol_decode=True,
         supported_decode_types=["I2C", "SPI", "UART", "RS232"],
         scpi_variant="x_series",
+        dialect="legacy",
     ),
     "SDS1202X-E": ModelCapability(
         model_name="SDS1202X-E",
@@ -101,6 +106,7 @@ MODEL_REGISTRY = {
         has_protocol_decode=True,
         supported_decode_types=["I2C", "SPI", "UART", "RS232"],
         scpi_variant="x_series",
+        dialect="legacy",
     ),
     "SDS1102X-E": ModelCapability(
         model_name="SDS1102X-E",
@@ -114,6 +120,7 @@ MODEL_REGISTRY = {
         has_protocol_decode=True,
         supported_decode_types=["I2C", "SPI", "UART", "RS232"],
         scpi_variant="x_series",
+        dialect="legacy",
     ),
     # SDS2000X Plus Series
     "SDS2104X Plus": ModelCapability(
@@ -128,6 +135,7 @@ MODEL_REGISTRY = {
         has_protocol_decode=True,
         supported_decode_types=["I2C", "SPI", "UART", "CAN", "LIN", "FlexRay"],
         scpi_variant="plus_series",
+        dialect="modern",
     ),  # 2 GSa/s
     "SDS2204X Plus": ModelCapability(
         model_name="SDS2204X Plus",
@@ -141,6 +149,7 @@ MODEL_REGISTRY = {
         has_protocol_decode=True,
         supported_decode_types=["I2C", "SPI", "UART", "CAN", "LIN", "FlexRay"],
         scpi_variant="plus_series",
+        dialect="modern",
     ),
     "SDS2354X Plus": ModelCapability(
         model_name="SDS2354X Plus",
@@ -154,6 +163,7 @@ MODEL_REGISTRY = {
         has_protocol_decode=True,
         supported_decode_types=["I2C", "SPI", "UART", "CAN", "LIN", "FlexRay"],
         scpi_variant="plus_series",
+        dialect="modern",
     ),
     # SDS5000X Series
     "SDS5104X": ModelCapability(
@@ -168,6 +178,7 @@ MODEL_REGISTRY = {
         has_protocol_decode=True,
         supported_decode_types=["I2C", "SPI", "UART", "CAN", "LIN", "FlexRay", "ARINC429"],
         scpi_variant="x_series",
+        dialect="modern",
     ),  # 5 GSa/s  # 250 Mpts  # 1 GHz
     "SDS5054X": ModelCapability(
         model_name="SDS5054X",
@@ -181,6 +192,7 @@ MODEL_REGISTRY = {
         has_protocol_decode=True,
         supported_decode_types=["I2C", "SPI", "UART", "CAN", "LIN", "FlexRay", "ARINC429"],
         scpi_variant="x_series",
+        dialect="modern",
     ),
 }
 
@@ -260,6 +272,14 @@ def detect_model_from_idn(idn_string: str) -> ModelCapability:
         if potential_channels in [2, 4]:
             num_channels = potential_channels
 
+    upper_model = model_from_idn.upper()
+    # Modern colon-form generations: HD models, Plus models, SDS5000X and up.
+    # Everything else (X-E era, unknown) stays on the legacy dialect.
+    if " HD" in upper_model or upper_model.endswith("HD") or "PLUS" in upper_model or any(s in upper_model for s in ("SDS5", "SDS6", "SDS7")):
+        dialect = "modern"
+    else:
+        dialect = "legacy"
+
     # Create generic capability
     generic_capability = ModelCapability(
         model_name=model_from_idn,
@@ -273,6 +293,7 @@ def detect_model_from_idn(idn_string: str) -> ModelCapability:
         has_protocol_decode=False,
         supported_decode_types=[],
         scpi_variant=scpi_variant,
+        dialect=dialect,
     )  # Conservative default  # Conservative default  # Most models support this  # Most models support this  # Conservative - don't assume
 
     logger.info(f"Created generic capability: {generic_capability}")

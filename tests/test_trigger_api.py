@@ -1,5 +1,6 @@
 import pytest
 
+from scpi_control.scpi_commands import SCPICommandSet
 from scpi_control.trigger import Trigger
 
 
@@ -8,6 +9,10 @@ class FakeScope:
         self.trig_type = trig_type
         self.current_source = source
         self.writes = []
+        self._commands = SCPICommandSet("legacy")
+
+    def _get_command(self, name: str, **kwargs) -> str:
+        return self._commands.get_command(name, **kwargs)
 
     def query(self, command: str) -> str:
         if command == "TRIG_SELECT?":
@@ -51,4 +56,5 @@ def test_set_slope_and_mode_delegate_to_property_writers():
     trigger.set_slope("neg")
     trigger.set_mode("single")
 
-    assert scope.writes == ["TRIG_SLOPE NEG", "TRIG_MODE SINGLE"]
+    # routed per-source; bare TRIG_SLOPE/TRIG_COUPLING were invalid on hardware (AUDIT H1)
+    assert scope.writes == ["C1:TRSL NEG", "TRIG_MODE SINGLE"]
