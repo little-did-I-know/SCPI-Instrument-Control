@@ -3,7 +3,7 @@ import asyncio
 from typing import Any, Callable, List
 
 from fastapi import APIRouter, Request
-from fastapi.responses import PlainTextResponse
+from fastapi.responses import PlainTextResponse, Response
 
 from scpi_control.exceptions import InvalidParameterError
 from scpi_control.server.api.sessions import require_session
@@ -142,6 +142,23 @@ async def capture_csv(session_id: str, request: Request, channels: str = "1"):
     csv_text = _build_csv(captures)
     filename = "capture_{0}_C{1}.csv".format(session.id, "-".join(str(c) for c in channel_list))
     return PlainTextResponse(csv_text, media_type="text/csv", headers={"Content-Disposition": 'attachment; filename="{0}"'.format(filename)})
+
+
+@router.get("/sessions/{session_id}/scope/screenshot.png")
+async def screenshot(session_id: str, request: Request):
+    session = require_session(request, session_id)
+
+    def grab(scope):
+        import io
+
+        image = scope.screen_capture.get_screenshot_pil()
+        buf = io.BytesIO()
+        image.save(buf, "PNG")
+        return buf.getvalue()
+
+    png = await run_job(session, grab)
+    filename = "screenshot_{0}.png".format(session.id)
+    return Response(content=png, media_type="image/png", headers={"Content-Disposition": 'attachment; filename="{0}"'.format(filename)})
 
 
 # NOTE: run_op's {op} path is a catch-all for POST /scope/*; any new specific

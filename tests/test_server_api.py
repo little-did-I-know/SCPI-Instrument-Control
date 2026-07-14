@@ -316,3 +316,13 @@ def test_cli_parses_defaults(monkeypatch):
     assert captured == {"host": "127.0.0.1", "port": 8765}
     cli.main(["--host", "0.0.0.0", "--port", "9000"])
     assert captured == {"host": "0.0.0.0", "port": 9000}
+
+
+class TestScreenshot:
+    def test_screenshot_returns_png(self, client):
+        sid = create_mock_session(client)["id"]
+        response = client.get("/api/sessions/{0}/scope/screenshot.png".format(sid))
+        assert response.status_code == 200
+        assert response.headers["content-type"] == "image/png"
+        assert response.content.startswith(b"\x89PNG\r\n\x1a\n")
+        assert "attachment" in response.headers.get("content-disposition", "")
