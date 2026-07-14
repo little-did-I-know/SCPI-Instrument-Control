@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { HomeScreen } from "./HomeScreen";
 import { api } from "../../api/client";
+import { getRecent } from "./recent";
 import type { DiscoveredDevice, SessionInfo } from "../../api/types";
 
 afterEach(() => {
@@ -34,6 +35,56 @@ describe("HomeScreen", () => {
     vi.spyOn(api, "discover").mockResolvedValue([]);
     render(<HomeScreen onConnected={vi.fn()} />);
     await screen.findByRole("button", { name: "Open SDS824X HD" });
+  });
+
+  it("opens a held session, records it in recent, and calls onConnected", async () => {
+    vi.spyOn(api, "listSessions").mockResolvedValue([SESSION]);
+    vi.spyOn(api, "discover").mockResolvedValue([]);
+    const getSession = vi.spyOn(api, "getSession").mockResolvedValue(SESSION);
+    const onConnected = vi.fn();
+    render(<HomeScreen onConnected={onConnected} />);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Open SDS824X HD" }));
+
+    await waitFor(() => expect(getSession).toHaveBeenCalledWith("abc"));
+    await waitFor(() => expect(onConnected).toHaveBeenCalledWith(SESSION));
+    await waitFor(() => expect(getRecent().map((r) => r.model)).toContain("SDS824X HD"));
+  });
+
+  it("connects to a manually entered IP", async () => {
+    vi.spyOn(api, "listSessions").mockResolvedValue([]);
+    vi.spyOn(api, "discover").mockResolvedValue([]);
+    const created = { ...SESSION, id: "man", address: "10.0.0.9", model: "10.0.0.9" };
+    const createSession = vi.spyOn(api, "createSession").mockResolvedValue(created);
+    const onConnected = vi.fn();
+    render(<HomeScreen onConnected={onConnected} />);
+
+    await userEvent.type(await screen.findByLabelText("IP address"), "10.0.0.9");
+    await userEvent.click(screen.getByRole("button", { name: "Connect" }));
+
+    await waitFor(() => expect(createSession).toHaveBeenCalledWith({ address: "10.0.0.9", label: "10.0.0.9" }));
+    await waitFor(() => expect(onConnected).toHaveBeenCalledWith(created));
+  });
+
+  it("does not re-scan on the interval while a connect is in flight", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      vi.spyOn(api, "listSessions").mockResolvedValue([]);
+      const discover = vi.spyOn(api, "discover").mockResolvedValue([FREE]);
+      vi.spyOn(api, "createSession").mockReturnValue(new Promise<SessionInfo>(() => {})); // never resolves — connect stays in flight
+      render(<HomeScreen onConnected={vi.fn()} />);
+
+      await vi.waitFor(() => expect(discover).toHaveBeenCalledTimes(1));
+      await user.click(await screen.findByRole("button", { name: "Connect SDS1104X-E" }));
+
+      // Two full refresh cycles pass while busy — the interval must not fire another scan.
+      await vi.advanceTimersByTimeAsync(30_000);
+      await vi.advanceTimersByTimeAsync(30_000);
+      expect(discover).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("connects a mock scope from the rail", async () => {

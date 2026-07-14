@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ApiError, api } from "../../api/client";
 import type { DiscoveredDevice, SessionInfo } from "../../api/types";
 import { GroupBox } from "../../ds/GroupBox";
@@ -25,12 +25,20 @@ export function HomeScreen({ onConnected }: Props) {
   const [busyAddress, setBusyAddress] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [lastScanned, setLastScanned] = useState<string>("not scanned yet");
+  const busyRef = useRef(false);
 
   const scan = useCallback(async () => {
     setScanning(true);
     setError(null);
     try {
-      const [sessions, found] = await Promise.all([api.listSessions(), api.discover()]);
+      const sessions = await api.listSessions();
+      const heldSeed = sessions.filter((s) => s.address === null).map(sessionAsDevice);
+      // seed the sessions zone immediately (mock-held sessions have no discover entry)
+      setDevices((prev) => {
+        const found = prev.filter((d) => !d.connected); // keep any prior fleet while re-scanning
+        return [...heldSeed, ...found];
+      });
+      const found = await api.discover();
       const heldAddresses = new Set(found.filter((d) => d.connected).map((d) => d.address));
       const heldFromSessions = sessions.filter((s) => !heldAddresses.has(s.address)).map(sessionAsDevice);
       setDevices([...heldFromSessions, ...found]);
@@ -45,13 +53,14 @@ export function HomeScreen({ onConnected }: Props) {
   useEffect(() => {
     scan();
     const id = setInterval(() => {
-      if (!busy) scan();
+      if (!busyRef.current) scan();
     }, REFRESH_MS);
     return () => clearInterval(id);
-  }, [scan, busy]);
+  }, [scan]);
 
   async function connect(body: Parameters<typeof api.createSession>[0], recent: RecentEntry, address: string | null) {
     setBusy(true);
+    busyRef.current = true;
     setBusyAddress(address);
     setActionError(null);
     try {
@@ -62,6 +71,7 @@ export function HomeScreen({ onConnected }: Props) {
       setActionError(err instanceof ApiError ? err.detail : String(err));
     } finally {
       setBusy(false);
+      busyRef.current = false;
       setBusyAddress(null);
     }
   }
@@ -70,13 +80,19 @@ export function HomeScreen({ onConnected }: Props) {
   const onOpenDevice = async (d: DiscoveredDevice) => {
     if (!d.session_id) return;
     setBusy(true);
+    busyRef.current = true;
+    setBusyAddress(d.address);
     setActionError(null);
     try {
-      onConnected(await api.getSession(d.session_id));
+      const session = await api.getSession(d.session_id);
+      pushRecent({ address: d.address, label: d.model, kind: d.kind, model: d.model, mock: false });
+      onConnected(session);
     } catch (err) {
       setActionError(err instanceof ApiError ? err.detail : String(err));
     } finally {
       setBusy(false);
+      busyRef.current = false;
+      setBusyAddress(null);
     }
   };
   const onReconnect = (e: RecentEntry) => (e.mock ? connect({ mock: true }, e, null) : connect({ address: e.address ?? undefined, label: e.label }, e, e.address));
