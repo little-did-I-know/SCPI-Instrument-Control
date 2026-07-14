@@ -128,6 +128,7 @@ all = [
 [project.scripts]
 siglent-gui = "scpi_control.gui.app:main"
 siglent-report-generator = "scpi_control.report_generator.app:main"
+scpi-web = "scpi_control.server.__main__:main"
 
 [tool.setuptools]
 include-package-data = true

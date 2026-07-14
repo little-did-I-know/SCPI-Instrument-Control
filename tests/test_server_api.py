@@ -192,3 +192,18 @@ class TestCapture:
     def test_capture_csv_bad_channels_param_is_400(self, client):
         sid = create_mock_session(client)["id"]
         assert client.get("/api/sessions/{0}/scope/capture.csv?channels=banana".format(sid)).status_code == 400
+
+
+def test_cli_parses_defaults(monkeypatch):
+    import scpi_control.server.__main__ as cli
+
+    captured = {}
+
+    def fake_run(app, host, port, **kwargs):
+        captured.update(host=host, port=port)
+
+    monkeypatch.setattr(cli.uvicorn, "run", fake_run)
+    cli.main([])
+    assert captured == {"host": "127.0.0.1", "port": 8765}
+    cli.main(["--host", "0.0.0.0", "--port", "9000"])
+    assert captured == {"host": "0.0.0.0", "port": 9000}

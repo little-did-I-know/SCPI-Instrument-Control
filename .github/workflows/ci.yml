@@ -143,6 +143,10 @@ jobs:
           pip install -e ".[dev]"
           pip install pytest pytest-cov pytest-xdist
 
+      - name: Install web extra (Python >= 3.9)
+        if: matrix.python-version != '3.8'
+        run: pip install -e ".[web]"
+
       - name: Run tests with coverage
         run: |
           pytest tests/ --cov=scpi_control --cov-report=xml --cov-report=term-missing -v

@@ -84,3 +84,6 @@ node_modules/
 
 # Documentation
 site/
+
+# Web gateway frontend build output
+scpi_control/server/static/

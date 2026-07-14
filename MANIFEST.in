@@ -13,6 +13,9 @@ include docs/SDS800XHD_Series_ProgrammingGuide_EN11G.pdf
 # Include resources (logos, icons)
 recursive-include resources *.png *.ico *.icns
 
+# Include web gateway frontend build output (when present)
+recursive-include scpi_control/server/static *
+
 # Include examples
 recursive-include examples *.py
 recursive-include examples *.md
