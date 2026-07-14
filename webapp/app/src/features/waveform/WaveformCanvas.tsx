@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { getFrame, subscribeFrames } from "./frames";
+import type { ChannelState } from "../../api/types";
 import { useSession } from "../../store/session";
 
 const TRACE = ["#FFDC32", "#40E0D0", "#FF69B4", "#32FF64"];
@@ -7,10 +8,14 @@ const DIVS_X = 14;
 const DIVS_Y = 10;
 const PAD = 8;
 
+// Stable reference: zustand v5 hands the selector straight to useSyncExternalStore
+// with no memoization, so a fresh `{}` per snapshot would loop forever while scope is null.
+const NO_CHANNELS: Record<string, ChannelState> = {};
+
 export function WaveformCanvas() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const wrapRef = useRef<HTMLDivElement | null>(null);
-  const channels = useSession((s) => s.scope?.channels ?? {});
+  const channels = useSession((s) => s.scope?.channels ?? NO_CHANNELS);
   const enabled = Object.entries(channels)
     .filter(([, channel]) => channel.enabled)
     .map(([key]) => Number(key));
@@ -78,6 +83,10 @@ export function WaveformCanvas() {
       ctx.stroke();
 
       let drew = false;
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(PAD, PAD, gw, gh);
+      ctx.clip(); // keep out-of-range traces inside the graticule
       enabled.forEach((channel) => {
         const frame = getFrame(channel);
         if (!frame || frame.points.length === 0) return;
@@ -96,10 +105,11 @@ export function WaveformCanvas() {
         ctx.stroke();
         drew = true;
       });
+      ctx.restore();
 
       if (!drew) {
         ctx.fillStyle = "#8b949e";
-        ctx.font = "13px var(--font-ui), sans-serif";
+        ctx.font = "13px 'Segoe UI', sans-serif";
         ctx.textAlign = "center";
         ctx.fillText("No data — enable a channel and press Run", w / 2, h / 2);
       }

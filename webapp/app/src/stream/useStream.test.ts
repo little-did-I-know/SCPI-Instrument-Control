@@ -18,14 +18,21 @@ class FakeWebSocket {
   }
 
   send() {}
-  close() {
+  close(code = 1000) {
     this.closed = true;
+    queueMicrotask(() => this.onclose?.({ code } as CloseEvent));
   }
 
   emit(message: unknown) {
     this.onmessage?.({ data: JSON.stringify(message) });
   }
+
+  emitClose(code: number) {
+    queueMicrotask(() => this.onclose?.({ code } as CloseEvent));
+  }
 }
+
+const SESSION = { id: "abc", label: "x", mock: true, address: null, state: "connected", idn: "", model: "", dialect: "legacy", num_channels: 4 };
 
 beforeEach(() => {
   vi.stubGlobal("WebSocket", FakeWebSocket as unknown as typeof WebSocket);
@@ -82,5 +89,44 @@ describe("useStream", () => {
     FakeWebSocket.last = null;
     renderHook(() => useStream(null));
     expect(FakeWebSocket.last).toBeNull();
+  });
+
+  it("treats a 4410 close from the live socket as a clean session end", async () => {
+    useSession.getState().setSession(SESSION);
+    renderHook(() => useStream("abc"));
+
+    FakeWebSocket.last!.emitClose(4410);
+    await waitFor(() => expect(useSession.getState().session).toBeNull());
+    expect(useSession.getState().status).toBe("disconnected");
+  });
+
+  it("surfaces an unexpected close from the live socket as an error", async () => {
+    useSession.getState().setSession(SESSION);
+    renderHook(() => useStream("abc"));
+
+    FakeWebSocket.last!.emitClose(1006);
+    await waitFor(() => expect(useSession.getState().status).toBe("error"));
+    expect(useSession.getState().error).toBe("stream disconnected");
+  });
+
+  it("ignores a late close from an already torn-down socket", async () => {
+    const first = renderHook(() => useStream("abc"));
+    const staleSocket = FakeWebSocket.last!;
+    first.unmount();
+
+    // A second, live stream takes over (StrictMode remount / session-id change).
+    renderHook(() => useStream("abc"));
+    const liveSocket = FakeWebSocket.last!;
+    expect(liveSocket).not.toBe(staleSocket);
+    useSession.getState().setSession(SESSION);
+
+    // The dead socket's close events land late — they must not touch the store.
+    staleSocket.emitClose(1006);
+    staleSocket.emitClose(4410);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(useSession.getState().session).toEqual(SESSION);
+    expect(useSession.getState().status).toBe("connected");
+    expect(useSession.getState().error).toBeNull();
   });
 });

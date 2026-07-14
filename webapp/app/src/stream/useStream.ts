@@ -37,7 +37,11 @@ export function useStream(sessionId: string | null): void {
     };
 
     return () => {
-      ended = true; // suppress the error path on our own teardown
+      // close() is async in browsers: detach the handlers so this socket's late
+      // close event can never clear/error a session a newer socket already owns.
+      socket.onmessage = null;
+      socket.onclose = null;
+      socket.onerror = null;
       socket.close();
       clearFrames();
     };
