@@ -16,6 +16,53 @@ from scpi_control import Oscilloscope
 from scpi_control.connection.mock import MockConnection
 from scpi_control.exceptions import SiglentError
 
+MAX_FRAME_POINTS = 2000
+MEASUREMENT_EVERY_N_POLLS = 4
+
+
+def _safe(fn, default=None):
+    try:
+        return fn()
+    except SiglentError:
+        return default
+
+
+def read_state(scope: Oscilloscope) -> Dict[str, Any]:
+    channels: Dict[int, Dict[str, Any]] = {}
+    for n in scope.supported_channels:
+        ch = scope.get_channel(n)
+        channels[n] = {
+            "enabled": ch.enabled,
+            "voltage_scale": ch.voltage_scale,
+            "voltage_offset": ch.voltage_offset,
+            "coupling": ch.coupling,
+            "probe_ratio": _safe(lambda: ch.probe_ratio),
+        }
+    trig = scope.trigger
+    return {
+        "run_state": scope.acquisition_status(),
+        "timebase": scope.timebase,
+        "channels": channels,
+        "trigger": {
+            "mode": trig.mode,
+            "source": _safe(lambda: trig.source),
+            "level": _safe(lambda: trig.level),
+            "slope": _safe(lambda: trig.slope),
+            "coupling": _safe(lambda: trig.coupling),
+        },
+    }
+
+
+def _waveform_frame(scope: Oscilloscope, channel: int) -> Dict[str, Any]:
+    data = scope.get_waveform(channel)
+    voltage = data.voltage
+    step = max(1, len(voltage) // MAX_FRAME_POINTS)
+    points = voltage[::step]
+    t0 = float(data.time[0]) if len(data.time) else 0.0
+    dt = float(data.time[1] - data.time[0]) * step if len(data.time) > 1 else 1.0
+    return {"type": "waveform", "channel": channel, "t0": t0, "dt": dt, "points": [float(v) for v in points]}
+
+
 _STOP = object()
 
 DEFAULT_MOCK_IDN = "Siglent Technologies,SDS1104X-E,MOCK0001,1.0.0.0"
@@ -47,6 +94,10 @@ class InstrumentSession:
         self._queue: "queue.Queue" = queue.Queue()
         self._closed = threading.Event()
         self._thread = threading.Thread(target=self._worker, name="scpi-session-{0}".format(self.id), daemon=True)
+        self._subscribers: List[Callable[[Dict[str, Any]], None]] = []
+        self._subscribers_lock = threading.Lock()
+        self.measurements: List[Tuple[int, str]] = []
+        self._poll_count = 0
 
     @classmethod
     def open(
@@ -101,6 +152,26 @@ class InstrumentSession:
         self._thread.join(timeout=timeout)
         self.state = "closed"
 
+    def subscribe(self, callback: Callable[[Dict[str, Any]], None]) -> Callable[[], None]:
+        with self._subscribers_lock:
+            self._subscribers.append(callback)
+
+        def unsubscribe() -> None:
+            with self._subscribers_lock:
+                if callback in self._subscribers:
+                    self._subscribers.remove(callback)
+
+        return unsubscribe
+
+    def publish(self, message: Dict[str, Any]) -> None:
+        with self._subscribers_lock:
+            subscribers = list(self._subscribers)
+        for callback in subscribers:
+            callback(message)
+
+    def set_measurements(self, items: List[Tuple[int, str]]) -> None:
+        self.measurements = list(items)
+
     def _worker(self) -> None:
         while True:
             try:
@@ -123,4 +194,26 @@ class InstrumentSession:
             pass
 
     def _poll_tick(self) -> None:
-        """Streaming poll; implemented in Task 2."""
+        with self._subscribers_lock:
+            if not self._subscribers:
+                return
+        if self.state != "connected":
+            return
+        self._poll_count += 1
+        scope = self._scope
+        try:
+            for n in scope.supported_channels:
+                ch = scope.get_channel(n)
+                if ch is not None and _safe(lambda: ch.enabled, default=False):
+                    self.publish(_waveform_frame(scope, n))
+            if self.measurements and self._poll_count % MEASUREMENT_EVERY_N_POLLS == 0:
+                values = []
+                for channel, mtype in self.measurements:
+                    value = _safe(lambda: scope.measurement.measure(mtype, channel))
+                    values.append({"channel": channel, "mtype": mtype, "value": value})
+                self.publish({"type": "measurements", "values": values})
+        except SiglentError as exc:
+            self.error_detail = str(exc)
+            self.publish({"type": "error", "detail": str(exc)})
+            if not scope.is_connected:
+                self.state = "error"
