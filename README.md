@@ -591,6 +591,24 @@ See `examples/vector_graphics_xy_mode.py` for programmatic usage and animation e
 - I2C, SPI, UART, CAN, LIN decoding
 - Packet analysis and export
 
+## Web Gateway (beta)
+
+Control instruments from any browser on your LAN:
+
+```bash
+pip install scpi-instrument-control[web]   # Python 3.9+
+scpi-web --host 0.0.0.0 --port 8765
+```
+
+Open `http://<gateway-pc>:8765`. Sessions can target real scopes by IP or a
+built-in mock (`mock: true`) for hardware-free use. The API is documented at
+`/docs` (OpenAPI). No authentication in this release — bind to `127.0.0.1`
+(the default) unless your LAN is trusted.
+
+- `GET /api/discover` scans the gateway's subnet (or `?cidr=…`) for SCPI
+  instruments on port 5025 and lists them with model and dialect — handy when
+  DHCP moves your instruments around.
+
 ## API Documentation
 
 ### Oscilloscope

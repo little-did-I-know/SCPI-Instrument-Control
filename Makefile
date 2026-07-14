@@ -193,6 +193,9 @@ pre-pr-fix:  ## Run pre-PR validation with auto-fix
 gui:  ## Launch the GUI application
 	siglent-gui
 
+web-server:  ## Run the web gateway (dev, mock-friendly)
+	python -m scpi_control.server --port 8765
+
 version:  ## Show package version
 	@python -c "import scpi_control; print(f'SCPI-Instrument-Control v{scpi_control.__version__}')"
 
