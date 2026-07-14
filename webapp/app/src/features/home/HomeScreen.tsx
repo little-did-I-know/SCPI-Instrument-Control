@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ApiError, api } from "../../api/client";
 import type { DiscoveredDevice, SessionInfo } from "../../api/types";
 import { GroupBox } from "../../ds/GroupBox";
+import { deviceKey } from "./deviceKey";
 import { GettingStarted } from "./GettingStarted";
 import { Hero } from "./Hero";
 import { InstrumentDashboard } from "./InstrumentDashboard";
@@ -22,7 +23,7 @@ export function HomeScreen({ onConnected }: Props) {
   const [scanning, setScanning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
-  const [busyAddress, setBusyAddress] = useState<string | null>(null);
+  const [busyKey, setBusyKey] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [lastScanned, setLastScanned] = useState<string>("not scanned yet");
   const busyRef = useRef(false);
@@ -60,10 +61,10 @@ export function HomeScreen({ onConnected }: Props) {
     return () => clearInterval(id);
   }, [scan]);
 
-  async function connect(body: Parameters<typeof api.createSession>[0], recent: RecentEntry, address: string | null) {
+  async function connect(body: Parameters<typeof api.createSession>[0], recent: RecentEntry, key: string | null) {
     setBusy(true);
     busyRef.current = true;
-    setBusyAddress(address);
+    setBusyKey(key);
     setActionError(null);
     try {
       const session = await api.createSession(body);
@@ -74,16 +75,16 @@ export function HomeScreen({ onConnected }: Props) {
     } finally {
       setBusy(false);
       busyRef.current = false;
-      setBusyAddress(null);
+      setBusyKey(null);
     }
   }
 
-  const onConnectDevice = (d: DiscoveredDevice) => connect({ address: d.address ?? undefined, label: d.model }, { address: d.address, label: d.model, kind: d.kind, model: d.model, mock: false }, d.address);
+  const onConnectDevice = (d: DiscoveredDevice) => connect({ address: d.address ?? undefined, label: d.model }, { address: d.address, label: d.model, kind: d.kind, model: d.model, mock: false }, deviceKey(d));
   const onOpenDevice = async (d: DiscoveredDevice) => {
     if (!d.session_id) return;
     setBusy(true);
     busyRef.current = true;
-    setBusyAddress(d.address);
+    setBusyKey(deviceKey(d));
     setActionError(null);
     try {
       const session = await api.getSession(d.session_id);
@@ -94,7 +95,7 @@ export function HomeScreen({ onConnected }: Props) {
     } finally {
       setBusy(false);
       busyRef.current = false;
-      setBusyAddress(null);
+      setBusyKey(null);
     }
   };
   const onReconnect = (e: RecentEntry) => (e.mock ? connect({ mock: true }, e, null) : connect({ address: e.address ?? undefined, label: e.label }, e, e.address));
@@ -108,7 +109,7 @@ export function HomeScreen({ onConnected }: Props) {
         <div style={{ flex: 3, display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
           <RecentBar onReconnect={onReconnect} />
           {actionError && <div role="alert" style={{ padding: "8px 10px", borderRadius: "var(--radius-sm)", background: "color-mix(in srgb, var(--danger) 12%, transparent)", color: "var(--danger)", fontSize: "var(--text-sm)" }}>{actionError}</div>}
-          <InstrumentDashboard devices={devices} scanning={scanning} error={error} busyAddress={busyAddress} onConnect={onConnectDevice} onOpen={onOpenDevice} />
+          <InstrumentDashboard devices={devices} scanning={scanning} error={error} busyKey={busyKey} onConnect={onConnectDevice} onOpen={onOpenDevice} />
         </div>
         <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "var(--space-2)", minWidth: 220 }}>
           <GroupBox title="Connect manually"><ManualConnect busy={busy} onConnectAddress={onConnectAddress} onConnectMock={onConnectMock} /></GroupBox>

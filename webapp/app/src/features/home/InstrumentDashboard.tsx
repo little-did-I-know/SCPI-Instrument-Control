@@ -1,13 +1,14 @@
 import { useState } from "react";
 import type { DiscoveredDevice } from "../../api/types";
 import { DeviceCard } from "./DeviceCard";
+import { deviceKey } from "./deviceKey";
 import { KIND_META, KIND_ORDER, type Kind } from "./kinds";
 
 export type DashboardProps = {
   devices: DiscoveredDevice[];
   scanning: boolean;
   error: string | null;
-  busyAddress: string | null;
+  busyKey: string | null;
   onConnect: (device: DiscoveredDevice) => void;
   onOpen: (device: DiscoveredDevice) => void;
 };
@@ -15,7 +16,7 @@ export type DashboardProps = {
 const zoneHeading = { fontSize: "var(--text-xs)", textTransform: "uppercase" as const, letterSpacing: "0.05em", color: "var(--lc-text-2)", fontWeight: 700, margin: "0 0 var(--space-2)" };
 const grid = { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: "var(--space-2)" };
 
-export function InstrumentDashboard({ devices, scanning, error, busyAddress, onConnect, onOpen }: DashboardProps) {
+export function InstrumentDashboard({ devices, scanning, error, busyKey, onConnect, onOpen }: DashboardProps) {
   const [query, setQuery] = useState("");
   const held = devices.filter((d) => d.connected);
   const available = devices.filter((d) => !d.connected);
@@ -24,7 +25,7 @@ export function InstrumentDashboard({ devices, scanning, error, busyAddress, onC
   const filtered = q ? available.filter((d) => `${d.model} ${d.address ?? ""} ${d.kind}`.toLowerCase().includes(q)) : available;
 
   function cardFor(device: DiscoveredDevice, variant: "available" | "session") {
-    return <DeviceCard key={`${device.address}-${device.model}`} device={device} variant={variant} busy={busyAddress !== null && busyAddress === device.address} onConnect={onConnect} onOpen={onOpen} />;
+    return <DeviceCard key={deviceKey(device)} device={device} variant={variant} busy={busyKey !== null && busyKey === deviceKey(device)} onConnect={onConnect} onOpen={onOpen} />;
   }
 
   return (
@@ -37,7 +38,7 @@ export function InstrumentDashboard({ devices, scanning, error, busyAddress, onC
       )}
 
       <section>
-        <h2 style={zoneHeading}>Available on the network <span style={{ color: "var(--lc-muted)" }}>{available.length}</span></h2>
+        <h2 style={zoneHeading}>Available on the network <span style={{ color: "var(--lc-muted)" }}>{q ? `${filtered.length} of ${available.length}` : available.length}</span></h2>
         <input
           aria-label="Filter instruments"
           value={query}
@@ -51,6 +52,7 @@ export function InstrumentDashboard({ devices, scanning, error, busyAddress, onC
         {!scanning && !error && devices.length === 0 && (
           <p style={{ color: "var(--lc-muted)" }}>No instruments found on your network. Check the instrument's LAN settings, enter an IP manually, or start a Mock scope.</p>
         )}
+        {q && filtered.length === 0 && available.length > 0 && <p style={{ color: "var(--lc-muted)" }}>No instruments match &ldquo;{query.trim()}&rdquo;.</p>}
 
         {KIND_ORDER.map((kind: Kind) => {
           const inKind = filtered.filter((d) => (d.kind as Kind) === kind || (kind === "unknown" && !(d.kind in KIND_META)));

@@ -13,7 +13,7 @@ const DEVICES = [
 ];
 
 function renderDash(over = {}) {
-  return render(<InstrumentDashboard devices={DEVICES} scanning={false} error={null} busyAddress={null} onConnect={vi.fn()} onOpen={vi.fn()} {...over} />);
+  return render(<InstrumentDashboard devices={DEVICES} scanning={false} error={null} busyKey={null} onConnect={vi.fn()} onOpen={vi.fn()} {...over} />);
 }
 
 describe("InstrumentDashboard", () => {
@@ -48,5 +48,26 @@ describe("InstrumentDashboard", () => {
   it("shows an empty nudge when idle with no devices", () => {
     renderDash({ devices: [] });
     expect(screen.getByText(/no instruments found/i)).toBeInTheDocument();
+  });
+
+  it("disables a held card by its device key (works for address-less mock sessions)", () => {
+    const mockHeld = dev({ address: null, model: "Mock", connected: true, session_id: "m1", viewers: 0 });
+    render(<InstrumentDashboard devices={[mockHeld]} scanning={false} error={null} busyKey="m1" onConnect={vi.fn()} onOpen={vi.fn()} />);
+    expect(screen.getByRole("button", { name: "Open Mock" })).toBeDisabled();
+  });
+
+  it("gives distinct Open buttons for two address-less mock sessions", () => {
+    const m1 = dev({ address: null, model: "Mock", connected: true, session_id: "m1", viewers: 0 });
+    const m2 = dev({ address: null, model: "Mock", connected: true, session_id: "m2", viewers: 0 });
+    render(<InstrumentDashboard devices={[m1, m2]} scanning={false} error={null} busyKey={null} onConnect={vi.fn()} onOpen={vi.fn()} />);
+    expect(screen.getAllByRole("button", { name: "Open Mock" })).toHaveLength(2);
+  });
+
+  it("shows a no-match message and a filtered count when the search matches nothing", async () => {
+    renderDash();
+    await userEvent.type(screen.getByLabelText("Filter instruments"), "zzz-no-such-device");
+    expect(screen.getByText(/no instruments match/i)).toHaveTextContent("zzz-no-such-device");
+    // available header count reflects the filter (0 of 2)
+    expect(screen.getByText(/0 of 2/)).toBeInTheDocument();
   });
 });
