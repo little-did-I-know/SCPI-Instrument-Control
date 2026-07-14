@@ -29,7 +29,9 @@ jobs:
           node-version: "24"
 
       - name: Install frontend dependencies
-        run: npm ci
+        # npm install (not ci): the Windows-generated lockfile omits Linux-only
+        # optional dep nodes, which makes strict `npm ci` fail on Linux runners.
+        run: npm install --no-audit --no-fund
         working-directory: webapp/app
 
       - name: Build frontend
