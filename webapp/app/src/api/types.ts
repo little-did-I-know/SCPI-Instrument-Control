@@ -36,7 +36,7 @@ export type SessionInfo = {
 };
 
 export type DiscoveredDevice = {
-  address: string;
+  address: string | null;
   idn: string;
   manufacturer: string;
   model: string;

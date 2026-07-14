@@ -1,8 +1,8 @@
 import { useState } from "react";
-import { ConnectDialog } from "./features/connect/ConnectDialog";
 import { ChannelsPanel } from "./features/controls/ChannelsPanel";
 import { ScopeToolbar } from "./features/controls/ScopeToolbar";
 import { TriggerPanel } from "./features/controls/TriggerPanel";
+import { HomeScreen } from "./features/home/HomeScreen";
 import { MeasurePanel } from "./features/measure/MeasurePanel";
 import { ReadoutStrip } from "./features/readout/ReadoutStrip";
 import { TerminalPanel } from "./features/terminal/TerminalPanel";
@@ -29,7 +29,7 @@ export default function App() {
         </span>
       </header>
       <main style={{ flex: 1, padding: "var(--space-3)", color: "var(--lc-text)", display: "flex", flexDirection: "column", gap: "var(--space-3)", minHeight: 0 }}>
-        {session === null && <ConnectDialog onConnected={(s) => useSession.getState().setSession(s)} />}
+        {session === null && <HomeScreen onConnected={(s) => useSession.getState().setSession(s)} />}
         {session !== null && <ReadoutStrip />}
         {session !== null && (
           <div style={{ flex: 1, display: "flex", gap: "var(--space-3)", minHeight: 0 }}>
