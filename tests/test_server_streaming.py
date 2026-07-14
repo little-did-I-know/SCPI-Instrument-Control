@@ -2,9 +2,13 @@
 
 import time
 
+import numpy as np
+import pytest
+
 from scpi_control import Oscilloscope
 from scpi_control.connection.mock import MockConnection
-from scpi_control.server.sessions import InstrumentSession, read_state
+from scpi_control.server.sessions import MAX_FRAME_POINTS, InstrumentSession, _waveform_frame, read_state
+from scpi_control.waveform import WaveformData
 
 LEGACY_IDN = "Siglent Technologies,SDS1104X-E,MOCK0001,1.0.0.0"
 
@@ -94,5 +98,40 @@ def test_user_job_still_runs_promptly_while_streaming():
         assert session.submit(lambda s: s.identify()).result(timeout=5)
         assert time.time() - start < 2.0
         unsubscribe()
+    finally:
+        session.close()
+
+
+class _StubScope:
+    def __init__(self, n):
+        self._data = WaveformData(time=np.linspace(0.0, 1.0, n), voltage=np.zeros(n), channel=1)
+
+    def get_waveform(self, channel):
+        return self._data
+
+
+@pytest.mark.parametrize("n", [1999, 2000, 2001, 4001, 14001])
+def test_waveform_frame_never_exceeds_cap(n):
+    frame = _waveform_frame(_StubScope(n), 1)
+    assert len(frame["points"]) <= MAX_FRAME_POINTS
+
+
+def test_raising_subscriber_does_not_kill_worker():
+    session = make_session()
+    try:
+        good = []
+
+        def bad(msg):
+            raise RuntimeError("boom")
+
+        unsubscribe_bad = session.subscribe(bad)
+        unsubscribe_good = session.subscribe(good.append)
+        deadline = time.time() + 5
+        while not good and time.time() < deadline:
+            time.sleep(0.02)
+        assert good, "worker died or good subscriber starved"
+        assert session.submit(lambda s: s.identify()).result(timeout=5)
+        unsubscribe_bad()
+        unsubscribe_good()
     finally:
         session.close()

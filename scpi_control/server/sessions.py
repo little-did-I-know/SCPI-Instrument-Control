@@ -56,7 +56,7 @@ def read_state(scope: Oscilloscope) -> Dict[str, Any]:
 def _waveform_frame(scope: Oscilloscope, channel: int) -> Dict[str, Any]:
     data = scope.get_waveform(channel)
     voltage = data.voltage
-    step = max(1, len(voltage) // MAX_FRAME_POINTS)
+    step = max(1, -(-len(voltage) // MAX_FRAME_POINTS))  # ceiling division keeps len(points) <= cap
     points = voltage[::step]
     t0 = float(data.time[0]) if len(data.time) else 0.0
     dt = float(data.time[1] - data.time[0]) * step if len(data.time) > 1 else 1.0
@@ -167,7 +167,10 @@ class InstrumentSession:
         with self._subscribers_lock:
             subscribers = list(self._subscribers)
         for callback in subscribers:
-            callback(message)
+            try:
+                callback(message)
+            except Exception:  # a broken subscriber must not kill the worker thread
+                continue
 
     def set_measurements(self, items: List[Tuple[int, str]]) -> None:
         self.measurements = list(items)
