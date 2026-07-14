@@ -40,6 +40,16 @@ describe("ChannelsPanel", () => {
     expect(useSession.getState().scope?.channels["2"].enabled).toBe(false);
   });
 
+  it("editing V/div by its accessible name PATCHes the channel", async () => {
+    const patchChannel = vi.spyOn(api, "patchChannel").mockResolvedValue(STATE);
+    render(<ChannelsPanel />);
+    const field = screen.getByLabelText("V/div C1");
+    await userEvent.clear(field);
+    await userEvent.type(field, "2");
+    await userEvent.tab();
+    await waitFor(() => expect(patchChannel).toHaveBeenCalledWith("abc", 1, { voltage_scale: 2 }));
+  });
+
   it("changing coupling PATCHes the new value", async () => {
     const patchChannel = vi.spyOn(api, "patchChannel").mockResolvedValue(STATE);
     render(<ChannelsPanel />);

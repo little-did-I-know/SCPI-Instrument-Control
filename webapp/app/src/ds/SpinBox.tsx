@@ -12,6 +12,8 @@ export type SpinBoxProps = {
   onChange?: (value: number) => void;
   width?: string | number;
   style?: React.CSSProperties;
+  /** Forwarded to the inner <input>, not the wrapper — see the destructure below. */
+  name?: string;
 } & Omit<React.HTMLAttributes<HTMLDivElement>, "onChange" | "style">;
 
 /**
@@ -31,6 +33,14 @@ export function SpinBox({
   onChange,
   width,
   style,
+  // ARIA/identity props belong on the real editable control, not the layout wrapper.
+  // Spreading them onto the wrapper would leave the <input> with no accessible name,
+  // so getByLabelText / screen readers would land on a non-editable <div>.
+  "aria-label": ariaLabel,
+  "aria-labelledby": ariaLabelledBy,
+  "aria-describedby": ariaDescribedBy,
+  id,
+  name,
   ...rest
 }: SpinBoxProps) {
   const isControlled = value !== undefined;
@@ -100,6 +110,11 @@ export function SpinBox({
     >
       <input
         type="text"
+        aria-label={ariaLabel}
+        aria-labelledby={ariaLabelledBy}
+        aria-describedby={ariaDescribedBy}
+        id={id}
+        name={name}
         disabled={disabled}
         value={editing ? draft : fmt(current)}
         onFocus={() => { setEditing(true); setDraft(String(current)); setFoc(true); }}
