@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { ApiError, api } from "../../api/client";
 import type { ChannelState } from "../../api/types";
 import { Checkbox } from "../../ds/Checkbox";
@@ -21,15 +21,21 @@ export function MeasurePanel() {
   // directly (no `?? []` fallback, which would fabricate a new array every render).
   const measurements = useSession((s) => s.measurements);
   const [error, setError] = useState<string | null>(null);
-  // No local mirror of the selection: the server is the source of truth. A local copy seeded
-  // once at mount goes stale (the stream lags the PUT by up to a broadcast interval, and a rail
-  // tab switch unmounts us), and since PUT /measurements is a FULL REPLACEMENT the next toggle
-  // computed from a stale list would silently drop a measurement the server still has active.
-  // `pending` is only an optimistic overlay for the in-flight toggle, so the checkbox responds
-  // instantly; it clears when the PUT resolves and the streamed truth takes over again.
+  // No local mirror of the selection — the server owns it. But the stream alone cannot carry it:
+  // the backend only broadcasts measurements while its list is NON-empty
+  // (sessions.py: `if self.measurements and self._poll_count % N == 0`), so once you deselect the
+  // last one the store keeps the final streamed values forever. Falling back to the store there
+  // would re-check the box and resurrect the measurement on the next full-replacement PUT.
+  //
+  // The PUT response IS server truth (scope.py echoes the stored list), so we settle to it.
+  // Precedence: in-flight optimistic > last acknowledged > streamed values.
   const [pending, setPending] = useState<Selection[] | null>(null);
+  const [acked, setAcked] = useState<Selection[] | null>(null);
+  // Monotonic request id: a slow PUT must never settle the selection after a newer toggle
+  // superseded it, or both boxes flap to unchecked and the next click drops them server-side.
+  const requestId = useRef(0);
 
-  const selected: Selection[] = pending ?? measurements.map((m) => ({ channel: m.channel, mtype: m.mtype }));
+  const selected: Selection[] = pending ?? acked ?? measurements.map((m) => ({ channel: m.channel, mtype: m.mtype }));
   const isChecked = (channel: number, mtype: string) =>
     selected.some((s) => s.channel === channel && s.mtype === mtype);
 
@@ -43,22 +49,29 @@ export function MeasurePanel() {
     const next = isChecked(channel, mtype)
       ? selected.filter((s) => !(s.channel === channel && s.mtype === mtype))
       : [...selected, { channel, mtype }];
+    const id = ++requestId.current;
     setPending(next);
     setError(null);
     try {
-      await api.setMeasurements(session.id, next);
+      const result = await api.setMeasurements(session.id, next);
+      if (id === requestId.current) {
+        setAcked(result.measurements); // durable across the empty-list broadcast gap
+        setPending(null);
+      }
+      // else: stale response, a newer toggle is in flight — it will settle the selection
     } catch (err) {
-      setError(err instanceof ApiError ? err.detail : String(err));
-    } finally {
-      setPending(null); // fall back to the server's truth
+      if (id === requestId.current) {
+        setError(err instanceof ApiError ? err.detail : String(err));
+        setPending(null); // failed: fall back to the last known truth
+      }
     }
   }
 
-  const rows = measurements.map((m) => [
-    `C${m.channel}`,
-    m.mtype,
-    m.value === null ? "--" : m.value.toFixed(3),
-  ]);
+  // Only render values for measurements that are actually selected — a deselected one lingers in
+  // the store (no empty-list broadcast) and would otherwise keep showing a stale row.
+  const rows = measurements
+    .filter((m) => isChecked(m.channel, m.mtype))
+    .map((m) => [`C${m.channel}`, m.mtype, m.value === null ? "--" : m.value.toFixed(3)]);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
