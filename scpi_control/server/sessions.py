@@ -162,6 +162,11 @@ class InstrumentSession:
         # thread is safe: subscribers only schedule via call_soon_threadsafe.
         self.publish({"type": "closed"})
 
+    @property
+    def viewers(self) -> int:
+        with self._subscribers_lock:
+            return len(self._subscribers)
+
     def subscribe(self, callback: Callable[[Dict[str, Any]], None]) -> Callable[[], None]:
         with self._subscribers_lock:
             self._subscribers.append(callback)

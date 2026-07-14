@@ -17,7 +17,7 @@ afterEach(() => vi.unstubAllGlobals());
 
 describe("api client", () => {
   it("creates a mock session", async () => {
-    const fetchMock = mockFetch({ id: "abc", label: "Mock scope", mock: true, address: null, state: "connected", idn: "x", model: "SDS1104X-E", dialect: "legacy", num_channels: 4 }, { status: 201 });
+    const fetchMock = mockFetch({ id: "abc", label: "Mock scope", mock: true, address: null, state: "connected", idn: "x", model: "SDS1104X-E", dialect: "legacy", num_channels: 4, viewers: 0 }, { status: 201 });
     const session = await api.createSession({ mock: true });
     expect(session.id).toBe("abc");
     const [url, init] = fetchMock.mock.calls[0];

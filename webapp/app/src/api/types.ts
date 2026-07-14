@@ -32,10 +32,11 @@ export type SessionInfo = {
   model: string;
   dialect: string;
   num_channels: number;
+  viewers: number;
 };
 
 export type DiscoveredDevice = {
-  address: string;
+  address: string | null;
   idn: string;
   manufacturer: string;
   model: string;
@@ -43,6 +44,7 @@ export type DiscoveredDevice = {
   kind: string;
   connected: boolean;
   session_id?: string;
+  viewers?: number;
 };
 
 export type ModelInfo = {

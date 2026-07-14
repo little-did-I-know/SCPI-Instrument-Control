@@ -9,7 +9,7 @@ const STATE = { run_state: "STOP", timebase: 0.001, channels: { "1": { enabled: 
 
 beforeEach(() => {
   useSession.getState().clearSession();
-  useSession.getState().setSession({ id: "abc", label: "x", mock: true, address: null, state: "connected", idn: "", model: "", dialect: "legacy", num_channels: 4 });
+  useSession.getState().setSession({ id: "abc", label: "x", mock: true, address: null, state: "connected", idn: "", model: "", dialect: "legacy", num_channels: 4, viewers: 0 });
   useSession.getState().applyState(STATE);
 });
 afterEach(() => vi.restoreAllMocks());

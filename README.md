@@ -621,6 +621,9 @@ Open `http://<gateway-pc>:8765`. For UI development, run `scpi-web` in one
 terminal and `cd webapp/app && npm run dev` in another — Vite proxies `/api`
 (HTTP and WebSocket) to the gateway with hot reload.
 
+The home screen scans your LAN and lists instruments to connect to, resume, or
+open a shared session on — plus manual IP and a hardware-free mock.
+
 ## API Documentation
 
 ### Oscilloscope
