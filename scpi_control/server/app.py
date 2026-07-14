@@ -68,6 +68,7 @@ def create_app(manager: Optional[SessionManager] = None) -> FastAPI:
 
     if STATIC_DIR.is_dir():
         index_file = STATIC_DIR / "index.html"
+        static_root = STATIC_DIR.resolve()
 
         # Catch-all GET, registered LAST so every API route wins. Serves a real
         # file when one exists (JS/CSS/assets), otherwise index.html so client
@@ -76,8 +77,10 @@ def create_app(manager: Optional[SessionManager] = None) -> FastAPI:
         async def spa(full_path: str):
             if full_path.startswith("api/"):
                 raise HTTPException(status_code=404, detail="unknown path /{0}".format(full_path))
-            candidate = STATIC_DIR / full_path
-            if full_path and candidate.is_file():
+            candidate = (STATIC_DIR / full_path).resolve()
+            # Guard against path traversal (e.g. "%2e%2e/secret.txt") escaping
+            # STATIC_DIR: only serve the resolved candidate if it's still inside.
+            if full_path and candidate.is_file() and candidate.is_relative_to(static_root):
                 return FileResponse(str(candidate))
             return FileResponse(str(index_file))
 
