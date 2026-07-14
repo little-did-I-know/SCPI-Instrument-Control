@@ -165,3 +165,22 @@ class TestTerminalAndMeasurements:
         assert bad_type.status_code == 400
         bad_channel = client.put("/api/sessions/{0}/scope/measurements".format(sid), json=[{"channel": 9, "mtype": "PKPK"}])
         assert bad_channel.status_code == 400
+
+
+class TestCapture:
+    def test_capture_csv_single_channel(self, client):
+        sid = create_mock_session(client)["id"]
+        response = client.get("/api/sessions/{0}/scope/capture.csv?channels=1".format(sid))
+        assert response.status_code == 200
+        assert response.headers["content-type"].startswith("text/csv")
+        assert "attachment" in response.headers.get("content-disposition", "")
+        lines = response.text.strip().splitlines()
+        assert lines[0] == "time_s,C1_V"
+        assert len(lines) > 10
+        first = lines[1].split(",")
+        float(first[0])
+        float(first[1])  # parseable numbers
+
+    def test_capture_csv_bad_channels_param_is_400(self, client):
+        sid = create_mock_session(client)["id"]
+        assert client.get("/api/sessions/{0}/scope/capture.csv?channels=banana".format(sid)).status_code == 400

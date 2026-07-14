@@ -3,6 +3,7 @@ import asyncio
 from typing import Any, Callable, List
 
 from fastapi import APIRouter, Request
+from fastapi.responses import PlainTextResponse
 
 from scpi_control.exceptions import InvalidParameterError
 from scpi_control.server.api.sessions import require_session
@@ -111,6 +112,36 @@ async def put_measurements(session_id: str, body: List[MeasurementItem], request
             raise InvalidParameterError("channel {0} out of range".format(item.channel))
     session.set_measurements([(item.channel, item.mtype.upper()) for item in body])
     return {"measurements": [{"channel": c, "mtype": m} for c, m in session.measurements]}
+
+
+def _build_csv(captures) -> str:
+    """captures: list of (channel:int, WaveformData). Align to the shortest."""
+    n = min(len(w.voltage) for _, w in captures)
+    time_axis = captures[0][1].time
+    header = "time_s," + ",".join("C{0}_V".format(c) for c, _ in captures)
+    rows = [header]
+    for i in range(n):
+        rows.append("{0:.9g},{1}".format(float(time_axis[i]), ",".join("{0:.9g}".format(float(w.voltage[i])) for _, w in captures)))
+    return "\n".join(rows) + "\n"
+
+
+@router.get("/sessions/{session_id}/scope/capture.csv")
+async def capture_csv(session_id: str, request: Request, channels: str = "1"):
+    session = require_session(request, session_id)
+    try:
+        channel_list = sorted({int(c) for c in channels.split(",") if c.strip()})
+    except ValueError:
+        raise InvalidParameterError("channels must be a comma-separated list of integers")
+    if not channel_list:
+        raise InvalidParameterError("no channels requested")
+
+    def capture(scope):
+        return [(c, scope.get_waveform(c)) for c in channel_list]
+
+    captures = await run_job(session, capture)
+    csv_text = _build_csv(captures)
+    filename = "capture_{0}_C{1}.csv".format(session.id, "-".join(str(c) for c in channel_list))
+    return PlainTextResponse(csv_text, media_type="text/csv", headers={"Content-Disposition": 'attachment; filename="{0}"'.format(filename)})
 
 
 # NOTE: run_op's {op} path is a catch-all for POST /scope/*; any new specific
