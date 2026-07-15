@@ -16,6 +16,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 from scpi_control import Oscilloscope
 from scpi_control.connection.mock import MockConnection
 from scpi_control.exceptions import SiglentConnectionError, SiglentError
+from scpi_control.server import compute
 
 MAX_FRAME_POINTS = 2000
 MEASUREMENT_EVERY_N_POLLS = 4
@@ -103,7 +104,12 @@ class InstrumentSession:
         self._subscribers_lock = threading.Lock()
         self.measurements: List[Tuple[int, str]] = []
         self._poll_count = 0
-        self._math_shown: set = set()  # math labels with a live trace on subscribers' canvases; worker-thread-only
+        # Server-owned analysis config. Request coroutines swap these whole
+        # dicts atomically (never mutate in place); the worker thread only reads.
+        self.spectrum_config: Dict[str, Any] = {"enabled": False, "channel": 1, "window": "hanning", "db": True}
+        self.filters: Dict[int, Dict[str, Any]] = {n: {"source": 1, "kind": "lowpass", "cutoff_low": None, "cutoff_high": None, "order": 5, "enabled": False} for n in (1, 2)}
+        self.active_reference: Optional[Dict[str, Any]] = None  # {"name", "channel", "data": {"time","voltage",...}}
+        self._shown: set = set()  # trace keys (M1/M2/F1/F2/SPEC) live on subscribers' canvases; worker-thread-only
 
     @classmethod
     def open(
@@ -195,6 +201,17 @@ class InstrumentSession:
         self.measurements = list(items)
         self.publish({"type": "measurements_config", "items": [{"channel": c, "mtype": m} for c, m in self.measurements]})
 
+    def reference_overlay(self) -> Dict[str, Any]:
+        active = self.active_reference
+        if active is None:
+            return {"name": None, "channel": None, "t0": 0.0, "dt": 1.0, "points": []}
+        frame = _decimate_frame(active["channel"], active["data"]["time"], active["data"]["voltage"])
+        return {"name": active["name"], "channel": active["channel"], "t0": frame["t0"], "dt": frame["dt"], "points": frame["points"]}
+
+    def set_active_reference(self, name: Optional[str], channel: Optional[int], data: Optional[Dict[str, Any]]) -> None:
+        self.active_reference = None if name is None else {"name": name, "channel": channel, "data": data}
+        self.publish({"type": "reference", **self.reference_overlay()})
+
     def _enter_error_state(self, detail: str) -> None:
         """Flip to the terminal error state and tell the streams once."""
         self.state = "error"
@@ -267,15 +284,35 @@ class InstrumentSession:
                 if result is not None:
                     self.publish(_decimate_frame(label, result.time, result.voltage))
                     shown_now.add(label)
-                elif label in self._math_shown:
+                elif label in self._shown:
                     self.publish(_decimate_frame(label, [], []))  # one-shot clear on transition
-            self._math_shown = shown_now
-            if self.measurements and self._poll_count % MEASUREMENT_EVERY_N_POLLS == 0:
-                values = []
-                for channel, mtype in self.measurements:
-                    value = _safe(lambda: scope.measurement.measure(mtype, channel))
-                    values.append({"channel": channel, "mtype": mtype, "value": value})
-                self.publish({"type": "measurements", "values": values})
+            for n in sorted(self.filters):
+                config = self.filters[n]
+                label = "F{0}".format(n)
+                result = compute.filtered_waveform(config, acquired) if config["enabled"] else None
+                if result is not None:
+                    self.publish(_decimate_frame(label, result.time, result.voltage))
+                    shown_now.add(label)
+                elif label in self._shown:
+                    self.publish(_decimate_frame(label, [], []))
+            spectrum_config = self.spectrum_config  # snapshot: request threads swap the dict atomically
+            frame = compute.spectrum_frame(spectrum_config, acquired) if spectrum_config["enabled"] else None
+            if frame is not None:
+                self.publish(frame)
+                shown_now.add("SPEC")
+            elif "SPEC" in self._shown:
+                self.publish(compute.empty_spectrum_frame(spectrum_config))
+            self._shown = shown_now
+            if self._poll_count % MEASUREMENT_EVERY_N_POLLS == 0:
+                if self.measurements:
+                    values = []
+                    for channel, mtype in self.measurements:
+                        value = _safe(lambda: scope.measurement.measure(mtype, channel))
+                        values.append({"channel": channel, "mtype": mtype, "value": value})
+                    self.publish({"type": "measurements", "values": values})
+                reference = self.active_reference  # snapshot for thread safety
+                if reference is not None:
+                    self.publish(compute.reference_stats(reference, acquired))
         except SiglentError as exc:
             self.error_detail = str(exc)
             self.publish({"type": "error", "detail": str(exc)})
