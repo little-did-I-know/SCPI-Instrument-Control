@@ -65,6 +65,18 @@ describe("useStream", () => {
     await waitFor(() => expect(useSession.getState().measurements[0].value).toBe(2));
   });
 
+  it("applies a measurements_config message to the store", async () => {
+    renderHook(() => useStream("abc"));
+    FakeWebSocket.last!.emit({ type: "measurements_config", items: [{ channel: 1, mtype: "PKPK" }] });
+    await waitFor(() => expect(useSession.getState().measurementConfig).toEqual([{ channel: 1, mtype: "PKPK" }]));
+  });
+
+  it("routes a math (M1) waveform frame to the frame buffer", async () => {
+    renderHook(() => useStream("abc"));
+    FakeWebSocket.last!.emit({ type: "waveform", channel: "M1", t0: 0, dt: 1e-6, points: [0, 1] });
+    await waitFor(() => expect(getFrame("M1")?.points).toEqual([0, 1]));
+  });
+
   it("treats a closed message as a clean session end", async () => {
     useSession.getState().setSession({ id: "abc", label: "x", mock: true, address: null, state: "connected", idn: "", model: "", dialect: "legacy", num_channels: 4, viewers: 0 });
     renderHook(() => useStream("abc"));

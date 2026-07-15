@@ -27,4 +27,9 @@ describe("frame buffer", () => {
     clearFrames();
     expect(getFrame(1)).toBeUndefined();
   });
+
+  it("stores frames under string keys (math channels)", () => {
+    setFrame("M1", { t0: 0, dt: 1, points: [1, 2] });
+    expect(getFrame("M1")?.points).toEqual([1, 2]);
+  });
 });

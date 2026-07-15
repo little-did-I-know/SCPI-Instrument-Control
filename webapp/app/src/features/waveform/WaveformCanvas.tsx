@@ -4,6 +4,9 @@ import type { ChannelState } from "../../api/types";
 import { useSession } from "../../store/session";
 
 const TRACE = ["#FFDC32", "#40E0D0", "#FF69B4", "#32FF64"];
+// Resolved to concrete hex (canvas 2D can't read CSS vars) — matches
+// --trace-reference / --trace-difference in webapp/design/tokens/colors.css.
+const MATH_TRACES: Record<string, string> = { M1: "#FFA500", M2: "#FF1493" };
 const DIVS_X = 14;
 const DIVS_Y = 10;
 const PAD = 8;
@@ -99,6 +102,27 @@ export function WaveformCanvas() {
         frame.points.forEach((volts, index) => {
           const x = PAD + (gw * index) / Math.max(1, frame.points.length - 1);
           const y = PAD + gh / 2 - (volts / fullScale) * gh;
+          if (index === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        });
+        ctx.stroke();
+        drew = true;
+      });
+
+      ["M1", "M2"].forEach((label) => {
+        const frame = getFrame(label);
+        if (!frame || frame.points.length === 0) return;
+        const min = Math.min(...frame.points);
+        const max = Math.max(...frame.points);
+        const mid = (min + max) / 2;
+        const halfSpan = (max - min) / 2;
+        ctx.strokeStyle = MATH_TRACES[label];
+        ctx.lineWidth = 2;
+        ctx.lineJoin = "round";
+        ctx.beginPath();
+        frame.points.forEach((volts, index) => {
+          const x = PAD + (gw * index) / Math.max(1, frame.points.length - 1);
+          const y = PAD + gh / 2 - ((volts - mid) / (halfSpan || 1)) * (gh / 2 * 0.9);
           if (index === 0) ctx.moveTo(x, y);
           else ctx.lineTo(x, y);
         });
