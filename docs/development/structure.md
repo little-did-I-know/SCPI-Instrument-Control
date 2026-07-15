@@ -1,6 +1,6 @@
 # Project Structure
 
-This guide explains the organization of the Siglent Oscilloscope Control library codebase, making it easier to navigate, understand, and contribute.
+This guide explains the organization of the SCPI Instrument Control codebase, making it easier to navigate, understand, and contribute.
 
 ## Overview
 
@@ -949,5 +949,5 @@ def function(arg1: str, arg2: int) -> bool:
 
 - [Building Guide](building.md) - Build and package the project
 - [Testing Guide](testing.md) - Learn about testing
-- [Contributing](../CONTRIBUTING.md) - Contribution guidelines
+- [Contributing](contributing.md) - Contribution guidelines
 - [API Reference](../api/oscilloscope.md) - Detailed API docs

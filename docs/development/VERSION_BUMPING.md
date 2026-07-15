@@ -408,5 +408,5 @@ The script will still validate:
 
 - [Semantic Versioning 2.0.0](https://semver.org/)
 - [Keep a Changelog](https://keepachangelog.com/)
-- [Contributing Guide](../CONTRIBUTING.md)
+- [Contributing Guide](contributing.md)
 - [Release Workflow](PYPI_DEPLOYMENT.md)

@@ -1,6 +1,6 @@
 # Testing Guide
 
-This guide covers the testing strategy, test organization, and best practices for the Siglent Oscilloscope Control library.
+This guide covers the testing strategy, test organization, and best practices for SCPI Instrument Control.
 
 ## Overview
 
@@ -1149,5 +1149,5 @@ class TestModule:
 
 - [Building Guide](building.md) - Build and package the project
 - [Project Structure](structure.md) - Understand the codebase
-- [Contributing Guidelines](../CONTRIBUTING.md) - How to contribute
+- [Contributing Guidelines](contributing.md) - How to contribute
 - [API Reference](../api/oscilloscope.md) - API documentation

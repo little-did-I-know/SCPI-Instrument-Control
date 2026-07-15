@@ -1,6 +1,6 @@
 # Project Structure
 
-This document describes the organization of the Siglent Oscilloscope Control project.
+This document describes the organization of the SCPI Instrument Control project.
 
 ## Directory Layout
 

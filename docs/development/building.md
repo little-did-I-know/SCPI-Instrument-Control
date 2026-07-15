@@ -1,6 +1,6 @@
 # Building the Project
 
-This guide covers how to build, test, and package the Siglent Oscilloscope Control library for development and distribution.
+This guide covers how to build, test, and package SCPI Instrument Control for development and distribution.
 
 ## Overview
 
@@ -20,7 +20,7 @@ The project uses a modern Python build system based on:
 **Python Version:**
 
 - Python 3.9 or later
-- Supports: 3.8, 3.9, 3.10, 3.11, 3.12
+- Supports: 3.9, 3.10, 3.11, 3.12, 3.13, 3.14
 
 **Operating Systems:**
 
@@ -253,6 +253,41 @@ dist/
   Siglent_Oscilloscope-0.3.0-py3-none-any.whl  # Wheel distribution
 ```
 
+### Test the Local Build
+
+Install the package you just built (as opposed to the editable checkout) to sanity-check it before uploading:
+
+```bash
+# Bash / WSL
+pip install dist/*.whl
+
+# Windows PowerShell (keep the pip upgrade separate so globbing works)
+python -m pip install --upgrade pip
+python -m pip install (Get-ChildItem dist\*.whl)
+
+# Windows Command Prompt (cmd.exe)
+for %f in (dist\*.whl) do python -m pip install --upgrade pip "%f"
+```
+
+If you see an error like `Invalid wheel filename (wrong number of parts): '*'` or
+`Requirement 'dist/*.whl' looks like a filename, but the file does not exist`, it
+usually means:
+
+1. `dist/` is empty because `python -m build` hasn't been run yet.
+2. The shell (especially PowerShell) didn't expand the `dist/*.whl` glob, so pip
+   received the literal string `dist/*.whl`. Use the PowerShell example above so
+   pip receives the actual wheel path.
+
+### Verify Package Contents
+
+```bash
+# View wheel contents
+unzip -l dist/*.whl
+
+# Or use tar for the source distribution
+tar -tzf dist/*.tar.gz
+```
+
 ### Clean Build Artifacts
 
 **Remove all build artifacts:**
@@ -429,7 +464,7 @@ make format
 **Black configuration:**
 
 - Line length: 200 characters
-- Target: Python 3.8, 3.9, 3.10, 3.11, 3.12
+- Target: Python 3.9, 3.10, 3.11, 3.12, 3.13, 3.14
 - See `pyproject.toml` for details
 
 **Formatted files:**
@@ -1070,5 +1105,5 @@ pip freeze > requirements.txt
 
 - [Project Structure](structure.md) - Understand the codebase organization
 - [Testing Guide](testing.md) - Learn about the test suite
-- [Contributing Guidelines](../CONTRIBUTING.md) - How to contribute
+- [Contributing Guidelines](contributing.md) - How to contribute
 - [Code of Conduct](../CODE_OF_CONDUCT.md) - Community guidelines

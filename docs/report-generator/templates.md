@@ -22,9 +22,22 @@ Think of templates as "test procedures" - they ensure consistency across multipl
 - ✅ **Sharing** - Team members use same templates
 - ✅ **Version Control** - Templates are JSON files
 
-## Creating Templates (API)
+## Creating Templates (GUI)
 
-> **Note:** Template creation through the GUI is planned for a future release. For now, use the Python API.
+The Report Generator application manages templates without writing any code:
+
+- **File → Save as Template...** (`Ctrl+S`) saves the current session's metadata, sections, and settings as a new template.
+- **File → Load Template...** (`Ctrl+L`) opens the Template Manager and applies the selected template's defaults to the current session.
+- The Report Options dialog also has its own **Save as Template...** button, so you can save a template at the point of generating a report.
+- **File → Manage Templates...** opens the Template Manager dialog, where you can browse all saved templates, view their details, **Load**, **Duplicate...**, **Delete**, **Import...**, or **Export...** them (import/export uses the template's JSON file, making templates easy to share with teammates).
+
+Templates are stored per-user:
+
+- **Windows**: `%APPDATA%\SiglentReportGenerator\templates\`
+- **macOS**: `~/Library/Application Support/SiglentReportGenerator/templates/`
+- **Linux**: `~/.config/SiglentReportGenerator/templates/`
+
+## Creating Templates (API)
 
 ### Basic Template
 

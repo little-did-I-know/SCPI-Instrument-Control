@@ -1,6 +1,6 @@
-# Siglent Oscilloscope Control
+# SCPI Instrument Control
 
-Welcome to the Siglent Oscilloscope Control library documentation!
+Welcome to the SCPI Instrument Control documentation! SCPI Instrument Control is a universal Python library for SCPI test equipment — oscilloscopes, function generators/AWGs, power supplies, and DAQ units — with a PyQt6 desktop GUI and a browser-based lab gateway.
 
 <div class="grid cards" markdown>
 
@@ -40,7 +40,7 @@ Welcome to the Siglent Oscilloscope Control library documentation!
 
 ## Overview
 
-This library provides comprehensive control for Siglent oscilloscopes via SCPI over Ethernet. It supports both programmatic control through a Python API and interactive control through a feature-rich PyQt6 GUI.
+This library provides comprehensive control for SCPI test equipment — oscilloscopes, function generators/AWGs, power supplies, and DAQ units — over Ethernet. It supports programmatic control through a Python API, interactive control through a feature-rich PyQt6 GUI, and a browser-based lab gateway for LAN-wide access.
 
 ### Supported Models
 
@@ -84,7 +84,7 @@ This library provides comprehensive control for Siglent oscilloscopes via SCPI o
 Install the base package:
 
 ```bash
-pip install SCPI-Instrument-Control
+pip install "SCPI-Instrument-Control"
 ```
 
 Or install with all features:

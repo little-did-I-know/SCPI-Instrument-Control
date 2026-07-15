@@ -1,6 +1,6 @@
 # Basic Usage
 
-This guide covers the fundamental concepts and patterns for using the Siglent Oscilloscope Control library.
+This guide covers the fundamental concepts and patterns for using SCPI Instrument Control, a universal Python library for SCPI test equipment — oscilloscopes, function generators/AWGs, power supplies, and DAQ units — with a PyQt6 desktop GUI and a browser-based lab gateway.
 
 ## Connecting to Your Oscilloscope
 

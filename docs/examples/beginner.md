@@ -19,7 +19,7 @@ Basic usage example for Siglent oscilloscope control.
 
 ### Requirements
 
-- siglent - Core library
+- scpi_control - Core library
 - Oscilloscope connected to network
 
 ### Configuration
@@ -131,7 +131,7 @@ Measurement example for Siglent oscilloscope.
 
 ### Requirements
 
-- siglent - Core library
+- scpi_control - Core library
 - Oscilloscope connected to network
 
 ### Configuration
@@ -260,7 +260,7 @@ Simple single capture example.
 
 ### Requirements
 
-- siglent - Core library
+- scpi_control - Core library
 - Oscilloscope connected to network
 
 ### Configuration

@@ -1,6 +1,6 @@
 # GUI Overview
 
-The Siglent Oscilloscope Control GUI provides a powerful, user-friendly interface for controlling your oscilloscope, viewing waveforms in real-time, and performing advanced analysis.
+The SCPI Instrument Control GUI is part of a universal Python library for SCPI test equipment — oscilloscopes, function generators/AWGs, power supplies, and DAQ units — with a PyQt6 desktop GUI and a browser-based lab gateway. This page covers the desktop GUI: a powerful, user-friendly interface for controlling your oscilloscope, viewing waveforms in real-time, and performing advanced analysis.
 
 ## Introduction
 
@@ -36,7 +36,7 @@ If you want to try the GUI with minimal dependencies:
 
 ```bash
 # Basic installation (no GUI extras)
-pip install SCPI-Instrument-Control
+pip install "SCPI-Instrument-Control"
 
 # GUI will work but with warnings about missing optional features
 ```

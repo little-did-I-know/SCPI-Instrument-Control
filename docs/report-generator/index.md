@@ -128,7 +128,7 @@ export_pdf(report, f"service_{customer_id}.pdf")
 
 **Minimum:**
 
-- Python 3.8 or later
+- Python 3.9 or later
 - 4 GB RAM
 - 500 MB disk space
 

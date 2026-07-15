@@ -1,655 +1,276 @@
 # Visual Measurements
 
-Visual measurements provide interactive, drag-and-drop markers for precise measurements directly on the waveform display. This guide covers how to use visual measurement markers effectively.
+Complete guide to using the interactive visual measurement system in the GUI application.
+
+## Table of Contents
+
+- [Overview](#overview)
+- [Getting Started](#getting-started)
+- [Measurement Types](#measurement-types)
+- [Using the Visual Measurement Panel](#using-the-visual-measurement-panel)
+- [Saving and Loading Configurations](#saving-and-loading-configurations)
+- [Exporting Results](#exporting-results)
+- [Tips and Best Practices](#tips-and-best-practices)
+- [Troubleshooting](#troubleshooting)
 
 ## Overview
 
-Visual measurements allow you to:
+The visual measurement system lets you measure signal properties by placing markers directly on waveforms. Instead of reading raw numbers only, you can see exactly where and how each measurement is being taken.
 
-- Add interactive markers to the waveform display
-- Drag markers to measure specific points
-- Calculate deltas between markers automatically
-- Snap markers to waveform data points
-- Label and customize markers
-- Export measurement data
+### Key Features
 
-### Marker Types
+- **Interactive Markers**: add a marker for a chosen measurement type and channel; it auto-positions on the waveform
+- **15+ Measurement Types**: frequency, voltage, and timing measurements
+- **Real-Time Updates**: measurements update as new waveform data arrives (manual or auto-update)
+- **Save/Load Configurations**: save marker setups for reuse
+- **Batch Measurements**: run multiple markers simultaneously
+- **Export Results**: export to CSV or JSON for analysis
 
-**Voltage Markers (Horizontal)**
+### How It Works
 
-- Measure voltage values
-- Horizontal lines across display
-- Multiple markers for delta measurements
+1. **Add a Marker**: select measurement type and channel, click "Add Marker"
+2. **Auto-Placement**: the marker automatically positions itself on the waveform
+3. **Visual Feedback**: see gates and the measurement region on the display
+4. **Live Results**: the measurement value appears in the marker list
+5. **Update as Needed**: click "Update All Measurements" (or enable auto-update) to refresh values as the waveform changes
 
-**Time Markers (Vertical)**
+## Getting Started
 
-- Measure time values
-- Vertical lines across display
-- Calculate time differences
+### Prerequisites
 
-**Frequency Markers**
+1. **Install with GUI support**:
 
-- Measure periods
-- Calculate frequency from period
-- Useful for periodic signals
+   ```bash
+   pip install "SCPI-Instrument-Control[gui]"
+   ```
 
-## Adding Markers
+2. **Connect to an oscilloscope**:
+   - Launch: `siglent-gui`
+   - Connect to your oscilloscope (enter IP address, or use a mock connection)
+   - Enable at least one channel (Channels tab)
 
-### Using the Visual Measurements Tab
+### Your First Measurement
 
-1. Open **Visual Measurements** tab in control panel
-2. Click **Add Voltage Marker** or **Add Time Marker**
-3. Marker appears on display
-4. Drag to desired position
+1. **Capture a waveform**:
+   - Click "Acquisition" → "Capture Single" (or start Live View)
+   - Verify the waveform appears on the display
 
-### Using Right-Click Menu
+2. **Open Visual Measurements**:
+   - Click the **"Visual Measure"** tab in the control panel
 
-1. Right-click on waveform display
-2. Select **Add Marker Here**
-3. Choose marker type
-4. Marker placed at click position
+3. **Add a frequency marker**:
+   - Type: **Frequency**
+   - Channel: **CH1** (or whichever channel has your signal)
+   - Click **"Add Marker"**
 
-### Using Keyboard
+4. **See the result**:
+   - The marker appears on the waveform with its gates
+   - The measurement result shows in the marker list
+   - The value updates when you click "Update All Measurements" (or automatically, if auto-update is enabled)
 
-Press `Ctrl+M` to add marker at cursor position
+## Measurement Types
 
-## Voltage Markers
+The type dropdown offers these measurements (grouped by marker class):
 
-### Creating Voltage Marker
+### Frequency and Period
 
-**Method 1: Add from Tab**
+**Types**: `FREQ` (Frequency), `PER` (Period)
 
-```
-1. Click "Add Voltage Marker" button
-2. Marker appears at center
-3. Drag to desired voltage
-```
+**Best used for**: periodic signals (sine waves, square waves, clock signals, PWM) — any repetitive waveform.
 
-**Method 2: Right-Click**
+### Voltage Measurements
 
-```
-1. Right-click at voltage position
-2. Select "Add Voltage Marker"
-3. Marker placed at click position
-```
+**Types**:
 
-### Voltage Marker Features
+- `PKPK` - Peak-to-Peak voltage
+- `AMPL` - Amplitude (peak to mid-level)
+- `MAX` - Maximum voltage
+- `MIN` - Minimum voltage
+- `RMS` - Root Mean Square voltage
+- `MEAN` - Average voltage
+- `TOP` - Top level
+- `BASE` - Base level
 
-**Display:**
+**Best used for**: power supply ripple, signal amplitude verification, DC level measurements, noise floor analysis.
 
-- Horizontal line spanning display
-- Label showing voltage value
-- Color-coded for visibility
+### Timing Measurements
 
-**Interaction:**
+**Types**:
 
-- Click and drag vertically to move
-- Snaps to waveform if enabled
-- Shows real-time voltage value
+- `RISE` - Rise time
+- `FALL` - Fall time
+- `WID` - Positive pulse width
+- `NWID` - Negative pulse width
+- `DUTY` - Duty cycle (percentage)
 
-**Label Format:**
+**Best used for**: edge rate verification, pulse width measurements, PWM duty cycle analysis, signal integrity checks.
 
-```
-V1: 2.345 V
-```
+## Using the Visual Measurement Panel
 
-### Multiple Voltage Markers
+### Panel Layout
 
-Add multiple markers for delta measurements:
+The panel has four groups, top to bottom:
 
-```
-V1: 3.500 V
-V2: 1.200 V
-ΔV: 2.300 V  (automatic)
-```
+- **Add Marker**: measurement type dropdown, channel dropdown (CH1-CH4), and an "Add Marker" button
+- **Active Markers**: a checkable list of markers, each showing `M<n>: CH<n> <Type> = <value>`
+- **Controls**: "Update All Measurements" and "Clear All Markers" (with a confirmation prompt)
+- **File Operations**: "Save Configuration...", "Load Configuration...", and "Export Results..."
 
-**Delta Calculation:**
+### Adding Markers
 
-- Automatically calculated between markers
-- Shows voltage difference
-- Updates as markers move
+1. **Select measurement type** from the dropdown (15 types available)
+2. **Select channel** (CH1-CH4)
+3. **Click "Add Marker"**
+   - The marker auto-positions on the waveform if data is available
+   - It's assigned a unique ID (M1, M2, M3, ...)
+   - The list is updated with the new marker
 
-## Time Markers
+### Managing Markers
 
-### Creating Time Marker
+**Enable/Disable**:
 
-**Method 1: Add from Tab**
+- Check/uncheck a marker in the list — disabled markers are hidden but stay in the list
 
-```
-1. Click "Add Time Marker" button
-2. Marker appears at center
-3. Drag to desired time
-```
+**Remove a Marker**:
 
-**Method 2: Right-Click**
+- Select it in the list and click "Remove Selected"
 
-```
-1. Right-click at time position
-2. Select "Add Time Marker"
-3. Marker placed at click position
-```
+**Clear All**:
 
-### Time Marker Features
+- Click "Clear All Markers" and confirm — removes every marker
 
-**Display:**
+**Update Measurements**:
 
-- Vertical line from top to bottom
-- Label showing time value
-- Dotted or solid line style
+- **Manual**: click "Update All Measurements"
+- **Automatic**: enable the auto-update checkbox — refreshes every second
 
-**Interaction:**
+## Saving and Loading Configurations
 
-- Click and drag horizontally to move
-- Shows real-time time value
-- Snaps to grid if enabled
+### Why Save Configurations?
 
-**Label Format:**
+- **Reuse**: apply the same measurement setup across sessions
+- **Share**: send configurations to colleagues
+- **Batch**: load multiple markers at once
 
-```
-T1: 125.3 µs
-```
+### Saving a Configuration
 
-### Multiple Time Markers
+1. Add the markers you want to keep
+2. Click **"Save Configuration..."**
+3. Choose a location and filename (`.json` is added automatically if omitted)
 
-Add multiple markers for timing measurements:
+### Loading a Configuration
 
-```
-T1: 100.0 µs
-T2: 125.0 µs
-Δt: 25.0 µs   (automatic)
-f = 40.0 kHz  (1/Δt)
-```
+1. Click **"Load Configuration..."**
+2. Select a configuration file (`.json`)
+3. Existing markers are cleared and replaced with the loaded set
+4. Measurements are recalculated from the current waveform
 
-**Delta Calculations:**
+### Default Configuration Directory
 
-- Time difference (Δt)
-- Frequency (1/Δt)
-- Updates in real-time
+The save/load dialogs default to a per-user config directory under `measurement_configs/`:
 
-## Frequency Markers
+- **Windows**: `%LOCALAPPDATA%\siglent\measurement_configs\`
+- **macOS**: `~/Library/Application Support/siglent/measurement_configs/`
+- **Linux**: `~/.config/siglent/measurement_configs/`
 
-### Period Measurement
+You can browse elsewhere from the file dialog.
 
-Use two time markers to measure period:
+## Exporting Results
 
-```
-1. Add Time Marker at start of cycle (T1)
-2. Add Time Marker at end of cycle (T2)
-3. Δt = period
-4. f = 1/Δt = frequency
+### CSV Export
+
+Exports the current marker list as comma-separated values (`Marker ID, Type, Channel, Value, Unit, Enabled`):
+
+```csv
+Marker ID,Type,Channel,Value,Unit,Enabled
+M1,FREQ,1,1234.5,Hz,Yes
+M2,PKPK,1,3.24,V,Yes
+M3,RISE,2,45.2,ns,Yes
 ```
 
-**Example:**
+### JSON Export
 
-```
-T1: 0.00 µs
-T2: 10.0 µs
-Period: 10.0 µs
-Frequency: 100.0 kHz
-```
+Exports a timestamped results object with one entry per marker (id, type, channel, value, unit).
 
-### Duty Cycle Measurement
+**To Export**:
 
-Measure pulse width and duty cycle:
-
-```
-1. Add marker at pulse start (T1)
-2. Add marker at pulse end (T2)
-3. Add marker at next pulse start (T3)
-4. High time: T2 - T1
-5. Period: T3 - T1
-6. Duty cycle: (T2-T1)/(T3-T1) × 100%
-```
-
-## Marker Management
-
-### Marker List
-
-All markers shown in Visual Measurements tab:
-
-**Columns:**
-
-- Type (Voltage/Time)
-- Label
-- Value
-- Color
-- Visible (checkbox)
-
-**Actions:**
-
-- Click to select
-- Checkbox to show/hide
-- Delete button to remove
-- Edit button to configure
-
-### Selecting Markers
-
-**Click on Marker:**
-
-- Selects marker
-- Highlights in list
-- Shows properties
-
-**Click in List:**
-
-- Selects from list
-- Highlights on display
-- Ready to edit
-
-### Moving Markers
-
-**Drag with Mouse:**
-
-- Click and hold marker
-- Drag to new position
-- Release to set
-
-**Keyboard:**
-
-- Arrow keys for fine adjustment
-- Shift+Arrow for larger steps
-- Works when marker selected
-
-**Numeric Input:**
-
-- Double-click marker label
-- Enter exact value
-- Press Enter to apply
-
-### Deleting Markers
-
-**Individual:**
-
-- Select marker
-- Press `Delete` key
-- Or click Delete button in list
-
-**All:**
-
-- Tools menu → Clear All Measurements
-- Removes all markers
-
-## Marker Properties
-
-### Customizing Markers
-
-**Label Text:**
-
-- Double-click to edit
-- Custom names (e.g., "Vmax", "Start Time")
-- Displayed on marker
-
-**Color:**
-
-- Click color picker
-- Choose from palette
-- Custom RGB values
-
-**Line Style:**
-
-- Solid, dashed, or dotted
-- Line width adjustment
-- Opacity/transparency
-
-**Font:**
-
-- Label font size
-- Font family
-- Bold/italic
-
-### Snap to Waveform
-
-**Enable Snapping:**
-
-- Checkbox in marker properties
-- Marker follows waveform data
-- Finds nearest data point
-
-**Behavior:**
-
-- Voltage markers snap to Y values
-- Helps find peaks/troughs
-- More accurate measurements
-
-**Example:**
-
-```
-Without snap: V = 2.347 V (approximate)
-With snap: V = 2.350 V (exact data point)
-```
-
-## Delta Measurements
-
-### Automatic Deltas
-
-When multiple markers of same type exist:
-
-**Voltage Deltas:**
-
-```
-V1: 3.5 V
-V2: 1.2 V
-ΔV: 2.3 V (V1 - V2)
-```
-
-**Time Deltas:**
-
-```
-T1: 100 µs
-T2: 150 µs
-Δt: 50 µs (T2 - T1)
-f: 20 kHz (1/Δt)
-```
-
-### Delta Display Options
-
-**Show in Label:**
-
-- Delta shown near markers
-- Updates as markers move
-- Toggle on/off
-
-**Show in Table:**
-
-- Delta measurements in list
-- Export with other measurements
-- Statistics tracking
-
-## Advanced Measurements
-
-### Rise Time Measurement
-
-Measure 10%-90% rise time:
-
-```
-1. Find rising edge
-2. Add V1 marker at 10% point
-3. Add V2 marker at 90% point
-4. Add T1 at V1 crossing
-5. Add T2 at V2 crossing
-6. Rise time = T2 - T1
-```
-
-### Overshoot Measurement
-
-Measure overshoot amplitude:
-
-```
-1. Add V1 at steady-state level
-2. Add V2 at peak overshoot
-3. Overshoot = ((V2-V1)/V1) × 100%
-```
-
-### Phase Difference
-
-Measure phase between channels:
-
-```
-1. Enable two channels
-2. Find zero crossing on C1 (T1)
-3. Find zero crossing on C2 (T2)
-4. Phase difference = (T2-T1) × 360° / period
-```
-
-## Measurement Accuracy
-
-### Precision
-
-**Time Measurements:**
-
-- Limited by sample rate
-- Resolution = 1/sample_rate
-- Example: 1 GSa/s → 1 ns resolution
-
-**Voltage Measurements:**
-
-- Limited by ADC resolution
-- 8-bit: ~0.4% accuracy
-- 12-bit: ~0.024% accuracy
-
-### Improving Accuracy
-
-**1. Increase Sample Rate:**
-
-- Use shorter timebase
-- Higher resolution
-- Better time accuracy
-
-**2. Enable Snap to Waveform:**
-
-- Uses actual data points
-- Eliminates interpolation error
-- More precise readings
-
-**3. Average Multiple Measurements:**
-
-- Take several readings
-- Calculate mean
-- Reduces noise effects
-
-**4. Use Statistics:**
-
-- Enable measurement statistics
-- View min/max/mean
-- See standard deviation
-
-## Working with Multiple Channels
-
-### Channel-Specific Markers
-
-Markers can be assigned to channels:
-
-**Channel 1 Markers:**
-
-- Snap to C1 waveform only
-- Color matches C1
-- Independent from other channels
-
-**Channel 2 Markers:**
-
-- Snap to C2 waveform
-- Different color
-- Separate measurements
-
-### Cross-Channel Measurements
-
-Measure between channels:
-
-**Time Delay:**
-
-```
-1. Add T1 at C1 event
-2. Add T2 at C2 event
-3. Delay = T2 - T1
-```
-
-**Voltage Difference:**
-
-```
-1. Add V1 on C1
-2. Add V2 on C2 (same time)
-3. Difference = V1 - V2
-```
-
-## Exporting Measurements
-
-### Export to CSV
-
-Save marker measurements:
-
-```
-Marker, Type, Value, Unit
-V1, Voltage, 3.500, V
-V2, Voltage, 1.200, V
-ΔV, Delta, 2.300, V
-T1, Time, 100.0, µs
-T2, Time, 150.0, µs
-Δt, Delta, 50.0, µs
-f, Frequency, 20.0, kHz
-```
-
-**To Export:**
-
-1. Visual Measurements tab
-2. Click "Export" button
-3. Choose file location
-4. Save as CSV
-
-### Include in Waveform Export
-
-When saving waveform data:
-
-- Checkbox: "Include markers"
-- Marker positions saved
-- Reload with waveform
+1. Update all measurements first (click "Update All Measurements")
+2. Click "Export Results..."
+3. Choose CSV or JSON by the file extension you type
 
 ## Tips and Best Practices
 
-### Effective Measurement
+### Getting Accurate Measurements
 
-!!! tip "Marker Placement" - Use snap-to-waveform for accuracy - Zoom in for precise positioning - Use cursors for reference - Label markers clearly
+1. **Use an appropriate timebase**:
+   - For frequency: show several complete cycles
+   - For rise time: zoom in on the edge
+   - For duty cycle: show the full period
 
-### Organization
+2. **Check signal quality**:
+   - Adequate voltage scale (signal fills most of the screen)
+   - Low noise
+   - Stable triggering
 
-!!! tip "Managing Many Markers" - Use consistent naming (V1, V2, V3...) - Color code by function - Hide markers not currently needed - Group related markers
+3. **Verify auto-placement**:
+   - Check that the marker's gates encompass the intended region
+   - For frequency, verify the gates span exactly one cycle
 
-### Accuracy
+### Working with Multiple Channels
 
-!!! tip "Precise Measurements" - Enable snap to waveform - Increase sample rate for time measurements - Use multiple markers and average - Enable measurement statistics
+Add one marker per channel to compare signals directly in the marker list, e.g. a Frequency marker on CH1 and CH2 side by side to compare rates, or Rise Time on both channels to compare edge speed.
 
-### Workflow
+### Performance Tips
 
-!!! tip "Efficient Workflow" - Right-click to add markers quickly - Use keyboard shortcuts - Save marker configurations - Export measurements for documentation
-
-## Keyboard Shortcuts
-
-| Shortcut      | Action                    |
-| ------------- | ------------------------- |
-| `Ctrl+M`      | Add marker at cursor      |
-| `Delete`      | Remove selected marker    |
-| `Arrow keys`  | Fine-tune marker position |
-| `Shift+Arrow` | Large steps               |
-| `Tab`         | Select next marker        |
-| `Shift+Tab`   | Select previous marker    |
+- Keep the marker count reasonable — fewer markers means faster updates
+- Disable markers you're not using instead of removing them, if you'll need them again soon
+- Auto-update adds a small refresh overhead per second; disable it if you don't need live updates
 
 ## Troubleshooting
 
-### Marker Not Snapping
+### Marker Not Appearing
 
-**Problem:** Snap to waveform not working
+**Symptom**: click "Add Marker" but nothing shows on the waveform
 
-**Solutions:**
+**Possible causes**:
 
-1. Enable "Snap to Waveform" in marker properties
-2. Ensure channel is enabled and visible
-3. Check waveform has data at marker position
-4. Zoom in if waveform is too small
+1. **No waveform data** — capture a waveform first (Single or Live View)
+2. **Channel disabled** — enable the channel in the Channels tab
+3. **Signal out of view** — autoscale or adjust timebase/voltage scale
 
-### Inaccurate Measurements
+### Incorrect Measurement Values
 
-**Problem:** Measurements don't match expected values
+**Symptom**: the measurement result seems wrong
 
-**Solutions:**
+**Possible causes**:
 
-1. Check probe ratio settings
-2. Verify voltage scale calibration
-3. Enable snap to waveform
-4. Increase sample rate for time measurements
-5. Check for aliasing
+1. **Auto-placement error** — check the gate positions visually; for frequency, verify the gates span exactly one cycle
+2. **Wrong measurement type** — PKPK vs AMPL, WID vs DUTY, etc. can look similar but measure different things
+3. **Signal quality issues** — increase averaging, reduce noise, check probe compensation
+4. **Timebase too coarse** — zoom in for better resolution, especially for rise/fall time
 
-### Markers Disappeared
+### Cannot Save/Load Configuration
 
-**Problem:** Markers not visible
+**Symptom**: error when saving or loading a configuration file
 
-**Solutions:**
+**Possible causes**:
 
-1. Check visibility checkbox in marker list
-2. Markers may be off-screen (reset zoom)
-3. Verify markers weren't accidentally deleted
-4. Check if correct channel is displayed
+1. **Permission denied** — check write permissions for the config directory, or save to a different folder
+2. **Invalid JSON** — only edit configuration files by hand if you know the schema; prefer the panel's Save/Load buttons
+3. **Missing directory** — the app creates its config directory automatically, but verify it exists if a save fails
 
-### Can't Move Marker
+### Auto-Update Not Working
 
-**Problem:** Marker won't drag
+**Symptom**: measurements don't update automatically
 
-**Solutions:**
+**Possible causes**:
 
-1. Click directly on marker line
-2. Ensure marker is selected
-3. Try using arrow keys instead
-4. Check if marker is locked
-
-## Examples
-
-### Example 1: Measure Pulse Width
-
-```
-Objective: Measure positive pulse width
-
-Steps:
-1. Enable channel with pulse signal
-2. Set trigger to rising edge
-3. Add Time Marker (T1) at rising edge
-4. Add Time Marker (T2) at falling edge
-5. Read Δt = pulse width
-
-Result: Δt = 125.3 µs
-```
-
-### Example 2: Measure Peak-to-Peak
-
-```
-Objective: Measure signal Vpp
-
-Steps:
-1. Capture waveform
-2. Enable snap to waveform
-3. Add Voltage Marker (V1) at maximum
-4. Add Voltage Marker (V2) at minimum
-5. Read ΔV = Vpp
-
-Result: ΔV = 5.02 V
-```
-
-### Example 3: Measure Frequency
-
-```
-Objective: Measure signal frequency
-
-Steps:
-1. Capture periodic signal
-2. Add Time Marker (T1) at zero crossing
-3. Add Time Marker (T2) at next zero crossing (same direction)
-4. Read period (Δt)
-5. Frequency automatically calculated
-
-Result:
-  Period = 10.04 µs
-  Frequency = 99.6 kHz
-```
-
-### Example 4: Rise Time (10%-90%)
-
-```
-Objective: Measure 10%-90% rise time
-
-Steps:
-1. Capture rising edge
-2. Calculate 10% and 90% levels:
-   Vmin = 0 V, Vmax = 5 V
-   V10% = 0.5 V, V90% = 4.5 V
-3. Add V1 marker at 0.5 V
-4. Add T1 marker where waveform crosses V1
-5. Add V2 marker at 4.5 V
-6. Add T2 marker where waveform crosses V2
-7. Rise time = T2 - T1
-
-Result: Rise time = 2.3 ns
-```
+1. **Auto-update disabled** — check the auto-update checkbox
+2. **Waveform not changing** — auto-update only recalculates against the currently captured waveform; start Live View or re-capture for new data
 
 ## Next Steps
 
 - [Interface Guide](interface.md) - Learn all GUI controls
-- [Live View](live-view.md) - Use markers in real-time display
+- [Live View](live-view.md) - Use markers with continuous acquisition
 - [FFT Analysis](fft-analysis.md) - Frequency domain measurements
-- [User Guide: Measurements](../user-guide/measurements.md) - Automated measurements
+- [User Guide: Measurements](../user-guide/measurements.md) - Automated (non-visual) measurements

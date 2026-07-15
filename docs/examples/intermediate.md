@@ -19,7 +19,7 @@ Batch capture with different configurations.
 
 ### Requirements
 
-- siglent - Core library
+- scpi_control - Core library
 - Oscilloscope connected to network
 
 ### Configuration
@@ -106,7 +106,7 @@ Continuous time-series data collection.
 
 ### Requirements
 
-- siglent - Core library
+- scpi_control - Core library
 - Oscilloscope connected to network
 
 ### Configuration
@@ -363,7 +363,7 @@ Trigger-based event capture.
 
 ### Requirements
 
-- siglent - Core library
+- scpi_control - Core library
 - Oscilloscope connected to network
 
 ### Configuration

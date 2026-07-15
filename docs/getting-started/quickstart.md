@@ -1,6 +1,6 @@
 # Quick Start
 
-Get up and running with the Siglent Oscilloscope Control library in 5 minutes!
+Get up and running with SCPI Instrument Control — a universal Python library for SCPI test equipment (oscilloscopes, function generators/AWGs, power supplies, and DAQ units) with a PyQt6 desktop GUI and a browser-based lab gateway — in 5 minutes!
 
 ## Installation
 
@@ -8,7 +8,7 @@ First, install the library:
 
 === "Basic (Programmatic Only)"
 `bash
-    pip install SCPI-Instrument-Control
+    pip install "SCPI-Instrument-Control"
     `
 
 === "With GUI"

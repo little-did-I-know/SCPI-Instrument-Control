@@ -158,6 +158,16 @@ nav:
       - Building: development/building.md
       - Project Structure: development/structure.md
       - Testing: development/testing.md
+      - Maintainer Guides:
+          - Pre-commit Checks: development/PRE_COMMIT_CHECKS.md
+          - Building Executables: development/BUILDING_EXECUTABLES.md
+          - Code Signing: development/CODE_SIGNING.md
+          - Icon Setup: development/ICON_SETUP.md
+          - PyPI Deployment: development/PYPI_DEPLOYMENT.md
+          - Version Bumping: development/VERSION_BUMPING.md
+          - Build Workflow Testing: development/TESTING_BUILD_WORKFLOW.md
+          - Experimental Features: development/EXPERIMENTAL_FEATURES.md
+          - Detailed Project Structure: development/PROJECT_STRUCTURE.md
   - About:
       - Changelog: about/changelog.md
       - License: about/license.md

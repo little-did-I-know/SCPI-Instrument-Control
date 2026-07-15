@@ -251,7 +251,7 @@ Vector Graphics on Oscilloscope using XY Mode
 
 ### Requirements
 
-- siglent - Core library
+- scpi_control[fun] - Vector graphics extras
 - Oscilloscope connected to network
 
 ### Configuration
@@ -273,7 +273,7 @@ This example demonstrates how to use the oscilloscope as a vector display
 by generating waveforms for XY mode.
 
 REQUIREMENTS:
-    - Install fun extras: pip install "SCPI-Instrument-Control[fun]"
+    - Install fun extras: pip install "Siglent-Oscilloscope[fun]"
     - External AWG/DAC to feed signals into scope channels
       OR use scope's built-in AWG if available
     - Oscilloscope channels connected to AWG outputs
@@ -490,7 +490,7 @@ if __name__ == "__main__":
             print("Vector graphics features require additional packages.")
             print()
             print("Install with:")
-            print('  pip install "SCPI-Instrument-Control[fun]"')
+            print('  pip install "Siglent-Oscilloscope[fun]"')
             print()
             print("This will install:")
             print("  - shapely (geometric operations)")
