@@ -55,6 +55,8 @@ export const api = {
   getMath: (id: string) => request<{ n: number; expression: string; enabled: boolean }[]>(`${scope(id)}/math`),
   patchMath: (id: string, n: number, body: { expression?: string; enabled?: boolean }) => request<{ n: number; expression: string; enabled: boolean }[]>(`${scope(id)}/math/${n}`, json("PATCH", body)),
   captureUrl: (id: string, channels: number[]) => `${scope(id)}/capture.csv?channels=${channels.join(",")}`,
+  screenshotUrl: (id: string) => `${scope(id)}/screenshot.png`,
+  waveformJsonUrl: (id: string, channels: number[]) => `${scope(id)}/waveform?channels=${channels.join(",")}`,
 };
 
 export type { MeasurementValue };

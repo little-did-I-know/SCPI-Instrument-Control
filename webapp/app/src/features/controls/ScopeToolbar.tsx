@@ -1,15 +1,28 @@
 import { useState } from "react";
 import { ApiError, api } from "../../api/client";
-import type { RunOp } from "../../api/types";
+import type { ChannelState, RunOp } from "../../api/types";
 import { Button } from "../../ds/Button";
 import { Toolbar, ToolbarSeparator } from "../../ds/Toolbar";
 import { useSession } from "../../store/session";
 import { ExportButton } from "../export/ExportButton";
+import { ScreenshotButton } from "../export/ScreenshotButton";
+
+// Stable reference: zustand v5 hands the selector straight to useSyncExternalStore
+// with no memoization, so a fresh `{}` per snapshot would loop forever while scope is null.
+const NO_CHANNELS: Record<string, ChannelState> = {};
 
 export function ScopeToolbar() {
   const session = useSession((s) => s.session);
   const runState = useSession((s) => s.scope?.run_state);
+  const channels = useSession((s) => s.scope?.channels ?? NO_CHANNELS);
+  const enabled = Object.entries(channels)
+    .filter(([, channel]) => channel.enabled)
+    .map(([key]) => Number(key))
+    .sort((a, b) => a - b);
   const [error, setError] = useState<string | null>(null);
+
+  const linkStyle = { fontSize: "var(--text-sm)", fontFamily: "var(--font-ui)", padding: "6px 12px", borderRadius: "var(--lc-radius-sm)", border: "1px solid var(--lc-border-strong)", color: "var(--lc-text)", textDecoration: "none" } as const;
+  const disabledLinkStyle = { ...linkStyle, color: "var(--lc-muted)", opacity: 0.6 };
 
   async function op(next: RunOp) {
     if (!session) return;
@@ -39,6 +52,14 @@ export function ScopeToolbar() {
         right={
           <>
             <ExportButton />
+            {!session || enabled.length === 0 ? (
+              <span style={disabledLinkStyle}>JSON</span>
+            ) : (
+              <a href={api.waveformJsonUrl(session.id, enabled)} download style={linkStyle}>
+                JSON
+              </a>
+            )}
+            <ScreenshotButton />
             <Button variant="danger" onClick={disconnect}>Disconnect</Button>
           </>
         }
