@@ -35,7 +35,7 @@ This project adheres to a Code of Conduct. By participating, you are expected to
 
 ### Prerequisites
 
-- Python 3.8 or higher
+- Python 3.9 or higher
 - Git
 - (Optional) A Siglent oscilloscope for hardware testing
 

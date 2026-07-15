@@ -222,7 +222,7 @@ pip install "SCPI-Instrument-Control[all]"
 
 #### 2. Update Your Import Statements
 
-**Old imports** (deprecated but still work):
+**Old imports** (no longer work as of v2.0.0):
 
 ```python
 from siglent import Oscilloscope, PowerSupply, FunctionGenerator
@@ -240,16 +240,11 @@ from scpi_control.waveform import Waveform
 
 #### 3. Backward Compatibility
 
-**Good news**: The old `import siglent` syntax still works! A compatibility shim automatically redirects to `scpi_control`.
-
-However, you'll see a `DeprecationWarning` encouraging you to update your code:
-
-```
-DeprecationWarning: The 'siglent' package name is deprecated and will be removed in v2.0.0.
-Please update your imports to use 'scpi_control' instead.
-```
-
-**The compatibility layer will be removed in v2.0.0**, so please migrate your code when convenient.
+The `siglent` compatibility shim was removed in **v2.0.0** (it had emitted a
+`DeprecationWarning` since v1.0.0). `import siglent` now raises
+`ModuleNotFoundError` — update your imports to `scpi_control` as shown above;
+the API is otherwise identical. If you cannot migrate yet, pin
+`SCPI-Instrument-Control<2.0`.
 
 #### 4. Command-Line Tools
 
@@ -267,7 +262,7 @@ No changes needed to scripts or automation that invoke these commands.
 | Old | New | Status |
 |-----|-----|--------|
 | PyPI package: `siglent` | PyPI package: `SCPI-Instrument-Control` | **Changed** |
-| `import siglent` | `import scpi_control` | **Recommended** |
+| `import siglent` | `import scpi_control` | **Required since v2.0.0** |
 | `siglent-gui` command | `siglent-gui` command | **Unchanged** |
 | `siglent-report-generator` command | `siglent-report-generator` command | **Unchanged** |
 
@@ -332,7 +327,7 @@ main()
 
 ### Core Library
 
-- Python 3.8+
+- Python 3.9+
 - NumPy >= 1.24.0
 - Matplotlib >= 3.7.0
 - SciPy >= 1.10.0
@@ -596,7 +591,7 @@ See `examples/vector_graphics_xy_mode.py` for programmatic usage and animation e
 Control instruments from any browser on your LAN:
 
 ```bash
-pip install scpi-instrument-control[web]   # Python 3.9+
+pip install scpi-instrument-control[web]   # includes the browser gateway
 scpi-web --host 0.0.0.0 --port 8765
 ```
 

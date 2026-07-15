@@ -7,7 +7,7 @@ Supports multiple transport protocols using PyVISA:
 - TCP/IP (VXI-11, raw socket)
 
 Requires pyvisa package:
-    pip install "Siglent-Oscilloscope[usb]"
+    pip install "SCPI-Instrument-Control[usb]"
 
 For pure Python backend (no NI-VISA required):
     pip install pyvisa-py
@@ -58,7 +58,7 @@ class VISAConnection(BaseConnection):
         >>> psu.connect()
 
     Note:
-        Requires PyVISA: pip install "Siglent-Oscilloscope[usb]"
+        Requires PyVISA: pip install "SCPI-Instrument-Control[usb]"
         Optional: pip install pyvisa-py (pure Python backend, no NI-VISA needed)
     """
 
@@ -92,7 +92,9 @@ class VISAConnection(BaseConnection):
             SiglentConnectionError: If backend initialization fails
         """
         if not PYVISA_AVAILABLE:
-            raise ImportError("PyVISA is required for USB/VISA connections.\n" "Install with: pip install 'Siglent-Oscilloscope[usb]'\n" "For pure Python backend (no NI-VISA): pip install pyvisa-py")
+            raise ImportError(
+                "PyVISA is required for USB/VISA connections.\n" "Install with: pip install 'SCPI-Instrument-Control[usb]'\n" "For pure Python backend (no NI-VISA): pip install pyvisa-py"
+            )
 
         self.resource_string = resource_string
         self.timeout = timeout
@@ -333,7 +335,7 @@ def list_visa_resources(backend: str = "@py") -> list:
         GPIB0::12::INSTR
     """
     if not PYVISA_AVAILABLE:
-        raise ImportError("PyVISA is required for VISA resource discovery.\n" "Install with: pip install 'Siglent-Oscilloscope[usb]'")
+        raise ImportError("PyVISA is required for VISA resource discovery.\n" "Install with: pip install 'SCPI-Instrument-Control[usb]'")
 
     try:
         rm = pyvisa.ResourceManager(backend)
@@ -362,7 +364,7 @@ def find_siglent_devices(backend: str = "@py") -> list:
         USB0::0xF4EC::...: Siglent Technologies,SPD3303X-E,...
     """
     if not PYVISA_AVAILABLE:
-        raise ImportError("PyVISA is required.\n" "Install with: pip install 'Siglent-Oscilloscope[usb]'")
+        raise ImportError("PyVISA is required.\n" "Install with: pip install 'SCPI-Instrument-Control[usb]'")
 
     siglent_devices = []
 

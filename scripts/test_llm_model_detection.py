@@ -8,8 +8,8 @@ This script tests the new "Detect Models" functionality for Ollama and LM Studio
 import sys
 from PyQt6.QtWidgets import QApplication
 
-from siglent.report_generator.llm.client import LLMConfig
-from siglent.report_generator.widgets.llm_settings_dialog import LLMSettingsDialog
+from scpi_control.report_generator.llm.client import LLMConfig
+from scpi_control.report_generator.widgets.llm_settings_dialog import LLMSettingsDialog
 
 
 def main():

@@ -17,7 +17,6 @@ def test_core_imports_without_gui(monkeypatch):
     monkeypatch.setattr(builtins, "__import__", _no_gui_import)
 
     modules = [
-        "siglent",  # Test backward compatibility
         "scpi_control",
         "scpi_control.oscilloscope",
         "scpi_control.connection",

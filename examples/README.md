@@ -232,7 +232,7 @@ collector.save_data(waveforms, 'output.mat', format='mat')
 ## Quick Start - Programmatic API
 
 ```python
-from siglent.automation import DataCollector
+from scpi_control.automation import DataCollector
 
 # Simple capture
 with DataCollector('192.168.1.100') as collector:

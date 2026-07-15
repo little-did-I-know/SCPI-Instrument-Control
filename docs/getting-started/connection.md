@@ -46,7 +46,7 @@ The Siglent Oscilloscope Control library communicates with oscilloscopes using t
 **Computer:**
 
 - Network interface (Ethernet or WiFi)
-- Python 3.8 or later installed
+- Python 3.9 or later installed
 - Siglent library installed: `pip install SCPI-Instrument-Control`
 
 **Network:**

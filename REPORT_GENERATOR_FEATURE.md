@@ -90,10 +90,10 @@ python -m siglent.report_generator.app
 ### Programmatic API
 
 ```python
-from siglent.report_generator.models.report_data import (
+from scpi_control.report_generator.models.report_data import (
     TestReport, ReportMetadata, WaveformData, MeasurementResult
 )
-from siglent.report_generator.generators.pdf_generator import PDFReportGenerator
+from scpi_control.report_generator.generators.pdf_generator import PDFReportGenerator
 from datetime import datetime
 
 # Create metadata

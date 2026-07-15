@@ -59,7 +59,7 @@ repos:
     rev: 1.7.10
     hooks:
       - id: bandit
-        args: [-ll, -r, siglent/]
+        args: [-ll, -r, scpi_control/]
         exclude: ^tests/
 
   # Custom hooks - Docstring validation
@@ -70,7 +70,7 @@ repos:
         entry: python scripts/hooks/validate_docstrings.py
         language: system
         types: [python]
-        files: ^(siglent/|examples/).*\.py$
+        files: ^(scpi_control/|examples/).*\.py$
         exclude: ^(tests/|scripts/)
 
   # Markdown linting (optional but recommended)

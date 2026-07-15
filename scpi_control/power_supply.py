@@ -3,9 +3,9 @@
 Supports generic SCPI-99 compliant power supplies and Siglent SPD series models.
 
 Installation:
-    pip install "Siglent-Oscilloscope"
+    pip install "SCPI-Instrument-Control"
     # Or with power supply examples:
-    pip install "Siglent-Oscilloscope[power-supply-beta]"
+    pip install "SCPI-Instrument-Control[power-supply-beta]"
 
 Features:
     - Multiple connection types: Ethernet/LAN, USB, GPIB, Serial
@@ -16,7 +16,7 @@ Features:
 
 Feedback:
     Please report issues and suggestions at:
-    https://github.com/little-did-I-know/Siglent-Oscilloscope/issues
+    https://github.com/little-did-I-know/SCPI-Instrument-Control/issues
 """
 
 import logging

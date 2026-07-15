@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Generate API reference documentation stubs using mkdocstrings.
 
-This script scans the siglent package, generates markdown stub pages that use
+This script scans the scpi_control package, generates markdown stub pages that use
 mkdocstrings autodoc syntax, and creates cross-references between related modules.
 
 Usage:
@@ -59,7 +59,7 @@ def find_module_file(package_dir: Path, module_name: str) -> Optional[Path]:
     """Find the Python file for a given module name.
 
     Args:
-        package_dir: Root package directory (siglent/).
+        package_dir: Root package directory (scpi_control/).
         module_name: Module name (e.g., "oscilloscope" or "connection.socket").
 
     Returns:
@@ -149,7 +149,7 @@ def generate_api_stub(module_info: Dict, related_modules: List[Dict]) -> str:
         lines.append("")
 
     # Mkdocstrings autodoc section
-    module_path = f"siglent.{module_info['name']}"
+    module_path = f"scpi_control.{module_info['name']}"
     lines.append(f"::: {module_path}")
     lines.append("    options:")
     lines.append("      show_root_heading: false")

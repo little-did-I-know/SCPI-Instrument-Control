@@ -7,7 +7,6 @@ include pyproject.toml
 # Include user-facing documentation
 recursive-include docs/images *.png *.jpg
 include docs/VISUAL_MEASUREMENTS.md
-include docs/SCREENSHOT_GUIDE.md
 include docs/SDS800XHD_Series_ProgrammingGuide_EN11G.pdf
 
 # Include resources (logos, icons)

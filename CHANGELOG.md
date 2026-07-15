@@ -7,14 +7,72 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-07-15
 
-## [1.0.1] - 2026-01-07
+### ⚠️ Breaking Changes
+
+- **Removed the `siglent` compatibility shim.** `import siglent` now raises
+  `ModuleNotFoundError`; use `import scpi_control` (identical API). The shim
+  had emitted a `DeprecationWarning` since 1.0.0, which announced its removal
+  in v2.0.0. If you cannot migrate yet, pin `SCPI-Instrument-Control<2.0`.
+- **Python 3.9+ required** (was 3.8+; Python 3.8 reached end of life in
+  October 2024). CI now tests Python 3.9 through 3.14.
 
 ### Added
 
+- **Browser-based lab gateway** (`pip install "SCPI-Instrument-Control[web]"`,
+  then `scpi-web` or `python -m scpi_control.server`): a FastAPI server that
+  manages named multi-instrument sessions and serves a React UI to any
+  browser on the LAN. Mock-first — every feature works against the built-in
+  mock scope (`mock: true`).
+  - Live waveform streaming over WebSocket, with channel, timebase, trigger,
+    and acquisition (run/stop/single/auto) controls
+  - LAN instrument discovery and a dashboard-style home screen
+  - Measurements with live values and cross-tab-synchronized selection
+  - Software math channels (M1/M2) streamed as canvas traces
+  - SCPI terminal, instrument screenshot PNG, full-resolution waveform
+    export as CSV and JSON
+  - FFT spectrum view computed server-side from full-resolution data
+    (window selection, peak markers, THD readout)
+  - Software Butterworth filters (lowpass/highpass/bandpass) streamed as
+    F1/F2 traces
+  - Reference waveforms: save named snapshots, ghost overlay on the canvas,
+    live correlation and max-deviation statistics
+  - Measurement trend recording: server-side ring buffer at ~1 Hz, live
+    trend chart, CSV export; the measurement selection locks while recording
+- Dual-dialect SCPI support: legacy (e.g. SDS1104X-E) and modern
+  (e.g. SDS800X HD) Siglent command sets behind one API, auto-detected from
+  `*IDN?` with a manual override
+
 ### Changed
 
+- Connection layer hardened: thread-safe socket handling, exact-length
+  binary reads, default SCPI port 5025
+- `wait_for_trigger` honors a user-configured NORMAL trigger mode instead of
+  forcing SINGLE
+- Black formatting standardized on the 26.x stable style; dev extra now
+  requires `black>=26.5,<27` (installed on Python >= 3.10, where Black 26 is available)
+- Removed the unused `uplot` frontend dependency (the UI draws on a
+  hand-rolled canvas)
+
 ### Fixed
+
+- Mock-fidelity and hardware-behavior fixes from the 2026-07 code audit
+  (trigger vocabulary mapping, waveform preamble parsing, measurement
+  timeout handling, and related issues)
+
+## [1.1.0] - 2026-01-12
+
+### Added
+
+- Data acquisition / data logger instrument support (`DataLogger`): Keysight
+  34970A/DAQ970A-style SCPI units — DMM function configuration (V/I/R/
+  temperature), scan lists, triggering, alarms, channel scaling, and timed
+  logging helpers (PR #39)
+
+## [1.0.1] - 2026-01-07
+
+Packaging and metadata fixes for the 1.0.0 rename release; no functional changes.
 
 ## [1.0.0] - 2026-01-06
 

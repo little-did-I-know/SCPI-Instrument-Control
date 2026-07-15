@@ -7,8 +7,8 @@ the signal detection and statistics calculation.
 """
 
 import numpy as np
-from siglent.report_generator.models.report_data import WaveformData
-from siglent.report_generator.utils.waveform_analyzer import WaveformAnalyzer, SignalType
+from scpi_control.report_generator.models.report_data import WaveformData
+from scpi_control.report_generator.utils.waveform_analyzer import WaveformAnalyzer, SignalType
 
 
 def generate_sine_wave(freq=1000, sample_rate=100000, duration=0.01, amplitude=1.0, noise_level=0.0):
