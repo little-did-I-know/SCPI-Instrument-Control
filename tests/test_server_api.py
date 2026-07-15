@@ -186,6 +186,14 @@ class TestTerminalAndMeasurements:
         assert bad_channel.status_code == 400
 
 
+class TestMeasurementsSync:
+    def test_get_measurements_returns_selection(self, client):
+        sid = create_mock_session(client)["id"]
+        client.put("/api/sessions/{0}/scope/measurements".format(sid), json=[{"channel": 1, "mtype": "PKPK"}])
+        body = client.get("/api/sessions/{0}/scope/measurements".format(sid)).json()
+        assert body["measurements"] == [{"channel": 1, "mtype": "PKPK"}]
+
+
 class TestCapture:
     def test_capture_csv_single_channel(self, client):
         sid = create_mock_session(client)["id"]
@@ -316,3 +324,64 @@ def test_cli_parses_defaults(monkeypatch):
     assert captured == {"host": "127.0.0.1", "port": 8765}
     cli.main(["--host", "0.0.0.0", "--port", "9000"])
     assert captured == {"host": "0.0.0.0", "port": 9000}
+
+
+class TestScreenshot:
+    def test_screenshot_returns_png(self, client):
+        sid = create_mock_session(client)["id"]
+        response = client.get("/api/sessions/{0}/scope/screenshot.png".format(sid))
+        assert response.status_code == 200
+        assert response.headers["content-type"] == "image/png"
+        assert response.content.startswith(b"\x89PNG\r\n\x1a\n")
+        assert "attachment" in response.headers.get("content-disposition", "")
+
+
+class TestWaveformJson:
+    def test_waveform_json_full_resolution(self, client):
+        sid = create_mock_session(client)["id"]
+        response = client.get("/api/sessions/{0}/scope/waveform?channels=1".format(sid))
+        assert response.status_code == 200
+        body = response.json()
+        assert len(body["channels"]) == 1
+        ch = body["channels"][0]
+        assert ch["channel"] == 1
+        assert isinstance(ch["points"], list) and len(ch["points"]) > 0
+        assert isinstance(ch["points"][0], float)
+        assert ch["dt"] > 0
+
+    def test_waveform_json_decimates_to_max_points(self, client):
+        sid = create_mock_session(client)["id"]
+        full = client.get("/api/sessions/{0}/scope/waveform?channels=1".format(sid)).json()["channels"][0]["points"]
+        capped = client.get("/api/sessions/{0}/scope/waveform?channels=1&max_points=10".format(sid)).json()["channels"][0]["points"]
+        assert len(capped) <= 10
+        assert len(capped) <= len(full)
+
+    def test_waveform_json_bad_channels_is_400(self, client):
+        sid = create_mock_session(client)["id"]
+        assert client.get("/api/sessions/{0}/scope/waveform?channels=banana".format(sid)).status_code == 400
+
+
+class TestMath:
+    def test_patch_math_sets_expression_and_enabled(self, client):
+        sid = create_mock_session(client)["id"]
+        response = client.patch("/api/sessions/{0}/scope/math/1".format(sid), json={"expression": "C1 - C2", "enabled": True})
+        assert response.status_code == 200
+        entry = [m for m in response.json() if m["n"] == 1][0]
+        assert entry["expression"] == "C1 - C2"
+        assert entry["enabled"] is True
+
+    def test_get_math_returns_both_channels(self, client):
+        sid = create_mock_session(client)["id"]
+        client.patch("/api/sessions/{0}/scope/math/2".format(sid), json={"expression": "INTG(C1)", "enabled": True})
+        body = client.get("/api/sessions/{0}/scope/math".format(sid)).json()
+        assert {m["n"] for m in body} == {1, 2}
+        m2 = [m for m in body if m["n"] == 2][0]
+        assert m2["expression"] == "INTG(C1)" and m2["enabled"] is True
+
+    def test_patch_math_bad_index_is_400(self, client):
+        sid = create_mock_session(client)["id"]
+        assert client.patch("/api/sessions/{0}/scope/math/3".format(sid), json={"enabled": True}).status_code == 400
+
+    def test_patch_math_empty_expression_is_400(self, client):
+        sid = create_mock_session(client)["id"]
+        assert client.patch("/api/sessions/{0}/scope/math/1".format(sid), json={"expression": "   "}).status_code == 400

@@ -3,11 +3,11 @@ import asyncio
 from typing import Any, Callable, List
 
 from fastapi import APIRouter, Request
-from fastapi.responses import PlainTextResponse
+from fastapi.responses import PlainTextResponse, Response
 
 from scpi_control.exceptions import InvalidParameterError
 from scpi_control.server.api.sessions import require_session
-from scpi_control.server.schemas import ALLOWED_COUPLING, ALLOWED_MEASUREMENTS, ChannelPatch, CommandIn, MeasurementItem, TimebasePatch, TriggerPatch
+from scpi_control.server.schemas import ALLOWED_COUPLING, ALLOWED_MEASUREMENTS, ChannelPatch, CommandIn, MathPatch, MeasurementItem, TimebasePatch, TriggerPatch
 from scpi_control.server.sessions import InstrumentSession, read_state
 
 router = APIRouter(tags=["scope"])
@@ -114,6 +114,12 @@ async def put_measurements(session_id: str, body: List[MeasurementItem], request
     return {"measurements": [{"channel": c, "mtype": m} for c, m in session.measurements]}
 
 
+@router.get("/sessions/{session_id}/scope/measurements")
+async def get_measurements(session_id: str, request: Request):
+    session = require_session(request, session_id)
+    return {"measurements": [{"channel": c, "mtype": m} for c, m in session.measurements]}
+
+
 def _build_csv(captures) -> str:
     """captures: list of (channel:int, WaveformData). Align to the shortest."""
     n = min(len(w.voltage) for _, w in captures)
@@ -142,6 +148,90 @@ async def capture_csv(session_id: str, request: Request, channels: str = "1"):
     csv_text = _build_csv(captures)
     filename = "capture_{0}_C{1}.csv".format(session.id, "-".join(str(c) for c in channel_list))
     return PlainTextResponse(csv_text, media_type="text/csv", headers={"Content-Disposition": 'attachment; filename="{0}"'.format(filename)})
+
+
+@router.get("/sessions/{session_id}/scope/screenshot.png")
+async def screenshot(session_id: str, request: Request):
+    session = require_session(request, session_id)
+
+    def grab(scope):
+        import io
+
+        image = scope.screen_capture.get_screenshot_pil()
+        buf = io.BytesIO()
+        image.save(buf, "PNG")
+        return buf.getvalue()
+
+    png = await run_job(session, grab)
+    filename = "screenshot_{0}.png".format(session.id)
+    return Response(content=png, media_type="image/png", headers={"Content-Disposition": 'attachment; filename="{0}"'.format(filename)})
+
+
+def _waveform_json(channel, data, max_points):
+    voltage = data.voltage
+    time_axis = data.time
+    step = 1
+    if max_points is not None and max_points > 0 and len(voltage) > max_points:
+        step = -(-len(voltage) // max_points)  # ceiling division keeps len <= max_points
+    points = [float(v) for v in voltage[::step]]
+    t0 = float(time_axis[0]) if len(time_axis) else 0.0
+    dt = float(time_axis[1] - time_axis[0]) * step if len(time_axis) > 1 else 1.0
+    return {
+        "channel": channel,
+        "t0": t0,
+        "dt": dt,
+        "sample_rate": data.sample_rate,
+        "voltage_scale": data.voltage_scale,
+        "voltage_offset": data.voltage_offset,
+        "points": points,
+    }
+
+
+@router.get("/sessions/{session_id}/scope/waveform")
+async def waveform_json(session_id: str, request: Request, channels: str = "1", max_points: int = 0):
+    session = require_session(request, session_id)
+    try:
+        channel_list = sorted({int(c) for c in channels.split(",") if c.strip()})
+    except ValueError:
+        raise InvalidParameterError("channels must be a comma-separated list of integers")
+    if not channel_list:
+        raise InvalidParameterError("no channels requested")
+
+    def capture(scope):
+        return [(c, scope.get_waveform(c)) for c in channel_list]
+
+    captures = await run_job(session, capture)
+    cap = max_points if max_points > 0 else None
+    return {"channels": [_waveform_json(c, data, cap) for c, data in captures]}
+
+
+def _math_state(scope):
+    return [{"n": n, "expression": m.expression, "enabled": m.enabled} for n, m in ((1, scope.math1), (2, scope.math2))]
+
+
+@router.get("/sessions/{session_id}/scope/math")
+async def get_math(session_id: str, request: Request):
+    session = require_session(request, session_id)
+    return await run_job(session, _math_state)
+
+
+@router.patch("/sessions/{session_id}/scope/math/{n}")
+async def patch_math(session_id: str, n: int, body: MathPatch, request: Request):
+    session = require_session(request, session_id)
+    if n not in (1, 2):
+        raise InvalidParameterError("math channel must be 1 or 2")
+    if body.expression is not None and not body.expression.strip():
+        raise InvalidParameterError("expression must not be empty")
+
+    def apply(scope):
+        math = scope.math1 if n == 1 else scope.math2
+        if body.expression is not None:
+            math.set_expression(body.expression)
+        if body.enabled is not None:
+            math.enable() if body.enabled else math.disable()
+        return _math_state(scope)
+
+    return await run_job(session, apply)
 
 
 # NOTE: run_op's {op} path is a catch-all for POST /scope/*; any new specific

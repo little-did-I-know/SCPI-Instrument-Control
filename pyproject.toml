@@ -73,6 +73,7 @@ gui = [
 web = [
     "fastapi>=0.115",
     "uvicorn[standard]>=0.30",
+    "Pillow>=10.0",
 ]
 fun = [
     "shapely>=2.0.0",

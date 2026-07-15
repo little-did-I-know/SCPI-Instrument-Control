@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { ChannelsPanel } from "./features/controls/ChannelsPanel";
+import { MathPanel } from "./features/controls/MathPanel";
 import { ScopeToolbar } from "./features/controls/ScopeToolbar";
 import { TriggerPanel } from "./features/controls/TriggerPanel";
 import { HomeScreen } from "./features/home/HomeScreen";
@@ -12,7 +13,7 @@ import { Tabs } from "./ds/Tabs";
 import { useStream } from "./stream/useStream";
 import { useSession } from "./store/session";
 
-const RAIL_TABS = ["Channels", "Trigger", "Measure", "Terminal"];
+const RAIL_TABS = ["Channels", "Trigger", "Math", "Measure", "Terminal"];
 
 export default function App() {
   const status = useSession((s) => s.status);
@@ -37,6 +38,7 @@ export default function App() {
               <Tabs tabs={RAIL_TABS} value={railTab} onChange={setRailTab}>
                 {railTab === "Channels" && <ChannelsPanel />}
                 {railTab === "Trigger" && <TriggerPanel />}
+                {railTab === "Math" && <MathPanel />}
                 {railTab === "Measure" && <MeasurePanel />}
                 {railTab === "Terminal" && <TerminalPanel />}
               </Tabs>

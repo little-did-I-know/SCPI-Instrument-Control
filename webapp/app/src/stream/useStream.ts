@@ -19,6 +19,7 @@ export function useStream(sessionId: string | null): void {
       if (message.type === "state") store.applyState(message.state);
       else if (message.type === "waveform") setFrame(message.channel, { t0: message.t0, dt: message.dt, points: message.points });
       else if (message.type === "measurements") store.applyMeasurements(message.values);
+      else if (message.type === "measurements_config") store.applyMeasurementConfig(message.items);
       else if (message.type === "error") store.setError(message.detail);
       else if (message.type === "closed") {
         ended = true;

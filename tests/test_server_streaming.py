@@ -138,3 +138,71 @@ def test_raising_subscriber_does_not_kill_worker():
         unsubscribe_good()
     finally:
         session.close()
+
+
+def test_poll_publishes_math_frame_when_enabled():
+    session = make_session()  # mock scope, channel 1 enabled
+    try:
+        # configure math1 = C1 (identity) and enable it
+        session.submit(lambda scope: scope.math1.set_expression("C1")).result(timeout=5)
+        session.submit(lambda scope: scope.math1.enable()).result(timeout=5)
+        frames = collect(session, "waveform", n=4, timeout=8.0)
+        math_frames = [f for f in frames if f["channel"] == "M1"]
+        assert math_frames, "expected an M1 math frame"
+        assert 0 < len(math_frames[0]["points"]) <= 2000
+    finally:
+        session.close()
+
+
+def test_poll_clears_math_frame_when_disabled():
+    session = make_session()  # mock scope, channel 1 enabled
+    try:
+        # configure math1 = C1 (identity) and enable it
+        session.submit(lambda scope: scope.math1.set_expression("C1")).result(timeout=5)
+        session.submit(lambda scope: scope.math1.enable()).result(timeout=5)
+
+        got = []
+
+        def cb(msg):
+            if msg["type"] == "waveform" and msg["channel"] == "M1":
+                got.append(msg)
+
+        unsubscribe = session.subscribe(cb)
+        deadline = time.time() + 8.0
+        while not any(len(f["points"]) > 0 for f in got) and time.time() < deadline:
+            time.sleep(0.02)
+        assert any(len(f["points"]) > 0 for f in got), "expected a non-empty M1 frame before disabling"
+
+        session.submit(lambda scope: scope.math1.disable()).result(timeout=5)
+
+        # give it a generous window (poll_interval=0.05 -> many ticks) to observe the clear
+        # frame and confirm no further M1 frames arrive afterward.
+        time.sleep(0.5)
+        unsubscribe()
+
+        # find the index of the first empty-points M1 frame after the disable call
+        empty_indices = [i for i, f in enumerate(got) if len(f["points"]) == 0]
+        assert empty_indices, "expected exactly one clear (empty-points) M1 frame after disabling"
+        assert len(empty_indices) == 1, "expected exactly ONE clear frame, not repeated clears"
+        clear_index = empty_indices[0]
+        # nothing after the clear frame should be another M1 frame at all
+        assert len(got) - 1 == clear_index, "no further M1 frames should be published after the clear"
+    finally:
+        session.close()
+
+
+def test_set_measurements_broadcasts_config():
+    session = make_session()
+    try:
+        got = []
+
+        def cb(msg):
+            if msg["type"] == "measurements_config":
+                got.append(msg)
+
+        unsubscribe = session.subscribe(cb)
+        session.set_measurements([(1, "PKPK"), (2, "FREQ")])
+        unsubscribe()
+        assert got and got[0]["items"] == [{"channel": 1, "mtype": "PKPK"}, {"channel": 2, "mtype": "FREQ"}]
+    finally:
+        session.close()

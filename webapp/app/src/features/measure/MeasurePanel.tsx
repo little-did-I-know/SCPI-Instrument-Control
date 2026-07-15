@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ApiError, api } from "../../api/client";
 import type { ChannelState } from "../../api/types";
 import { Checkbox } from "../../ds/Checkbox";
@@ -19,23 +19,50 @@ export function MeasurePanel() {
   const channels = useSession((s) => s.scope?.channels ?? NO_CHANNELS);
   // s.measurements is already a stable array reference in the store — select it
   // directly (no `?? []` fallback, which would fabricate a new array every render).
+  // It now carries only VALUES for display; the SELECTION lives in s.measurementConfig
+  // (seeded via GET on mount, kept current via the measurements_config broadcast).
   const measurements = useSession((s) => s.measurements);
+  const measurementConfig = useSession((s) => s.measurementConfig);
   const [error, setError] = useState<string | null>(null);
-  // No local mirror of the selection — the server owns it. But the stream alone cannot carry it:
-  // the backend only broadcasts measurements while its list is NON-empty
-  // (sessions.py: `if self.measurements and self._poll_count % N == 0`), so once you deselect the
-  // last one the store keeps the final streamed values forever. Falling back to the store there
-  // would re-check the box and resurrect the measurement on the next full-replacement PUT.
+  // No local mirror of the acknowledged selection — the STORE's measurementConfig is the single
+  // acknowledged-truth source. The mount GET, each PUT response, and every measurements_config
+  // broadcast all write it (via applyMeasurementConfig), so an already-mounted panel — this rail,
+  // or another tab that receives the broadcast — always reflects the live selection, even in
+  // steady state (no remount required).
   //
-  // The PUT response IS server truth (scope.py echoes the stored list), so we settle to it.
-  // Precedence: in-flight optimistic > last acknowledged > streamed values.
+  // Precedence: in-flight optimistic (`pending`) > acknowledged truth (`measurementConfig`).
   const [pending, setPending] = useState<Selection[] | null>(null);
-  const [acked, setAcked] = useState<Selection[] | null>(null);
   // Monotonic request id: a slow PUT must never settle the selection after a newer toggle
   // superseded it, or both boxes flap to unchecked and the next click drops them server-side.
   const requestId = useRef(0);
 
-  const selected: Selection[] = pending ?? acked ?? measurements.map((m) => ({ channel: m.channel, mtype: m.mtype }));
+  // Seed the selection from the server on mount — the store's measurementConfig may still be
+  // stale/empty at first render (it only updates via broadcast), so we GET it directly once per
+  // session. This GET is slow relative to everything else that can happen after mount (a user
+  // toggle settling its own acknowledged truth, or a real measurements_config broadcast arriving)
+  // — applying it unconditionally on resolve would let a stale response clobber fresher truth
+  // that already landed in the store. So we snapshot "nothing has happened yet" at the moment the
+  // request goes out and only apply the result if that's still true when it comes back;
+  // otherwise the newer source (a toggle's PUT response, or a broadcast) already won.
+  useEffect(() => {
+    if (!session) return;
+    let cancelled = false;
+    const requestIdAtStart = requestId.current;
+    const configAtStart = useSession.getState().measurementConfig;
+    api.getMeasurements(session.id).then((result) => {
+      const noToggleSince = requestId.current === requestIdAtStart;
+      const noBroadcastSince = useSession.getState().measurementConfig === configAtStart;
+      if (!cancelled && noToggleSince && noBroadcastSince) {
+        useSession.getState().applyMeasurementConfig(result.measurements);
+      }
+    }).catch(() => {
+      // no server truth available yet (e.g. modern-dialect scope) — fall through to the
+      // measurementConfig broadcast / default-empty precedence below.
+    });
+    return () => { cancelled = true; };
+  }, [session?.id]);
+
+  const selected: Selection[] = pending ?? measurementConfig;
   const isChecked = (channel: number, mtype: string) =>
     selected.some((s) => s.channel === channel && s.mtype === mtype);
 
@@ -55,7 +82,7 @@ export function MeasurePanel() {
     try {
       const result = await api.setMeasurements(session.id, next);
       if (id === requestId.current) {
-        setAcked(result.measurements); // durable across the empty-list broadcast gap
+        useSession.getState().applyMeasurementConfig(result.measurements); // durable across the empty-list broadcast gap
         setPending(null);
       }
       // else: stale response, a newer toggle is in flight — it will settle the selection

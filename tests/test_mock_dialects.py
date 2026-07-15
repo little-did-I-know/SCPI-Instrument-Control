@@ -109,3 +109,24 @@ def test_modern_mock_still_times_out_on_pava():
             scope.measurement.measure("PKPK", 1)
     finally:
         scope.disconnect()
+
+
+def test_mock_answers_scdp_with_a_valid_image():
+    import io
+
+    from PIL import Image
+
+    from scpi_control import Oscilloscope
+    from scpi_control.connection.mock import MockConnection
+
+    conn = MockConnection("mock", idn="Siglent Technologies,SDS1104X-E,MOCK0001,1.0.0.0")
+    scope = Oscilloscope("mock", connection=conn)
+    scope.connect()
+    try:
+        image = scope.screen_capture.get_screenshot_pil()  # BMP → PIL
+        assert image.size[0] >= 1 and image.size[1] >= 1
+        buf = io.BytesIO()
+        image.save(buf, "PNG")
+        assert buf.getvalue().startswith(b"\x89PNG\r\n\x1a\n")
+    finally:
+        scope.disconnect()

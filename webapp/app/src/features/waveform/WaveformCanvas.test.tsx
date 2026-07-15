@@ -2,6 +2,7 @@ import { render } from "@testing-library/react";
 import { StrictMode } from "react";
 import { beforeEach, describe, expect, it } from "vitest";
 import { WaveformCanvas } from "./WaveformCanvas";
+import { setFrame, clearFrames } from "./frames";
 import { useSession } from "../../store/session";
 
 beforeEach(() => useSession.getState().clearSession());
@@ -19,5 +20,13 @@ describe("WaveformCanvas", () => {
         </StrictMode>,
       ),
     ).not.toThrow();
+  });
+
+  it("renders with a math frame present without throwing", () => {
+    // seed a math frame in the buffer, then render
+    clearFrames();
+    setFrame("M1", { t0: 0, dt: 1, points: [0, 1, 0, -1] });
+    expect(() => render(<WaveformCanvas />)).not.toThrow();
+    clearFrames();
   });
 });

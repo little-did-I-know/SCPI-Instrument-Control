@@ -20,6 +20,16 @@ def _format_nr3(value: float) -> str:
     return f"{value:.2E}"
 
 
+def _build_ieee_block(payload: bytes) -> bytes:
+    """Wrap payload in an IEEE-488.2 definite-length block: #<ndigits><length><payload>."""
+    length_str = str(len(payload)).encode()
+    return b"#" + str(len(length_str)).encode() + length_str + payload
+
+
+# Minimal valid 1x1 24bpp BMP, so a mock SCDP? screenshot decodes as a real image.
+MOCK_SCREENSHOT_BMP = bytes.fromhex("424d3a000000000000003600000028000000010000000100000001001800000000000400000000000000000000000000000000000000ffffff00")
+
+
 # Canonical PAVA? measurement values for the legacy dialect (mirrors real
 # hardware where PAVA? is legacy-only; the modern dialect has no equivalent).
 _MOCK_PAVA_VALUES: Dict[str, Tuple[str, str]] = {
@@ -779,15 +789,17 @@ class MockConnection(BaseConnection):
 
     def _build_waveform_block(self, payload: bytes) -> bytes:
         """Construct a minimal Siglent-style block response."""
-        length = len(payload)
-        length_str = str(length).encode()
-        header = b"DESC,#" + str(len(length_str)).encode() + length_str
-        return header + payload
+        return b"DESC," + _build_ieee_block(payload)
 
     def read_raw(self, size: Optional[int] = None) -> bytes:
-        """Return deterministic raw waveform data."""
+        """Return deterministic raw waveform data (or a mock screenshot BMP after SCDP?)."""
         if not self._connected:
             raise exceptions.ConnectionError(f"Not connected to oscilloscope at {self.host}:{self.port}")
+
+        if self.writes and self.writes[-1].upper() == "SCDP?":
+            # Bare IEEE 488.2 block (no "DESC," prefix), matching how a real
+            # scope's SCDP? reply is parsed in screen_capture.py.
+            return _build_ieee_block(MOCK_SCREENSHOT_BMP)
 
         channel = self._last_waveform_channel or next(iter(self._waveform_payloads.keys()))
         payload = self._waveform_payloads.get(channel, bytes())

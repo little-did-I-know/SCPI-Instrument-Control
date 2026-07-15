@@ -59,8 +59,9 @@ export type MeasurementValue = { channel: number; mtype: string; value: number |
 
 export type StreamMessage =
   | { type: "state"; state: ScopeState }
-  | { type: "waveform"; channel: number; t0: number; dt: number; points: number[] }
+  | { type: "waveform"; channel: number | string; t0: number; dt: number; points: number[] }
   | { type: "measurements"; values: MeasurementValue[] }
+  | { type: "measurements_config"; items: { channel: number; mtype: string }[] }
   | { type: "error"; detail: string }
   | { type: "closed" };
 
