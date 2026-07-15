@@ -1,4 +1,5 @@
 import { useState } from "react";
+import type { ReactNode } from "react";
 import { ApiError, api } from "../../api/client";
 import type { ChannelState, RunOp } from "../../api/types";
 import { Button } from "../../ds/Button";
@@ -11,7 +12,7 @@ import { ScreenshotButton } from "../export/ScreenshotButton";
 // with no memoization, so a fresh `{}` per snapshot would loop forever while scope is null.
 const NO_CHANNELS: Record<string, ChannelState> = {};
 
-export function ScopeToolbar() {
+export function ScopeToolbar({ viewToggle }: { viewToggle?: ReactNode }) {
   const session = useSession((s) => s.session);
   const runState = useSession((s) => s.scope?.run_state);
   const channels = useSession((s) => s.scope?.channels ?? NO_CHANNELS);
@@ -69,6 +70,8 @@ export function ScopeToolbar() {
         <Button variant="ghost" onClick={() => op("single")}>Single</Button>
         <Button variant="ghost" onClick={() => op("auto")}>Auto</Button>
         <ToolbarSeparator />
+        {viewToggle}
+        {viewToggle && <ToolbarSeparator />}
         <span style={{ fontFamily: "var(--font-mono)", fontSize: "var(--text-sm)", color: "var(--lc-text-2)" }}>{runState}</span>
       </Toolbar>
       {error && (
