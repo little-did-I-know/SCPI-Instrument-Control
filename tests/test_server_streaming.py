@@ -138,3 +138,17 @@ def test_raising_subscriber_does_not_kill_worker():
         unsubscribe_good()
     finally:
         session.close()
+
+
+def test_poll_publishes_math_frame_when_enabled():
+    session = make_session()  # mock scope, channel 1 enabled
+    try:
+        # configure math1 = C1 (identity) and enable it
+        session.submit(lambda scope: scope.math1.set_expression("C1")).result(timeout=5)
+        session.submit(lambda scope: scope.math1.enable()).result(timeout=5)
+        frames = collect(session, "waveform", n=4, timeout=8.0)
+        math_frames = [f for f in frames if f["channel"] == "M1"]
+        assert math_frames, "expected an M1 math frame"
+        assert 0 < len(math_frames[0]["points"]) <= 2000
+    finally:
+        session.close()

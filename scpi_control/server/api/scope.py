@@ -7,7 +7,7 @@ from fastapi.responses import PlainTextResponse, Response
 
 from scpi_control.exceptions import InvalidParameterError
 from scpi_control.server.api.sessions import require_session
-from scpi_control.server.schemas import ALLOWED_COUPLING, ALLOWED_MEASUREMENTS, ChannelPatch, CommandIn, MeasurementItem, TimebasePatch, TriggerPatch
+from scpi_control.server.schemas import ALLOWED_COUPLING, ALLOWED_MEASUREMENTS, ChannelPatch, CommandIn, MathPatch, MeasurementItem, TimebasePatch, TriggerPatch
 from scpi_control.server.sessions import InstrumentSession, read_state
 
 router = APIRouter(tags=["scope"])
@@ -197,6 +197,35 @@ async def waveform_json(session_id: str, request: Request, channels: str = "1", 
     captures = await run_job(session, capture)
     cap = max_points if max_points > 0 else None
     return {"channels": [_waveform_json(c, data, cap) for c, data in captures]}
+
+
+def _math_state(scope):
+    return [{"n": n, "expression": m.expression, "enabled": m.enabled} for n, m in ((1, scope.math1), (2, scope.math2))]
+
+
+@router.get("/sessions/{session_id}/scope/math")
+async def get_math(session_id: str, request: Request):
+    session = require_session(request, session_id)
+    return await run_job(session, _math_state)
+
+
+@router.patch("/sessions/{session_id}/scope/math/{n}")
+async def patch_math(session_id: str, n: int, body: MathPatch, request: Request):
+    session = require_session(request, session_id)
+    if n not in (1, 2):
+        raise InvalidParameterError("math channel must be 1 or 2")
+    if body.expression is not None and not body.expression.strip():
+        raise InvalidParameterError("expression must not be empty")
+
+    def apply(scope):
+        math = scope.math1 if n == 1 else scope.math2
+        if body.expression is not None:
+            math.set_expression(body.expression)
+        if body.enabled is not None:
+            math.enable() if body.enabled else math.disable()
+        return _math_state(scope)
+
+    return await run_job(session, apply)
 
 
 # NOTE: run_op's {op} path is a catch-all for POST /scope/*; any new specific

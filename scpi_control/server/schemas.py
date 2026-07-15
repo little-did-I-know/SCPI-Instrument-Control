@@ -58,6 +58,11 @@ class CommandIn(BaseModel):
     command: str
 
 
+class MathPatch(BaseModel):
+    expression: Optional[str] = None
+    enabled: Optional[bool] = None
+
+
 class ModelOut(BaseModel):
     model_name: str
     series: str

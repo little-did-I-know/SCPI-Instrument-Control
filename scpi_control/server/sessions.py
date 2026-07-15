@@ -54,14 +54,17 @@ def read_state(scope: Oscilloscope) -> Dict[str, Any]:
     }
 
 
-def _waveform_frame(scope: Oscilloscope, channel: int) -> Dict[str, Any]:
-    data = scope.get_waveform(channel)
-    voltage = data.voltage
+def _decimate_frame(channel, time_axis, voltage) -> Dict[str, Any]:
     step = max(1, -(-len(voltage) // MAX_FRAME_POINTS))  # ceiling division keeps len(points) <= cap
     points = voltage[::step]
-    t0 = float(data.time[0]) if len(data.time) else 0.0
-    dt = float(data.time[1] - data.time[0]) * step if len(data.time) > 1 else 1.0
+    t0 = float(time_axis[0]) if len(time_axis) else 0.0
+    dt = float(time_axis[1] - time_axis[0]) * step if len(time_axis) > 1 else 1.0
     return {"type": "waveform", "channel": channel, "t0": t0, "dt": dt, "points": [float(v) for v in points]}
+
+
+def _waveform_frame(scope: Oscilloscope, channel: int) -> Dict[str, Any]:
+    data = scope.get_waveform(channel)
+    return _decimate_frame(channel, data.time, data.voltage)
 
 
 _STOP = object()
@@ -247,10 +250,18 @@ class InstrumentSession:
         self._poll_count += 1
         scope = self._scope
         try:
+            acquired = {}
             for n in scope.supported_channels:
                 ch = scope.get_channel(n)
                 if ch is not None and _safe(lambda: ch.enabled, default=False):
-                    self.publish(_waveform_frame(scope, n))
+                    data = scope.get_waveform(n)
+                    acquired["C{0}".format(n)] = data
+                    self.publish(_decimate_frame(n, data.time, data.voltage))
+            for label, math in (("M1", scope.math1), ("M2", scope.math2)):
+                if math is not None and _safe(lambda: math.enabled, default=False):
+                    result = _safe(lambda: math.compute(acquired))
+                    if result is not None:
+                        self.publish(_decimate_frame(label, result.time, result.voltage))
             if self.measurements and self._poll_count % MEASUREMENT_EVERY_N_POLLS == 0:
                 values = []
                 for channel, mtype in self.measurements:
