@@ -11,4 +11,11 @@ describe("ViewModeToggle", () => {
     await userEvent.click(screen.getByRole("button", { name: "Spectrum" }));
     expect(onChange).toHaveBeenCalledWith("Spectrum");
   });
+
+  it("offers the Trend mode", async () => {
+    const onChange = vi.fn();
+    render(<ViewModeToggle value="Time" onChange={onChange} />);
+    await userEvent.click(screen.getByRole("button", { name: "Trend" }));
+    expect(onChange).toHaveBeenCalledWith("Trend");
+  });
 });

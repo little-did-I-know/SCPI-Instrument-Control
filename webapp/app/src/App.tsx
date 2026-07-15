@@ -10,6 +10,7 @@ import { ReadoutStrip } from "./features/readout/ReadoutStrip";
 import { ReferencePanel } from "./features/reference/ReferencePanel";
 import { useReferenceSeed } from "./features/reference/useReferenceSeed";
 import { TerminalPanel } from "./features/terminal/TerminalPanel";
+import { TrendCanvas } from "./features/trend/TrendCanvas";
 import { SpectrumCanvas } from "./features/waveform/SpectrumCanvas";
 import { WaveformCanvas } from "./features/waveform/WaveformCanvas";
 import type { ViewMode } from "./features/waveform/ViewModeToggle";
@@ -54,7 +55,7 @@ export default function App() {
               </Tabs>
             </div>
             <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "var(--space-3)", minWidth: 0 }}>
-              {viewMode === "Time" ? <WaveformCanvas /> : <SpectrumCanvas />}
+              {viewMode === "Time" ? <WaveformCanvas /> : viewMode === "Spectrum" ? <SpectrumCanvas /> : <TrendCanvas />}
               <ScopeToolbar viewToggle={<ViewModeToggle value={viewMode} onChange={setViewMode} />} />
             </div>
           </div>
