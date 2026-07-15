@@ -19,6 +19,15 @@ def client():
     manager.close_all()
 
 
+@pytest.fixture()
+def ref_client(tmp_path):
+    manager = SessionManager()
+    app = create_app(manager, references_dir=str(tmp_path))
+    with TestClient(app) as test_client:
+        yield test_client
+    manager.close_all()
+
+
 def test_lists_no_sessions_initially(client):
     response = client.get("/api/sessions")
     assert response.status_code == 200
@@ -458,3 +467,55 @@ class TestFilters:
     def test_bad_source_is_400(self, client):
         sid = create_mock_session(client)["id"]
         assert client.patch("/api/sessions/{0}/scope/filters/1".format(sid), json={"source": 9}).status_code == 400
+
+
+class TestReferences:
+    def test_save_returns_the_list(self, ref_client):
+        sid = create_mock_session(ref_client)["id"]
+        response = ref_client.post("/api/sessions/{0}/scope/references".format(sid), json={"name": "golden", "channel": 1})
+        assert response.status_code == 201
+        refs = response.json()
+        assert len(refs) == 1
+        assert refs[0]["name"] == "golden" and refs[0]["channel"] == 1
+        assert refs[0]["num_samples"] > 0
+
+    def test_saving_an_existing_name_replaces_it(self, ref_client):
+        sid = create_mock_session(ref_client)["id"]
+        ref_client.post("/api/sessions/{0}/scope/references".format(sid), json={"name": "golden", "channel": 1})
+        refs = ref_client.post("/api/sessions/{0}/scope/references".format(sid), json={"name": "golden", "channel": 1}).json()
+        assert len(refs) == 1
+
+    def test_activate_returns_overlay_and_get_matches(self, ref_client):
+        sid = create_mock_session(ref_client)["id"]
+        ref_client.post("/api/sessions/{0}/scope/references".format(sid), json={"name": "golden", "channel": 1})
+        overlay = ref_client.put("/api/sessions/{0}/scope/reference".format(sid), json={"name": "golden"}).json()
+        assert overlay["name"] == "golden" and overlay["channel"] == 1
+        assert 0 < len(overlay["points"]) <= 2000
+        assert ref_client.get("/api/sessions/{0}/scope/reference".format(sid)).json() == overlay
+
+    def test_deactivate_clears_the_overlay(self, ref_client):
+        sid = create_mock_session(ref_client)["id"]
+        ref_client.post("/api/sessions/{0}/scope/references".format(sid), json={"name": "golden", "channel": 1})
+        ref_client.put("/api/sessions/{0}/scope/reference".format(sid), json={"name": "golden"})
+        overlay = ref_client.put("/api/sessions/{0}/scope/reference".format(sid), json={"name": None}).json()
+        assert overlay["name"] is None and overlay["points"] == []
+
+    def test_activate_unknown_is_404(self, ref_client):
+        sid = create_mock_session(ref_client)["id"]
+        assert ref_client.put("/api/sessions/{0}/scope/reference".format(sid), json={"name": "nope"}).status_code == 404
+
+    def test_delete_removes_and_clears_active(self, ref_client):
+        sid = create_mock_session(ref_client)["id"]
+        ref_client.post("/api/sessions/{0}/scope/references".format(sid), json={"name": "golden", "channel": 1})
+        ref_client.put("/api/sessions/{0}/scope/reference".format(sid), json={"name": "golden"})
+        assert ref_client.delete("/api/sessions/{0}/scope/references/golden".format(sid)).status_code == 204
+        assert ref_client.get("/api/sessions/{0}/scope/reference".format(sid)).json()["name"] is None
+        assert ref_client.delete("/api/sessions/{0}/scope/references/golden".format(sid)).status_code == 404
+
+    def test_empty_name_is_400(self, ref_client):
+        sid = create_mock_session(ref_client)["id"]
+        assert ref_client.post("/api/sessions/{0}/scope/references".format(sid), json={"name": "   ", "channel": 1}).status_code == 400
+
+    def test_bad_channel_is_400(self, ref_client):
+        sid = create_mock_session(ref_client)["id"]
+        assert ref_client.post("/api/sessions/{0}/scope/references".format(sid), json={"name": "x", "channel": 9}).status_code == 400

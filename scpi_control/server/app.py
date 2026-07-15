@@ -19,7 +19,7 @@ def _error_response(status: int, exc: BaseException) -> JSONResponse:
     return JSONResponse(status_code=status, content={"error": type(exc).__name__, "detail": str(exc)})
 
 
-def create_app(manager: Optional[SessionManager] = None) -> FastAPI:
+def create_app(manager: Optional[SessionManager] = None, references_dir: Optional[str] = None) -> FastAPI:
     manager = manager if manager is not None else SessionManager()
 
     @asynccontextmanager
@@ -30,6 +30,10 @@ def create_app(manager: Optional[SessionManager] = None) -> FastAPI:
 
     app = FastAPI(title="SCPI Instrument Control Gateway", lifespan=lifespan)
     app.state.manager = manager
+    # Reference store is created lazily on first use: ReferenceWaveform.__init__
+    # mkdirs its storage directory, and most requests never need it.
+    app.state.references_dir = references_dir
+    app.state.references = None
 
     from scpi_control.server.api import discovery as discovery_api
     from scpi_control.server.api import scope as scope_api

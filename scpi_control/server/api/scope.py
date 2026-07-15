@@ -1,8 +1,10 @@
 # scpi_control/server/api/scope.py
 import asyncio
+from dataclasses import replace
 from typing import Any, Callable, List
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, HTTPException, Request
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import PlainTextResponse, Response
 
 from scpi_control.exceptions import InvalidParameterError
@@ -17,6 +19,8 @@ from scpi_control.server.schemas import (
     FilterPatch,
     MathPatch,
     MeasurementItem,
+    ReferenceCreate,
+    ReferencePut,
     SpectrumPatch,
     TimebasePatch,
     TriggerPatch,
@@ -305,6 +309,93 @@ async def patch_filter(session_id: str, n: int, body: FilterPatch, request: Requ
                 raise InvalidParameterError("cutoff_low must be below cutoff_high")
     session.filters = {**session.filters, n: merged}
     return _filter_state(session)
+
+
+def _reference_store(request: Request):
+    if request.app.state.references is None:
+        from scpi_control.reference_waveform import ReferenceWaveform
+
+        request.app.state.references = ReferenceWaveform(request.app.state.references_dir)
+    return request.app.state.references
+
+
+def _ref_channel(value):
+    """Normalize a stored channel value (int, '1', or 'C1') to an int, else None."""
+    if isinstance(value, int):
+        return value
+    digits = "".join(ch for ch in str(value) if ch.isdigit())
+    return int(digits) if digits else None
+
+
+def _reference_list(store):
+    return [{"name": r["name"], "channel": _ref_channel(r["channel"]), "timestamp": r["timestamp"], "num_samples": r["num_samples"], "time_span": r["time_span"]} for r in store.list_references()]
+
+
+@router.get("/sessions/{session_id}/scope/references")
+async def list_references(session_id: str, request: Request):
+    require_session(request, session_id)
+    store = _reference_store(request)
+    return await run_in_threadpool(_reference_list, store)
+
+
+@router.post("/sessions/{session_id}/scope/references", status_code=201)
+async def save_reference(session_id: str, body: ReferenceCreate, request: Request):
+    session = require_session(request, session_id)
+    name = body.name.strip()
+    if not name:
+        raise InvalidParameterError("reference name must not be empty")
+    if not 1 <= body.channel <= max(1, session.num_channels):
+        raise InvalidParameterError("channel {0} out of range".format(body.channel))
+    data = await run_job(session, lambda scope: scope.get_waveform(body.channel))
+    data = replace(data, channel=body.channel)  # normalize: list/activate read the channel from NPZ metadata
+    store = _reference_store(request)
+
+    def persist():
+        while store.delete_reference(name):  # replace-on-save, incl. legacy timestamped duplicates
+            pass
+        store.save_reference(data, name)
+        return _reference_list(store)
+
+    return await run_in_threadpool(persist)
+
+
+@router.delete("/sessions/{session_id}/scope/references/{name}", status_code=204)
+async def delete_reference(session_id: str, name: str, request: Request):
+    session = require_session(request, session_id)
+    store = _reference_store(request)
+
+    def remove():
+        deleted = store.delete_reference(name)
+        while store.delete_reference(name):
+            pass
+        return deleted
+
+    if not await run_in_threadpool(remove):
+        raise HTTPException(status_code=404, detail="unknown reference {0}".format(name))
+    active = session.active_reference
+    if active is not None and active["name"] == name:
+        session.set_active_reference(None, None, None)
+
+
+@router.get("/sessions/{session_id}/scope/reference")
+async def get_reference(session_id: str, request: Request):
+    session = require_session(request, session_id)
+    return session.reference_overlay()
+
+
+@router.put("/sessions/{session_id}/scope/reference")
+async def put_reference(session_id: str, body: ReferencePut, request: Request):
+    session = require_session(request, session_id)
+    if body.name is None:
+        session.set_active_reference(None, None, None)
+        return session.reference_overlay()
+    store = _reference_store(request)
+    loaded = await run_in_threadpool(store.load_reference, body.name)
+    if loaded is None:
+        raise HTTPException(status_code=404, detail="unknown reference {0}".format(body.name))
+    metadata = loaded.get("metadata", {})
+    session.set_active_reference(metadata.get("name", body.name), _ref_channel(metadata.get("channel")), loaded)
+    return session.reference_overlay()
 
 
 # NOTE: run_op's {op} path is a catch-all for POST /scope/*; any new specific

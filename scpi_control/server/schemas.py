@@ -81,6 +81,15 @@ class FilterPatch(BaseModel):
     order: Optional[int] = None
 
 
+class ReferenceCreate(BaseModel):
+    name: str
+    channel: int
+
+
+class ReferencePut(BaseModel):
+    name: Optional[str] = None
+
+
 class ModelOut(BaseModel):
     model_name: str
     series: str
