@@ -608,6 +608,10 @@ built-in mock (`mock: true`) for hardware-free use. The API is documented at
 - `GET /api/discover` scans the gateway's subnet (or `?cidr=…`) for SCPI
   instruments on port 5025 and lists them with model and dialect — handy when
   DHCP moves your instruments around.
+- `GET .../scope/screenshot.png` — the instrument's display as a PNG
+- `GET .../scope/waveform?channels=1,2&max_points=N` — waveform data as JSON
+- `GET/PATCH .../scope/math/{1,2}` — software math channels (streamed as M1/M2 traces)
+- `GET .../scope/measurements` — the current measurement selection
 
 ### Browser UI
 
