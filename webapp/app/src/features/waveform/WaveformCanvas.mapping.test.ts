@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mathTracePixels } from "./WaveformCanvas";
+import { mathTracePixels, refTracePixels } from "./WaveformCanvas";
 
 describe("mathTracePixels", () => {
   it("returns [] for no points", () => {
@@ -23,5 +23,18 @@ describe("mathTracePixels", () => {
     expect(px[0].y).toBeGreaterThan(center); // -1 below (y grows downward)
     expect(px[2].y).toBeLessThan(center); // +1 above
     px.forEach((p) => expect(Number.isFinite(p.y)).toBe(true));
+  });
+});
+
+describe("refTracePixels", () => {
+  it("uses the source channel's voltage scale when provided", () => {
+    // 1 V/div on a 10-division canvas -> full scale 10 V; +5 V lands at the top edge
+    const px = refTracePixels([0, 5], 1, 100, 100, 0);
+    expect(px[0].y).toBeCloseTo(50);
+    expect(px[1].y).toBeCloseTo(0);
+  });
+
+  it("falls back to auto-fit when no scale is available", () => {
+    expect(refTracePixels([0, 1], undefined, 100, 100, 0)).toEqual(mathTracePixels([0, 1], 100, 100, 0));
   });
 });

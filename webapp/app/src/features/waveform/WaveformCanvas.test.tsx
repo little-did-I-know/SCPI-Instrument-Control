@@ -29,4 +29,12 @@ describe("WaveformCanvas", () => {
     expect(() => render(<WaveformCanvas />)).not.toThrow();
     clearFrames();
   });
+
+  it("renders with filtered and reference frames present without throwing", () => {
+    clearFrames();
+    setFrame("F1", { t0: 0, dt: 1, points: [1, -1, 1] });
+    setFrame("REF", { t0: 0, dt: 1, points: [0, 1, 0] });
+    expect(() => render(<WaveformCanvas />)).not.toThrow();
+    clearFrames();
+  });
 });
