@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useStream } from "./useStream";
 import { useSession } from "../store/session";
 import { getFrame, clearFrames } from "../features/waveform/frames";
+import { getSpectrum, clearSpectrum } from "../features/waveform/spectrum";
 
 class FakeWebSocket {
   static last: FakeWebSocket | null = null;
@@ -38,6 +39,7 @@ beforeEach(() => {
   vi.stubGlobal("WebSocket", FakeWebSocket as unknown as typeof WebSocket);
   useSession.getState().clearSession();
   clearFrames();
+  clearSpectrum();
 });
 
 const STATE = { run_state: "STOP", timebase: 0.001, channels: { "1": { enabled: true, voltage_scale: 0.5, voltage_offset: 0, coupling: "DC", probe_ratio: 10 } }, trigger: { mode: "AUTO", source: "C1", level: 0, slope: "POS", coupling: "DC" } };
@@ -140,5 +142,41 @@ describe("useStream", () => {
     expect(useSession.getState().session).toEqual(SESSION);
     expect(useSession.getState().status).toBe("connected");
     expect(useSession.getState().error).toBeNull();
+  });
+
+  it("routes a spectrum frame to the spectrum buffer", async () => {
+    renderHook(() => useStream("abc"));
+    FakeWebSocket.last!.emit({ type: "spectrum", channel: 1, f0: 0, df: 10, points: [1, 2], db: true, window: "hanning", peaks: [], thd: null });
+    await waitFor(() => expect(getSpectrum()?.points).toEqual([1, 2]));
+  });
+
+  it("clears the spectrum buffer on an empty spectrum frame", async () => {
+    renderHook(() => useStream("abc"));
+    FakeWebSocket.last!.emit({ type: "spectrum", channel: 1, f0: 0, df: 10, points: [1], db: true, window: "hanning", peaks: [], thd: null });
+    await waitFor(() => expect(getSpectrum()).not.toBeNull());
+    FakeWebSocket.last!.emit({ type: "spectrum", channel: 1, f0: 0, df: 1, points: [], db: true, window: "hanning", peaks: [], thd: null });
+    await waitFor(() => expect(getSpectrum()).toBeNull());
+  });
+
+  it("applies a reference broadcast to the frame buffer and store", async () => {
+    renderHook(() => useStream("abc"));
+    FakeWebSocket.last!.emit({ type: "reference", name: "golden", channel: 1, t0: 0, dt: 1, points: [1, 2] });
+    await waitFor(() => expect(getFrame("REF")?.points).toEqual([1, 2]));
+    expect(useSession.getState().activeReference).toEqual({ name: "golden", channel: 1 });
+  });
+
+  it("clears the reference on a null-name broadcast", async () => {
+    renderHook(() => useStream("abc"));
+    FakeWebSocket.last!.emit({ type: "reference", name: "golden", channel: 1, t0: 0, dt: 1, points: [1, 2] });
+    await waitFor(() => expect(useSession.getState().activeReference).not.toBeNull());
+    FakeWebSocket.last!.emit({ type: "reference", name: null, channel: null, t0: 0, dt: 1, points: [] });
+    await waitFor(() => expect(useSession.getState().activeReference).toBeNull());
+    expect(getFrame("REF")?.points).toEqual([]);
+  });
+
+  it("applies reference stats to the store", async () => {
+    renderHook(() => useStream("abc"));
+    FakeWebSocket.last!.emit({ type: "reference_stats", correlation: 0.9, max_deviation: 0.1 });
+    await waitFor(() => expect(useSession.getState().referenceStats).toEqual({ correlation: 0.9, max_deviation: 0.1 }));
   });
 });
