@@ -615,6 +615,8 @@ built-in mock (`mock: true`) for hardware-free use. The API is documented at
 - `GET/PATCH .../scope/spectrum` — server-computed FFT spectrum (streamed as `spectrum` frames)
 - `GET .../scope/filters` + `PATCH .../scope/filters/{1,2}` — software Butterworth filters (streamed as F1/F2 traces)
 - `GET/POST/DELETE .../scope/references` + `GET/PUT .../scope/reference` — saved reference waveforms and the live overlay
+- `POST .../scope/log/start` / `POST .../scope/log/stop` — record the selected measurements (~1 Hz) server-side
+- `GET .../scope/log`, `GET .../scope/log/data?since=`, `GET .../scope/log.csv` — recording status, rows, and CSV export
 
 ### Browser UI
 
