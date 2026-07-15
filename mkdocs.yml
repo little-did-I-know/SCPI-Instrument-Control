@@ -115,10 +115,15 @@ nav:
       - Connection Setup: getting-started/connection.md
   - User Guide:
       - Basic Usage: user-guide/basic-usage.md
+      - SCPI Dialects: user-guide/scpi-dialects.md
       - Waveform Capture: user-guide/waveform-capture.md
       - Measurements: user-guide/measurements.md
       - Trigger Control: user-guide/trigger-control.md
       - Advanced Features: user-guide/advanced-features.md
+  - Web Gateway:
+      - Overview: gateway/index.md
+      - Browser UI Tour: gateway/browser-ui.md
+      - REST & WebSocket API: gateway/api.md
   - GUI Application:
       - Overview: gui/overview.md
       - Interface Guide: gui/interface.md

@@ -600,6 +600,8 @@ built-in mock (`mock: true`) for hardware-free use. The API is documented at
 `/docs` (OpenAPI). No authentication in this release — bind to `127.0.0.1`
 (the default) unless your LAN is trusted.
 
+Full documentation: [Web Gateway guide](https://little-did-I-know.github.io/SCPI-Instrument-Control/gateway/) — overview, browser UI tour, and the complete REST & WebSocket API reference.
+
 - `GET /api/discover` scans the gateway's subnet (or `?cidr=…`) for SCPI
   instruments on port 5025 and lists them with model and dialect — handy when
   DHCP moves your instruments around.
