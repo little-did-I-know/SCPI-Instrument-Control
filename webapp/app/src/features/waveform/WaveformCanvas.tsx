@@ -4,10 +4,16 @@ import type { ChannelState } from "../../api/types";
 import { useSession } from "../../store/session";
 
 const TRACE = ["#FFDC32", "#40E0D0", "#FF69B4", "#32FF64"];
-// Concrete hex (canvas 2D can't read CSS vars). Chosen far in hue from all four
-// channel traces (gold/cyan/hotpink/green) so math traces stay distinguishable;
-// they're also dashed below to read as "computed".
-const MATH_TRACES: Record<string, string> = { M1: "#FFFFFF", M2: "#B18CFF" }; // white + light violet, distinct from channel traces
+// Computed traces (math + filters): concrete hex (canvas 2D can't read CSS vars),
+// chosen far in hue from the four channel colors. Dashes mark them as computed;
+// filters get a tighter dash than math so the two families stay tellable apart.
+const COMPUTED_TRACES: Record<string, { color: string; dash: number[] }> = {
+  M1: { color: "#FFFFFF", dash: [5, 3] },
+  M2: { color: "#B18CFF", dash: [5, 3] },
+  F1: { color: "#FFA657", dash: [2, 2] },
+  F2: { color: "#FF7B72", dash: [2, 2] },
+};
+const REF_TRACE = { color: "#8B949E", dash: [8, 4] };
 const DIVS_X = 14;
 const DIVS_Y = 10;
 const PAD = 8;
@@ -31,10 +37,22 @@ export function mathTracePixels(points: number[], gw: number, gh: number, pad: n
   }));
 }
 
+// Reference ghost mapping: align with the source channel's volts/div when we
+// know it (honest visual comparison); otherwise auto-fit like a math trace.
+export function refTracePixels(points: number[], voltageScale: number | undefined, gw: number, gh: number, pad: number): { x: number; y: number }[] {
+  if (!voltageScale) return mathTracePixels(points, gw, gh, pad);
+  const fullScale = voltageScale * DIVS_Y;
+  return points.map((volts, i) => ({
+    x: pad + (gw * i) / Math.max(1, points.length - 1),
+    y: pad + gh / 2 - (volts / fullScale) * gh,
+  }));
+}
+
 export function WaveformCanvas() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const channels = useSession((s) => s.scope?.channels ?? NO_CHANNELS);
+  const activeReference = useSession((s) => s.activeReference);
   const enabled = Object.entries(channels)
     .filter(([, channel]) => channel.enabled)
     .map(([key]) => Number(key));
@@ -106,6 +124,26 @@ export function WaveformCanvas() {
       ctx.beginPath();
       ctx.rect(PAD, PAD, gw, gh);
       ctx.clip(); // keep out-of-range traces inside the graticule
+
+      const ref = getFrame("REF");
+      if (ref && ref.points.length > 0) {
+        const scale = activeReference?.channel != null ? channels[String(activeReference.channel)]?.voltage_scale : undefined;
+        const pixels = refTracePixels(ref.points, scale, gw, gh, PAD);
+        ctx.save();
+        ctx.setLineDash(REF_TRACE.dash);
+        ctx.strokeStyle = REF_TRACE.color;
+        ctx.lineWidth = 1.5;
+        ctx.lineJoin = "round";
+        ctx.beginPath();
+        pixels.forEach(({ x, y }, index) => {
+          if (index === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        });
+        ctx.stroke();
+        ctx.restore();
+        drew = true;
+      }
+
       enabled.forEach((channel) => {
         const frame = getFrame(channel);
         if (!frame || frame.points.length === 0) return;
@@ -125,13 +163,13 @@ export function WaveformCanvas() {
         drew = true;
       });
 
-      ["M1", "M2"].forEach((label) => {
+      Object.keys(COMPUTED_TRACES).forEach((label) => {
         const frame = getFrame(label);
         if (!frame || frame.points.length === 0) return;
         const pixels = mathTracePixels(frame.points, gw, gh, PAD);
         ctx.save();
-        ctx.setLineDash([5, 3]); // dashed → unmistakably a computed math trace
-        ctx.strokeStyle = MATH_TRACES[label];
+        ctx.setLineDash(COMPUTED_TRACES[label].dash);
+        ctx.strokeStyle = COMPUTED_TRACES[label].color;
         ctx.lineWidth = 2;
         ctx.lineJoin = "round";
         ctx.beginPath();
@@ -158,7 +196,7 @@ export function WaveformCanvas() {
       cancelAnimationFrame(raf);
       unsubscribe();
     };
-  }, [enabledKey, channels]);
+  }, [enabledKey, channels, activeReference]);
 
   return (
     <div ref={wrapRef} style={{ position: "relative", flex: 1, minHeight: 320, background: "#0d1117", border: "1px solid var(--scope-border-2)", borderRadius: "var(--lc-radius)" }}>

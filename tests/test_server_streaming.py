@@ -206,3 +206,118 @@ def test_set_measurements_broadcasts_config():
         assert got and got[0]["items"] == [{"channel": 1, "mtype": "PKPK"}, {"channel": 2, "mtype": "FREQ"}]
     finally:
         session.close()
+
+
+def test_poll_publishes_spectrum_frame_when_enabled():
+    session = make_session()
+    try:
+        session.spectrum_config = {**session.spectrum_config, "enabled": True}
+        frames = collect(session, "spectrum", n=1, timeout=8.0)
+        assert frames, "expected a spectrum frame"
+        frame = frames[0]
+        assert frame["channel"] == 1 and frame["db"] is True and frame["window"] == "hanning"
+        assert 0 < len(frame["points"]) <= 2000
+        assert frame["df"] > 0
+    finally:
+        session.close()
+
+
+def test_poll_clears_spectrum_frame_when_disabled():
+    session = make_session()
+    try:
+        session.spectrum_config = {**session.spectrum_config, "enabled": True}
+        assert collect(session, "spectrum", n=1, timeout=8.0), "expected a live spectrum frame first"
+        cleared = []
+        unsubscribe = session.subscribe(lambda m: cleared.append(m) if m["type"] == "spectrum" and m["points"] == [] else None)
+        session.spectrum_config = {**session.spectrum_config, "enabled": False}
+        deadline = time.time() + 8.0
+        while not cleared and time.time() < deadline:
+            time.sleep(0.02)
+        unsubscribe()
+        assert cleared, "expected a one-shot empty spectrum frame on disable"
+    finally:
+        session.close()
+
+
+def test_poll_publishes_filtered_trace():
+    session = make_session()
+    try:
+        session.filters = {**session.filters, 1: {**session.filters[1], "enabled": True, "cutoff_high": 100.0}}
+        frames = collect(session, "waveform", n=6, timeout=8.0)
+        f1 = [f for f in frames if f["channel"] == "F1"]
+        assert f1, "expected an F1 filtered frame"
+        assert 0 < len(f1[0]["points"]) <= 2000
+    finally:
+        session.close()
+
+
+def test_poll_clears_filtered_trace_when_disabled():
+    session = make_session()
+    try:
+        session.filters = {**session.filters, 1: {**session.filters[1], "enabled": True, "cutoff_high": 100.0}}
+        assert [f for f in collect(session, "waveform", n=6, timeout=8.0) if f["channel"] == "F1"]
+        cleared = []
+        unsubscribe = session.subscribe(lambda m: cleared.append(m) if m["type"] == "waveform" and m["channel"] == "F1" and m["points"] == [] else None)
+        session.filters = {**session.filters, 1: {**session.filters[1], "enabled": False}}
+        deadline = time.time() + 8.0
+        while not cleared and time.time() < deadline:
+            time.sleep(0.02)
+        unsubscribe()
+        assert cleared, "expected a one-shot empty F1 frame on disable"
+    finally:
+        session.close()
+
+
+def test_set_active_reference_broadcasts_overlay_and_clear():
+    session = make_session()
+    try:
+        got = []
+        unsubscribe = session.subscribe(lambda m: got.append(m) if m["type"] == "reference" else None)
+        data = session.submit(lambda scope: scope.get_waveform(1)).result(timeout=5)
+        session.set_active_reference("golden", 1, {"time": data.time, "voltage": data.voltage})
+        session.set_active_reference(None, None, None)
+        unsubscribe()
+        assert got[0]["name"] == "golden" and got[0]["channel"] == 1
+        assert 0 < len(got[0]["points"]) <= 2000
+        assert got[1]["name"] is None and got[1]["points"] == []
+    finally:
+        session.close()
+
+
+def test_poll_publishes_reference_stats_for_active_reference():
+    session = make_session()
+    try:
+        # the mock replays the same record every tick -> self-compare is deterministic
+        data = session.submit(lambda scope: scope.get_waveform(1)).result(timeout=5)
+        session.set_active_reference("golden", 1, {"time": data.time, "voltage": data.voltage})
+        msgs = collect(session, "reference_stats", n=1, timeout=8.0)
+        assert msgs, "expected a reference_stats message"
+        assert msgs[0]["correlation"] is not None and msgs[0]["correlation"] > 0.99
+        assert msgs[0]["max_deviation"] is not None
+    finally:
+        session.close()
+
+
+def test_poll_survives_unexpected_analysis_exception(monkeypatch):
+    # An unexpected (non-Siglent) error in analysis compute must never kill
+    # the worker: the tick degrades that trace and keeps publishing channels.
+    from scpi_control.server import compute
+
+    def boom(config, acquired):
+        raise RuntimeError("unexpected numpy edge case")
+
+    monkeypatch.setattr(compute, "filtered_waveform", boom)
+    monkeypatch.setattr(compute, "spectrum_frame", boom)
+    session = make_session()
+    try:
+        session.filters = {**session.filters, 1: {**session.filters[1], "enabled": True, "cutoff_high": 100.0}}
+        session.spectrum_config = {**session.spectrum_config, "enabled": True}
+        # n=8: this mock's default enables all 4 channels, so one healthy tick
+        # already yields 4 "waveform" messages; require two full ticks' worth
+        # so the assertion actually distinguishes "died after tick 1" from
+        # "kept polling."
+        frames = collect(session, "waveform", n=8, timeout=8.0)
+        channel_frames = [f for f in frames if f["channel"] == 1]
+        assert len(channel_frames) >= 2, "worker must keep polling after an analysis exception"
+    finally:
+        session.close()

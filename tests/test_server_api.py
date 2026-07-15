@@ -19,6 +19,15 @@ def client():
     manager.close_all()
 
 
+@pytest.fixture()
+def ref_client(tmp_path):
+    manager = SessionManager()
+    app = create_app(manager, references_dir=str(tmp_path))
+    with TestClient(app) as test_client:
+        yield test_client
+    manager.close_all()
+
+
 def test_lists_no_sessions_initially(client):
     response = client.get("/api/sessions")
     assert response.status_code == 200
@@ -385,3 +394,128 @@ class TestMath:
     def test_patch_math_empty_expression_is_400(self, client):
         sid = create_mock_session(client)["id"]
         assert client.patch("/api/sessions/{0}/scope/math/1".format(sid), json={"expression": "   "}).status_code == 400
+
+
+def test_allowed_windows_matches_fft_analyzer():
+    from scpi_control.analysis import FFTAnalyzer
+    from scpi_control.server.schemas import ALLOWED_WINDOWS
+
+    assert ALLOWED_WINDOWS == frozenset(FFTAnalyzer.WINDOW_FUNCTIONS)
+
+
+class TestSpectrumConfig:
+    def test_get_returns_defaults(self, client):
+        sid = create_mock_session(client)["id"]
+        body = client.get("/api/sessions/{0}/scope/spectrum".format(sid)).json()
+        assert body == {"enabled": False, "channel": 1, "window": "hanning", "db": True}
+
+    def test_patch_updates_and_persists(self, client):
+        sid = create_mock_session(client)["id"]
+        response = client.patch("/api/sessions/{0}/scope/spectrum".format(sid), json={"enabled": True, "channel": 2, "window": "flattop", "db": False})
+        assert response.status_code == 200
+        assert response.json() == {"enabled": True, "channel": 2, "window": "flattop", "db": False}
+        assert client.get("/api/sessions/{0}/scope/spectrum".format(sid)).json()["window"] == "flattop"
+
+    def test_patch_unknown_window_is_400(self, client):
+        sid = create_mock_session(client)["id"]
+        assert client.patch("/api/sessions/{0}/scope/spectrum".format(sid), json={"window": "kaiser"}).status_code == 400
+
+    def test_patch_bad_channel_is_400(self, client):
+        sid = create_mock_session(client)["id"]
+        assert client.patch("/api/sessions/{0}/scope/spectrum".format(sid), json={"channel": 9}).status_code == 400
+
+
+class TestFilters:
+    def test_get_returns_two_disabled_filters(self, client):
+        sid = create_mock_session(client)["id"]
+        body = client.get("/api/sessions/{0}/scope/filters".format(sid)).json()
+        assert [f["n"] for f in body] == [1, 2]
+        assert all(f["enabled"] is False and f["kind"] == "lowpass" and f["order"] == 5 for f in body)
+
+    def test_patch_configures_and_enables(self, client):
+        sid = create_mock_session(client)["id"]
+        response = client.patch("/api/sessions/{0}/scope/filters/1".format(sid), json={"kind": "bandpass", "cutoff_low": 10, "cutoff_high": 100, "enabled": True})
+        assert response.status_code == 200
+        entry = [f for f in response.json() if f["n"] == 1][0]
+        assert entry["kind"] == "bandpass" and entry["cutoff_low"] == 10 and entry["cutoff_high"] == 100 and entry["enabled"] is True
+
+    def test_patch_bad_index_is_400(self, client):
+        sid = create_mock_session(client)["id"]
+        assert client.patch("/api/sessions/{0}/scope/filters/3".format(sid), json={"enabled": True}).status_code == 400
+
+    def test_enabling_without_required_cutoff_is_400(self, client):
+        sid = create_mock_session(client)["id"]
+        assert client.patch("/api/sessions/{0}/scope/filters/1".format(sid), json={"enabled": True}).status_code == 400
+
+    def test_bandpass_cutoff_order_is_400(self, client):
+        sid = create_mock_session(client)["id"]
+        body = {"kind": "bandpass", "cutoff_low": 100, "cutoff_high": 10, "enabled": True}
+        assert client.patch("/api/sessions/{0}/scope/filters/1".format(sid), json=body).status_code == 400
+
+    def test_nonpositive_cutoff_is_400(self, client):
+        sid = create_mock_session(client)["id"]
+        assert client.patch("/api/sessions/{0}/scope/filters/1".format(sid), json={"cutoff_high": 0}).status_code == 400
+
+    def test_bad_kind_is_400(self, client):
+        sid = create_mock_session(client)["id"]
+        assert client.patch("/api/sessions/{0}/scope/filters/1".format(sid), json={"kind": "notch"}).status_code == 400
+
+    def test_bad_order_is_400(self, client):
+        sid = create_mock_session(client)["id"]
+        assert client.patch("/api/sessions/{0}/scope/filters/1".format(sid), json={"order": 0}).status_code == 400
+
+    def test_bad_source_is_400(self, client):
+        sid = create_mock_session(client)["id"]
+        assert client.patch("/api/sessions/{0}/scope/filters/1".format(sid), json={"source": 9}).status_code == 400
+
+
+class TestReferences:
+    def test_save_returns_the_list(self, ref_client):
+        sid = create_mock_session(ref_client)["id"]
+        response = ref_client.post("/api/sessions/{0}/scope/references".format(sid), json={"name": "golden", "channel": 1})
+        assert response.status_code == 201
+        refs = response.json()
+        assert len(refs) == 1
+        assert refs[0]["name"] == "golden" and refs[0]["channel"] == 1
+        assert refs[0]["num_samples"] > 0
+
+    def test_saving_an_existing_name_replaces_it(self, ref_client):
+        sid = create_mock_session(ref_client)["id"]
+        ref_client.post("/api/sessions/{0}/scope/references".format(sid), json={"name": "golden", "channel": 1})
+        refs = ref_client.post("/api/sessions/{0}/scope/references".format(sid), json={"name": "golden", "channel": 1}).json()
+        assert len(refs) == 1
+
+    def test_activate_returns_overlay_and_get_matches(self, ref_client):
+        sid = create_mock_session(ref_client)["id"]
+        ref_client.post("/api/sessions/{0}/scope/references".format(sid), json={"name": "golden", "channel": 1})
+        overlay = ref_client.put("/api/sessions/{0}/scope/reference".format(sid), json={"name": "golden"}).json()
+        assert overlay["name"] == "golden" and overlay["channel"] == 1
+        assert 0 < len(overlay["points"]) <= 2000
+        assert ref_client.get("/api/sessions/{0}/scope/reference".format(sid)).json() == overlay
+
+    def test_deactivate_clears_the_overlay(self, ref_client):
+        sid = create_mock_session(ref_client)["id"]
+        ref_client.post("/api/sessions/{0}/scope/references".format(sid), json={"name": "golden", "channel": 1})
+        ref_client.put("/api/sessions/{0}/scope/reference".format(sid), json={"name": "golden"})
+        overlay = ref_client.put("/api/sessions/{0}/scope/reference".format(sid), json={"name": None}).json()
+        assert overlay["name"] is None and overlay["points"] == []
+
+    def test_activate_unknown_is_404(self, ref_client):
+        sid = create_mock_session(ref_client)["id"]
+        assert ref_client.put("/api/sessions/{0}/scope/reference".format(sid), json={"name": "nope"}).status_code == 404
+
+    def test_delete_removes_and_clears_active(self, ref_client):
+        sid = create_mock_session(ref_client)["id"]
+        ref_client.post("/api/sessions/{0}/scope/references".format(sid), json={"name": "golden", "channel": 1})
+        ref_client.put("/api/sessions/{0}/scope/reference".format(sid), json={"name": "golden"})
+        assert ref_client.delete("/api/sessions/{0}/scope/references/golden".format(sid)).status_code == 204
+        assert ref_client.get("/api/sessions/{0}/scope/reference".format(sid)).json()["name"] is None
+        assert ref_client.delete("/api/sessions/{0}/scope/references/golden".format(sid)).status_code == 404
+
+    def test_empty_name_is_400(self, ref_client):
+        sid = create_mock_session(ref_client)["id"]
+        assert ref_client.post("/api/sessions/{0}/scope/references".format(sid), json={"name": "   ", "channel": 1}).status_code == 400
+
+    def test_bad_channel_is_400(self, ref_client):
+        sid = create_mock_session(ref_client)["id"]
+        assert ref_client.post("/api/sessions/{0}/scope/references".format(sid), json={"name": "x", "channel": 9}).status_code == 400

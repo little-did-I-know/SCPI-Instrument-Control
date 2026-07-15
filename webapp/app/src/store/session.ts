@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { MeasurementValue, ScopeState, SessionInfo } from "../api/types";
+import type { MeasurementValue, ReferenceStats, ScopeState, SessionInfo } from "../api/types";
 
 export type ConnStatus = "disconnected" | "connecting" | "connected" | "error";
 
@@ -10,11 +10,15 @@ type SessionStore = {
   error: string | null;
   measurements: MeasurementValue[];
   measurementConfig: { channel: number; mtype: string }[];
+  activeReference: { name: string; channel: number | null } | null;
+  referenceStats: ReferenceStats | null;
   setSession: (session: SessionInfo) => void;
   clearSession: () => void;
   applyState: (state: ScopeState) => void;
   applyMeasurements: (values: MeasurementValue[]) => void;
   applyMeasurementConfig: (items: { channel: number; mtype: string }[]) => void;
+  applyReference: (ref: { name: string; channel: number | null } | null) => void;
+  applyReferenceStats: (stats: ReferenceStats | null) => void;
   setStatus: (status: ConnStatus) => void;
   setError: (error: string | null) => void;
 };
@@ -26,11 +30,15 @@ export const useSession = create<SessionStore>((set) => ({
   error: null,
   measurements: [],
   measurementConfig: [],
+  activeReference: null,
+  referenceStats: null,
   setSession: (session) => set({ session, status: "connected", error: null }),
-  clearSession: () => set({ session: null, scope: null, status: "disconnected", error: null, measurements: [], measurementConfig: [] }),
+  clearSession: () => set({ session: null, scope: null, status: "disconnected", error: null, measurements: [], measurementConfig: [], activeReference: null, referenceStats: null }),
   applyState: (scope) => set({ scope }),
   applyMeasurements: (measurements) => set({ measurements }),
   applyMeasurementConfig: (measurementConfig) => set({ measurementConfig }),
+  applyReference: (activeReference) => set({ activeReference }),
+  applyReferenceStats: (referenceStats) => set({ referenceStats }),
   setStatus: (status) => set({ status }),
   setError: (error) => set({ error, status: error ? "error" : "connected" }),
 }));

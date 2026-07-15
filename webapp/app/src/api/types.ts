@@ -57,11 +57,21 @@ export type ModelInfo = {
 
 export type MeasurementValue = { channel: number; mtype: string; value: number | null };
 
+export type SpectrumConfig = { enabled: boolean; channel: number; window: string; db: boolean };
+export type FilterConfig = { n: number; source: number; kind: "lowpass" | "highpass" | "bandpass"; cutoff_low: number | null; cutoff_high: number | null; order: number; enabled: boolean };
+export type ReferenceInfo = { name: string; channel: number | null; timestamp: string; num_samples: number; time_span: number };
+export type ReferenceOverlay = { name: string | null; channel: number | null; t0: number; dt: number; points: number[] };
+export type ReferenceStats = { correlation: number | null; max_deviation: number | null };
+export type SpectrumFrame = { channel: number; f0: number; df: number; points: number[]; db: boolean; window: string; peaks: [number, number][]; thd: number | null };
+
 export type StreamMessage =
   | { type: "state"; state: ScopeState }
   | { type: "waveform"; channel: number | string; t0: number; dt: number; points: number[] }
   | { type: "measurements"; values: MeasurementValue[] }
   | { type: "measurements_config"; items: { channel: number; mtype: string }[] }
+  | ({ type: "spectrum" } & SpectrumFrame)
+  | ({ type: "reference" } & ReferenceOverlay)
+  | ({ type: "reference_stats" } & ReferenceStats)
   | { type: "error"; detail: string }
   | { type: "closed" };
 
