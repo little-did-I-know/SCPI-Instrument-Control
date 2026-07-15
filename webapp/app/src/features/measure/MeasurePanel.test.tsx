@@ -166,11 +166,28 @@ describe("MeasurePanel", () => {
   });
 
   it("reconciles a measurements_config broadcast into the selection", async () => {
+    // this covers the broadcast-BEFORE-GET-settles path: the broadcast lands while the mocked
+    // GET is still in flight, so the noBroadcastSince guard must block the GET from clobbering it.
     vi.spyOn(api, "getMeasurements").mockResolvedValue({ measurements: [] });
     render(<MeasurePanel />);
     act(() => useSession.getState().applyMeasurementConfig([{ channel: 1, mtype: "FREQ" }]));
     const setMeasurements = vi.spyOn(api, "setMeasurements").mockResolvedValue({ measurements: [] });
     await userEvent.click(await screen.findByLabelText("FREQ C1")); // config made it selected → unchecking PUTs []
+    await waitFor(() => expect(setMeasurements).toHaveBeenLastCalledWith("abc", []));
+  });
+
+  it("reflects a measurements_config broadcast that arrives after the mount GET settled (live cross-tab sync)", async () => {
+    vi.spyOn(api, "getMeasurements").mockResolvedValue({ measurements: [{ channel: 1, mtype: "PKPK" }] });
+    render(<MeasurePanel />);
+    // GET settles FIRST — PKPK is the acknowledged selection (this is steady state, not the race window)
+    await waitFor(() => expect(api.getMeasurements).toHaveBeenCalledWith("abc"));
+    await screen.findByLabelText("PKPK C1");
+    // a broadcast from another tab now changes the selection to FREQ, AFTER the GET already settled
+    act(() => useSession.getState().applyMeasurementConfig([{ channel: 1, mtype: "FREQ" }]));
+    // the panel must reflect FREQ live: clicking the now-selected FREQ unchecks it → PUT [].
+    // (Old acked-mask design would still show PKPK selected, so clicking FREQ would PUT [PKPK, FREQ].)
+    const setMeasurements = vi.spyOn(api, "setMeasurements").mockResolvedValue({ measurements: [] });
+    await userEvent.click(await screen.findByLabelText("FREQ C1"));
     await waitFor(() => expect(setMeasurements).toHaveBeenLastCalledWith("abc", []));
   });
 });
