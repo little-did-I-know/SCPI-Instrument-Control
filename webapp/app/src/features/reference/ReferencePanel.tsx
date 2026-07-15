@@ -81,7 +81,7 @@ export function ReferencePanel() {
               <div key={ref.name} style={rowStyle}>
                 <span style={{ flex: 1, fontFamily: "var(--font-mono)", overflow: "hidden", textOverflow: "ellipsis" }}>{ref.name}</span>
                 <span style={{ color: "var(--lc-muted)" }}>C{ref.channel ?? "?"}</span>
-                <Button variant="ghost" aria-label={`${active ? "Deactivate" : "Activate"} ${ref.name}`} onClick={() => toggleActive(ref)}>
+                <Button variant="ghost" aria-label={`${active ? "Hide" : "Show"} ${ref.name}`} onClick={() => toggleActive(ref)}>
                   {active ? "Hide" : "Show"}
                 </Button>
                 <Button variant="ghost" aria-label={`Delete ${ref.name}`} onClick={() => remove(ref.name)}>

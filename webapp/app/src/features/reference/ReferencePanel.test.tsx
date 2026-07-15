@@ -30,10 +30,10 @@ describe("ReferencePanel", () => {
     vi.spyOn(api, "listReferences").mockResolvedValue(REFS);
     const put = vi.spyOn(api, "putReference").mockResolvedValue(OVERLAY);
     render(<ReferencePanel />);
-    await userEvent.click(await screen.findByLabelText("Activate golden"));
+    await userEvent.click(await screen.findByLabelText("Show golden"));
     expect(put).toHaveBeenCalledWith("abc", "golden");
     act(() => useSession.getState().applyReference({ name: "golden", channel: 1 })); // the broadcast lands
-    await userEvent.click(await screen.findByLabelText("Deactivate golden"));
+    await userEvent.click(await screen.findByLabelText("Hide golden"));
     expect(put).toHaveBeenLastCalledWith("abc", null);
   });
 
