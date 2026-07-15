@@ -7,7 +7,20 @@ from fastapi.responses import PlainTextResponse, Response
 
 from scpi_control.exceptions import InvalidParameterError
 from scpi_control.server.api.sessions import require_session
-from scpi_control.server.schemas import ALLOWED_COUPLING, ALLOWED_MEASUREMENTS, ChannelPatch, CommandIn, MathPatch, MeasurementItem, TimebasePatch, TriggerPatch
+from scpi_control.server.schemas import (
+    ALLOWED_COUPLING,
+    ALLOWED_FILTER_KINDS,
+    ALLOWED_MEASUREMENTS,
+    ALLOWED_WINDOWS,
+    ChannelPatch,
+    CommandIn,
+    FilterPatch,
+    MathPatch,
+    MeasurementItem,
+    SpectrumPatch,
+    TimebasePatch,
+    TriggerPatch,
+)
 from scpi_control.server.sessions import InstrumentSession, read_state
 
 router = APIRouter(tags=["scope"])
@@ -232,6 +245,66 @@ async def patch_math(session_id: str, n: int, body: MathPatch, request: Request)
         return _math_state(scope)
 
     return await run_job(session, apply)
+
+
+@router.get("/sessions/{session_id}/scope/spectrum")
+async def get_spectrum(session_id: str, request: Request):
+    session = require_session(request, session_id)
+    return dict(session.spectrum_config)
+
+
+@router.patch("/sessions/{session_id}/scope/spectrum")
+async def patch_spectrum(session_id: str, body: SpectrumPatch, request: Request):
+    session = require_session(request, session_id)
+    updates = {k: v for k, v in body.model_dump().items() if v is not None}
+    if "window" in updates and updates["window"] not in ALLOWED_WINDOWS:
+        raise InvalidParameterError("unknown window: {0}".format(updates["window"]))
+    if "channel" in updates and not 1 <= updates["channel"] <= max(1, session.num_channels):
+        raise InvalidParameterError("channel {0} out of range".format(updates["channel"]))
+    session.spectrum_config = {**session.spectrum_config, **updates}
+    return dict(session.spectrum_config)
+
+
+def _filter_state(session):
+    return [{"n": n, **session.filters[n]} for n in sorted(session.filters)]
+
+
+@router.get("/sessions/{session_id}/scope/filters")
+async def get_filters(session_id: str, request: Request):
+    session = require_session(request, session_id)
+    return _filter_state(session)
+
+
+@router.patch("/sessions/{session_id}/scope/filters/{n}")
+async def patch_filter(session_id: str, n: int, body: FilterPatch, request: Request):
+    session = require_session(request, session_id)
+    if n not in (1, 2):
+        raise InvalidParameterError("filter must be 1 or 2")
+    updates = {k: v for k, v in body.model_dump().items() if v is not None}
+    if "kind" in updates and updates["kind"] not in ALLOWED_FILTER_KINDS:
+        raise InvalidParameterError("unknown filter kind: {0}".format(updates["kind"]))
+    if "source" in updates and not 1 <= updates["source"] <= max(1, session.num_channels):
+        raise InvalidParameterError("channel {0} out of range".format(updates["source"]))
+    if "order" in updates and not 1 <= updates["order"] <= 10:
+        raise InvalidParameterError("order must be between 1 and 10")
+    for key in ("cutoff_low", "cutoff_high"):
+        if key in updates and updates[key] <= 0:
+            raise InvalidParameterError("{0} must be positive".format(key))
+    merged = {**session.filters[n], **updates}
+    if merged["enabled"]:
+        # completeness is only enforced when the merged config is enabled, so
+        # partial configuration while disabled stays a valid workflow
+        if merged["kind"] == "lowpass" and merged["cutoff_high"] is None:
+            raise InvalidParameterError("lowpass requires cutoff_high")
+        if merged["kind"] == "highpass" and merged["cutoff_low"] is None:
+            raise InvalidParameterError("highpass requires cutoff_low")
+        if merged["kind"] == "bandpass":
+            if merged["cutoff_low"] is None or merged["cutoff_high"] is None:
+                raise InvalidParameterError("bandpass requires cutoff_low and cutoff_high")
+            if not merged["cutoff_low"] < merged["cutoff_high"]:
+                raise InvalidParameterError("cutoff_low must be below cutoff_high")
+    session.filters = {**session.filters, n: merged}
+    return _filter_state(session)
 
 
 # NOTE: run_op's {op} path is a catch-all for POST /scope/*; any new specific

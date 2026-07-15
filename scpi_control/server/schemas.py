@@ -6,6 +6,8 @@ from pydantic import BaseModel
 
 ALLOWED_MEASUREMENTS = frozenset({"PKPK", "MAX", "MIN", "AMPL", "TOP", "BASE", "CMEAN", "MEAN", "RMS", "CRMS", "FREQ", "PER", "RISE", "FALL", "WID", "NWID", "DUTY"})
 ALLOWED_COUPLING = frozenset({"DC", "AC", "GND"})
+ALLOWED_WINDOWS = frozenset({"rectangular", "hanning", "hamming", "blackman", "bartlett", "flattop"})
+ALLOWED_FILTER_KINDS = frozenset({"lowpass", "highpass", "bandpass"})
 
 
 class SessionCreate(BaseModel):
@@ -61,6 +63,22 @@ class CommandIn(BaseModel):
 class MathPatch(BaseModel):
     expression: Optional[str] = None
     enabled: Optional[bool] = None
+
+
+class SpectrumPatch(BaseModel):
+    enabled: Optional[bool] = None
+    channel: Optional[int] = None
+    window: Optional[str] = None
+    db: Optional[bool] = None
+
+
+class FilterPatch(BaseModel):
+    enabled: Optional[bool] = None
+    source: Optional[int] = None
+    kind: Optional[str] = None
+    cutoff_low: Optional[float] = None
+    cutoff_high: Optional[float] = None
+    order: Optional[int] = None
 
 
 class ModelOut(BaseModel):

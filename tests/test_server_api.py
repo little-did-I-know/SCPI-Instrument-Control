@@ -385,3 +385,76 @@ class TestMath:
     def test_patch_math_empty_expression_is_400(self, client):
         sid = create_mock_session(client)["id"]
         assert client.patch("/api/sessions/{0}/scope/math/1".format(sid), json={"expression": "   "}).status_code == 400
+
+
+def test_allowed_windows_matches_fft_analyzer():
+    from scpi_control.analysis import FFTAnalyzer
+    from scpi_control.server.schemas import ALLOWED_WINDOWS
+
+    assert ALLOWED_WINDOWS == frozenset(FFTAnalyzer.WINDOW_FUNCTIONS)
+
+
+class TestSpectrumConfig:
+    def test_get_returns_defaults(self, client):
+        sid = create_mock_session(client)["id"]
+        body = client.get("/api/sessions/{0}/scope/spectrum".format(sid)).json()
+        assert body == {"enabled": False, "channel": 1, "window": "hanning", "db": True}
+
+    def test_patch_updates_and_persists(self, client):
+        sid = create_mock_session(client)["id"]
+        response = client.patch("/api/sessions/{0}/scope/spectrum".format(sid), json={"enabled": True, "channel": 2, "window": "flattop", "db": False})
+        assert response.status_code == 200
+        assert response.json() == {"enabled": True, "channel": 2, "window": "flattop", "db": False}
+        assert client.get("/api/sessions/{0}/scope/spectrum".format(sid)).json()["window"] == "flattop"
+
+    def test_patch_unknown_window_is_400(self, client):
+        sid = create_mock_session(client)["id"]
+        assert client.patch("/api/sessions/{0}/scope/spectrum".format(sid), json={"window": "kaiser"}).status_code == 400
+
+    def test_patch_bad_channel_is_400(self, client):
+        sid = create_mock_session(client)["id"]
+        assert client.patch("/api/sessions/{0}/scope/spectrum".format(sid), json={"channel": 9}).status_code == 400
+
+
+class TestFilters:
+    def test_get_returns_two_disabled_filters(self, client):
+        sid = create_mock_session(client)["id"]
+        body = client.get("/api/sessions/{0}/scope/filters".format(sid)).json()
+        assert [f["n"] for f in body] == [1, 2]
+        assert all(f["enabled"] is False and f["kind"] == "lowpass" and f["order"] == 5 for f in body)
+
+    def test_patch_configures_and_enables(self, client):
+        sid = create_mock_session(client)["id"]
+        response = client.patch("/api/sessions/{0}/scope/filters/1".format(sid), json={"kind": "bandpass", "cutoff_low": 10, "cutoff_high": 100, "enabled": True})
+        assert response.status_code == 200
+        entry = [f for f in response.json() if f["n"] == 1][0]
+        assert entry["kind"] == "bandpass" and entry["cutoff_low"] == 10 and entry["cutoff_high"] == 100 and entry["enabled"] is True
+
+    def test_patch_bad_index_is_400(self, client):
+        sid = create_mock_session(client)["id"]
+        assert client.patch("/api/sessions/{0}/scope/filters/3".format(sid), json={"enabled": True}).status_code == 400
+
+    def test_enabling_without_required_cutoff_is_400(self, client):
+        sid = create_mock_session(client)["id"]
+        assert client.patch("/api/sessions/{0}/scope/filters/1".format(sid), json={"enabled": True}).status_code == 400
+
+    def test_bandpass_cutoff_order_is_400(self, client):
+        sid = create_mock_session(client)["id"]
+        body = {"kind": "bandpass", "cutoff_low": 100, "cutoff_high": 10, "enabled": True}
+        assert client.patch("/api/sessions/{0}/scope/filters/1".format(sid), json=body).status_code == 400
+
+    def test_nonpositive_cutoff_is_400(self, client):
+        sid = create_mock_session(client)["id"]
+        assert client.patch("/api/sessions/{0}/scope/filters/1".format(sid), json={"cutoff_high": 0}).status_code == 400
+
+    def test_bad_kind_is_400(self, client):
+        sid = create_mock_session(client)["id"]
+        assert client.patch("/api/sessions/{0}/scope/filters/1".format(sid), json={"kind": "notch"}).status_code == 400
+
+    def test_bad_order_is_400(self, client):
+        sid = create_mock_session(client)["id"]
+        assert client.patch("/api/sessions/{0}/scope/filters/1".format(sid), json={"order": 0}).status_code == 400
+
+    def test_bad_source_is_400(self, client):
+        sid = create_mock_session(client)["id"]
+        assert client.patch("/api/sessions/{0}/scope/filters/1".format(sid), json={"source": 9}).status_code == 400
