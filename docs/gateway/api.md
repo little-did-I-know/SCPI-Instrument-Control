@@ -29,12 +29,12 @@ All paths below are under `/api/sessions/{id}/scope/`.
 
 | Method | Path | Body / params | Response | Errors |
 |---|---|---|---|---|
-| `GET` | `state` | — | Full state snapshot (channels, timebase, trigger, run state) | 404 unknown session |
+| `GET` | `state` | — | Full state snapshot (channels, timebase, trigger, run state) | 404 unknown session; 409 if the session is in an error/closed state |
 | `PATCH` | `channels/{n}` | `{enabled?, voltage_scale?, voltage_offset?, coupling?, probe_ratio?}` | State snapshot | 400 invalid coupling (must be `DC`/`AC`/`GND`) or unknown channel; 409 if the session is in an error/closed state |
 | `PATCH` | `timebase` | `{timebase}` (seconds/div, required) | State snapshot | 409 session not accepting jobs |
 | `PATCH` | `trigger` | `{mode?, source?, level?, slope?, coupling?}` | State snapshot | 400 invalid value (trigger coupling must be `DC`/`AC`/`HFREJ`/`LFREJ`); 409 session not accepting jobs |
 | `POST` | `run` \| `stop` \| `single` \| `auto` | — | State snapshot | 400 unknown operation (any other `{op}` value); 409 session not accepting jobs |
-| `POST` | `command` | `{command}` — a raw SCPI string | `{command, response}` — `response` is the query reply, or `null` for a write | 400 empty command |
+| `POST` | `command` | `{command}` — a raw SCPI string | `{command, response}` — `response` is the query reply, or `null` for a write | 400 empty command; 409 if the session is in an error/closed state |
 | `PUT` | `measurements` | `[{channel, mtype}]` — `mtype` one of the 17 supported types (`PKPK`, `MAX`, `MIN`, `AMPL`, `TOP`, `BASE`, `CMEAN`, `MEAN`, `RMS`, `CRMS`, `FREQ`, `PER`, `RISE`, `FALL`, `WID`, `NWID`, `DUTY`) | `{measurements: [{channel, mtype}]}` | 400 unknown `mtype` or out-of-range channel; **409 while a trend recording is active** (selection is locked) |
 | `GET` | `measurements` | — | `{measurements: [{channel, mtype}]}` | — |
 
@@ -46,9 +46,9 @@ All paths under `/api/sessions/{id}/scope/`.
 
 | Method | Path | Params | Response | Errors |
 |---|---|---|---|---|
-| `GET` | `capture.csv` | `?channels=1,2` (comma-separated) | `text/csv` — one `time_s` column plus one `C{n}_V` column per requested channel, aligned to the shortest capture | 400 no/invalid channels |
-| `GET` | `screenshot.png` | — | `image/png` — the instrument's display | — |
-| `GET` | `waveform` | `?channels=1,2&max_points=N` | `{"channels": [{channel, t0, dt, sample_rate, voltage_scale, voltage_offset, points}, ...]}` — `points` decimated to `max_points` (0/omitted = full resolution) | 400 no/invalid channels |
+| `GET` | `capture.csv` | `?channels=1,2` (comma-separated) | `text/csv` — one `time_s` column plus one `C{n}_V` column per requested channel, aligned to the shortest capture | 400 no/invalid channels; 409 if the session is in an error/closed state |
+| `GET` | `screenshot.png` | — | `image/png` — the instrument's display | 409 if the session is in an error/closed state |
+| `GET` | `waveform` | `?channels=1,2&max_points=N` | `{"channels": [{channel, t0, dt, sample_rate, voltage_scale, voltage_offset, points}, ...]}` — `points` decimated to `max_points` (0/omitted = full resolution) | 400 no/invalid channels; 409 if the session is in an error/closed state |
 
 ## Analysis
 
@@ -56,8 +56,8 @@ All paths under `/api/sessions/{id}/scope/`.
 
 | Method | Path | Body | Response | Errors |
 |---|---|---|---|---|
-| `GET` | `math` | — | `[{n, expression, enabled}]` for M1 and M2 | — |
-| `PATCH` | `math/{n}` | `{expression?, enabled?}` (`n` is 1 or 2) | `[{n, expression, enabled}]` (both channels) | 400 unknown `n`, or an empty expression |
+| `GET` | `math` | — | `[{n, expression, enabled}]` for M1 and M2 | 409 if the session is in an error/closed state |
+| `PATCH` | `math/{n}` | `{expression?, enabled?}` (`n` is 1 or 2) | `[{n, expression, enabled}]` (both channels) | 400 unknown `n`, or an empty expression; 409 if the session is in an error/closed state |
 | `GET` | `spectrum` | — | `{enabled, channel, window, db}` | — |
 | `PATCH` | `spectrum` | `{enabled?, channel?, window?, db?}` | Updated `{enabled, channel, window, db}` | 400 unknown window (must be one of `rectangular`/`hanning`/`hamming`/`blackman`/`bartlett`/`flattop`) or out-of-range channel |
 | `GET` | `filters` | — | `[{n, source, kind, cutoff_low, cutoff_high, order, enabled}]` for F1 and F2 | — |
@@ -72,7 +72,7 @@ All paths under `/api/sessions/{id}/scope/`.
 | Method | Path | Body | Response | Errors |
 |---|---|---|---|---|
 | `GET` | `references` | — | List of saved references: `[{name, channel, timestamp, num_samples, time_span}]` | — |
-| `POST` | `references` | `{name, channel}` — snapshots the channel's current waveform | **201** — the full updated reference list (same shape as `GET references`, replace-on-save if `name` already existed) | 400 empty name or out-of-range channel |
+| `POST` | `references` | `{name, channel}` — snapshots the channel's current waveform | **201** — the full updated reference list (same shape as `GET references`, replace-on-save if `name` already existed) | 400 empty name or out-of-range channel; 409 if the session is in an error/closed state |
 | `DELETE` | `references/{name}` | — | **204** No Content | 404 unknown reference name |
 | `GET` | `reference` | — | The active overlay: `{name, channel, t0, dt, points}` (`name`/`channel` are `null` when no reference is active) | — |
 | `PUT` | `reference` | `{name}` or `{name: null}` to clear | The active overlay (as above) | 404 unknown reference name |

@@ -19,7 +19,7 @@ The dialect is detected automatically from the instrument's `*IDN?` response
 when you call `scope.connect()`. Detection first checks the built-in model
 registry (which pins the dialect for every officially supported model); for
 an unrecognized model it falls back to a heuristic — model names ending in
-`HD`, containing `PLUS`, or starting with `SDS5`/`SDS6`/`SDS7` are treated as
+`HD`, containing `PLUS`, or containing `SDS5`/`SDS6`/`SDS7` (or 'HD') are treated as
 modern, everything else as legacy.
 
 Check what was detected after connecting:
@@ -69,9 +69,9 @@ raw commands in whichever dialect the connected scope speaks.
 ## Known dialect gaps
 
 Automated measurements (`PAVA?`) are **legacy-only** today. On a
-modern-dialect scope, `scope.measurement.measure(...)` returns `None`
-instead of raising, and the web gateway's Measure tab shows measurements as
-unavailable rather than trying to display stale or missing values.
+modern-dialect scope, direct `scope.measurement.measure(...)` calls time out
+and raise `SiglentTimeoutError` (from `scpi_control.exceptions`). The web
+gateway catches this internally and shows measurements as unavailable in its UI.
 
 ## Mock sessions
 
