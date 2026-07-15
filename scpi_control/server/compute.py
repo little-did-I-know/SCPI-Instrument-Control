@@ -63,3 +63,47 @@ def spectrum_frame(config: Dict[str, Any], acquired: Dict[str, Any]) -> Optional
         "peaks": peaks,
         "thd": thd,
     }
+
+
+def filtered_waveform(config: Dict[str, Any], acquired: Dict[str, Any]):
+    """Apply the configured Butterworth filter to its source channel's waveform."""
+    data = acquired.get("C{0}".format(config["source"]))
+    if data is None or len(data.voltage) < 2:
+        return None
+    kind = config["kind"]
+    low = config["cutoff_low"]
+    high = config["cutoff_high"]
+    order = config["order"]
+    if kind == "lowpass" and high is not None:
+        return _analyzer.apply_lowpass_filter(data, high, order)
+    if kind == "highpass" and low is not None:
+        return _analyzer.apply_highpass_filter(data, low, order)
+    if kind == "bandpass" and low is not None and high is not None:
+        return _analyzer.apply_bandpass_filter(data, low, high, order)
+    return None
+
+
+def reference_stats(reference: Dict[str, Any], acquired: Dict[str, Any]) -> Dict[str, Any]:
+    """Correlation + max deviation of the live source-channel trace vs the reference.
+
+    Mirrors ReferenceWaveform.calculate_correlation/_difference semantics
+    (interpolate onto the live grid when lengths differ) without instantiating
+    the store. Degrades every failure to nulls — never raises.
+    """
+    stats: Dict[str, Any] = {"type": "reference_stats", "correlation": None, "max_deviation": None}
+    channel = reference.get("channel")
+    data = acquired.get("C{0}".format(channel)) if channel else None
+    if data is None or len(data.voltage) < 2:
+        return stats
+    try:
+        ref_voltage = np.asarray(reference["data"]["voltage"], dtype=float)
+        if len(data.voltage) != len(ref_voltage):
+            ref_time = np.asarray(reference["data"]["time"], dtype=float)
+            ref_voltage = np.interp(data.time, ref_time, ref_voltage)
+        stats["max_deviation"] = float(np.max(np.abs(data.voltage - ref_voltage)))
+        with np.errstate(divide="ignore", invalid="ignore"):
+            correlation = float(np.corrcoef(data.voltage, ref_voltage)[0, 1])
+        stats["correlation"] = correlation if np.isfinite(correlation) else None
+    except Exception:
+        return {"type": "reference_stats", "correlation": None, "max_deviation": None}
+    return stats
