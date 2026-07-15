@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { AnalysisPanel } from "./features/controls/AnalysisPanel";
 import { ChannelsPanel } from "./features/controls/ChannelsPanel";
 import { MathPanel } from "./features/controls/MathPanel";
 import { ScopeToolbar } from "./features/controls/ScopeToolbar";
@@ -17,7 +18,7 @@ import { Tabs } from "./ds/Tabs";
 import { useStream } from "./stream/useStream";
 import { useSession } from "./store/session";
 
-const RAIL_TABS = ["Channels", "Trigger", "Math", "Measure", "Terminal"];
+const RAIL_TABS = ["Channels", "Trigger", "Math", "Analysis", "Reference", "Measure", "Terminal"];
 
 export default function App() {
   const status = useSession((s) => s.status);
@@ -45,6 +46,8 @@ export default function App() {
                 {railTab === "Channels" && <ChannelsPanel />}
                 {railTab === "Trigger" && <TriggerPanel />}
                 {railTab === "Math" && <MathPanel />}
+                {railTab === "Analysis" && <AnalysisPanel />}
+                {railTab === "Reference" && null}
                 {railTab === "Measure" && <MeasurePanel />}
                 {railTab === "Terminal" && <TerminalPanel />}
               </Tabs>
