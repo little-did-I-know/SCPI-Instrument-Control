@@ -153,6 +153,18 @@ nav:
       - Screen Capture: api/screen_capture.md
       - Reference Waveform: api/reference_waveform.md
       - Math Channel: api/math_channel.md
+      - Function Generator: api/function_generator.md
+      - AWG Output: api/awg_output.md
+      - Power Supply: api/power_supply.md
+      - Power Supply Output: api/power_supply_output.md
+      - Data Logger (DAQ): api/data_logger.md
+      - PSU Data Logger: api/psu_data_logger.md
+      - Protocol Decode: api/protocol_decode.md
+      - Web Gateway:
+          - Sessions: api/server_sessions.md
+          - Trend Recorder: api/server_recorder.md
+          - Analysis Compute: api/server_compute.md
+          - Discovery: api/server_discovery.md
       - GUI Components: api/gui.md
   - Examples:
       - Beginner Examples: examples/beginner.md

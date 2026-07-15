@@ -109,6 +109,61 @@ api:
       description: "Math channel operations and expressions"
       priority: 14
 
+    - name: "function_generator"
+      title: "Function Generator"
+      description: "AWG / function generator control (Siglent SDG and generic SCPI-99)"
+      priority: 15
+
+    - name: "awg_output"
+      title: "AWG Output"
+      description: "AWG output channel configuration"
+      priority: 16
+
+    - name: "power_supply"
+      title: "Power Supply"
+      description: "PSU control (Siglent SPD and generic SCPI-99)"
+      priority: 17
+
+    - name: "power_supply_output"
+      title: "Power Supply Output"
+      description: "PSU output channel configuration"
+      priority: 18
+
+    - name: "data_logger"
+      title: "Data Logger (DAQ)"
+      description: "Data acquisition / switch unit control (Keysight 34970A/DAQ970A style)"
+      priority: 19
+
+    - name: "psu_data_logger"
+      title: "PSU Data Logger"
+      description: "Timed logging of power supply readings"
+      priority: 20
+
+    - name: "protocol_decode"
+      title: "Protocol Decode"
+      description: "Serial protocol decoding (I2C, SPI, UART)"
+      priority: 21
+
+    - name: "server.sessions"
+      title: "Gateway Sessions"
+      description: "Web gateway instrument sessions and streaming poll loop"
+      priority: 22
+
+    - name: "server.recorder"
+      title: "Gateway Trend Recorder"
+      description: "In-memory measurement trend recording"
+      priority: 23
+
+    - name: "server.compute"
+      title: "Gateway Analysis Compute"
+      description: "Poll-loop FFT, filter, and reference-stat computations"
+      priority: 24
+
+    - name: "server.discovery"
+      title: "Gateway Discovery"
+      description: "LAN instrument discovery"
+      priority: 25
+
   # Modules/patterns to exclude
   exclude_modules:
     - "_*"
