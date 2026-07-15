@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import type { StreamMessage } from "../api/types";
+import { appendTrend, clearTrend, seedTrend } from "../features/trend/trend";
 import { clearFrames, setFrame } from "../features/waveform/frames";
 import { clearSpectrum, setSpectrum } from "../features/waveform/spectrum";
 import { useSession } from "../store/session";
@@ -19,8 +20,15 @@ export function useStream(sessionId: string | null): void {
       const store = useSession.getState();
       if (message.type === "state") store.applyState(message.state);
       else if (message.type === "waveform") setFrame(message.channel, { t0: message.t0, dt: message.dt, points: message.points });
-      else if (message.type === "measurements") store.applyMeasurements(message.values);
+      else if (message.type === "measurements") {
+        store.applyMeasurements(message.values);
+        if (message.timestamp != null && store.logStatus?.state === "recording") appendTrend(message.timestamp, message.values);
+      }
       else if (message.type === "measurements_config") store.applyMeasurementConfig(message.items);
+      else if (message.type === "log_status") {
+        store.applyLogStatus({ state: message.state, started_at: message.started_at, row_count: message.row_count, columns: message.columns });
+        if (message.state === "recording" && message.row_count === 0) seedTrend({ columns: message.columns, rows: [] }); // fresh recording: reset the client buffer
+      }
       else if (message.type === "spectrum") setSpectrum(message.points.length ? message : null);
       else if (message.type === "reference") {
         setFrame("REF", { t0: message.t0, dt: message.dt, points: message.points });
@@ -31,6 +39,7 @@ export function useStream(sessionId: string | null): void {
         ended = true;
         clearFrames();
         clearSpectrum();
+        clearTrend();
         store.clearSession();
       }
     };
@@ -39,6 +48,7 @@ export function useStream(sessionId: string | null): void {
       if (ended || event.code === CLOSE_SESSION_ENDED) {
         clearFrames();
         clearSpectrum();
+        clearTrend();
         useSession.getState().clearSession();
         return;
       }
@@ -54,6 +64,7 @@ export function useStream(sessionId: string | null): void {
       socket.close();
       clearFrames();
       clearSpectrum();
+      clearTrend();
     };
   }, [sessionId]);
 }

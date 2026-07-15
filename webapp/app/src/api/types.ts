@@ -64,16 +64,21 @@ export type ReferenceOverlay = { name: string | null; channel: number | null; t0
 export type ReferenceStats = { correlation: number | null; max_deviation: number | null };
 export type SpectrumFrame = { channel: number; f0: number; df: number; points: number[]; db: boolean; window: string; peaks: [number, number][]; thd: number | null };
 
+export type LogStatus = { state: "idle" | "recording"; started_at: number | null; row_count: number; columns: { channel: number; mtype: string }[] };
+export type LogInfo = LogStatus & { max_rows: number };
+export type LogData = { columns: { channel: number; mtype: string }[]; rows: (number | null)[][] };
+
 export type StreamMessage =
   | { type: "state"; state: ScopeState }
   | { type: "waveform"; channel: number | string; t0: number; dt: number; points: number[] }
-  | { type: "measurements"; values: MeasurementValue[] }
+  | { type: "measurements"; values: MeasurementValue[]; timestamp?: number }
   | { type: "measurements_config"; items: { channel: number; mtype: string }[] }
   | ({ type: "spectrum" } & SpectrumFrame)
   | ({ type: "reference" } & ReferenceOverlay)
   | ({ type: "reference_stats" } & ReferenceStats)
   | { type: "error"; detail: string }
-  | { type: "closed" };
+  | { type: "closed" }
+  | ({ type: "log_status" } & LogStatus);
 
 export type SessionCreate = { label?: string; address?: string; port?: number; mock?: boolean; model?: string };
 export type ChannelPatch = Partial<{ enabled: boolean; voltage_scale: number; voltage_offset: number; coupling: string; probe_ratio: number }>;
