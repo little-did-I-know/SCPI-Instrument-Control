@@ -23,6 +23,7 @@ export function MeasurePanel() {
   // (seeded via GET on mount, kept current via the measurements_config broadcast).
   const measurements = useSession((s) => s.measurements);
   const measurementConfig = useSession((s) => s.measurementConfig);
+  const recording = useSession((s) => s.logStatus?.state === "recording");
   const [error, setError] = useState<string | null>(null);
   // No local mirror of the acknowledged selection — the STORE's measurementConfig is the single
   // acknowledged-truth source. The mount GET, each PUT response, and every measurements_config
@@ -73,6 +74,7 @@ export function MeasurePanel() {
 
   async function toggle(channel: number, mtype: string) {
     if (!session) return;
+    if (recording) return;
     const next = isChecked(channel, mtype)
       ? selected.filter((s) => !(s.channel === channel && s.mtype === mtype))
       : [...selected, { channel, mtype }];
@@ -117,6 +119,7 @@ export function MeasurePanel() {
                     aria-label={`${mtype} C${n}`}
                     label={mtype}
                     checked={isChecked(n, mtype)}
+                    disabled={recording}
                     onChange={() => toggle(n, mtype)}
                   />
                 ))}
@@ -124,6 +127,11 @@ export function MeasurePanel() {
             </div>
           ))}
         </div>
+        {recording && (
+          <div style={{ color: "var(--lc-muted)", fontSize: "var(--text-sm)", marginTop: "6px" }}>
+            Selection locked while recording.
+          </div>
+        )}
       </GroupBox>
 
       {selected.length === 0 && (
