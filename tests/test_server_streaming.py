@@ -296,3 +296,28 @@ def test_poll_publishes_reference_stats_for_active_reference():
         assert msgs[0]["max_deviation"] is not None
     finally:
         session.close()
+
+
+def test_poll_survives_unexpected_analysis_exception(monkeypatch):
+    # An unexpected (non-Siglent) error in analysis compute must never kill
+    # the worker: the tick degrades that trace and keeps publishing channels.
+    from scpi_control.server import compute
+
+    def boom(config, acquired):
+        raise RuntimeError("unexpected numpy edge case")
+
+    monkeypatch.setattr(compute, "filtered_waveform", boom)
+    monkeypatch.setattr(compute, "spectrum_frame", boom)
+    session = make_session()
+    try:
+        session.filters = {**session.filters, 1: {**session.filters[1], "enabled": True, "cutoff_high": 100.0}}
+        session.spectrum_config = {**session.spectrum_config, "enabled": True}
+        # n=8: this mock's default enables all 4 channels, so one healthy tick
+        # already yields 4 "waveform" messages; require two full ticks' worth
+        # so the assertion actually distinguishes "died after tick 1" from
+        # "kept polling."
+        frames = collect(session, "waveform", n=8, timeout=8.0)
+        channel_frames = [f for f in frames if f["channel"] == 1]
+        assert len(channel_frames) >= 2, "worker must keep polling after an analysis exception"
+    finally:
+        session.close()

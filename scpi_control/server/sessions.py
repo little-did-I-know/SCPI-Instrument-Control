@@ -29,6 +29,18 @@ def _safe(fn, default=None):
         return default
 
 
+def _quiet(fn, default=None):
+    """Like _safe, but for analysis compute: ANY exception degrades to default.
+
+    The poll tick is the session heartbeat; a numpy edge case in analysis
+    must never kill the worker thread.
+    """
+    try:
+        return fn()
+    except Exception:
+        return default
+
+
 def read_state(scope: Oscilloscope) -> Dict[str, Any]:
     channels: Dict[int, Dict[str, Any]] = {}
     for n in scope.supported_channels:
@@ -289,14 +301,14 @@ class InstrumentSession:
             for n in sorted(self.filters):
                 config = self.filters[n]
                 label = "F{0}".format(n)
-                result = compute.filtered_waveform(config, acquired) if config["enabled"] else None
+                result = _quiet(lambda: compute.filtered_waveform(config, acquired)) if config["enabled"] else None
                 if result is not None:
                     self.publish(_decimate_frame(label, result.time, result.voltage))
                     shown_now.add(label)
                 elif label in self._shown:
                     self.publish(_decimate_frame(label, [], []))
             spectrum_config = self.spectrum_config  # snapshot: request threads swap the dict atomically
-            frame = compute.spectrum_frame(spectrum_config, acquired) if spectrum_config["enabled"] else None
+            frame = _quiet(lambda: compute.spectrum_frame(spectrum_config, acquired)) if spectrum_config["enabled"] else None
             if frame is not None:
                 self.publish(frame)
                 shown_now.add("SPEC")
