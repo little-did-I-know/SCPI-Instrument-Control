@@ -15,6 +15,7 @@ beforeEach(() => {
   useSession.getState().clearSession();
   useSession.getState().setSession({ id: "abc", label: "x", mock: true, address: null, state: "connected", idn: "", model: "", dialect: "legacy", num_channels: 4, viewers: 0 });
   vi.spyOn(api, "getLog").mockResolvedValue(IDLE);
+  vi.spyOn(api, "getLogData").mockResolvedValue({ columns: [], rows: [] });
 });
 afterEach(() => vi.restoreAllMocks());
 
@@ -52,5 +53,12 @@ describe("LogPanel", () => {
     render(<LogPanel />);
     await userEvent.click(await screen.findByRole("button", { name: "Start recording" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("no measurements selected");
+  });
+
+  it("backfills the trend buffer on mount so the row counter is live", async () => {
+    vi.spyOn(api, "getLog").mockResolvedValue({ state: "idle", started_at: 100, row_count: 2, columns: [{ channel: 1, mtype: "PKPK" }], max_rows: 86400 });
+    vi.spyOn(api, "getLogData").mockResolvedValue({ columns: [{ channel: 1, mtype: "PKPK" }], rows: [[100, 1.5], [101, 2.5]] });
+    render(<LogPanel />);
+    expect(await screen.findByText(/2 rows/)).toBeInTheDocument();
   });
 });

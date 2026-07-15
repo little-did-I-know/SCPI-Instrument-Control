@@ -65,7 +65,16 @@ export function TrendCanvas() {
   // the live appends only cover samples that arrived while this tab was open.
   useEffect(() => {
     if (!session) return;
-    api.getLogData(session.id).then(seedTrend).catch(() => {});
+    let stale = false;
+    api
+      .getLogData(session.id)
+      .then((data) => {
+        if (!stale) seedTrend(data);
+      })
+      .catch(() => {});
+    return () => {
+      stale = true;
+    };
   }, [session?.id, startedAt]);
 
   useEffect(() => {

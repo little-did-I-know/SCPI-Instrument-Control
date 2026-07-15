@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { ApiError, api } from "../../api/client";
-import { getTrend, subscribeTrend } from "./trend";
+import { getTrend, seedTrend, subscribeTrend } from "./trend";
 import { Button } from "../../ds/Button";
 import { GroupBox } from "../../ds/GroupBox";
 import { useSession } from "../../store/session";
@@ -28,6 +28,15 @@ export function LogPanel() {
       .then((info) => {
         if (stale || useSession.getState().logStatus !== before) return;
         useSession.getState().applyLogStatus({ state: info.state, started_at: info.started_at, row_count: info.row_count, columns: info.columns });
+      })
+      .catch(() => {});
+    // Backfill the shared trend buffer too: a tab that missed the start
+    // broadcast (opened mid-recording, or refreshed) otherwise shows 0 rows
+    // and skips live appends until the user enters Trend view.
+    api
+      .getLogData(session.id)
+      .then((data) => {
+        if (!stale) seedTrend(data);
       })
       .catch(() => {});
     return () => {
