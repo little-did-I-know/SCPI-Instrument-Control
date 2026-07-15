@@ -1,6 +1,7 @@
 # scpi_control/server/api/scope.py
 import asyncio
 from dataclasses import replace
+from datetime import datetime
 from typing import Any, Callable, List
 
 from fastapi import APIRouter, HTTPException, Request
@@ -25,7 +26,7 @@ from scpi_control.server.schemas import (
     TimebasePatch,
     TriggerPatch,
 )
-from scpi_control.server.sessions import InstrumentSession, read_state
+from scpi_control.server.sessions import InstrumentSession, SessionError, read_state
 
 router = APIRouter(tags=["scope"])
 
@@ -122,6 +123,8 @@ async def send_command(session_id: str, body: CommandIn, request: Request):
 @router.put("/sessions/{session_id}/scope/measurements")
 async def put_measurements(session_id: str, body: List[MeasurementItem], request: Request):
     session = require_session(request, session_id)
+    if session.recorder.state == "recording":
+        raise SessionError("measurement selection is locked while recording")
     for item in body:
         if item.mtype.upper() not in ALLOWED_MEASUREMENTS:
             raise InvalidParameterError("unknown measurement type: {0}".format(item.mtype))
@@ -396,6 +399,53 @@ async def put_reference(session_id: str, body: ReferencePut, request: Request):
     metadata = loaded.get("metadata", {})
     session.set_active_reference(metadata.get("name", body.name), _ref_channel(metadata.get("channel")), loaded)
     return session.reference_overlay()
+
+
+@router.post("/sessions/{session_id}/scope/log/start")
+async def log_start(session_id: str, request: Request):
+    session = require_session(request, session_id)
+    return session.start_recording()
+
+
+@router.post("/sessions/{session_id}/scope/log/stop")
+async def log_stop(session_id: str, request: Request):
+    session = require_session(request, session_id)
+    return session.stop_recording()
+
+
+@router.get("/sessions/{session_id}/scope/log")
+async def log_status(session_id: str, request: Request):
+    session = require_session(request, session_id)
+    return session.recorder.status()
+
+
+@router.get("/sessions/{session_id}/scope/log/data")
+async def log_data(session_id: str, request: Request, since: float = 0.0):
+    session = require_session(request, session_id)
+    status = session.recorder.status()
+    return {"columns": status["columns"], "rows": session.recorder.rows_since(since)}
+
+
+def _build_log_csv(status, rows) -> str:
+    header = "timestamp,elapsed_s," + ",".join("C{0} {1}".format(c["channel"], c["mtype"]) for c in status["columns"])
+    started = status["started_at"] or 0.0
+    lines = [header]
+    for row in rows:
+        ts = row[0]
+        cells = ["" if v is None else "{0:.9g}".format(float(v)) for v in row[1:]]
+        lines.append("{0},{1:.3f},{2}".format(datetime.fromtimestamp(ts).isoformat(), ts - started, ",".join(cells)))
+    return "\n".join(lines) + "\n"
+
+
+@router.get("/sessions/{session_id}/scope/log.csv")
+async def log_csv(session_id: str, request: Request):
+    session = require_session(request, session_id)
+    status = session.recorder.status()
+    if status["started_at"] is None:
+        raise HTTPException(status_code=404, detail="no recording exists")
+    csv_text = _build_log_csv(status, session.recorder.rows_since())
+    filename = "log_{0}.csv".format(session.id)
+    return PlainTextResponse(csv_text, media_type="text/csv", headers={"Content-Disposition": 'attachment; filename="{0}"'.format(filename)})
 
 
 # NOTE: run_op's {op} path is a catch-all for POST /scope/*; any new specific

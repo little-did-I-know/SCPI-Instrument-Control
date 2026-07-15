@@ -10,6 +10,8 @@ import { ReadoutStrip } from "./features/readout/ReadoutStrip";
 import { ReferencePanel } from "./features/reference/ReferencePanel";
 import { useReferenceSeed } from "./features/reference/useReferenceSeed";
 import { TerminalPanel } from "./features/terminal/TerminalPanel";
+import { LogPanel } from "./features/trend/LogPanel";
+import { TrendCanvas } from "./features/trend/TrendCanvas";
 import { SpectrumCanvas } from "./features/waveform/SpectrumCanvas";
 import { WaveformCanvas } from "./features/waveform/WaveformCanvas";
 import type { ViewMode } from "./features/waveform/ViewModeToggle";
@@ -19,7 +21,7 @@ import { Tabs } from "./ds/Tabs";
 import { useStream } from "./stream/useStream";
 import { useSession } from "./store/session";
 
-const RAIL_TABS = ["Channels", "Trigger", "Math", "Analysis", "Reference", "Measure", "Terminal"];
+const RAIL_TABS = ["Channels", "Trigger", "Math", "Analysis", "Reference", "Log", "Measure", "Terminal"];
 
 export default function App() {
   const status = useSession((s) => s.status);
@@ -49,12 +51,13 @@ export default function App() {
                 {railTab === "Math" && <MathPanel />}
                 {railTab === "Analysis" && <AnalysisPanel />}
                 {railTab === "Reference" && <ReferencePanel />}
+                {railTab === "Log" && <LogPanel />}
                 {railTab === "Measure" && <MeasurePanel />}
                 {railTab === "Terminal" && <TerminalPanel />}
               </Tabs>
             </div>
             <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "var(--space-3)", minWidth: 0 }}>
-              {viewMode === "Time" ? <WaveformCanvas /> : <SpectrumCanvas />}
+              {viewMode === "Time" ? <WaveformCanvas /> : viewMode === "Spectrum" ? <SpectrumCanvas /> : <TrendCanvas />}
               <ScopeToolbar viewToggle={<ViewModeToggle value={viewMode} onChange={setViewMode} />} />
             </div>
           </div>

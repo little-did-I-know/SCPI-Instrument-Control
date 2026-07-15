@@ -1,4 +1,4 @@
-const MODES = ["Time", "Spectrum"] as const;
+const MODES = ["Time", "Spectrum", "Trend"] as const;
 export type ViewMode = (typeof MODES)[number];
 
 export function ViewModeToggle({ value, onChange }: { value: ViewMode; onChange: (mode: ViewMode) => void }) {

@@ -7,7 +7,8 @@ import pytest
 
 from scpi_control import Oscilloscope
 from scpi_control.connection.mock import MockConnection
-from scpi_control.server.sessions import MAX_FRAME_POINTS, InstrumentSession, _waveform_frame, read_state
+from scpi_control.exceptions import InvalidParameterError
+from scpi_control.server.sessions import MAX_FRAME_POINTS, InstrumentSession, SessionError, _waveform_frame, read_state
 from scpi_control.waveform import WaveformData
 
 LEGACY_IDN = "Siglent Technologies,SDS1104X-E,MOCK0001,1.0.0.0"
@@ -319,5 +320,80 @@ def test_poll_survives_unexpected_analysis_exception(monkeypatch):
         frames = collect(session, "waveform", n=8, timeout=8.0)
         channel_frames = [f for f in frames if f["channel"] == 1]
         assert len(channel_frames) >= 2, "worker must keep polling after an analysis exception"
+    finally:
+        session.close()
+
+
+def test_measurements_message_carries_timestamp():
+    session = make_session()
+    try:
+        session.set_measurements([(1, "PKPK")])
+        before = time.time()
+        msgs = collect(session, "measurements", n=1, timeout=8.0)
+        assert msgs, "expected a measurements message"
+        assert isinstance(msgs[0]["timestamp"], float)
+        assert before - 1.0 <= msgs[0]["timestamp"] <= time.time() + 1.0
+    finally:
+        session.close()
+
+
+def test_recorder_accumulates_rows_while_recording():
+    session = make_session()
+    try:
+        session.set_measurements([(1, "PKPK")])
+        session.start_recording()
+        msgs = collect(session, "measurements", n=2, timeout=12.0)
+        assert msgs
+        status = session.recorder.status()
+        assert status["row_count"] >= 1
+        rows = session.recorder.rows_since()
+        assert len(rows[0]) == 2  # [timestamp, one column value]
+        assert rows[0][0] == msgs[0]["timestamp"]  # same clock stamp feeds both
+    finally:
+        session.close()
+
+
+def test_recorder_ignores_measurements_when_idle():
+    session = make_session()
+    try:
+        session.set_measurements([(1, "PKPK")])
+        assert collect(session, "measurements", n=1, timeout=8.0)
+        assert session.recorder.status()["row_count"] == 0
+    finally:
+        session.close()
+
+
+def test_start_and_stop_recording_broadcast_log_status():
+    session = make_session()
+    try:
+        got = []
+        unsubscribe = session.subscribe(lambda m: got.append(m) if m["type"] == "log_status" else None)
+        session.set_measurements([(1, "PKPK")])
+        session.start_recording()
+        session.stop_recording()
+        unsubscribe()
+        assert [m["state"] for m in got] == ["recording", "idle"]
+        assert got[0]["started_at"] is not None and got[0]["row_count"] == 0
+        assert got[0]["columns"] == [{"channel": 1, "mtype": "PKPK"}]
+    finally:
+        session.close()
+
+
+def test_start_recording_requires_a_selection():
+    session = make_session()
+    try:
+        with pytest.raises(InvalidParameterError):
+            session.start_recording()
+    finally:
+        session.close()
+
+
+def test_double_start_recording_raises_session_error():
+    session = make_session()
+    try:
+        session.set_measurements([(1, "PKPK")])
+        session.start_recording()
+        with pytest.raises(SessionError):
+            session.start_recording()
     finally:
         session.close()

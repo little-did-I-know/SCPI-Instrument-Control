@@ -519,3 +519,79 @@ class TestReferences:
     def test_bad_channel_is_400(self, ref_client):
         sid = create_mock_session(ref_client)["id"]
         assert ref_client.post("/api/sessions/{0}/scope/references".format(sid), json={"name": "x", "channel": 9}).status_code == 400
+
+
+@pytest.fixture()
+def managed_client():
+    manager = SessionManager()
+    app = create_app(manager)
+    with TestClient(app) as test_client:
+        yield test_client, manager
+    manager.close_all()
+
+
+class TestTrendLog:
+    def test_start_requires_a_selection(self, client):
+        sid = create_mock_session(client)["id"]
+        assert client.post("/api/sessions/{0}/scope/log/start".format(sid)).status_code == 400
+
+    def test_start_returns_status_and_double_start_conflicts(self, client):
+        sid = create_mock_session(client)["id"]
+        client.put("/api/sessions/{0}/scope/measurements".format(sid), json=[{"channel": 1, "mtype": "PKPK"}])
+        response = client.post("/api/sessions/{0}/scope/log/start".format(sid))
+        assert response.status_code == 200
+        body = response.json()
+        assert body["state"] == "recording"
+        assert body["columns"] == [{"channel": 1, "mtype": "PKPK"}]
+        assert body["row_count"] == 0 and body["max_rows"] == 86400
+        assert client.post("/api/sessions/{0}/scope/log/start".format(sid)).status_code == 409
+
+    def test_measurement_selection_is_locked_while_recording(self, client):
+        sid = create_mock_session(client)["id"]
+        client.put("/api/sessions/{0}/scope/measurements".format(sid), json=[{"channel": 1, "mtype": "PKPK"}])
+        client.post("/api/sessions/{0}/scope/log/start".format(sid))
+        assert client.put("/api/sessions/{0}/scope/measurements".format(sid), json=[]).status_code == 409
+        client.post("/api/sessions/{0}/scope/log/stop".format(sid))
+        assert client.put("/api/sessions/{0}/scope/measurements".format(sid), json=[]).status_code == 200
+
+    def test_stop_is_idempotent(self, client):
+        sid = create_mock_session(client)["id"]
+        response = client.post("/api/sessions/{0}/scope/log/stop".format(sid))
+        assert response.status_code == 200
+        assert response.json()["state"] == "idle"
+
+    def test_log_status_defaults(self, client):
+        sid = create_mock_session(client)["id"]
+        body = client.get("/api/sessions/{0}/scope/log".format(sid)).json()
+        assert body == {"state": "idle", "started_at": None, "columns": [], "row_count": 0, "max_rows": 86400}
+
+    def test_log_data_and_csv_from_recorded_rows(self, managed_client):
+        client, manager = managed_client
+        sid = create_mock_session(client)["id"]
+        client.put("/api/sessions/{0}/scope/measurements".format(sid), json=[{"channel": 1, "mtype": "PKPK"}, {"channel": 2, "mtype": "FREQ"}])
+        client.post("/api/sessions/{0}/scope/log/start".format(sid))
+        session = manager.get(sid)
+        started = session.recorder.started_at
+        session.recorder.append(started + 1.0, [1.5, None])
+        session.recorder.append(started + 2.0, [1.25, 50.0])
+
+        data = client.get("/api/sessions/{0}/scope/log/data".format(sid)).json()
+        assert data["columns"] == [{"channel": 1, "mtype": "PKPK"}, {"channel": 2, "mtype": "FREQ"}]
+        assert len(data["rows"]) == 2
+        assert data["rows"][0][1] == 1.5 and data["rows"][0][2] is None
+
+        partial = client.get("/api/sessions/{0}/scope/log/data?since={1}".format(sid, started + 1.0)).json()
+        assert len(partial["rows"]) == 1 and partial["rows"][0][2] == 50.0
+
+        response = client.get("/api/sessions/{0}/scope/log.csv".format(sid))
+        assert response.status_code == 200
+        assert response.headers["content-type"].startswith("text/csv")
+        assert "attachment" in response.headers.get("content-disposition", "")
+        lines = response.text.strip().split("\n")
+        assert lines[0] == "timestamp,elapsed_s,C1 PKPK,C2 FREQ"
+        first = lines[1].split(",")
+        assert first[1] == "1.000" and first[2] == "1.5" and first[3] == ""
+
+    def test_csv_before_any_recording_is_404(self, client):
+        sid = create_mock_session(client)["id"]
+        assert client.get("/api/sessions/{0}/scope/log.csv".format(sid)).status_code == 404

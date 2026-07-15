@@ -4,6 +4,7 @@ import { useStream } from "./useStream";
 import { useSession } from "../store/session";
 import { getFrame, clearFrames } from "../features/waveform/frames";
 import { getSpectrum, clearSpectrum } from "../features/waveform/spectrum";
+import { clearTrend, getTrend, seedTrend } from "../features/trend/trend";
 
 class FakeWebSocket {
   static last: FakeWebSocket | null = null;
@@ -40,6 +41,7 @@ beforeEach(() => {
   useSession.getState().clearSession();
   clearFrames();
   clearSpectrum();
+  clearTrend();
 });
 
 const STATE = { run_state: "STOP", timebase: 0.001, channels: { "1": { enabled: true, voltage_scale: 0.5, voltage_offset: 0, coupling: "DC", probe_ratio: 10 } }, trigger: { mode: "AUTO", source: "C1", level: 0, slope: "POS", coupling: "DC" } };
@@ -178,5 +180,30 @@ describe("useStream", () => {
     renderHook(() => useStream("abc"));
     FakeWebSocket.last!.emit({ type: "reference_stats", correlation: 0.9, max_deviation: 0.1 });
     await waitFor(() => expect(useSession.getState().referenceStats).toEqual({ correlation: 0.9, max_deviation: 0.1 }));
+  });
+
+  it("applies a log_status message to the store and seeds a fresh trend buffer", async () => {
+    renderHook(() => useStream("abc"));
+    seedTrend({ columns: [{ channel: 3, mtype: "MAX" }], rows: [[1, 9]] }); // stale previous recording
+    FakeWebSocket.last!.emit({ type: "log_status", state: "recording", started_at: 100, row_count: 0, columns: [{ channel: 1, mtype: "PKPK" }] });
+    await waitFor(() => expect(useSession.getState().logStatus?.state).toBe("recording"));
+    expect(getTrend().columns).toEqual([{ channel: 1, mtype: "PKPK" }]);
+    expect(getTrend().rows).toEqual([]); // fresh start replaced the stale buffer
+  });
+
+  it("appends timestamped measurements to the trend buffer while recording", async () => {
+    renderHook(() => useStream("abc"));
+    FakeWebSocket.last!.emit({ type: "log_status", state: "recording", started_at: 100, row_count: 0, columns: [{ channel: 1, mtype: "PKPK" }] });
+    FakeWebSocket.last!.emit({ type: "measurements", values: [{ channel: 1, mtype: "PKPK", value: 2 }], timestamp: 101 });
+    await waitFor(() => expect(getTrend().rows).toEqual([[101, 2]]));
+    expect(useSession.getState().measurements[0].value).toBe(2); // display path unaffected
+  });
+
+  it("does not append measurements while idle", async () => {
+    renderHook(() => useStream("abc"));
+    seedTrend({ columns: [{ channel: 1, mtype: "PKPK" }], rows: [] });
+    FakeWebSocket.last!.emit({ type: "measurements", values: [{ channel: 1, mtype: "PKPK", value: 2 }], timestamp: 101 });
+    await waitFor(() => expect(useSession.getState().measurements.length).toBe(1));
+    expect(getTrend().rows).toEqual([]);
   });
 });

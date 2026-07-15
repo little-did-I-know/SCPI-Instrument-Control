@@ -1,4 +1,4 @@
-import type { ChannelPatch, DiscoveredDevice, FilterConfig, MeasurementValue, ModelInfo, ReferenceInfo, ReferenceOverlay, RunOp, ScopeState, SessionCreate, SessionInfo, SpectrumConfig, TriggerPatch } from "./types";
+import type { ChannelPatch, DiscoveredDevice, FilterConfig, LogData, LogInfo, MeasurementValue, ModelInfo, ReferenceInfo, ReferenceOverlay, RunOp, ScopeState, SessionCreate, SessionInfo, SpectrumConfig, TriggerPatch } from "./types";
 
 export class ApiError extends Error {
   status: number;
@@ -67,6 +67,11 @@ export const api = {
   captureUrl: (id: string, channels: number[]) => `${scope(id)}/capture.csv?channels=${channels.join(",")}`,
   screenshotUrl: (id: string) => `${scope(id)}/screenshot.png`,
   waveformJsonUrl: (id: string, channels: number[]) => `${scope(id)}/waveform?channels=${channels.join(",")}`,
+  logStart: (id: string) => request<LogInfo>(`${scope(id)}/log/start`, { method: "POST" }),
+  logStop: (id: string) => request<LogInfo>(`${scope(id)}/log/stop`, { method: "POST" }),
+  getLog: (id: string) => request<LogInfo>(`${scope(id)}/log`),
+  getLogData: (id: string, since = 0) => request<LogData>(`${scope(id)}/log/data?since=${since}`),
+  logCsvUrl: (id: string) => `${scope(id)}/log.csv`,
 };
 
 export type { MeasurementValue };

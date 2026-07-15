@@ -190,4 +190,13 @@ describe("MeasurePanel", () => {
     await userEvent.click(await screen.findByLabelText("FREQ C1"));
     await waitFor(() => expect(setMeasurements).toHaveBeenLastCalledWith("abc", []));
   });
+
+  it("locks the selection checkboxes while recording", async () => {
+    const setMeasurements = vi.spyOn(api, "setMeasurements").mockResolvedValue({ measurements: [] });
+    render(<MeasurePanel />);
+    act(() => useSession.getState().applyLogStatus({ state: "recording", started_at: 100, row_count: 0, columns: [{ channel: 1, mtype: "PKPK" }] }));
+    expect(await screen.findByText(/selection locked while recording/i)).toBeInTheDocument();
+    await userEvent.click(screen.getByLabelText("PKPK C1"));
+    expect(setMeasurements).not.toHaveBeenCalled();
+  });
 });
