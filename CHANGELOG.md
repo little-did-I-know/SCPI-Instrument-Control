@@ -51,7 +51,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `wait_for_trigger` honors a user-configured NORMAL trigger mode instead of
   forcing SINGLE
 - Black formatting standardized on the 26.x stable style; dev extra now
-  requires `black>=26.5,<27`
+  requires `black>=26.5,<27` (installed on Python >= 3.10, where Black 26 is available)
 - Removed the unused `uplot` frontend dependency (the UI draws on a
   hand-rolled canvas)
 
