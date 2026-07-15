@@ -7,6 +7,7 @@ import { TriggerPanel } from "./features/controls/TriggerPanel";
 import { HomeScreen } from "./features/home/HomeScreen";
 import { MeasurePanel } from "./features/measure/MeasurePanel";
 import { ReadoutStrip } from "./features/readout/ReadoutStrip";
+import { ReferencePanel } from "./features/reference/ReferencePanel";
 import { useReferenceSeed } from "./features/reference/useReferenceSeed";
 import { TerminalPanel } from "./features/terminal/TerminalPanel";
 import { SpectrumCanvas } from "./features/waveform/SpectrumCanvas";
@@ -47,7 +48,7 @@ export default function App() {
                 {railTab === "Trigger" && <TriggerPanel />}
                 {railTab === "Math" && <MathPanel />}
                 {railTab === "Analysis" && <AnalysisPanel />}
-                {railTab === "Reference" && null}
+                {railTab === "Reference" && <ReferencePanel />}
                 {railTab === "Measure" && <MeasurePanel />}
                 {railTab === "Terminal" && <TerminalPanel />}
               </Tabs>
