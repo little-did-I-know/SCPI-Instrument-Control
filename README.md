@@ -327,7 +327,7 @@ main()
 
 ### Core Library
 
-- Python 3.8+
+- Python 3.9+
 - NumPy >= 1.24.0
 - Matplotlib >= 3.7.0
 - SciPy >= 1.10.0
@@ -591,7 +591,7 @@ See `examples/vector_graphics_xy_mode.py` for programmatic usage and animation e
 Control instruments from any browser on your LAN:
 
 ```bash
-pip install scpi-instrument-control[web]   # Python 3.9+
+pip install scpi-instrument-control[web]   # includes the browser gateway
 scpi-web --host 0.0.0.0 --port 8765
 ```
 
