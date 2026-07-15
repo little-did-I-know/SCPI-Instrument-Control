@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ApiError, api } from "../../api/client";
 import type { ChannelState } from "../../api/types";
 import { Checkbox } from "../../ds/Checkbox";
@@ -19,23 +19,49 @@ export function MeasurePanel() {
   const channels = useSession((s) => s.scope?.channels ?? NO_CHANNELS);
   // s.measurements is already a stable array reference in the store — select it
   // directly (no `?? []` fallback, which would fabricate a new array every render).
+  // It now carries only VALUES for display; the SELECTION lives in s.measurementConfig
+  // (seeded via GET on mount, kept current via the measurements_config broadcast).
   const measurements = useSession((s) => s.measurements);
+  const measurementConfig = useSession((s) => s.measurementConfig);
   const [error, setError] = useState<string | null>(null);
-  // No local mirror of the selection — the server owns it. But the stream alone cannot carry it:
-  // the backend only broadcasts measurements while its list is NON-empty
-  // (sessions.py: `if self.measurements and self._poll_count % N == 0`), so once you deselect the
-  // last one the store keeps the final streamed values forever. Falling back to the store there
+  // No local mirror of the selection — the server owns it. The backend only broadcasts
+  // measurement VALUES while the list is NON-empty (sessions.py: `if self.measurements and
+  // self._poll_count % N == 0`), so the config broadcast (and the mount GET) are the only
+  // durable sources for an empty selection — falling back to stale streamed values there
   // would re-check the box and resurrect the measurement on the next full-replacement PUT.
   //
   // The PUT response IS server truth (scope.py echoes the stored list), so we settle to it.
-  // Precedence: in-flight optimistic > last acknowledged > streamed values.
+  // Precedence: in-flight optimistic > last acknowledged (PUT/GET) > synced config broadcast.
   const [pending, setPending] = useState<Selection[] | null>(null);
   const [acked, setAcked] = useState<Selection[] | null>(null);
   // Monotonic request id: a slow PUT must never settle the selection after a newer toggle
   // superseded it, or both boxes flap to unchecked and the next click drops them server-side.
   const requestId = useRef(0);
 
-  const selected: Selection[] = pending ?? acked ?? measurements.map((m) => ({ channel: m.channel, mtype: m.mtype }));
+  // Seed the selection from the server on mount — the store's measurementConfig may still be
+  // stale/empty at first render (it only updates via broadcast), so we GET it directly once per
+  // session. This GET is slow relative to everything else that can happen after mount (a user
+  // toggle settling its own acked, or a real measurements_config broadcast arriving) — applying
+  // it unconditionally on resolve would let a stale response clobber fresher local truth. So we
+  // snapshot "nothing has happened yet" at the moment the request goes out and only apply the
+  // result if that's still true when it comes back; otherwise the newer source already won.
+  useEffect(() => {
+    if (!session) return;
+    let cancelled = false;
+    const requestIdAtStart = requestId.current;
+    const configAtStart = useSession.getState().measurementConfig;
+    api.getMeasurements(session.id).then((result) => {
+      const noToggleSince = requestId.current === requestIdAtStart;
+      const noBroadcastSince = useSession.getState().measurementConfig === configAtStart;
+      if (!cancelled && noToggleSince && noBroadcastSince) setAcked(result.measurements);
+    }).catch(() => {
+      // no server truth available yet (e.g. modern-dialect scope) — fall through to the
+      // measurementConfig broadcast / default-empty precedence below.
+    });
+    return () => { cancelled = true; };
+  }, [session?.id]);
+
+  const selected: Selection[] = pending ?? acked ?? measurementConfig;
   const isChecked = (channel: number, mtype: string) =>
     selected.some((s) => s.channel === channel && s.mtype === mtype);
 
