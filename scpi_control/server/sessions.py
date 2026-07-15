@@ -103,6 +103,7 @@ class InstrumentSession:
         self._subscribers_lock = threading.Lock()
         self.measurements: List[Tuple[int, str]] = []
         self._poll_count = 0
+        self._math_shown: set = set()  # math labels with a live trace on subscribers' canvases; worker-thread-only
 
     @classmethod
     def open(
@@ -258,11 +259,17 @@ class InstrumentSession:
                     data = scope.get_waveform(n)
                     acquired["C{0}".format(n)] = data
                     self.publish(_decimate_frame(n, data.time, data.voltage))
+            shown_now = set()
             for label, math in (("M1", scope.math1), ("M2", scope.math2)):
+                result = None
                 if math is not None and _safe(lambda: math.enabled, default=False):
                     result = _safe(lambda: math.compute(acquired))
-                    if result is not None:
-                        self.publish(_decimate_frame(label, result.time, result.voltage))
+                if result is not None:
+                    self.publish(_decimate_frame(label, result.time, result.voltage))
+                    shown_now.add(label)
+                elif label in self._math_shown:
+                    self.publish(_decimate_frame(label, [], []))  # one-shot clear on transition
+            self._math_shown = shown_now
             if self.measurements and self._poll_count % MEASUREMENT_EVERY_N_POLLS == 0:
                 values = []
                 for channel, mtype in self.measurements:
