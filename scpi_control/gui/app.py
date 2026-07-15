@@ -47,8 +47,8 @@ def _check_gui_dependencies():
         print("\nThe following required packages are missing:")
         for pkg in missing_required:
             print(f"  - {pkg}")
-        print("\nPlease install the GUI version of Siglent-Oscilloscope:")
-        print('  pip install "Siglent-Oscilloscope[gui]"')
+        print("\nPlease install the GUI version of SCPI-Instrument-Control:")
+        print('  pip install "SCPI-Instrument-Control[gui]"')
         print("\nOr if installing from source:")
         print('  pip install -e ".[gui]"')
         print("=" * 70 + "\n")
@@ -63,7 +63,7 @@ def _check_gui_dependencies():
         for pkg in missing_optional:
             print(f"  - {pkg}")
         print("\nFor the best experience, install the full GUI version:")
-        print('  pip install "Siglent-Oscilloscope[gui]"')
+        print('  pip install "SCPI-Instrument-Control[gui]"')
         print("\nOr if installing from source:")
         print('  pip install -e ".[gui]"')
         print("=" * 70 + "\n")
@@ -80,7 +80,7 @@ def _require_gui_dependencies():
         from PyQt6.QtCore import Qt
         from PyQt6.QtWidgets import QApplication
     except ModuleNotFoundError as exc:
-        raise ImportError("PyQt6 is required for the GUI. Install the GUI extras with:\n" '  pip install "Siglent-Oscilloscope[gui]"') from exc
+        raise ImportError("PyQt6 is required for the GUI. Install the GUI extras with:\n" '  pip install "SCPI-Instrument-Control[gui]"') from exc
 
     return QApplication, Qt
 

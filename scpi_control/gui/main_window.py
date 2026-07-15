@@ -12,7 +12,7 @@ from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QAction
 from PyQt6.QtWidgets import QFileDialog, QGroupBox, QHBoxLayout, QInputDialog, QMainWindow, QMessageBox, QProgressDialog, QPushButton, QSplitter, QStatusBar, QTabWidget, QVBoxLayout, QWidget
 
-from scpi_control import DataLogger, Oscilloscope, PowerSupply
+from scpi_control import DataLogger, Oscilloscope, PowerSupply, __version__
 from scpi_control.exceptions import SiglentConnectionError, SiglentError
 
 # Try to use PyQtGraph for high-performance plotting, fallback to matplotlib
@@ -27,7 +27,7 @@ except ImportError:
 
     USING_PYQTGRAPH = False
     logger = logging.getLogger(__name__)
-    logger.warning("PyQtGraph not available, using matplotlib (install with: pip install 'Siglent-Oscilloscope[gui]')")
+    logger.warning("PyQtGraph not available, using matplotlib (install with: pip install 'SCPI-Instrument-Control[gui]')")
 from scpi_control.gui.connection_manager import ConnectionManager
 from scpi_control.gui.live_view_worker import LiveViewWorker
 from scpi_control.gui.waveform_capture_worker import WaveformCaptureWorker
@@ -1678,9 +1678,9 @@ class MainWindow(QMainWindow):
 
     def _on_about(self):
         """Show about dialog."""
-        about_text = """
+        about_text = f"""
         <h3>Siglent Oscilloscope Control</h3>
-        <p><b>Version 0.1.0</b></p>
+        <p><b>Version {__version__}</b></p>
         <p>Advanced control application for Siglent oscilloscopes</p>
 
         <h4>Supported Models</h4>

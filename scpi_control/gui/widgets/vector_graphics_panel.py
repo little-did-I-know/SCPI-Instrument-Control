@@ -11,7 +11,7 @@ Features:
     - Animation frame generation
 
 Requires 'fun' extras installation:
-    pip install "Siglent-Oscilloscope[fun]"
+    pip install "SCPI-Instrument-Control[fun]"
 """
 
 import logging
@@ -193,7 +193,7 @@ class VectorGraphicsPanel(QWidget):
         info.setWordWrap(True)
         msg_layout.addWidget(info)
 
-        install_label = QLabel('<p><code>pip install "Siglent-Oscilloscope[fun]"</code></p>')
+        install_label = QLabel('<p><code>pip install "SCPI-Instrument-Control[fun]"</code></p>')
         install_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         install_label.setStyleSheet("background-color: #f0f0f0; padding: 10px; font-family: monospace;")
         msg_layout.addWidget(install_label)

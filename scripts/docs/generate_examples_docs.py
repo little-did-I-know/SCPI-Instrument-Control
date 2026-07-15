@@ -127,7 +127,7 @@ def extract_requirements(filepath: Path, docstring: str) -> List[str]:
 
     # Default requirements
     if not requirements:
-        requirements = ["siglent - Core library"]
+        requirements = ["scpi_control - Core library"]
 
     requirements.append("Oscilloscope connected to network")
 

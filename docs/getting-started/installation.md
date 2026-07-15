@@ -4,7 +4,7 @@ This page describes how to install the Siglent Oscilloscope Control library.
 
 ## Requirements
 
-- **Python**: 3.8 or higher
+- **Python**: 3.9 or higher
 - **Operating System**: Windows, macOS, or Linux
 - **Network**: Ethernet connection to oscilloscope
 - **Oscilloscope**: Siglent SDS series with SCPI support

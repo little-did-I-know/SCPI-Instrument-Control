@@ -2,7 +2,7 @@
 
 This module enables drawing shapes, text, and animations on the oscilloscope screen
 by generating synchronized waveforms for X and Y channels. Requires the 'fun' extras:
-    pip install "Siglent-Oscilloscope[fun]"
+    pip install "SCPI-Instrument-Control[fun]"
 
 Examples:
     >>> from scpi_control import Oscilloscope
@@ -74,7 +74,7 @@ def _check_fun_dependencies():
         missing.append("svgpathtools>=1.6.0")
 
     if missing:
-        raise ImportError(f"Vector graphics features require the 'fun' extras.\n" f"Missing packages: {', '.join(missing)}\n\n" f'Install with: pip install "Siglent-Oscilloscope[fun]"')
+        raise ImportError(f"Vector graphics features require the 'fun' extras.\n" f"Missing packages: {', '.join(missing)}\n\n" f'Install with: pip install "SCPI-Instrument-Control[fun]"')
 
 
 @dataclass

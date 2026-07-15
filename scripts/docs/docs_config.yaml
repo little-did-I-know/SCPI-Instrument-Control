@@ -34,7 +34,7 @@ examples:
 
 # API reference configuration
 api:
-  package_dir: "siglent"
+  package_dir: "scpi_control"
   output_dir: "docs/api"
 
   # Modules to document

@@ -6,7 +6,7 @@ This guide explains how to build standalone executables for the Siglent Report G
 
 ### All Platforms
 
-1. **Install Python 3.8+** with pip
+1. **Install Python 3.9+** with pip
 
 2. **Install the package with all dependencies:**
 

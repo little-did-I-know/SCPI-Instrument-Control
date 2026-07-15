@@ -3,7 +3,7 @@
 Supports generic SCPI-99 compliant arbitrary waveform generators and Siglent SDG series models.
 
 Installation:
-    pip install "Siglent-Oscilloscope"
+    pip install "SCPI-Instrument-Control"
 
 Features:
     - Multiple connection types: Ethernet/LAN, USB, GPIB, Serial
@@ -14,7 +14,7 @@ Features:
 
 Feedback:
     Please report issues and suggestions at:
-    https://github.com/little-did-I-know/Siglent-Oscilloscope/issues
+    https://github.com/little-did-I-know/SCPI-Instrument-Control/issues
 """
 
 import logging
