@@ -186,6 +186,14 @@ class TestTerminalAndMeasurements:
         assert bad_channel.status_code == 400
 
 
+class TestMeasurementsSync:
+    def test_get_measurements_returns_selection(self, client):
+        sid = create_mock_session(client)["id"]
+        client.put("/api/sessions/{0}/scope/measurements".format(sid), json=[{"channel": 1, "mtype": "PKPK"}])
+        body = client.get("/api/sessions/{0}/scope/measurements".format(sid)).json()
+        assert body["measurements"] == [{"channel": 1, "mtype": "PKPK"}]
+
+
 class TestCapture:
     def test_capture_csv_single_channel(self, client):
         sid = create_mock_session(client)["id"]

@@ -192,6 +192,7 @@ class InstrumentSession:
 
     def set_measurements(self, items: List[Tuple[int, str]]) -> None:
         self.measurements = list(items)
+        self.publish({"type": "measurements_config", "items": [{"channel": c, "mtype": m} for c, m in self.measurements]})
 
     def _enter_error_state(self, detail: str) -> None:
         """Flip to the terminal error state and tell the streams once."""

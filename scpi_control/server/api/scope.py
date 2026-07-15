@@ -114,6 +114,12 @@ async def put_measurements(session_id: str, body: List[MeasurementItem], request
     return {"measurements": [{"channel": c, "mtype": m} for c, m in session.measurements]}
 
 
+@router.get("/sessions/{session_id}/scope/measurements")
+async def get_measurements(session_id: str, request: Request):
+    session = require_session(request, session_id)
+    return {"measurements": [{"channel": c, "mtype": m} for c, m in session.measurements]}
+
+
 def _build_csv(captures) -> str:
     """captures: list of (channel:int, WaveformData). Align to the shortest."""
     n = min(len(w.voltage) for _, w in captures)

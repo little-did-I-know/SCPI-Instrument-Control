@@ -152,3 +152,20 @@ def test_poll_publishes_math_frame_when_enabled():
         assert 0 < len(math_frames[0]["points"]) <= 2000
     finally:
         session.close()
+
+
+def test_set_measurements_broadcasts_config():
+    session = make_session()
+    try:
+        got = []
+
+        def cb(msg):
+            if msg["type"] == "measurements_config":
+                got.append(msg)
+
+        unsubscribe = session.subscribe(cb)
+        session.set_measurements([(1, "PKPK"), (2, "FREQ")])
+        unsubscribe()
+        assert got and got[0]["items"] == [{"channel": 1, "mtype": "PKPK"}, {"channel": 2, "mtype": "FREQ"}]
+    finally:
+        session.close()
