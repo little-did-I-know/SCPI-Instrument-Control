@@ -612,6 +612,9 @@ built-in mock (`mock: true`) for hardware-free use. The API is documented at
 - `GET .../scope/waveform?channels=1,2&max_points=N` — waveform data as JSON
 - `GET/PATCH .../scope/math/{1,2}` — software math channels (streamed as M1/M2 traces)
 - `GET .../scope/measurements` — the current measurement selection
+- `GET/PATCH .../scope/spectrum` — server-computed FFT spectrum (streamed as `spectrum` frames)
+- `GET/PATCH .../scope/filters/{1,2}` — software Butterworth filters (streamed as F1/F2 traces)
+- `GET/POST/DELETE .../scope/references` + `GET/PUT .../scope/reference` — saved reference waveforms and the live overlay
 
 ### Browser UI
 
