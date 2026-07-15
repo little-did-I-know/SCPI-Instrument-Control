@@ -8,7 +8,7 @@ import sys
 if sys.platform == "win32":
     sys.stdout.reconfigure(encoding="utf-8")
 
-from siglent.report_generator.llm.client import LLMClient, LLMConfig
+from scpi_control.report_generator.llm.client import LLMClient, LLMConfig
 
 print("=" * 70)
 print("OLLAMA PYTHON CLIENT INTEGRATION TEST")

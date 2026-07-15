@@ -83,7 +83,7 @@ When using SCPI-Instrument-Control, we recommend the following security practice
 ### Safe Usage Examples
 
 ```python
-from siglent import Oscilloscope
+from scpi_control import Oscilloscope
 
 # Good: Validate IP address before connecting
 import ipaddress

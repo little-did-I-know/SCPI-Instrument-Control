@@ -43,7 +43,7 @@ def main():
     # Import and run
     from PyQt6.QtWidgets import QApplication
 
-    from siglent.gui.main_window import MainWindow
+    from scpi_control.gui.main_window import MainWindow
 
     app = QApplication(sys.argv)
     window = MainWindow()

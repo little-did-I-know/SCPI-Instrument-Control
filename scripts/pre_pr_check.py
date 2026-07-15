@@ -211,14 +211,14 @@ def check_exception_imports() -> bool:
             sys.path.insert(0, str(project_root))
 
         # Clear any cached imports to force reload from local version
-        if "siglent.exceptions" in sys.modules:
-            del sys.modules["siglent.exceptions"]
-        if "siglent" in sys.modules:
-            del sys.modules["siglent"]
+        if "scpi_control.exceptions" in sys.modules:
+            del sys.modules["scpi_control.exceptions"]
+        if "scpi_control" in sys.modules:
+            del sys.modules["scpi_control"]
 
         # Test new exception names
         # Test backward compatibility aliases
-        from siglent.exceptions import CommandError, ConnectionError, SiglentConnectionError, SiglentError, SiglentTimeoutError, TimeoutError
+        from scpi_control.exceptions import CommandError, ConnectionError, SiglentConnectionError, SiglentError, SiglentTimeoutError, TimeoutError
 
         # Verify they are the same class (aliases work)
         if ConnectionError is not SiglentConnectionError:
@@ -230,8 +230,8 @@ def check_exception_imports() -> bool:
             return False
 
         # Test top-level package imports
-        from siglent import SiglentConnectionError as TopLevelConn
-        from siglent import SiglentTimeoutError as TopLevelTimeout
+        from scpi_control import SiglentConnectionError as TopLevelConn
+        from scpi_control import SiglentTimeoutError as TopLevelTimeout
 
         if TopLevelConn is not SiglentConnectionError:
             print_error("Top-level import of SiglentConnectionError failed")

@@ -239,7 +239,7 @@ def check_entry_point():
     # Try to import (may fail without dependencies)
     try:
         sys.path.insert(0, str(Path.cwd()))
-        from siglent.gui import app
+        from scpi_control.gui import app
 
         print_success("Successfully imported siglent.gui.app")
 

@@ -114,8 +114,8 @@ def extract_requirements(filepath: Path, docstring: str) -> List[str]:
         with open(filepath, "r", encoding="utf-8") as f:
             content = f.read()
 
-        if "from siglent import VectorDisplay" in content:
-            requirements.append("siglent[fun] - Vector graphics extras")
+        if "from scpi_control.vector_graphics import" in content and "VectorDisplay" in content:
+            requirements.append("scpi_control[fun] - Vector graphics extras")
         elif "matplotlib" in content:
             requirements.append("matplotlib - For plotting")
 

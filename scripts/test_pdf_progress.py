@@ -10,11 +10,11 @@ import numpy as np
 from pathlib import Path
 from datetime import datetime
 
-from siglent.report_generator.models.report_data import (
+from scpi_control.report_generator.models.report_data import (
     TestReport, ReportMetadata, TestSection, WaveformData
 )
-from siglent.report_generator.generators.pdf_generator import PDFReportGenerator
-from siglent.report_generator.models.report_options import ReportOptions
+from scpi_control.report_generator.generators.pdf_generator import PDFReportGenerator
+from scpi_control.report_generator.models.report_options import ReportOptions
 
 
 def generate_test_waveform(freq=1000, sample_rate=100000, duration=0.01, amplitude=1.0):

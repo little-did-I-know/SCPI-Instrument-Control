@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 # Test the GUI
 from PyQt6.QtWidgets import QApplication
 
-from siglent.gui.main_window import MainWindow
+from scpi_control.gui.main_window import MainWindow
 
 
 def main():

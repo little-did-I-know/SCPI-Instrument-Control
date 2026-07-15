@@ -12,8 +12,8 @@ pytest.importorskip("PyQt6")
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QApplication, QMainWindow, QPushButton, QVBoxLayout, QWidget
 
-from siglent.gui.widgets.waveform_display import WaveformDisplay
-from siglent.waveform import WaveformData
+from scpi_control.gui.widgets.waveform_display import WaveformDisplay
+from scpi_control.waveform import WaveformData
 
 
 class TestWindow(QMainWindow):
