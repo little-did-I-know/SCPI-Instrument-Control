@@ -1,254 +1,96 @@
-# Siglent Oscilloscope Control Examples
+# SCPI Instrument Control — Examples
 
-This directory contains example scripts demonstrating various features of the Siglent oscilloscope control package.
+These scripts show the library in action end to end: oscilloscope capture and
+analysis, the web gateway's REST API, function generator / AWG control,
+power supply control, data acquisition, and report generation. Most connect
+to real hardware over LAN by default (update the IP/host constant near the
+top of each file); a few run entirely against mock connections and need no
+instrument at all — those are called out below.
 
-## Examples
-
-### basic_usage.py
-
-Basic oscilloscope control demonstrating:
-
-- Connecting to the oscilloscope
-- Configuring channels (coupling, scale, offset, probe ratio)
-- Setting up triggers
-- Performing measurements
-
-**Usage:**
+Install the core library, then add the extras a given example needs:
 
 ```bash
-python basic_usage.py
+pip install "SCPI-Instrument-Control"
 ```
 
-### waveform_capture.py
+## Oscilloscope
 
-Waveform acquisition and export demonstrating:
+| File | What it shows | Requirements |
+| --- | --- | --- |
+| `basic_usage.py` | Connecting to an oscilloscope, configuring channels and trigger, and performing basic operations. | Oscilloscope on the network |
+| `waveform_capture.py` | Capturing waveform data from the oscilloscope and saving it to a file. | Oscilloscope on the network, matplotlib |
+| `measurements.py` | Automated measurements (frequency, Vpp, RMS, period, etc.) on oscilloscope channels. | Oscilloscope on the network |
+| `live_plot.py` | Real-time waveform acquisition and plotting using matplotlib animation. | Oscilloscope on the network, matplotlib |
+| `simple_capture.py` | Single waveform capture with analysis via the automation API (Vpp, RMS, frequency) and saving to NumPy format. | Oscilloscope on the network |
+| `batch_capture.py` | Capturing multiple waveforms with different timebase and voltage-scale settings, for characterizing signals at different scales. | Oscilloscope on the network |
+| `continuous_capture.py` | Collecting waveforms continuously over a period of time, for monitoring, statistics, or time-varying phenomena. | Oscilloscope on the network |
+| `trigger_based_capture.py` | Waiting for specific trigger conditions and capturing waveforms when they occur, for sporadic events. | Oscilloscope on the network |
+| `advanced_analysis.py` | Advanced waveform analysis and visualization: FFT analysis, statistical analysis, and matplotlib plots. | Oscilloscope on the network, matplotlib |
+| `probe_calibration_analysis.py` | Waveform region extraction for probe compensation analysis: plateau detection, slope analysis, calibration guidance, and zoomed PDF report plots. | Oscilloscope on the network, `SCPI-Instrument-Control[report-generator]` |
+| `dialect_override_example.py` | SCPI dialect auto-detection from `*IDN?` and the `dialect=` override for forcing a command set; runs entirely on mock connections. | Core install only (no hardware) |
 
-- Capturing waveform data from a channel
-- Saving waveform to CSV file
-- Plotting waveform with matplotlib
-- Exporting plot to PNG image
+## Web Gateway
 
-**Usage:**
+| File | What it shows | Requirements |
+| --- | --- | --- |
+| `gateway_rest_client.py` | Driving the web gateway's REST API from Python: creating a mock session, configuring a channel, fetching waveform JSON, downloading a screenshot, and sending a raw SCPI command — the same API the browser UI uses. | `SCPI-Instrument-Control[web]` + a running `scpi-web` gateway |
+| `trend_logging_walkthrough.py` | Recording measurement trends in-process via the gateway's session layer (no server or browser): polling measurements, recording them, and exporting to CSV. | Core install only (no hardware, no server) |
 
-```bash
-python waveform_capture.py
-```
+## Function Generator / AWG
 
-**Output:**
+| File | What it shows | Requirements |
+| --- | --- | --- |
+| `function_generator_basic.py` | Basic control of Siglent SDG-series function generators over Ethernet/LAN. | Function generator on the network |
+| `vector_graphics_xy_mode.py` | Using the oscilloscope as a vector display: generating X/Y waveform data for shapes, saving waveform files for an AWG, and animating via rotation/transforms. | `SCPI-Instrument-Control[fun]`, external AWG/DAC feeding the scope's channels |
 
-- `waveform.csv` - Waveform data in CSV format
-- `waveform.png` - Waveform plot image
+## Power Supply
 
-### measurements.py
+| File | What it shows | Requirements |
+| --- | --- | --- |
+| `psu_basic_control.py` | Controlling a SCPI power supply (Siglent SPD series or generic SCPI-99) over Ethernet/LAN. | Power supply on the network |
+| `psu_advanced_features.py` | Advanced PSU features: CSV data logging, tracking modes (series/parallel), timer functionality, waveform generation, and OVP/OCP protection. | Power supply on the network |
+| `psu_usb_connection.py` | Connecting to a power supply via USB/GPIB/Serial/TCP-IP using `VISAConnection`. | `SCPI-Instrument-Control[usb]`, PSU reachable via USB-TMC/GPIB/Serial/VXI-11 |
+| `psu_gui_test.py` | Testing the PSU control GUI against a mock connection, with no physical hardware required. | `SCPI-Instrument-Control[gui]` |
 
-Automated measurements demonstrating:
+## Data Acquisition
 
-- Individual measurements (frequency, Vpp, RMS, period, etc.)
-- Batch measurements on a channel
-- Using the measurement API
+| File | What it shows | Requirements |
+| --- | --- | --- |
+| `data_logger_basic.py` | Basic usage of the `DataLogger` class for DAQ/switch units (e.g. Keysight 34970A/DAQ970A style). | DAQ instrument on the network |
 
-**Usage:**
+## Report Generator
 
-```bash
-python measurements.py
-```
+| File | What it shows | Requirements |
+| --- | --- | --- |
+| `report_generation_example.py` | Generating professional PDF/Markdown test reports: loading waveform data, adding measurements with pass/fail criteria, optional AI analysis, and rendering the report. | `SCPI-Instrument-Control[report-generator]` |
 
-### live_plot.py
+## Interactive Tutorial
 
-Real-time waveform plotting demonstrating:
-
-- Live waveform acquisition
-- Animated matplotlib plotting
-- Multi-channel display
-
-**Usage:**
-
-```bash
-python live_plot.py
-```
-
-**Note:** Close the plot window to stop the live view.
+| File | What it shows | Requirements |
+| --- | --- | --- |
+| `interactive_tutorial.ipynb` | End-to-end Jupyter walkthrough: connect, configure channels/trigger, capture and plot a waveform, run automated measurements, FFT analysis, multi-channel capture, and export — narrated step by step. | Jupyter, oscilloscope on the network, matplotlib, scipy |
 
 ## Configuration
 
-Before running the examples, update the `SCOPE_IP` variable in each script to match your oscilloscope's IP address.
+Most scripts read an IP/host constant (commonly `SCOPE_IP`) near the top of
+the file — update it to match your instrument. To find an oscilloscope's
+LAN address: **Utility → I/O → LAN** on the instrument's front panel.
 
-To find your oscilloscope's IP address:
+The scripts marked "no hardware" above (`dialect_override_example.py`,
+`trend_logging_walkthrough.py`, `psu_gui_test.py`) use mock connections and
+run as-is.
 
-1. Press **Utility** on the oscilloscope
-2. Navigate to **I/O** settings
-3. Check the **LAN** configuration
-
-## Requirements
-
-All examples require the siglent package to be installed:
+## Running an example
 
 ```bash
-cd /path/to/Siglent
-pip install -e .
+python examples/basic_usage.py
 ```
 
-## Programmatic Data Collection Examples
-
-The following examples demonstrate the high-level automation API for programmatic data collection and analysis:
-
-### simple_capture.py
-
-Single waveform capture with analysis:
-
-- Connecting to the oscilloscope
-- Capturing waveforms from multiple channels
-- Analyzing waveform data (Vpp, RMS, frequency)
-- Saving waveforms to file (NumPy format)
-
-**Usage:**
+For `gateway_rest_client.py`, start the gateway first, in another terminal:
 
 ```bash
-python simple_capture.py
+pip install "SCPI-Instrument-Control[web]"
+scpi-web
 ```
 
-**Output:**
-
-- Console output with waveform statistics
-- `simple_capture_ch1.npz` and `simple_capture_ch2.npz` files
-
----
-
-### batch_capture.py
-
-Batch capture with configuration sweeps:
-
-- Capturing with different timebase scales
-- Capturing with different voltage scales
-- Progress tracking during batch operations
-- Saving batch results with metadata
-
-**Usage:**
-
-```bash
-python batch_capture.py
-```
-
-**Output:**
-
-- Console progress updates
-- `batch_output/` directory with waveforms and metadata
-
-**Use Cases:** Automated testing, signal characterization, parameter sweeps
-
----
-
-### continuous_capture.py
-
-Time-series data collection:
-
-- Continuous capture over specified duration
-- Capturing to memory (short durations)
-- Capturing to files (long durations)
-- Statistical analysis of time-varying signals
-
-**Usage:**
-
-```bash
-python continuous_capture.py
-```
-
-**Output:**
-
-- Console statistics for memory-based capture
-- `continuous_data/` directory with timestamped files
-
-**Use Cases:** Signal monitoring, stability testing, long-term logging
-
----
-
-### trigger_based_capture.py
-
-Event-based waveform capture:
-
-- Configuring trigger conditions (source, edge, level)
-- Waiting for specific trigger events
-- Capturing single and multiple trigger events
-- Event-based data collection
-
-**Usage:**
-
-```bash
-python trigger_based_capture.py
-```
-
-**Output:**
-
-- `trigger_captures/` directory with triggered waveforms
-- `multi_trigger_captures/` directory with multiple events
-
-**Use Cases:** Sporadic event capture, glitch detection, intermittent signal troubleshooting
-
----
-
-### advanced_analysis.py
-
-Advanced signal analysis and visualization:
-
-- Advanced measurements (SNR, THD)
-- FFT spectrum analysis
-- Statistical distribution analysis
-- Visualization with matplotlib
-- Automated report generation
-
-**Usage:**
-
-```bash
-python advanced_analysis.py
-```
-
-**Output:**
-
-- Interactive matplotlib plots (time-domain, frequency spectrum, histogram)
-- `analyzed_waveform.npz` - Raw data
-- `analysis_report.txt` - Complete analysis report
-
-**Requirements:** matplotlib, numpy
-
----
-
-## File Formats
-
-The automation API supports multiple export formats:
-
-| Format | Extension | Best For          | Metadata |
-| ------ | --------- | ----------------- | -------- |
-| NumPy  | .npz      | Python analysis   | Yes      |
-| CSV    | .csv      | Spreadsheet tools | Optional |
-| MATLAB | .mat      | MATLAB/Simulink   | Yes      |
-| HDF5   | .h5       | Large datasets    | Yes      |
-
-Change format using the `format` parameter:
-
-```python
-collector.save_data(waveforms, 'output.mat', format='mat')
-```
-
-## Quick Start - Programmatic API
-
-```python
-from scpi_control.automation import DataCollector
-
-# Simple capture
-with DataCollector('192.168.1.100') as collector:
-    data = collector.capture_single([1, 2])
-    stats = collector.analyze_waveform(data[1])
-    print(f"Vpp: {stats['vpp']:.3f}V")
-    collector.save_data(data, 'measurement.npz')
-```
-
-## Tips
-
-- Make sure your oscilloscope is connected to the same network as your computer
-- Ensure the SCPI port (5025) is accessible
-- Some commands may vary slightly between oscilloscope models - refer to your programming manual
-- Enable at least one channel before capturing waveforms
-- Use AUTO trigger mode for continuous acquisition
-- Use NORMAL or SINGLE mode for specific trigger conditions
-- For long captures, save to files instead of memory to avoid memory issues
-- Use context managers (`with` statements) for automatic connection cleanup
+Then run the client script.

@@ -1,0 +1,71 @@
+"""Drive the web gateway's REST API from Python — no browser needed.
+
+Start the gateway first (in another terminal):
+
+    pip install "SCPI-Instrument-Control[web]"
+    scpi-web
+
+Then run this script. It creates a hardware-free mock session, configures a
+channel, fetches full-resolution waveform data as JSON, and downloads a
+screenshot PNG — the same API the browser UI uses.
+
+Requirements:
+    - SCPI-Instrument-Control[web] (for the gateway itself)
+    - Python standard library only for this client (urllib)
+"""
+
+import json
+import urllib.request
+from typing import Optional, Union
+
+BASE = "http://127.0.0.1:8765/api"
+
+Body = Optional[Union[dict, list]]  # examples run on the package floor, Python 3.9
+
+
+def call(method: str, path: str, body: Body = None) -> bytes:
+    data = None if body is None else json.dumps(body).encode()
+    request = urllib.request.Request(BASE + path, data=data, method=method)
+    if data is not None:
+        request.add_header("Content-Type", "application/json")
+    with urllib.request.urlopen(request) as response:
+        return response.read()
+
+
+def call_json(method: str, path: str, body: Body = None):
+    return json.loads(call(method, path, body))
+
+
+def main() -> None:
+    # 1. Create a mock oscilloscope session (no hardware required)
+    session = call_json("POST", "/sessions", {"mock": True, "label": "REST demo"})
+    session_id = session["id"]
+    print(f"Session {session_id}: {session['model']} ({session['dialect']} dialect)")
+
+    scope = f"/sessions/{session_id}/scope"
+    try:
+        # 2. Configure channel 1 and read the full state snapshot back
+        state = call_json("PATCH", f"{scope}/channels/1", {"enabled": True, "voltage_scale": 0.5})
+        print(f"Timebase: {state['timebase']} s/div, C1 scale: {state['channels']['1']['voltage_scale']} V/div")
+
+        # 3. Fetch full-resolution waveform data as JSON
+        waveform = call_json("GET", f"{scope}/waveform?channels=1&max_points=16")
+        channel = waveform["channels"][0]
+        print(f"Waveform C{channel['channel']}: {len(channel['points'])} points, dt={channel['dt']:.2e} s")
+
+        # 4. Download the instrument screenshot
+        png = call("GET", f"{scope}/screenshot.png")
+        with open("gateway_screenshot.png", "wb") as f:
+            f.write(png)
+        print(f"Saved gateway_screenshot.png ({len(png)} bytes)")
+
+        # 5. Send a raw SCPI query through the terminal endpoint
+        reply = call_json("POST", f"{scope}/command", {"command": "*IDN?"})
+        print(f"*IDN? -> {reply['response']}")
+    finally:
+        call("DELETE", f"/sessions/{session_id}")
+        print("Session closed.")
+
+
+if __name__ == "__main__":
+    main()

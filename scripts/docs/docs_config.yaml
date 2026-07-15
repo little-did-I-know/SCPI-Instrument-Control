@@ -13,16 +13,27 @@ examples:
       - "basic_usage.py"
       - "waveform_capture.py"
       - "measurements.py"
+      - "dialect_override_example.py"
+      - "psu_basic_control.py"
+      - "function_generator_basic.py"
+      - "data_logger_basic.py"
 
     intermediate:
       - "live_plot.py"
       - "batch_capture.py"
       - "continuous_capture.py"
       - "trigger_based_capture.py"
+      - "gateway_rest_client.py"
+      - "trend_logging_walkthrough.py"
+      - "psu_advanced_features.py"
+      - "psu_usb_connection.py"
 
     advanced:
       - "advanced_analysis.py"
       - "vector_graphics_xy_mode.py"
+      - "probe_calibration_analysis.py"
+      - "report_generation_example.py"
+      - "psu_gui_test.py"
 
   # Files to exclude from documentation
   exclude_files:
