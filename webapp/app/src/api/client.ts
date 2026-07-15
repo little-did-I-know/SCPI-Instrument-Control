@@ -52,6 +52,8 @@ export const api = {
   runOp: (id: string, op: RunOp) => request<ScopeState>(`${scope(id)}/${op}`, { method: "POST" }),
   command: (id: string, command: string) => request<{ command: string; response: string | null }>(`${scope(id)}/command`, json("POST", { command })),
   setMeasurements: (id: string, items: { channel: number; mtype: string }[]) => request<{ measurements: { channel: number; mtype: string }[] }>(`${scope(id)}/measurements`, json("PUT", items)),
+  getMath: (id: string) => request<{ n: number; expression: string; enabled: boolean }[]>(`${scope(id)}/math`),
+  patchMath: (id: string, n: number, body: { expression?: string; enabled?: boolean }) => request<{ n: number; expression: string; enabled: boolean }[]>(`${scope(id)}/math/${n}`, json("PATCH", body)),
   captureUrl: (id: string, channels: number[]) => `${scope(id)}/capture.csv?channels=${channels.join(",")}`,
 };
 
