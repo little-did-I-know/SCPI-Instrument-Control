@@ -4,9 +4,10 @@ import type { ChannelState } from "../../api/types";
 import { useSession } from "../../store/session";
 
 const TRACE = ["#FFDC32", "#40E0D0", "#FF69B4", "#32FF64"];
-// Resolved to concrete hex (canvas 2D can't read CSS vars) — matches
-// --trace-reference / --trace-difference in webapp/design/tokens/colors.css.
-const MATH_TRACES: Record<string, string> = { M1: "#FFA500", M2: "#FF1493" };
+// Concrete hex (canvas 2D can't read CSS vars). Chosen far in hue from all four
+// channel traces (gold/cyan/hotpink/green) so math traces stay distinguishable;
+// they're also dashed below to read as "computed".
+const MATH_TRACES: Record<string, string> = { M1: "#FFFFFF", M2: "#B18CFF" }; // white + light violet, distinct from channel traces
 const DIVS_X = 14;
 const DIVS_Y = 10;
 const PAD = 8;
@@ -14,6 +15,21 @@ const PAD = 8;
 // Stable reference: zustand v5 hands the selector straight to useSyncExternalStore
 // with no memoization, so a fresh `{}` per snapshot would loop forever while scope is null.
 const NO_CHANNELS: Record<string, ChannelState> = {};
+
+// Pure trace-point mapping for math channels (no voltage_scale): auto-fit each
+// trace to its own min/max so it's visible at any amplitude. Extracted so the
+// risky min/max/NaN math is unit-testable without a canvas 2D context.
+export function mathTracePixels(points: number[], gw: number, gh: number, pad: number): { x: number; y: number }[] {
+  if (points.length === 0) return [];
+  const min = Math.min(...points);
+  const max = Math.max(...points);
+  const mid = (min + max) / 2;
+  const halfSpan = (max - min) / 2 || 1; // flat trace → draw the mid-line, no divide-by-zero
+  return points.map((v, i) => ({
+    x: pad + (gw * i) / Math.max(1, points.length - 1),
+    y: pad + gh / 2 - ((v - mid) / halfSpan) * ((gh / 2) * 0.9),
+  }));
+}
 
 export function WaveformCanvas() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -112,21 +128,19 @@ export function WaveformCanvas() {
       ["M1", "M2"].forEach((label) => {
         const frame = getFrame(label);
         if (!frame || frame.points.length === 0) return;
-        const min = Math.min(...frame.points);
-        const max = Math.max(...frame.points);
-        const mid = (min + max) / 2;
-        const halfSpan = (max - min) / 2;
+        const pixels = mathTracePixels(frame.points, gw, gh, PAD);
+        ctx.save();
+        ctx.setLineDash([5, 3]); // dashed → unmistakably a computed math trace
         ctx.strokeStyle = MATH_TRACES[label];
         ctx.lineWidth = 2;
         ctx.lineJoin = "round";
         ctx.beginPath();
-        frame.points.forEach((volts, index) => {
-          const x = PAD + (gw * index) / Math.max(1, frame.points.length - 1);
-          const y = PAD + gh / 2 - ((volts - mid) / (halfSpan || 1)) * (gh / 2 * 0.9);
+        pixels.forEach(({ x, y }, index) => {
           if (index === 0) ctx.moveTo(x, y);
           else ctx.lineTo(x, y);
         });
         ctx.stroke();
+        ctx.restore();
         drew = true;
       });
       ctx.restore();
