@@ -528,40 +528,45 @@ with TriggerWaitCollector('192.168.1.100') as tc:
 
 ## Trigger Coupling
 
-Trigger coupling filters the trigger signal (not available on all models):
+Trigger coupling filters the trigger signal (not available on all models),
+via the `scope.trigger.coupling` property:
 
 ```python
 # DC coupling - pass all frequencies
-scope.write("TRIG_COUPLING DC")
+scope.trigger.coupling = "DC"
 
 # AC coupling - block DC component
-scope.write("TRIG_COUPLING AC")
+scope.trigger.coupling = "AC"
 
 # High frequency reject
-scope.write("TRIG_COUPLING HFREJ")
+scope.trigger.coupling = "HFREJ"
 
 # Low frequency reject
-scope.write("TRIG_COUPLING LFREJ")
+scope.trigger.coupling = "LFREJ"
 ```
+
+Allowed values are `DC`, `AC`, `HFREJ`, and `LFREJ`. The property is
+dialect-aware — it works identically whether the connected scope speaks the
+legacy or modern command set. See [SCPI Dialects](scpi-dialects.md) for how
+that translation works.
 
 ## Trigger Holdoff
 
-Trigger holdoff prevents re-triggering for a specified time:
+Programmatic trigger holdoff is **not currently supported**. Older releases
+of this library exposed a `scope.trigger.holdoff` property, but it was
+built on the legacy `TRIG_DELAY` command, which actually controls trigger
+*delay* (the time from trigger event to the sample point), not holdoff (the
+dead time after a trigger before the scope will trigger again) — the
+underlying instrument exposes true holdoff through different commands. A
+corrected implementation is on the roadmap; until then, do not rely on that
+property, and don't expect a `scope.trigger.holdoff` example on this page.
 
-```python
-# Set holdoff time (in seconds)
-holdoff_time = 1e-6  # 1 microsecond
-scope.write(f"TRIG_HOLDOFF {holdoff_time}")
-
-# Get current holdoff
-response = scope.query("TRIG_HOLDOFF?")
-```
-
-**Use for:**
-
-- Complex waveforms with multiple edges
-- Triggering on specific events in a pattern
-- Avoiding false triggers
+For now, set trigger holdoff from the instrument's front panel, or through
+its vendor-supplied UI. If you need to script it in the meantime, the
+gateway's Terminal tab (or `scope.write()`/`scope.query()`) lets you send
+whatever raw command your instrument actually uses — see
+[SCPI Dialects](scpi-dialects.md) for the difference between the legacy and
+modern command sets.
 
 ## Tips for Stable Triggering
 
@@ -608,9 +613,9 @@ current_level = scope.trigger.level
 scope.trigger.level = current_level * 1.2
 
 # Or use trigger coupling to filter noise
-scope.write("TRIG_COUPLING AC")  # Remove DC
+scope.trigger.coupling = "AC"      # Remove DC
 # or
-scope.write("TRIG_COUPLING HFREJ")  # Remove HF noise
+scope.trigger.coupling = "HFREJ"   # Remove HF noise
 ```
 
 ### Missing Intermittent Events
@@ -694,6 +699,7 @@ with Oscilloscope(SCOPE_IP) as scope:
 
 ## Next Steps
 
+- [SCPI Dialects](scpi-dialects.md) - How legacy and modern command sets differ, and how to send raw commands
 - [Advanced Features](advanced-features.md) - FFT analysis, math channels, and automation
 - [Measurements](measurements.md) - Use stable triggers for accurate measurements
 - [Waveform Capture](waveform-capture.md) - Capture triggered waveforms

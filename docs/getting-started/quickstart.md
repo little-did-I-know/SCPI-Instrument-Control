@@ -1,6 +1,6 @@
 # Quick Start
 
-Get up and running with the Siglent Oscilloscope Control library in 5 minutes!
+Get up and running with SCPI Instrument Control — a universal Python library for SCPI test equipment (oscilloscopes, function generators/AWGs, power supplies, and DAQ units) with a PyQt6 desktop GUI and a browser-based lab gateway — in 5 minutes!
 
 ## Installation
 
@@ -8,7 +8,7 @@ First, install the library:
 
 === "Basic (Programmatic Only)"
 `bash
-    pip install SCPI-Instrument-Control
+    pip install "SCPI-Instrument-Control"
     `
 
 === "With GUI"
@@ -16,10 +16,21 @@ First, install the library:
     pip install "SCPI-Instrument-Control[gui]"
     `
 
+=== "With Web Gateway"
+`bash
+    pip install "SCPI-Instrument-Control[web]"
+    scpi-web
+    `
+
+    Then open <http://127.0.0.1:8765> in your browser.
+
 === "Everything"
 `bash
     pip install "SCPI-Instrument-Control[all]"
     `
+
+    Everything for desktop use — the web gateway and USB support are
+    separate extras (`[web]`, `[usb]`).
 
 ## Your First Script
 
@@ -170,7 +181,7 @@ with DataCollector('192.168.1.100') as collector:
 
 ## Next Steps
 
-!!! tip "Learn More" - [Connection Setup](connection.md) - Configure network and connection settings - [Basic Usage](../user-guide/basic-usage.md) - Detailed usage guide - [Waveform Capture](../user-guide/waveform-capture.md) - Advanced capture techniques - [Measurements](../user-guide/measurements.md) - All measurement types - [GUI Guide](../gui/overview.md) - GUI application features
+!!! tip "Learn More" - [Connection Setup](connection.md) - Configure network and connection settings - [Basic Usage](../user-guide/basic-usage.md) - Detailed usage guide - [Waveform Capture](../user-guide/waveform-capture.md) - Advanced capture techniques - [Measurements](../user-guide/measurements.md) - All measurement types - [GUI Guide](../gui/overview.md) - GUI application features - [Web Gateway](../gateway/index.md) - Browser-based lab gateway
 
 !!! example "Examples"
 Check out the [examples directory](https://github.com/little-did-I-know/SCPI-Instrument-Control/tree/main/examples) for more code samples:

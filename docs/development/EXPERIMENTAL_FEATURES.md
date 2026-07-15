@@ -1,6 +1,6 @@
 # Experimental Features and Beta Releases
 
-This guide documents the strategy for introducing, managing, and graduating experimental features in the Siglent Oscilloscope Control project.
+This guide documents the strategy for introducing, managing, and graduating experimental features in the SCPI Instrument Control project.
 
 ## Table of Contents
 

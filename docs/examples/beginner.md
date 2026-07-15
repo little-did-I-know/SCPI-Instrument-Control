@@ -7,7 +7,11 @@ Complete examples for getting started with the Siglent Oscilloscope library. The
 | Example | Description |
 |---------|-------------|
 | [Basic usage example for Siglent oscilloscope control](#basic-usage-example-for-siglent-oscilloscope-control) | Basic usage example for Siglent oscilloscope control. |
+| [Basic Data Logger / DAQ example](#basic-data-logger-/-daq-example) | Basic Data Logger / DAQ example. |
+| [SCPI dialect auto-detection and manual override](#scpi-dialect-auto-detection-and-manual-override) | SCPI dialect auto-detection and manual override. |
+| [Basic Function Generator / AWG Usage Example](#basic-function-generator-/-awg-usage-example) | Basic Function Generator / AWG Usage Example. |
 | [Measurement example for Siglent oscilloscope](#measurement-example-for-siglent-oscilloscope) | Measurement example for Siglent oscilloscope. |
+| [Basic power supply control example](#basic-power-supply-control-example) | Basic power supply control example. |
 | [Simple single capture example](#simple-single-capture-example) | Simple single capture example. |
 | [Waveform capture example for Siglent oscilloscope](#waveform-capture-example-for-siglent-oscilloscope) | Waveform capture example for Siglent oscilloscope. |
 
@@ -19,7 +23,7 @@ Basic usage example for Siglent oscilloscope control.
 
 ### Requirements
 
-- siglent - Core library
+- scpi_control - Core library
 - Oscilloscope connected to network
 
 ### Configuration
@@ -125,13 +129,420 @@ if __name__ == "__main__":
 
 ---
 
+## Basic Data Logger / DAQ example
+
+Basic Data Logger / DAQ example.
+
+### Requirements
+
+- scpi_control - Core library
+- Oscilloscope connected to network
+
+### Configuration
+
+Update `SCOPE_IP` to match your oscilloscope's IP address (default: `192.168.1.100`).
+
+### Usage
+
+```bash
+python examples/data_logger_basic.py
+```
+
+### Source Code
+
+```python
+"""Basic Data Logger / DAQ example.
+
+This example demonstrates basic usage of the DataLogger class for
+data acquisition systems like the Keysight 34970A/DAQ970A.
+
+Requirements:
+    - A SCPI-compatible DAQ system (Keysight 34970A, DAQ970A, or similar)
+    - Network connection to the instrument
+"""
+
+from scpi_control import DataLogger
+
+# Replace with your DAQ's IP address
+DAQ_IP = "192.168.1.100"
+
+
+def basic_measurements():
+    """Demonstrate basic voltage measurements."""
+    print("=== Basic Voltage Measurements ===\n")
+
+    with DataLogger(DAQ_IP) as daq:
+        print(f"Connected to: {daq.identify()}")
+        print(f"Model: {daq.model_capability.model_name}")
+        print(f"Channels available: {daq.model_capability.get_all_channels()}\n")
+
+        # Configure channels 101-103 for DC voltage measurement
+        channels = [101, 102, 103]
+        daq.configure_voltage_dc(channels, range="AUTO", resolution="AUTO")
+        print(f"Configured channels {channels} for DC voltage\n")
+
+        # Take immediate measurements
+        readings = daq.measure_voltage_dc(channels)
+        print("Measurement results:")
+        for reading in readings:
+            print(f"  Channel {reading.channel}: {reading.value:.6f} {reading.unit}")
+
+
+def scan_multiple_channels():
+    """Demonstrate scanning multiple channels."""
+    print("\n=== Multi-Channel Scan ===\n")
+
+    with DataLogger(DAQ_IP) as daq:
+        # Configure different measurement types on different channels
+        daq.configure_voltage_dc([101, 102], range="10")  # 10V range
+        daq.configure_temperature([103, 104], sensor_type="TC", sensor_subtype="K")
+        daq.configure_resistance([105], four_wire=False)
+
+        # Set up scan list
+        scan_channels = [101, 102, 103, 104, 105]
+        daq.set_scan_list(scan_channels)
+        print(f"Scan list: {daq.get_scan_list()}")
+
+        # Configure trigger for immediate single scan
+        daq.set_trigger_source("IMM")
+        daq.set_trigger_count(1)
+
+        # Initiate and read
+        readings = daq.read()
+        print(f"\nScanned {len(readings)} channels:")
+        for i, reading in enumerate(readings):
+            ch = scan_channels[i] if i < len(scan_channels) else "?"
+            print(f"  Channel {ch}: {reading.value:.6f}")
+
+
+def continuous_logging():
+    """Demonstrate continuous data logging."""
+    print("\n=== Continuous Logging (5 seconds) ===\n")
+
+    with DataLogger(DAQ_IP) as daq:
+        # Configure for voltage monitoring
+        channels = [101, 102]
+        daq.configure_voltage_dc(channels)
+
+        # Log at 1 second intervals for 5 seconds
+        print("Logging for 5 seconds...")
+        all_readings = daq.start_logging(
+            channels=channels,
+            interval=1.0,
+            duration=5.0,
+            callback=lambda r: print(f"  Got {len(r)} readings"),
+        )
+
+        print(f"\nTotal scans collected: {len(all_readings)}")
+        print(f"Total readings: {sum(len(r) for r in all_readings)}")
+
+
+def alarm_monitoring():
+    """Demonstrate alarm/limit checking."""
+    print("\n=== Alarm Monitoring ===\n")
+
+    with DataLogger(DAQ_IP) as daq:
+        if not daq.model_capability.has_alarm:
+            print("This model does not support alarm limits")
+            return
+
+        # Configure voltage measurement with limits
+        channel = 101
+        daq.configure_voltage_dc(channel)
+
+        # Set alarm limits: warn if voltage goes outside 0-5V
+        daq.set_alarm_limits(channel, high=5.0, low=0.0)
+        daq.enable_alarm(channel, enable=True)
+        print(f"Alarm limits set on channel {channel}: 0V to 5V")
+
+        # Take a measurement
+        readings = daq.measure_voltage_dc(channel)
+        print(f"Current reading: {readings[0].value:.3f} V")
+
+
+def scaling_example():
+    """Demonstrate mx+b scaling."""
+    print("\n=== Scaling (mx+b) Example ===\n")
+
+    with DataLogger(DAQ_IP) as daq:
+        if not daq.model_capability.has_math:
+            print("This model does not support scaling")
+            return
+
+        channel = 101
+        daq.configure_voltage_dc(channel)
+
+        # Apply scaling: convert 0-10V input to 0-100% display
+        # Scaled value = (reading * 10) + 0 = percentage
+        daq.set_scaling(channel, gain=10.0, offset=0.0, enable=True)
+        print("Scaling configured: 0-10V input -> 0-100% output")
+
+        readings = daq.measure_voltage_dc(channel)
+        print(f"Raw voltage: {readings[0].value:.3f} V")
+        # Note: scaled value would be returned if DAQ returns scaled data
+
+
+if __name__ == "__main__":
+    print("Data Logger / DAQ Basic Examples")
+    print("================================\n")
+
+    try:
+        basic_measurements()
+        # scan_multiple_channels()
+        # continuous_logging()
+        # alarm_monitoring()
+        # scaling_example()
+    except Exception as e:
+        print(f"Error: {e}")
+        print("\nMake sure:")
+        print(f"  1. Your DAQ is connected at {DAQ_IP}")
+        print("  2. The IP address is correct")
+        print("  3. No other software is using the connection")
+```
+
+---
+
+## SCPI dialect auto-detection and manual override
+
+SCPI dialect auto-detection and manual override.
+
+### Requirements
+
+- scpi_control - Core library
+- Oscilloscope connected to network
+
+### Configuration
+
+Update `SCOPE_IP` to match your oscilloscope's IP address (default: `192.168.1.100`).
+
+### Usage
+
+```bash
+python examples/dialect_override_example.py
+```
+
+### Source Code
+
+```python
+"""SCPI dialect auto-detection and manual override.
+
+The library speaks two Siglent command sets: "legacy" (SDS1000X-E era,
+e.g. C1:VDIV 500mV) and "modern" (SDS800X HD era, e.g. :CHANnel1:SCALe 0.5).
+The dialect is auto-detected from *IDN? at connect; pass dialect= to force
+one when detection guesses wrong. This example uses mock connections so it
+runs without hardware.
+
+Requirements: SCPI-Instrument-Control (core install)
+"""
+
+from scpi_control import Oscilloscope
+from scpi_control.connection.mock import MockConnection
+from scpi_control.exceptions import SiglentTimeoutError
+
+LEGACY_IDN = "Siglent Technologies,SDS1104X-E,MOCK0001,1.0.0.0"
+MODERN_IDN = "Siglent Technologies,SDS824X HD,MOCK0002,3.8.12"
+
+
+def show(scope: Oscilloscope, label: str) -> None:
+    scope.connect()
+    try:
+        print(f"{label}: model={scope.device_info.get('model')}, detected dialect={scope.dialect}")
+        scope.timebase = 1e-3  # same API call regardless of dialect
+        print(f"  timebase set to {scope.timebase} s/div via the {scope.dialect} command set")
+    finally:
+        scope.disconnect()
+
+
+def main() -> None:
+    # Auto-detection from *IDN?
+    show(Oscilloscope("mock", connection=MockConnection("mock", idn=LEGACY_IDN)), "Legacy scope (auto)")
+    show(Oscilloscope("mock", connection=MockConnection("mock", idn=MODERN_IDN)), "Modern scope (auto)")
+
+    # Manual override: dialect= exists for the case where the model registry
+    # misidentifies real hardware from *IDN? and you need to force the wire
+    # protocol the instrument *actually* speaks. Forcing a dialect the
+    # instrument does NOT speak is a misuse - and our mock is faithful enough
+    # to prove it: it answers only the real protocol for its *IDN?, so
+    # forcing "modern" onto a legacy-speaking instrument here fails exactly
+    # like it would on real mismatched hardware (a timeout, not a crash).
+    forced = Oscilloscope("mock", connection=MockConnection("mock", idn=LEGACY_IDN), dialect="modern")
+    forced.connect()
+    try:
+        print(f"Legacy IDN, dialect forced to modern: model={forced.device_info.get('model')}, dialect={forced.dialect}")
+        try:
+            forced.timebase = 1e-3
+            print(f"  timebase set to {forced.timebase} s/div via the {forced.dialect} command set")
+        except SiglentTimeoutError:
+            print("  (expected) a modern-dialect query against a legacy-speaking instrument timed out")
+            print("  -- only override dialect to match what the real instrument speaks")
+    finally:
+        forced.disconnect()
+    # On real hardware, override with the dialect the instrument actually
+    # speaks: Oscilloscope("192.168.1.100", dialect="modern")
+
+
+if __name__ == "__main__":
+    main()
+```
+
+---
+
+## Basic Function Generator / AWG Usage Example
+
+Basic Function Generator / AWG Usage Example.
+
+### Requirements
+
+- scpi_control - Core library
+- Oscilloscope connected to network
+
+### Configuration
+
+Update `SCOPE_IP` to match your oscilloscope's IP address (default: `192.168.1.100`).
+
+### Usage
+
+```bash
+python examples/function_generator_basic.py
+```
+
+### Source Code
+
+```python
+"""Basic Function Generator / AWG Usage Example.
+
+This example demonstrates basic control of Siglent SDG series function generators
+using SCPI commands over Ethernet/LAN.
+
+Supported models:
+- SDG1000X series (SDG1020, SDG1025, SDG1032X, etc.)
+- SDG2000X series (SDG2042X, SDG2082X, SDG2122X, etc.)
+- Generic SCPI-compliant arbitrary waveform generators
+
+Requirements:
+- Function generator connected to network
+- IP address configured on generator
+- Default SCPI port: 5025
+
+Usage:
+    python function_generator_basic.py --ip 192.168.1.100
+"""
+
+import argparse
+import logging
+import time
+
+from scpi_control import FunctionGenerator
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+logger = logging.getLogger(__name__)
+
+
+def main():
+    """Main function to demonstrate AWG control."""
+    parser = argparse.ArgumentParser(description="Control Siglent Function Generator")
+    parser.add_argument("--ip", type=str, default="192.168.1.100", help="Function generator IP address")
+    parser.add_argument("--port", type=int, default=5025, help="SCPI port (default: 5025)")
+    args = parser.parse_args()
+
+    logger.info(f"Connecting to function generator at {args.ip}:{args.port}")
+
+    # Using context manager for automatic connection/disconnection
+    with FunctionGenerator(args.ip, port=args.port) as awg:
+        # Get device info
+        logger.info(f"Connected to: {awg.identify()}")
+        logger.info(f"Model: {awg.model_capability.model_name}")
+        logger.info(f"Manufacturer: {awg.model_capability.manufacturer}")
+        logger.info(f"Channels: {awg.model_capability.num_channels}")
+        logger.info(f"SCPI variant: {awg.model_capability.scpi_variant}")
+
+        # Example 1: Generate a simple sine wave
+        logger.info("\n=== Example 1: Sine Wave ===")
+        awg.channel1.configure_sine(frequency=1000.0, amplitude=5.0, offset=0.0)
+        awg.channel1.enable()
+        logger.info("Channel 1: 1kHz sine wave, 5Vpp, 0V offset")
+        logger.info(f"Configuration: {awg.channel1.get_configuration()}")
+
+        time.sleep(2)
+
+        # Example 2: Generate a square wave on channel 2
+        if awg.model_capability.num_channels >= 2:
+            logger.info("\n=== Example 2: Square Wave ===")
+            awg.channel2.configure_square(frequency=500.0, amplitude=3.3)
+            awg.channel2.enable()
+            logger.info("Channel 2: 500Hz square wave, 3.3Vpp")
+
+            time.sleep(2)
+
+        # Example 3: Pulse wave with duty cycle control
+        logger.info("\n=== Example 3: Pulse Wave ===")
+        awg.channel1.configure_pulse(
+            frequency=10e3,  # 10 kHz
+            amplitude=2.0,
+            duty_cycle=25.0,  # 25% duty cycle
+            offset=0.5,
+        )
+        logger.info("Channel 1: 10kHz pulse, 2Vpp, 25% duty cycle, 0.5V offset")
+
+        time.sleep(2)
+
+        # Example 4: Ramp/Triangle wave with symmetry control
+        logger.info("\n=== Example 4: Ramp Wave ===")
+        awg.channel1.configure_ramp(
+            frequency=1000.0,
+            amplitude=4.0,
+            symmetry=50.0,  # 50% = triangle wave
+        )
+        logger.info("Channel 1: 1kHz triangle wave (50% symmetry), 4Vpp")
+
+        time.sleep(2)
+
+        # Example 5: Channel synchronization (phase offset)
+        if awg.model_capability.num_channels >= 2:
+            logger.info("\n=== Example 5: Channel Synchronization ===")
+            awg.channel1.configure_sine(frequency=1000.0, amplitude=5.0)
+            awg.channel2.configure_sine(frequency=1000.0, amplitude=5.0)
+            awg.sync_channels(phase_offset=90.0)  # 90 degrees phase shift
+            awg.channel1.enable()
+            awg.channel2.enable()
+            logger.info("Channels 1 and 2: synchronized with 90° phase offset")
+
+            time.sleep(2)
+
+        # Example 6: Manual waveform configuration
+        logger.info("\n=== Example 6: Manual Configuration ===")
+        awg.channel1.function = "SINE"
+        awg.channel1.frequency = 2500.0  # 2.5 kHz
+        awg.channel1.amplitude = 3.0  # 3 Vpp
+        awg.channel1.offset = 1.5  # 1.5V DC offset
+        awg.channel1.phase = 0.0
+        awg.channel1.enable()
+        logger.info(f"Channel 1 configured manually: {awg.channel1.function}, " f"{awg.channel1.frequency}Hz, {awg.channel1.amplitude}Vpp")
+
+        time.sleep(2)
+
+        # Turn off all outputs (safety)
+        logger.info("\n=== Turning off all outputs ===")
+        awg.all_outputs_off()
+        logger.info("All outputs disabled")
+
+    logger.info("\nDisconnected from function generator")
+
+
+if __name__ == "__main__":
+    main()
+```
+
+---
+
 ## Measurement example for Siglent oscilloscope
 
 Measurement example for Siglent oscilloscope.
 
 ### Requirements
 
-- siglent - Core library
+- scpi_control - Core library
 - Oscilloscope connected to network
 
 ### Configuration
@@ -254,13 +665,191 @@ if __name__ == "__main__":
 
 ---
 
+## Basic power supply control example
+
+Basic power supply control example.
+
+### Requirements
+
+- scpi_control - Core library
+- Oscilloscope connected to network
+
+### Configuration
+
+Update `SCOPE_IP` to match your oscilloscope's IP address (default: `192.168.1.100`).
+
+### Usage
+
+```bash
+python examples/psu_basic_control.py
+```
+
+### Source Code
+
+```python
+"""Basic power supply control example.
+
+This example demonstrates how to control a SCPI power supply using the Siglent package.
+Works with both Siglent SPD series and generic SCPI-99 compliant power supplies.
+
+Connection Methods:
+    - Ethernet/LAN (this example): PowerSupply('192.168.1.200')
+    - USB: See psu_usb_connection.py
+
+For USB support:
+    pip install "Siglent-Oscilloscope[usb]"
+"""
+
+from scpi_control import PowerSupply
+
+
+def main():
+    # Connect to power supply (use your PSU's IP address)
+    psu = PowerSupply("192.168.1.200")
+
+    print("Connecting to power supply...")
+    psu.connect()
+
+    # Display device information
+    print(f"\nConnected to: {psu.device_info['manufacturer']} {psu.device_info['model']}")
+    print(f"Firmware: {psu.device_info['firmware']}")
+    print(f"Serial: {psu.device_info['serial']}")
+    print(f"Number of outputs: {psu.model_capability.num_outputs}")
+    print(f"SCPI variant: {psu.model_capability.scpi_variant}")
+
+    # Configure output 1
+    print("\n--- Configuring Output 1 ---")
+    psu.output1.voltage = 5.0
+    psu.output1.current = 1.0
+    print(f"Set voltage: {psu.output1.voltage}V")
+    print(f"Set current limit: {psu.output1.current}A")
+
+    # Enable output
+    print("\nEnabling output 1...")
+    psu.output1.enable()
+    print(f"Output enabled: {psu.output1.enabled}")
+
+    # Read measurements
+    print("\n--- Measurements ---")
+    measured_v = psu.output1.measure_voltage()
+    measured_i = psu.output1.measure_current()
+    measured_p = psu.output1.measure_power()
+
+    print(f"Measured voltage: {measured_v:.3f}V")
+    print(f"Measured current: {measured_i:.3f}A")
+    print(f"Measured power: {measured_p:.3f}W")
+
+    try:
+        mode = psu.output1.get_mode()
+        print(f"Operating mode: {mode}")
+    except Exception as e:
+        print(f"Mode query not supported: {e}")
+
+    # Get full configuration
+    print("\n--- Output 1 Configuration ---")
+    config = psu.output1.get_configuration()
+    for key, value in config.items():
+        print(f"{key}: {value}")
+
+    # Disable output (safety)
+    print("\nDisabling output 1...")
+    psu.output1.disable()
+    print(f"Output enabled: {psu.output1.enabled}")
+
+    # Disconnect
+    psu.disconnect()
+    print("\nDisconnected from power supply")
+
+
+def multi_output_example():
+    """Example for multi-output power supplies (e.g., SPD3303X)."""
+
+    psu = PowerSupply("192.168.1.200")
+    psu.connect()
+
+    if psu.model_capability.num_outputs < 3:
+        print("This example requires a 3-output power supply")
+        psu.disconnect()
+        return
+
+    print(f"Configuring {psu.model_capability.num_outputs} outputs...")
+
+    # Configure different voltages on each output
+    psu.output1.voltage = 5.0
+    psu.output1.current = 2.0
+    psu.output1.enable()
+
+    psu.output2.voltage = 12.0
+    psu.output2.current = 1.5
+    psu.output2.enable()
+
+    psu.output3.voltage = 3.3
+    psu.output3.current = 3.0
+    psu.output3.enable()
+
+    # Read all measurements
+    for output_num in [1, 2, 3]:
+        output = getattr(psu, f"output{output_num}")
+        v = output.measure_voltage()
+        i = output.measure_current()
+        p = output.measure_power()
+        print(f"Output {output_num}: {v:.2f}V, {i:.3f}A, {p:.2f}W")
+
+    # Safety: Turn off all outputs
+    print("\nTurning off all outputs (safety)...")
+    psu.all_outputs_off()
+
+    psu.disconnect()
+
+
+def context_manager_example():
+    """Example using context manager for automatic connection management."""
+
+    # Using 'with' ensures proper connection/disconnection
+    with PowerSupply("192.168.1.200") as psu:
+        print(f"Connected to {psu.model_capability.model_name}")
+
+        psu.output1.voltage = 3.3
+        psu.output1.current = 1.0
+        psu.output1.enable()
+
+        v = psu.output1.measure_voltage()
+        print(f"Output voltage: {v:.3f}V")
+
+        psu.output1.disable()
+
+    # PSU is automatically disconnected here
+    print("Automatically disconnected")
+
+
+if __name__ == "__main__":
+    print("=" * 60)
+    print("Power Supply Control Example")
+    print("=" * 60)
+
+    # Run basic example
+    main()
+
+    print("\n" + "=" * 60)
+    print("For multi-output example, uncomment the following line:")
+    print("=" * 60)
+    # multi_output_example()
+
+    print("\n" + "=" * 60)
+    print("Context Manager Example")
+    print("=" * 60)
+    # context_manager_example()
+```
+
+---
+
 ## Simple single capture example
 
 Simple single capture example.
 
 ### Requirements
 
-- siglent - Core library
+- scpi_control - Core library
 - Oscilloscope connected to network
 
 ### Configuration

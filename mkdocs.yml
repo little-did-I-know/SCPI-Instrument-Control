@@ -115,10 +115,15 @@ nav:
       - Connection Setup: getting-started/connection.md
   - User Guide:
       - Basic Usage: user-guide/basic-usage.md
+      - SCPI Dialects: user-guide/scpi-dialects.md
       - Waveform Capture: user-guide/waveform-capture.md
       - Measurements: user-guide/measurements.md
       - Trigger Control: user-guide/trigger-control.md
       - Advanced Features: user-guide/advanced-features.md
+  - Web Gateway:
+      - Overview: gateway/index.md
+      - Browser UI Tour: gateway/browser-ui.md
+      - REST & WebSocket API: gateway/api.md
   - GUI Application:
       - Overview: gui/overview.md
       - Interface Guide: gui/interface.md
@@ -148,6 +153,18 @@ nav:
       - Screen Capture: api/screen_capture.md
       - Reference Waveform: api/reference_waveform.md
       - Math Channel: api/math_channel.md
+      - Function Generator: api/function_generator.md
+      - AWG Output: api/awg_output.md
+      - Power Supply: api/power_supply.md
+      - Power Supply Output: api/power_supply_output.md
+      - Data Logger (DAQ): api/data_logger.md
+      - PSU Data Logger: api/psu_data_logger.md
+      - Protocol Decode: api/protocol_decode.md
+      - Web Gateway:
+          - Sessions: api/server_sessions.md
+          - Trend Recorder: api/server_recorder.md
+          - Analysis Compute: api/server_compute.md
+          - Discovery: api/server_discovery.md
       - GUI Components: api/gui.md
   - Examples:
       - Beginner Examples: examples/beginner.md
@@ -158,6 +175,16 @@ nav:
       - Building: development/building.md
       - Project Structure: development/structure.md
       - Testing: development/testing.md
+      - Maintainer Guides:
+          - Pre-commit Checks: development/PRE_COMMIT_CHECKS.md
+          - Building Executables: development/BUILDING_EXECUTABLES.md
+          - Code Signing: development/CODE_SIGNING.md
+          - Icon Setup: development/ICON_SETUP.md
+          - PyPI Deployment: development/PYPI_DEPLOYMENT.md
+          - Version Bumping: development/VERSION_BUMPING.md
+          - Build Workflow Testing: development/TESTING_BUILD_WORKFLOW.md
+          - Experimental Features: development/EXPERIMENTAL_FEATURES.md
+          - Detailed Project Structure: development/PROJECT_STRUCTURE.md
   - About:
       - Changelog: about/changelog.md
       - License: about/license.md

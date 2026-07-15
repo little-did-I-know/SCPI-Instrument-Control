@@ -1,6 +1,6 @@
 # Code Signing for Executables
 
-This guide explains how to set up code signing for the Siglent Oscilloscope GUI executables.
+This guide explains how to set up code signing for the SCPI Instrument Control GUI executables.
 
 ## Why Code Signing?
 

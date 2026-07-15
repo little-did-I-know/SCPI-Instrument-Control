@@ -4,7 +4,7 @@ This guide provides detailed instructions for connecting to your Siglent oscillo
 
 ## Overview
 
-The Siglent Oscilloscope Control library communicates with oscilloscopes using the SCPI (Standard Commands for Programmable Instruments) protocol over TCP/IP. This allows:
+SCPI Instrument Control communicates with oscilloscopes using the SCPI (Standard Commands for Programmable Instruments) protocol over TCP/IP. This allows:
 
 - **Remote Control**: Send commands from your computer
 - **Data Retrieval**: Download waveforms and screenshots
@@ -47,7 +47,7 @@ The Siglent Oscilloscope Control library communicates with oscilloscopes using t
 
 - Network interface (Ethernet or WiFi)
 - Python 3.9 or later installed
-- Siglent library installed: `pip install SCPI-Instrument-Control`
+- SCPI Instrument Control installed: `pip install "SCPI-Instrument-Control"`
 
 **Network:**
 
@@ -60,7 +60,7 @@ The Siglent Oscilloscope Control library communicates with oscilloscopes using t
 **Python Packages:**
 
 ```bash
-pip install SCPI-Instrument-Control
+pip install "SCPI-Instrument-Control"
 ```
 
 **Optional for GUI:**

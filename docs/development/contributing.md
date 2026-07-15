@@ -1,4 +1,4 @@
-# Contributing to Siglent Oscilloscope Control
+# Contributing to SCPI Instrument Control
 
 Thank you for your interest in contributing! This document provides guidelines and instructions for contributing to the project.
 
@@ -510,4 +510,4 @@ By contributing, you agree that your contributions will be licensed under the MI
 
 ---
 
-Thank you for contributing to Siglent Oscilloscope Control! 🎉
+Thank you for contributing to SCPI Instrument Control! 🎉

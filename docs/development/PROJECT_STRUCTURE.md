@@ -1,6 +1,6 @@
 # Project Structure
 
-This document describes the organization of the Siglent Oscilloscope Control project.
+This document describes the organization of the SCPI Instrument Control project.
 
 ## Directory Layout
 
@@ -31,13 +31,9 @@ Siglent/
 ├── docs/                    # Documentation
 │   ├── images/             # Screenshots (installed)
 │   ├── development/        # Dev docs (not installed)
-│   │   ├── BUILD.md
 │   │   ├── PYPI_DEPLOYMENT.md
 │   │   └── PROJECT_STRUCTURE.md
-│   ├── VISUAL_MEASUREMENTS.md  # User guide (installed)
 │   ├── SCREENSHOT_GUIDE.md     # Development guide
-│   ├── CONTRIBUTING.md         # Contribution guide
-│   ├── SECURITY.md             # Security policy
 │   └── SDS800XHD_Series_ProgrammingGuide_EN11G.pdf  # Scope manual
 │
 ├── examples/                # Example scripts (installed)
@@ -70,7 +66,6 @@ When users install the package via `pip install SCPI-Instrument-Control`, they g
 
 - `README.md` - Main documentation
 - `CHANGELOG.md` - Version history
-- `docs/VISUAL_MEASUREMENTS.md` - Visual measurement guide
 - `docs/images/` - GUI screenshots
 - `docs/SDS800XHD_Series_ProgrammingGuide_EN11G.pdf` - Scope manual
 
@@ -79,7 +74,6 @@ When users install the package via `pip install SCPI-Instrument-Control`, they g
 - `tests/` - Test suite (for development only)
 - `scripts/` - Development utilities
 - `docs/development/` - Build and deployment documentation
-- `docs/CONTRIBUTING.md`, `docs/SECURITY.md` - Development guides
 
 ## Directory Purposes
 
@@ -130,17 +124,13 @@ Project documentation, split into user-facing and developer-facing content.
 
 **User Documentation (installed):**
 
-- `VISUAL_MEASUREMENTS.md` - How to use visual measurement markers
 - `images/` - GUI screenshots for README
 - `SDS800XHD_Series_ProgrammingGuide_EN11G.pdf` - Oscilloscope reference
 
 **Developer Documentation (not installed):**
 
-- `development/BUILD.md` - How to build and package
 - `development/PYPI_DEPLOYMENT.md` - PyPI deployment guide
 - `development/PROJECT_STRUCTURE.md` - This file
-- `CONTRIBUTING.md` - How to contribute
-- `SECURITY.md` - Security policy
 - `SCREENSHOT_GUIDE.md` - Screenshot capture guide
 
 ### examples/
@@ -220,7 +210,7 @@ Controls what files are included in source distributions:
    - cmd.exe: `for %f in (dist\*.whl) do python -m pip install --upgrade pip "%f"`
 9. **Deploy to PyPI:** `twine upload dist/*`
 
-See `docs/development/BUILD.md` and `docs/development/PYPI_DEPLOYMENT.md` for detailed instructions.
+See `docs/development/PYPI_DEPLOYMENT.md` for detailed instructions.
 
 ## Migration from Old Structure
 

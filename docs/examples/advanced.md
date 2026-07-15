@@ -7,6 +7,9 @@ Advanced examples demonstrating signal analysis, FFT processing, and specialized
 | Example | Description |
 |---------|-------------|
 | [Advanced waveform analysis and visualization](#advanced-waveform-analysis-and-visualization) | Advanced waveform analysis and visualization. |
+| [Probe Calibration Analysis Example](#probe-calibration-analysis-example) | Probe Calibration Analysis Example |
+| [Test the power supply GUI with a mock connection](#test-the-power-supply-gui-with-a-mock-connection) | Test the power supply GUI with a mock connection. |
+| [Example: Generating Professional Test Reports](#example:-generating-professional-test-reports) | Example: Generating Professional Test Reports |
 | [Vector Graphics on Oscilloscope using XY Mode](#vector-graphics-on-oscilloscope-using-xy-mode) | Vector Graphics on Oscilloscope using XY Mode |
 
 ---
@@ -245,13 +248,895 @@ if __name__ == "__main__":
 
 ---
 
+## Probe Calibration Analysis Example
+
+Probe Calibration Analysis Example
+
+### Requirements
+
+- scpi_control - Core library
+- Oscilloscope connected to network
+
+### Configuration
+
+Update `SCOPE_IP` to match your oscilloscope's IP address (default: `192.168.1.100`).
+
+### Usage
+
+```bash
+python examples/probe_calibration_analysis.py
+```
+
+### Source Code
+
+```python
+#!/usr/bin/env python3
+"""
+Probe Calibration Analysis Example
+
+Demonstrates the new waveform region extraction features for analyzing
+probe compensation using oscilloscope calibration signals.
+
+This example shows:
+1. Automatic plateau detection in square waves
+2. Plateau slope analysis for probe compensation assessment
+3. Calibration guidance generation
+4. Zoomed region plots in PDF reports
+5. Manual region addition and analysis
+
+For best results, capture a 1kHz square wave from your oscilloscope's
+probe compensation output with different probe compensation settings:
+- Properly compensated (flat plateaus)
+- Undercompensated (rising plateaus)
+- Overcompensated (falling plateaus)
+"""
+
+from datetime import datetime
+from pathlib import Path
+
+import numpy as np
+
+from scpi_control.report_generator.generators.markdown_generator import MarkdownReportGenerator
+from scpi_control.report_generator.generators.pdf_generator import PDFReportGenerator
+from scpi_control.report_generator.models.report_data import ReportMetadata, TestReport, TestSection, WaveformData
+from scpi_control.report_generator.utils.waveform_analyzer import WaveformAnalyzer
+
+
+def generate_test_square_wave(slope: float = 0, noise: float = 0.01):
+    """
+    Generate a test square wave with configurable plateau slope.
+
+    Args:
+        slope: Plateau slope in V/s (positive=rising, negative=falling, 0=flat)
+        noise: Noise level to add (RMS voltage)
+
+    Returns:
+        Tuple of (time_data, voltage_data)
+    """
+    # 1kHz square wave, 10ms duration, 100kS/s
+    sample_rate = 100000
+    duration = 0.01
+    freq = 1000
+
+    t = np.linspace(0, duration, int(sample_rate * duration))
+
+    # Generate base square wave
+    v = np.sign(np.sin(2 * np.pi * freq * t))
+
+    # Add slope to plateaus
+    if slope != 0:
+        # Find high and low plateau regions
+        high_regions = v > 0.5
+        low_regions = v < -0.5
+
+        # Add linear trend to each plateau
+        for i in range(len(v) - 1):
+            if high_regions[i]:
+                # Rising edge at start of plateau
+                if i == 0 or not high_regions[i - 1]:
+                    plateau_start_time = t[i]
+                # Add slope
+                v[i] += slope * (t[i] - plateau_start_time)
+            elif low_regions[i]:
+                # Falling edge at start of plateau
+                if i == 0 or not low_regions[i - 1]:
+                    plateau_start_time = t[i]
+                # Add slope
+                v[i] += slope * (t[i] - plateau_start_time)
+
+    # Add noise
+    if noise > 0:
+        v += np.random.normal(0, noise, len(v))
+
+    return t, v
+
+
+def main():
+    """Run the probe calibration analysis example."""
+    print("=" * 70)
+    print("Probe Calibration Analysis - Region Extraction Demo")
+    print("=" * 70)
+
+    # Create metadata
+    metadata = ReportMetadata(
+        title="Oscilloscope Probe Calibration Test",
+        technician="Test Engineer",
+        test_date=datetime.now(),
+        equipment_model="SDS2104X Plus",
+        test_procedure="PROC-001: 10X Probe Compensation Verification",
+        notes="Testing probe compensation using 1kHz calibration signal",
+    )
+
+    # Create report
+    report = TestReport(metadata=metadata)
+
+    # Executive summary
+    report.executive_summary = """
+This report analyzes oscilloscope probe compensation using the built-in 1kHz
+calibration signal. Proper probe compensation is critical for accurate measurements.
+
+The analysis examines plateau slope and flatness to determine if the probe's
+trimmer capacitor requires adjustment.
+"""
+
+    # ========================================================================
+    # Test Case 1: Properly Compensated Probe
+    # ========================================================================
+    print("\n1. Generating properly compensated probe test...")
+    section1 = TestSection(title="Test 1: Properly Compensated Probe", content="This test shows a properly compensated 10X probe with flat plateaus.")
+
+    # Generate test waveform (flat plateaus, minimal slope)
+    t1, v1 = generate_test_square_wave(slope=0, noise=0.005)
+
+    waveform1 = WaveformData(channel_name="CH1", time_data=t1, voltage_data=v1, sample_rate=100000, record_length=len(t1), label="Properly Compensated Probe", probe_ratio=10)
+
+    # Analyze the waveform (detects signal type)
+    print("   - Analyzing waveform...")
+    waveform1.analyze()
+    print(f"   - Detected signal type: {waveform1.signal_type}")
+
+    # Automatically detect and analyze regions
+    print("   - Detecting plateau regions...")
+    WaveformAnalyzer.detect_regions(waveform1, auto_detect_plateaus=True, auto_detect_edges=False)
+    print(f"   - Found {len(waveform1.regions)} regions")
+
+    # Analyze all detected regions
+    print("   - Analyzing regions...")
+    WaveformAnalyzer.analyze_all_regions(waveform1)
+
+    # Print region analysis results
+    for i, region in enumerate(waveform1.regions, 1):
+        print(f"     Region {i}: {region.label}")
+        print(f"       - Slope: {region.slope:.0f} V/s")
+        print(f"       - Flatness: {region.flatness*1e3:.2f} mV")
+        if region.calibration_recommendation:
+            print(f"       - {region.calibration_recommendation}")
+
+    section1.waveforms.append(waveform1)
+    report.add_section(section1)
+
+    # ========================================================================
+    # Test Case 2: Undercompensated Probe
+    # ========================================================================
+    print("\n2. Generating undercompensated probe test...")
+    section2 = TestSection(title="Test 2: Undercompensated Probe", content="This test shows an undercompensated probe with rising plateaus.")
+
+    # Generate test waveform (positive slope = undercompensated)
+    t2, v2 = generate_test_square_wave(slope=15000, noise=0.008)
+
+    waveform2 = WaveformData(channel_name="CH2", time_data=t2, voltage_data=v2, sample_rate=100000, record_length=len(t2), label="Undercompensated Probe", probe_ratio=10)
+
+    waveform2.analyze()
+    WaveformAnalyzer.detect_regions(waveform2, auto_detect_plateaus=True, auto_detect_edges=False)
+    WaveformAnalyzer.analyze_all_regions(waveform2)
+
+    for i, region in enumerate(waveform2.regions, 1):
+        print(f"     Region {i}: {region.label}")
+        print(f"       - Slope: {region.slope:.0f} V/s")
+        if region.calibration_recommendation:
+            print(f"       - {region.calibration_recommendation}")
+
+    section2.waveforms.append(waveform2)
+    report.add_section(section2)
+
+    # ========================================================================
+    # Test Case 3: Overcompensated Probe
+    # ========================================================================
+    print("\n3. Generating overcompensated probe test...")
+    section3 = TestSection(title="Test 3: Overcompensated Probe", content="This test shows an overcompensated probe with falling plateaus.")
+
+    # Generate test waveform (negative slope = overcompensated)
+    t3, v3 = generate_test_square_wave(slope=-18000, noise=0.006)
+
+    waveform3 = WaveformData(channel_name="CH3", time_data=t3, voltage_data=v3, sample_rate=100000, record_length=len(t3), label="Overcompensated Probe", probe_ratio=10)
+
+    waveform3.analyze()
+    WaveformAnalyzer.detect_regions(waveform3, auto_detect_plateaus=True, auto_detect_edges=False)
+    WaveformAnalyzer.analyze_all_regions(waveform3)
+
+    for i, region in enumerate(waveform3.regions, 1):
+        print(f"     Region {i}: {region.label}")
+        print(f"       - Slope: {region.slope:.0f} V/s")
+        if region.calibration_recommendation:
+            print(f"       - {region.calibration_recommendation}")
+
+    section3.waveforms.append(waveform3)
+    report.add_section(section3)
+
+    # ========================================================================
+    # Test Case 4: Manual Region Addition
+    # ========================================================================
+    print("\n4. Demonstrating manual region addition...")
+    section4 = TestSection(title="Test 4: Manual Region Definition", content="This example shows how to manually add custom regions of interest.")
+
+    # Generate another test waveform
+    t4, v4 = generate_test_square_wave(slope=5000, noise=0.01)
+
+    waveform4 = WaveformData(channel_name="CH4", time_data=t4, voltage_data=v4, sample_rate=100000, record_length=len(t4), label="Manual Region Example")
+
+    waveform4.analyze()
+
+    # Manually add a custom region (e.g., focusing on first high plateau)
+    custom_region = waveform4.add_region(
+        start_time=0.0005,  # 0.5ms
+        end_time=0.0010,  # 1.0ms
+        label="Custom Analysis Region",
+        description="Manually defined region for detailed investigation",
+        region_type="custom",
+        ideal_value=1.0,
+        tolerance_min=0.95,
+        tolerance_max=1.05,
+    )
+
+    # Analyze the custom region
+    WaveformAnalyzer.analyze_region(waveform4, custom_region)
+
+    print(f"     Custom region: {custom_region.label}")
+    print(f"       - Time range: {custom_region.start_time*1e3:.3f}ms to {custom_region.end_time*1e3:.3f}ms")
+    print(f"       - Slope: {custom_region.slope:.0f} V/s")
+    print(f"       - Passes spec: {custom_region.passes_spec}")
+
+    section4.waveforms.append(waveform4)
+    report.add_section(section4)
+
+    # Add key findings
+    report.key_findings = [
+        "Test 1 (Properly Compensated): Flat plateaus with minimal slope - probe calibration is good",
+        "Test 2 (Undercompensated): Rising plateaus indicate trimmer capacitor needs clockwise adjustment",
+        "Test 3 (Overcompensated): Falling plateaus indicate trimmer capacitor needs counter-clockwise adjustment",
+        "Region extraction enables detailed analysis of specific waveform sections",
+        "Automatic calibration guidance provides actionable recommendations",
+    ]
+
+    # Add recommendations
+    report.recommendations = [
+        "Always verify probe compensation before critical measurements",
+        "Use the 1kHz calibration signal output on your oscilloscope",
+        "Adjust trimmer capacitor in small increments (10-15°) and retest",
+        "Document probe compensation status in test reports",
+        "Recheck compensation when changing measurement setup or environment",
+    ]
+
+    # ========================================================================
+    # Generate Reports
+    # ========================================================================
+    print("\n" + "=" * 70)
+    print("Generating Reports...")
+    print("=" * 70)
+
+    # Generate PDF
+    pdf_path = Path("probe_calibration_analysis.pdf")
+    print(f"\nGenerating PDF: {pdf_path}")
+    pdf_generator = PDFReportGenerator()
+    pdf_success = pdf_generator.generate(report, pdf_path)
+
+    if pdf_success:
+        print(f"  ✓ PDF generated successfully ({pdf_path.stat().st_size:,} bytes)")
+    else:
+        print(f"  ✗ PDF generation failed")
+
+    # Generate Markdown
+    md_path = Path("probe_calibration_analysis.md")
+    print(f"\nGenerating Markdown: {md_path}")
+    md_generator = MarkdownReportGenerator(include_plots=True, plots_dir="plots")
+    md_success = md_generator.generate(report, md_path)
+
+    if md_success:
+        print(f"  ✓ Markdown generated successfully ({md_path.stat().st_size:,} bytes)")
+    else:
+        print(f"  ✗ Markdown generation failed")
+
+    # ========================================================================
+    # Summary
+    # ========================================================================
+    print("\n" + "=" * 70)
+    print("Feature Demonstration Summary")
+    print("=" * 70)
+    print("\n✓ Features Demonstrated:")
+    print("  1. Automatic plateau detection in square waves")
+    print("  2. Plateau slope analysis for probe compensation")
+    print("  3. Automatic calibration guidance generation")
+    print("  4. Zoomed region plots in reports")
+    print("  5. Manual region definition and analysis")
+    print("  6. Region-specific statistics and measurements")
+    print("  7. Color-coded calibration recommendations")
+    print("  8. Both PDF and Markdown report generation")
+
+    print("\n✓ Report Contents:")
+    print(f"  - {len(report.sections)} test sections")
+    total_waveforms = sum(len(s.waveforms) for s in report.sections)
+    total_regions = sum(len(w.regions) for w in [wf for s in report.sections for wf in s.waveforms])
+    print(f"  - {total_waveforms} waveforms analyzed")
+    print(f"  - {total_regions} regions detected and analyzed")
+    print(f"  - {len(report.key_findings)} key findings")
+    print(f"  - {len(report.recommendations)} recommendations")
+
+    print("\n✓ Files Generated:")
+    if pdf_success:
+        print(f"  - {pdf_path}")
+    if md_success:
+        print(f"  - {md_path}")
+        print(f"  - plots/ (region zoomed plots)")
+
+    print("\n" + "=" * 70)
+    print("Review the generated PDF to see:")
+    print("  • Full waveform plots")
+    print("  • Automatic plateau detection")
+    print("  • Zoomed region subsections")
+    print("  • Slope analysis tables")
+    print("  • Color-coded calibration guidance")
+    print("  • Detailed region-specific measurements")
+    print("=" * 70)
+
+    return 0
+
+
+if __name__ == "__main__":
+    import sys
+
+    sys.exit(main())
+```
+
+---
+
+## Test the power supply GUI with a mock connection
+
+Test the power supply GUI with a mock connection.
+
+### Requirements
+
+- PyQt6 - For GUI
+- Oscilloscope connected to network
+
+### Configuration
+
+Update `SCOPE_IP` to match your oscilloscope's IP address (default: `192.168.1.100`).
+
+### Usage
+
+```bash
+python examples/psu_gui_test.py
+```
+
+### Source Code
+
+```python
+"""Test the power supply GUI with a mock connection.
+
+This script demonstrates the PSU control GUI using a mock connection,
+allowing you to test the interface without physical hardware.
+"""
+
+import sys
+
+from PyQt6.QtWidgets import QApplication, QMessageBox
+
+from scpi_control import PowerSupply
+from scpi_control.connection.mock import MockConnection
+from scpi_control.gui.main_window import MainWindow
+
+
+def test_psu_gui_with_mock():
+    """Launch GUI and connect to mock PSU."""
+    app = QApplication(sys.argv)
+
+    # Create main window
+    window = MainWindow()
+    window.show()
+
+    # Create mock PSU connection
+    print("Creating mock PSU connection (Siglent SPD3303X)...")
+    mock_conn = MockConnection(psu_mode=True, psu_idn="Siglent Technologies,SPD3303X,SPD123456,V1.01")
+
+    # Create PSU instance with mock connection
+    psu = PowerSupply("mock", connection=mock_conn)
+
+    try:
+        # Connect to mock PSU
+        psu.connect()
+        print(f"Connected to: {psu.model_capability.model_name}")
+        print(f"Outputs: {psu.model_capability.num_outputs}")
+
+        # Pass PSU to GUI
+        window.psu = psu
+        window.psu_control.set_psu(psu)
+
+        # Switch to Power Supply tab
+        for i in range(window.tabs.count()):
+            if window.tabs.tabText(i) == "Power Supply":
+                window.tabs.setCurrentIndex(i)
+                break
+
+        # Show connection info
+        info_msg = (
+            f"Mock PSU Connected!\n\n"
+            f"Model: {psu.model_capability.model_name}\n"
+            f"Outputs: {psu.model_capability.num_outputs}\n"
+            f"SCPI Variant: {psu.model_capability.scpi_variant}\n\n"
+            f"You can now test the PSU controls:\n"
+            f"- Set voltage and current\n"
+            f"- Enable/disable outputs\n"
+            f"- View real-time measurements\n"
+            f"- Test the safety 'All Off' button"
+        )
+        QMessageBox.information(window, "Mock PSU Connected", info_msg)
+
+        print("\nGUI launched successfully!")
+        print("Try the PSU controls in the 'Power Supply' tab")
+        print("\nInstructions:")
+        print("1. Adjust voltage and current sliders")
+        print("2. Enable outputs with checkboxes")
+        print("3. Watch real-time measurements update")
+        print("4. Test the 'All Outputs OFF' safety button")
+
+        # Run the application
+        sys.exit(app.exec())
+
+    except Exception as e:
+        print(f"Error: {e}")
+        import traceback
+
+        traceback.print_exc()
+
+
+def test_generic_psu():
+    """Test with a generic SCPI PSU."""
+    app = QApplication(sys.argv)
+
+    window = MainWindow()
+    window.show()
+
+    # Create mock generic PSU connection
+    print("Creating mock generic PSU connection...")
+    mock_conn = MockConnection(psu_mode=True, psu_idn="RIGOL TECHNOLOGIES,DP832,DP8XXXX,V1.0")
+
+    psu = PowerSupply("mock", connection=mock_conn)
+
+    try:
+        psu.connect()
+        print(f"Connected to: {psu.model_capability.model_name}")
+        print(f"SCPI Variant: {psu.model_capability.scpi_variant}")
+
+        window.psu = psu
+        window.psu_control.set_psu(psu)
+
+        # Switch to Power Supply tab
+        for i in range(window.tabs.count()):
+            if window.tabs.tabText(i) == "Power Supply":
+                window.tabs.setCurrentIndex(i)
+                break
+
+        info_msg = (
+            f"Mock Generic PSU Connected!\n\n"
+            f"Model: {psu.model_capability.model_name}\n"
+            f"Manufacturer: {psu.model_capability.manufacturer}\n"
+            f"SCPI Variant: generic (standard commands)\n\n"
+            f"This demonstrates generic SCPI-99 compatibility"
+        )
+        QMessageBox.information(window, "Generic PSU Connected", info_msg)
+
+        print("\nGeneric PSU GUI test launched!")
+        sys.exit(app.exec())
+
+    except Exception as e:
+        print(f"Error: {e}")
+        import traceback
+
+        traceback.print_exc()
+
+
+if __name__ == "__main__":
+    print("=" * 60)
+    print("Power Supply GUI Test with Mock Connection")
+    print("=" * 60)
+    print()
+    print("Choose test:")
+    print("1. Siglent SPD3303X (default)")
+    print("2. Generic SCPI PSU")
+    print()
+
+    choice = input("Enter choice (1 or 2, default=1): ").strip()
+
+    if choice == "2":
+        test_generic_psu()
+    else:
+        test_psu_gui_with_mock()
+```
+
+---
+
+## Example: Generating Professional Test Reports
+
+Example: Generating Professional Test Reports
+
+### Requirements
+
+- scpi_control - Core library
+- Oscilloscope connected to network
+
+### Configuration
+
+Update `SCOPE_IP` to match your oscilloscope's IP address (default: `192.168.1.100`).
+
+### Usage
+
+```bash
+python examples/report_generation_example.py
+```
+
+### Source Code
+
+```python
+"""
+Example: Generating Professional Test Reports
+
+This example demonstrates how to use the Report Generator to create
+professional PDF and Markdown reports from oscilloscope data.
+
+Features demonstrated:
+- Loading waveform data from files
+- Creating report metadata
+- Adding measurements with pass/fail criteria
+- Using AI for report analysis (optional)
+- Generating PDF and Markdown reports
+"""
+
+from datetime import datetime
+from pathlib import Path
+
+import numpy as np
+
+from scpi_control.report_generator.generators.markdown_generator import MarkdownReportGenerator
+from scpi_control.report_generator.models.criteria import ComparisonType, CriteriaSet, MeasurementCriteria
+from scpi_control.report_generator.models.report_data import MeasurementResult, ReportMetadata, TestReport, TestSection, WaveformData
+
+# Import PDF generator if available
+try:
+    from scpi_control.report_generator.generators.pdf_generator import PDFReportGenerator
+
+    PDF_AVAILABLE = True
+except ImportError:
+    print("Warning: reportlab not installed - PDF generation will be skipped")
+    PDF_AVAILABLE = False
+
+from scpi_control.report_generator.llm.analyzer import ReportAnalyzer
+
+# Import LLM components if you want AI features
+from scpi_control.report_generator.llm.client import LLMClient, LLMConfig
+
+
+def create_sample_waveform() -> WaveformData:
+    """Create a sample waveform for demonstration."""
+    # Generate a simple sine wave with some noise
+    sample_rate = 1e9  # 1 GS/s
+    duration = 1e-3  # 1 ms
+    frequency = 1e3  # 1 kHz
+
+    num_samples = int(sample_rate * duration)
+    time_data = np.linspace(0, duration, num_samples)
+
+    # Generate sine wave with noise
+    voltage_data = 2.0 * np.sin(2 * np.pi * frequency * time_data)
+    voltage_data += 0.1 * np.random.randn(num_samples)  # Add noise
+
+    return WaveformData(
+        channel_name="CH1",
+        time_data=time_data,
+        voltage_data=voltage_data,
+        sample_rate=sample_rate,
+        record_length=num_samples,
+        timebase=100e-6,  # 100 μs/div
+        voltage_scale=1.0,  # 1 V/div
+        probe_ratio=1.0,
+        coupling="DC",
+        label="Power Supply Output",
+    )
+
+
+def create_sample_measurements() -> list[MeasurementResult]:
+    """Create sample measurements with pass/fail status."""
+    measurements = [
+        MeasurementResult(
+            name="Frequency",
+            value=1.002e3,  # 1.002 kHz (slightly off)
+            unit="Hz",
+            channel="CH1",
+            passed=True,
+            criteria_min=990,
+            criteria_max=1010,
+        ),
+        MeasurementResult(
+            name="Peak-to-Peak",
+            value=3.98,
+            unit="V",
+            channel="CH1",
+            passed=True,
+            criteria_min=3.8,
+            criteria_max=4.2,
+        ),
+        MeasurementResult(
+            name="RMS",
+            value=1.42,
+            unit="V",
+            channel="CH1",
+            passed=True,
+            criteria_min=1.35,
+            criteria_max=1.50,
+        ),
+        MeasurementResult(
+            name="Rise Time",
+            value=125e-9,
+            unit="s",
+            channel="CH1",
+            passed=False,  # This one failed!
+            criteria_max=100e-9,
+        ),
+    ]
+
+    return measurements
+
+
+def create_criteria_set() -> CriteriaSet:
+    """Create a set of pass/fail criteria."""
+    criteria_set = CriteriaSet(
+        name="Power Supply Output Test",
+        description="Criteria for 1kHz, 4Vpp sine wave output",
+    )
+
+    # Frequency must be within ±1%
+    criteria_set.add_criteria(
+        MeasurementCriteria(
+            measurement_name="Frequency",
+            comparison_type=ComparisonType.RANGE,
+            min_value=990,
+            max_value=1010,
+            channel="CH1",
+            description="Output frequency within ±1%",
+            severity="critical",
+        )
+    )
+
+    # Vpp must be 4V ± 0.2V
+    criteria_set.add_criteria(
+        MeasurementCriteria(
+            measurement_name="Peak-to-Peak",
+            comparison_type=ComparisonType.RANGE,
+            min_value=3.8,
+            max_value=4.2,
+            channel="CH1",
+            description="Peak-to-peak voltage within spec",
+            severity="critical",
+        )
+    )
+
+    # Rise time must be < 100ns
+    criteria_set.add_criteria(
+        MeasurementCriteria(
+            measurement_name="Rise Time",
+            comparison_type=ComparisonType.MAX_ONLY,
+            max_value=100e-9,
+            channel="CH1",
+            description="Rise time must be fast",
+            severity="warning",
+        )
+    )
+
+    return criteria_set
+
+
+def create_report_with_ai(report: TestReport) -> TestReport:
+    """
+    Add AI-generated content to the report.
+
+    This requires Ollama or LM Studio to be running locally.
+    """
+    try:
+        # Configure Ollama (default settings)
+        llm_config = LLMConfig.create_ollama_config(model="llama3.2")
+
+        # Create client and analyzer
+        llm_client = LLMClient(llm_config)
+        analyzer = ReportAnalyzer(llm_client)
+
+        print("Testing LLM connection...")
+        if not llm_client.test_connection():
+            print("Warning: Could not connect to LLM. Skipping AI features.")
+            print("To enable AI features, install and run Ollama: https://ollama.com")
+            return report
+
+        print("Generating AI-powered executive summary...")
+        report.executive_summary = analyzer.generate_executive_summary(report)
+        report.ai_generated_summary = True
+
+        print("Generating AI key findings...")
+        report.key_findings = analyzer.generate_key_findings(report, max_findings=3) or []
+
+        print("Generating AI recommendations...")
+        suggestions = analyzer.suggest_next_steps(report)
+        if suggestions:
+            # Parse suggestions into list
+            report.recommendations = [line.strip() for line in suggestions.split("\n") if line.strip() and (line.strip()[0].isdigit() or line.strip().startswith("-"))]
+
+        # Add AI insights to sections
+        for section in report.sections:
+            if section.measurements:
+                print(f"Analyzing section: {section.title}...")
+                section.ai_insights = analyzer.interpret_measurements(report)
+
+        print("AI analysis complete!")
+
+    except Exception as e:
+        print(f"Warning: AI features failed: {e}")
+        print("Continuing without AI features...")
+
+    return report
+
+
+def main():
+    """Main example function."""
+    print("=" * 60)
+    print("Siglent Report Generator - Example Script")
+    print("=" * 60)
+    print()
+
+    # Step 1: Create report metadata
+    print("Step 1: Creating report metadata...")
+    metadata = ReportMetadata(
+        title="Power Supply Ripple and Noise Test",
+        technician="John Engineer",
+        test_date=datetime.now(),
+        equipment_model="SDS2104X Plus",
+        equipment_id="SN12345678",
+        test_procedure="TEST-PS-001 Rev 2.1",
+        project_name="DC Power Supply Validation",
+        customer="Acme Electronics",
+        temperature="23°C",
+        humidity="45% RH",
+        location="Test Lab 3",
+        notes="Testing 5V output under 1A load. Some rise time issues observed.",
+        company_name="Example Test Laboratory",
+    )
+
+    # Step 2: Create sample data
+    print("Step 2: Generating sample waveform data...")
+    waveform = create_sample_waveform()
+    measurements = create_sample_measurements()
+
+    # Step 3: Build the report
+    print("Step 3: Building test report...")
+    report = TestReport(metadata=metadata)
+
+    # Add test setup section
+    setup_section = TestSection(
+        title="Test Setup",
+        content=(
+            "The device under test (DUT) was configured for 5V output with a 1A resistive load. "
+            "Channel 1 of the oscilloscope was connected to the output using a 1:1 probe. "
+            "The oscilloscope was set to 100 µs/div timebase with 1 V/div vertical scale."
+        ),
+        order=1,
+    )
+    report.add_section(setup_section)
+
+    # Add waveform section
+    waveform_section = TestSection(
+        title="Waveform Captures",
+        content="Captured waveform showing the 1 kHz test signal output.",
+        waveforms=[waveform],
+        measurements=measurements,
+        order=2,
+    )
+    report.add_section(waveform_section)
+
+    # Add measurement results section
+    measurement_section = TestSection(
+        title="Measurement Results",
+        content="Automated measurements with pass/fail criteria.",
+        measurements=measurements,
+        order=3,
+    )
+    report.add_section(measurement_section)
+
+    # Calculate overall result
+    report.overall_result = report.calculate_overall_result()
+
+    # Step 4: Add AI analysis (optional)
+    print()
+    print("Step 4: AI Analysis (optional)...")
+    print("Note: This requires Ollama or LM Studio running locally.")
+
+    # Check if running interactively
+    enable_ai = False
+    try:
+        import sys
+
+        # Try to get input with a timeout by checking stdin
+        if sys.stdin.isatty() and hasattr(sys.stdin, "read"):
+            user_input = input("Enable AI features? (y/n): ").strip().lower()
+            enable_ai = user_input == "y"
+    except (EOFError, OSError):
+        # Not interactive or stdin not available
+        print("Running in non-interactive mode - skipping AI features.")
+        print("To enable AI, run the script interactively in a terminal.")
+        enable_ai = False
+
+    if enable_ai:
+        report = create_report_with_ai(report)
+    else:
+        print("Skipping AI features.")
+
+    # Step 5: Generate reports
+    print()
+    print("Step 5: Generating reports...")
+
+    # Create output directory
+    output_dir = Path("example_reports")
+    output_dir.mkdir(exist_ok=True)
+
+    # Generate Markdown report
+    print("  - Generating Markdown report...")
+    md_path = output_dir / "example_report.md"
+    md_generator = MarkdownReportGenerator(include_plots=True)
+
+    if md_generator.generate(report, md_path):
+        print(f"    [OK] Markdown report saved: {md_path}")
+    else:
+        print(f"    [FAILED] Failed to generate Markdown report")
+
+    # Generate PDF report (if available)
+    if PDF_AVAILABLE:
+        print("  - Generating PDF report...")
+        pdf_path = output_dir / "example_report.pdf"
+        pdf_generator = PDFReportGenerator()
+
+        if pdf_generator.generate(report, pdf_path):
+            print(f"    [OK] PDF report saved: {pdf_path}")
+        else:
+            print(f"    [FAILED] Failed to generate PDF report")
+    else:
+        print("  - PDF generation skipped (reportlab not installed)")
+
+    # Done!
+    print()
+    print("=" * 60)
+    print("Example complete!")
+    print(f"Reports saved to: {output_dir.absolute()}")
+    print("=" * 60)
+
+
+if __name__ == "__main__":
+    main()
+```
+
+---
+
 ## Vector Graphics on Oscilloscope using XY Mode
 
 Vector Graphics on Oscilloscope using XY Mode
 
 ### Requirements
 
-- siglent - Core library
+- scpi_control[fun] - Vector graphics extras
 - Oscilloscope connected to network
 
 ### Configuration
@@ -273,7 +1158,7 @@ This example demonstrates how to use the oscilloscope as a vector display
 by generating waveforms for XY mode.
 
 REQUIREMENTS:
-    - Install fun extras: pip install "SCPI-Instrument-Control[fun]"
+    - Install fun extras: pip install "Siglent-Oscilloscope[fun]"
     - External AWG/DAC to feed signals into scope channels
       OR use scope's built-in AWG if available
     - Oscilloscope channels connected to AWG outputs
@@ -490,7 +1375,7 @@ if __name__ == "__main__":
             print("Vector graphics features require additional packages.")
             print()
             print("Install with:")
-            print('  pip install "SCPI-Instrument-Control[fun]"')
+            print('  pip install "Siglent-Oscilloscope[fun]"')
             print()
             print("This will install:")
             print("  - shapely (geometric operations)")

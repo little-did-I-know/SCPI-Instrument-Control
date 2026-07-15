@@ -1,6 +1,6 @@
 # PyPI Deployment Guide
 
-This guide explains how to build and upload the Siglent package to PyPI.
+This guide explains how to build and upload the SCPI Instrument Control package to PyPI.
 
 ## Prerequisites
 

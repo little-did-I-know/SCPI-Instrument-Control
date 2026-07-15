@@ -1,6 +1,6 @@
 # Building Standalone Executables
 
-This guide explains how to build standalone executables for the Siglent Oscilloscope GUI application that can run without Python installed.
+This guide explains how to build standalone executables for the SCPI Instrument Control GUI application that can run without Python installed.
 
 ## Overview
 

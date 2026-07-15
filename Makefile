@@ -125,6 +125,7 @@ test-build-system:  ## Run pre-flight checks for build system
 
 docs-generate:  ## Generate all documentation from code
 	@echo "Generating documentation from code..."
+	python -c "import shutil; shutil.copyfile('CHANGELOG.md', 'docs/about/changelog.md')"
 	python scripts/docs/generate_examples_docs.py
 	python scripts/docs/generate_api_stubs.py
 	@echo "Documentation generated successfully!"
