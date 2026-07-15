@@ -18,9 +18,9 @@ to the right wire commands underneath.
 The dialect is detected automatically from the instrument's `*IDN?` response
 when you call `scope.connect()`. Detection first checks the built-in model
 registry (which pins the dialect for every officially supported model); for
-an unrecognized model it falls back to a heuristic — model names ending in
-`HD`, containing `PLUS`, or containing `SDS5`/`SDS6`/`SDS7` (or 'HD') are treated as
-modern, everything else as legacy.
+an unrecognized model it falls back to a heuristic — model names containing
+` HD` (with the space) or ending in `HD`, containing `PLUS`, or containing
+`SDS5`/`SDS6`/`SDS7` are treated as modern, everything else as legacy.
 
 Check what was detected after connecting:
 

@@ -63,6 +63,36 @@ pip install "SCPI-Instrument-Control[fun]"
 - Pillow >= 10.0.0 (text rendering)
 - svgpathtools >= 1.6.0 (SVG support)
 
+### Web Gateway
+
+For the browser-based lab gateway (a FastAPI server plus a web UI) so any
+browser on your LAN can control the instrument, no client install required:
+
+```bash
+pip install "SCPI-Instrument-Control[web]"
+```
+
+**Includes:**
+
+- fastapi >= 0.115
+- uvicorn[standard] >= 0.30
+- Pillow >= 10.0
+
+Start it with `scpi-web`. See the [Web Gateway guide](../gateway/index.md) for details.
+
+### USB / GPIB / Serial
+
+For instruments connected via USB, GPIB, or serial instead of Ethernet:
+
+```bash
+pip install "SCPI-Instrument-Control[usb]"
+```
+
+**Includes:**
+
+- pyvisa >= 1.14.0
+- pyvisa-py >= 0.7.0 (pure Python backend, no NI-VISA required)
+
 ### All Features
 
 Install everything:
@@ -70,6 +100,9 @@ Install everything:
 ```bash
 pip install "SCPI-Instrument-Control[all]"
 ```
+
+`[all]` does **not** include the web gateway (`[web]`) or USB/GPIB/Serial
+support (`[usb]`) — install those explicitly if you need them.
 
 ## Development Installation
 
@@ -129,7 +162,7 @@ scope.disconnect()
 Expected output:
 
 ```
-0.3.0
+2.0.0
 Siglent Technologies,SDS824X HD,SDSMMDD1XXXXX,8.2.5.1.37R9
 ```
 

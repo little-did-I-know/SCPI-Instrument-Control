@@ -28,6 +28,14 @@ Welcome to the SCPI Instrument Control documentation! SCPI Instrument Control is
 
   [:octicons-arrow-right-24: GUI Guide](gui/overview.md)
 
+- :material-web:{ .lg .middle } **Web Gateway**
+
+  ***
+
+  Control instruments from any browser on your LAN — no client install
+
+  [:octicons-arrow-right-24: Web Gateway](gateway/index.md)
+
 - :material-api:{ .lg .middle } **API Reference**
 
   ***
@@ -76,7 +84,7 @@ This library provides comprehensive control for SCPI test equipment — oscillos
     - **Multi-channel** - Simultaneous capture from all channels
     - **Thread-safe** - Background data acquisition without blocking
     - **Type hints** - Full type annotation for IDE support
-    - **Extensive tests** - 240+ tests with 42% coverage
+    - **Extensive tests** - 660+ automated tests
     - **Documentation** - Comprehensive docstrings and guides
 
 ## Installation
