@@ -149,7 +149,7 @@ def generate_api_stub(module_info: Dict, related_modules: List[Dict]) -> str:
         lines.append("")
 
     # Mkdocstrings autodoc section
-    module_path = f"siglent.{module_info['name']}"
+    module_path = f"scpi_control.{module_info['name']}"
     lines.append(f"::: {module_path}")
     lines.append("    options:")
     lines.append("      show_root_heading: false")

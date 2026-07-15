@@ -137,7 +137,7 @@ def check_formatting(auto_fix: bool = False) -> bool:
             return True
         else:
             print_error("Code formatting issues found")
-            print_warning("  Run: black --line-length 200 siglent/ tests/ examples/")
+            print_warning("  Run: black --line-length 200 scpi_control/ tests/ examples/")
             print_warning("  Or: python scripts/pre_pr_check.py --fix")
             return False
 
@@ -289,7 +289,7 @@ def check_coverage(fast_mode: bool = False) -> bool:
 
     print_step("Checking test coverage...")
 
-    success, output = run_command(["pytest", "tests/", "--cov=siglent", "--cov-report=term-missing", "--cov-report=html", "-q"], check=False, capture=True)
+    success, output = run_command(["pytest", "tests/", "--cov=scpi_control", "--cov-report=term-missing", "--cov-report=html", "-q"], check=False, capture=True)
 
     if success:
         # Extract coverage percentage
