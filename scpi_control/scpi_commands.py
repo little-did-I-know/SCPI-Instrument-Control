@@ -435,6 +435,21 @@ class SCPICommandSet:
             # Preamble trigger-point offset, absent on TBS
             # -- MSO2 p.2-701 / MSO456 p.2-1462
             "get_wfm_pt_off": "WFMOutpre:PT_Off?",
+            # Badge measurements. The modern MSO families have no
+            # MEASUrement:IMMed subsystem -- measurements are stateful "badges"
+            # that are added, configured, then read. Verified on both families:
+            # MSO2 PM 077-1776-07 (ADDNew p.414, TYPe p.487, SOUrce p.483,
+            # RESUlts p.481, DELete p.424, LIST p.430) and 4/5/6 PM 077-1305-11
+            # (ADDNew p.576, TYPe p.717, SOUrce p.709, RESUlts p.705,
+            # DELete p.596, LIST p.607).
+            "add_measurement_badge": 'MEASUrement:ADDNew "MEAS{n}"',
+            "set_badge_type": "MEASUrement:MEAS{n}:TYPe {type}",
+            "set_badge_source": "MEASUrement:MEAS{n}:SOUrce {src}",
+            # Plain result query -- the SUBGROUP form needs the 5-DPM/5-IMDA/
+            # 6-DPM options, this one does not (4/5/6 p.705).
+            "get_badge_value": "MEASUrement:MEAS{n}:RESUlts:CURRentacq:MEAN?",
+            "delete_badge": 'MEASUrement:DELete "MEAS{n}"',
+            "list_badges": "MEASUrement:LIST?",
         },
         # LeCroy MAUI family: the base table is already MAUI-correct, so no
         # per-family overrides are needed today (placeholder for future splits
@@ -699,6 +714,38 @@ _MEASUREMENT_TO_WIRE = {
 def measurement_to_wire(dialect: str, mtype: str) -> str:
     """Convert a public measurement type to the dialect's wire token."""
     return _to_wire(_MEASUREMENT_TO_WIRE, _MEASUREMENT_TYPES, dialect, mtype, "measurement type")
+
+
+# Badge measurement vocabulary (MEASUrement:MEAS<x>:TYPe). Distinct from the
+# IMMed vocabulary above -- e.g. RISe/FALL there vs RISETIME/FALLTIME here.
+# Only the tokens BOTH modern-MSO manuals list are mapped:
+#   MSO2 PM 077-1776-07 p.487 and 4/5/6 PM 077-1305-11 p.717.
+# Deliberately unmapped, so they gate as FeatureNotSupportedError:
+#   TOP/BASE  -- the families diverge (MSO2 has TOP|BASE, 4/5/6 has HIGH|LOW|BASE)
+#   CMEAN     -- neither manual lists a cycle-mean badge token
+#   CRMS      -- ACRMS is AC-coupled RMS, a different measurement
+_BADGE_TYPE_TO_WIRE = {
+    "tektronix": {
+        "PKPK": "PK2Pk",
+        "MAX": "MAXIMUM",
+        "MIN": "MINIMUM",
+        "AMPL": "AMPLITUDE",
+        "MEAN": "MEAN",
+        "RMS": "RMS",
+        "FREQ": "FREQUENCY",
+        "PER": "PERIOD",
+        "RISE": "RISETIME",
+        "FALL": "FALLTIME",
+        "WID": "PWIDTH",
+        "NWID": "NWIDTH",
+        "DUTY": "PDUTY",
+    },
+}
+
+
+def badge_type_to_wire(dialect: str, mtype: str) -> str:
+    """Convert a public measurement type to a badge TYPe token."""
+    return _to_wire(_BADGE_TYPE_TO_WIRE, _MEASUREMENT_TYPES, dialect, mtype, "badge measurement type")
 
 
 def mode_to_wire(dialect: str, mode: str) -> str:

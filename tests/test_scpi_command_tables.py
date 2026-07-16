@@ -4,6 +4,7 @@ import pytest
 
 from scpi_control.scpi_commands import (
     SCPICommandSet,
+    badge_type_to_wire,
     coupling_from_wire,
     coupling_to_wire,
     mode_from_wire,
@@ -394,3 +395,55 @@ def test_tek_line_trigger_source_gate_is_conservative_not_absence():
 
     # The AUX mapping is family-independent and stays available.
     assert channel_token("tektronix", "EX") == "AUX"
+
+
+class TestBadgeMeasurementTable:
+    def setup_method(self):
+        self.cmds = SCPICommandSet("tektronix", "tek_mso")
+
+    def test_badge_entries(self):
+        assert self.cmds.get_command("add_measurement_badge", n=3) == 'MEASUrement:ADDNew "MEAS3"'
+        assert self.cmds.get_command("set_badge_type", n=3, type="PK2Pk") == "MEASUrement:MEAS3:TYPe PK2Pk"
+        assert self.cmds.get_command("set_badge_source", n=3, src="CH2") == "MEASUrement:MEAS3:SOUrce CH2"
+        assert self.cmds.get_command("get_badge_value", n=3) == "MEASUrement:MEAS3:RESUlts:CURRentacq:MEAN?"
+        assert self.cmds.get_command("delete_badge", n=3) == 'MEASUrement:DELete "MEAS3"'
+        assert self.cmds.get_command("list_badges") == "MEASUrement:LIST?"
+
+    def test_badges_are_mso_only_not_tbs(self):
+        # TBS1000C has MEASUrement:IMMed instead; the two are mutually exclusive.
+        tbs = SCPICommandSet("tektronix", "tek_tbs")
+        assert not tbs.has_command("add_measurement_badge")
+        assert tbs.has_command("set_meas_immed_type")
+        assert not self.cmds.has_command("set_meas_immed_type")
+
+
+class TestBadgeTypeMap:
+    def test_maps_the_types_both_manuals_share(self):
+        assert badge_type_to_wire("tektronix", "PKPK") == "PK2Pk"
+        assert badge_type_to_wire("tektronix", "AMPL") == "AMPLITUDE"
+        assert badge_type_to_wire("tektronix", "MAX") == "MAXIMUM"
+        assert badge_type_to_wire("tektronix", "MIN") == "MINIMUM"
+        assert badge_type_to_wire("tektronix", "MEAN") == "MEAN"
+        assert badge_type_to_wire("tektronix", "RMS") == "RMS"
+        assert badge_type_to_wire("tektronix", "FREQ") == "FREQUENCY"
+        assert badge_type_to_wire("tektronix", "PER") == "PERIOD"
+        assert badge_type_to_wire("tektronix", "WID") == "PWIDTH"
+        assert badge_type_to_wire("tektronix", "NWID") == "NWIDTH"
+        assert badge_type_to_wire("tektronix", "DUTY") == "PDUTY"
+
+    def test_badge_vocabulary_differs_from_immed(self):
+        # IMMed spells these RISe/FALL; the badge subsystem spells them out.
+        assert badge_type_to_wire("tektronix", "RISE") == "RISETIME"
+        assert badge_type_to_wire("tektronix", "FALL") == "FALLTIME"
+        assert measurement_to_wire("tektronix", "RISE") == "RISe"
+
+    def test_family_divergent_and_absent_types_gate(self):
+        # TOP/BASE exist on MSO2 but not 4/5/6 (and vice versa for HIGH/LOW);
+        # CMEAN has no badge token; ACRMS is AC-coupled RMS, not cycle RMS.
+        for mtype in ("TOP", "BASE", "CMEAN", "CRMS"):
+            with pytest.raises(exc.FeatureNotSupportedError):
+                badge_type_to_wire("tektronix", mtype)
+
+    def test_unknown_public_type_is_a_value_error(self):
+        with pytest.raises(ValueError):
+            badge_type_to_wire("tektronix", "BOGUS")
