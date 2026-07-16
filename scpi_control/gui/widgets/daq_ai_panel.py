@@ -100,7 +100,7 @@ class DAQAIPanel(QWidget):
         provider_layout.addWidget(provider_label)
 
         self.provider_combo = QComboBox()
-        self.provider_combo.addItems(["Ollama (Local)", "OpenAI"])
+        self.provider_combo.addItems(["Ollama (Local)"])
         self.provider_combo.currentIndexChanged.connect(self._on_provider_changed)
         provider_layout.addWidget(self.provider_combo)
 
@@ -180,16 +180,13 @@ class DAQAIPanel(QWidget):
         if index == 0:  # Ollama
             self.model_combo.clear()
             self.model_combo.addItems(["llama3.2", "llama3.1", "mistral", "codellama", "phi3"])
-        elif index == 1:  # OpenAI
-            self.model_combo.clear()
-            self.model_combo.addItems(["gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "gpt-3.5-turbo"])
 
     def _on_connect_clicked(self):
         """Handle connect button click."""
         try:
             from scpi_control.report_generator.llm import create_daq_analyzer
 
-            provider_map = {0: "ollama", 1: "openai"}
+            provider_map = {0: "ollama"}
             provider = provider_map.get(self.provider_combo.currentIndex(), "ollama")
             model = self.model_combo.currentText()
 

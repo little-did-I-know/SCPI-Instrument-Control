@@ -2,13 +2,12 @@
 Waveform file loader supporting multiple formats.
 
 Supports loading waveform data from NPZ, CSV, MAT, and HDF5 files
-created by the Siglent oscilloscope library.
+created by scpi_control.
 """
 
 import logging
-from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional
+from typing import Dict, Iterable, List, Optional
 
 import numpy as np
 
@@ -208,7 +207,12 @@ class WaveformLoader:
                 body = line[len(ws.CSV_COMMENT) :].strip()
                 if ":" in body:
                     label, _, value = body.partition(":")
-                    header[label.strip()] = value.strip()
+                    label = label.strip()
+                    # First write wins: the genuine header always precedes the
+                    # "Additional Metadata" block, so a user metadata key that
+                    # happens to be named e.g. "Channel" must not overwrite it.
+                    if label not in header:
+                        header[label] = value.strip()
         return header
 
     @staticmethod
@@ -308,15 +312,20 @@ class WaveformLoader:
                 # Core fields live on the FILE's attrs, not the dataset's.
                 attrs = dict(f.attrs)
                 voltage = f[ws.VOLTAGE][:]
+                time_data = f[ws.TIME][:]
                 channel = attrs.get(ws.CHANNEL, ws.VOLTAGE)
                 if isinstance(channel, bytes):
                     channel = channel.decode()
                 return [
                     WaveformData(
                         channel_name=str(channel),
-                        time_data=f[ws.TIME][:],
+                        time_data=time_data,
                         voltage_data=voltage,
-                        sample_rate=float(attrs.get(ws.SAMPLE_RATE, 0.0)),
+                        # Foreign files can name datasets 'time'/'voltage' without
+                        # carrying our sample_rate attr; derive it from the
+                        # numeric time axis instead of silently reporting 0.0,
+                        # matching the heuristic path below.
+                        sample_rate=float(attrs.get(ws.SAMPLE_RATE, WaveformLoader._rate_from_time(time_data))),
                         record_length=len(voltage),
                         source_file=filepath,
                     )

@@ -10,9 +10,11 @@ Or after installation:
 Logging
 -------
 This module is the ONLY place in the report generator that configures a
-logging sink (handlers/levels). Library modules must keep doing just
-`logger = logging.getLogger(__name__)` and never attach handlers of their
-own - that boundary is deliberate.
+logging sink (handlers/levels), and it does so only for the
+"scpi_control.report_generator" logger tree - the rest of the library
+(driver, GUI, server, protocol decoders) is left alone. Library modules
+must keep doing just `logger = logging.getLogger(__name__)` and never
+attach handlers of their own - that boundary is deliberate.
 
 `_configure_logging()` attaches:
   - a StreamHandler, so a console/dev run shows log output (previously,
@@ -50,7 +52,8 @@ _logging_configured = False
 
 def _configure_logging() -> None:
     """
-    Attach a console + file logging sink to the "scpi_control" logger tree.
+    Attach a console + file logging sink to the "scpi_control.report_generator"
+    logger tree.
 
     Safe to call more than once - only the first call has any effect, so
     calling main() twice (e.g. in tests) does not stack duplicate handlers.
@@ -62,7 +65,7 @@ def _configure_logging() -> None:
 
     level = logging.DEBUG if os.environ.get("SCPI_REPORT_DEBUG") else logging.INFO
 
-    pkg_logger = logging.getLogger("scpi_control")
+    pkg_logger = logging.getLogger("scpi_control.report_generator")
     pkg_logger.setLevel(level)
 
     formatter = logging.Formatter("%(asctime)s %(levelname)-8s %(name)s: %(message)s")
