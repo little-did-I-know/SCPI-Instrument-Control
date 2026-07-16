@@ -197,6 +197,11 @@ class Oscilloscope:
     def disconnect(self) -> None:
         """Close connection to the oscilloscope."""
         logger.info("Disconnecting from oscilloscope")
+        # Release instrument-side state while the link is still up
+        try:
+            self.measurement.cleanup()
+        except Exception as e:
+            logger.debug(f"Measurement cleanup skipped: {e}")
         self._connection.disconnect()
         self._device_info = None
         self.model_capability = None

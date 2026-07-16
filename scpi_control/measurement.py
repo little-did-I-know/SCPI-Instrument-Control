@@ -4,8 +4,9 @@ import logging
 from typing import TYPE_CHECKING, Any, Dict, Literal, Optional
 
 from scpi_control import exceptions
+from scpi_control.measurement_badges import BadgePool
 from scpi_control.models import validate_channel
-from scpi_control.scpi_commands import measurement_to_wire
+from scpi_control.scpi_commands import badge_type_to_wire, measurement_to_wire
 
 if TYPE_CHECKING:
     from scpi_control.oscilloscope import Oscilloscope
@@ -47,6 +48,8 @@ class Measurement:
             oscilloscope: Parent Oscilloscope instance
         """
         self._scope = oscilloscope
+        # Badge lifecycle for the modern Tek MSO families; inert on other dialects
+        self._badge_pool = BadgePool(oscilloscope)
 
     @property
     def _dialect(self) -> str:
@@ -56,6 +59,10 @@ class Measurement:
     def _require(self, command_name: str) -> None:
         if not self._scope._has_command(command_name):
             raise exceptions.FeatureNotSupportedError(f"{command_name} is not supported on the {self._dialect} dialect")
+
+    def cleanup(self) -> None:
+        """Release instrument-side measurement state owned by this session."""
+        self._badge_pool.cleanup()
 
     def measure(self, mtype: MeasurementType, channel: int) -> float:
         """Perform a measurement on a channel.
@@ -73,21 +80,24 @@ class Measurement:
         validate_channel(self._scope, channel)
 
         mtype = mtype.upper()
-        wire_type = measurement_to_wire(self._dialect, mtype)
 
         if self._dialect == "tektronix":
-            if not self._scope._has_command("set_meas_immed_type"):
-                raise exceptions.FeatureNotSupportedError(
-                    f"measure({mtype!r}) is not supported: this Tektronix family/configuration lacks the " "MEASUrement:IMMed subsystem (badge-based measurements are a follow-up)"
-                )
-            # Immediate measurement: configure type+source, then read the value
-            self._scope.write(self._scope._get_command("set_meas_immed_type", type=wire_type))
-            self._scope.write(self._scope._get_command("set_meas_immed_source", ch=channel))
-            response = self._scope.query(self._scope._get_command("get_meas_immed_value"))
-            try:
-                return float(response.strip())
-            except ValueError as e:
-                raise exceptions.CommandError(f"Failed to parse measurement: {e}")
+            if self._scope._has_command("set_meas_immed_type"):
+                # TBS1000C: immediate measurement -- configure type+source, read the value
+                wire_type = measurement_to_wire(self._dialect, mtype)
+                self._scope.write(self._scope._get_command("set_meas_immed_type", type=wire_type))
+                self._scope.write(self._scope._get_command("set_meas_immed_source", ch=channel))
+                response = self._scope.query(self._scope._get_command("get_meas_immed_value"))
+                try:
+                    return float(response.strip())
+                except ValueError as e:
+                    raise exceptions.CommandError(f"Failed to parse measurement: {e}")
+            if self._scope._has_command("add_measurement_badge"):
+                # MSO 2/4/5/6: no IMMed subsystem -- measure via a badge
+                return self._badge_pool.value(badge_type_to_wire(self._dialect, mtype), channel)
+            raise exceptions.FeatureNotSupportedError(f"measure({mtype!r}) is not supported: this Tektronix family/configuration has neither the MEASUrement:IMMed subsystem nor measurement badges")
+
+        wire_type = measurement_to_wire(self._dialect, mtype)
 
         # Query parameter value
         response = self._scope.query(self._scope._get_command("get_parameter_value", ch=channel, param=wire_type))
