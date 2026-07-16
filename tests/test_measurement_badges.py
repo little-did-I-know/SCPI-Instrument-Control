@@ -61,8 +61,10 @@ def test_same_type_on_another_channel_gets_its_own_slot():
 def test_user_badges_are_never_reused_or_deleted():
     # Seed a user badge on MEAS2, not MEAS1, so lowest-free-slot allocation
     # (which should land on MEAS1) is distinguishable from a naive max+1
-    # strategy (which would also land on MEAS2, colliding with the user's
-    # badge). This also covers the non-contiguous-gap case.
+    # strategy (which would land on MEAS3, not colliding) and from a
+    # count+1 strategy (which would land on MEAS2, colliding with the
+    # user's badge). This also covers the case where the user's badges
+    # don't start at MEAS1.
     scope, conn = _mso_scope(tek_badges={2: {"type": "FREQUENCY", "source": "CH1"}})
     scope.measurement.measure_vpp(1)
 

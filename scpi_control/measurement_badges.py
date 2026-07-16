@@ -2,8 +2,10 @@
 
 These scopes have no MEASUrement:IMMed subsystem. A measurement is a stateful
 "badge" that is added to the instrument, configured with a type and source, and
-then read -- MSO2 PM 077-1776-07 (p.414/487/483/481/424/430) and 4/5/6 PM
-077-1305-11 (p.576/717/709/705/596/607).
+then read -- MSO2 PM 077-1776-07 (ADDNew p.2-395, TYPe p.2-468, SOUrce p.2-464,
+RESUlts p.2-462, DELete p.2-405, LIST p.2-411) and 4/5/6 PM 077-1305-11
+(ADDNew p.2-561, TYPe p.2-702, SOUrce p.2-694, RESUlts p.2-690, DELete p.2-581,
+LIST p.2-592).
 
 The pool keeps one badge per distinct (wire_type, channel) so that repeated
 measurements -- the common case, e.g. the gateway polling at ~1 Hz -- cost a
