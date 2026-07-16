@@ -4,7 +4,16 @@ import logging
 from typing import TYPE_CHECKING, Literal, Optional, Union
 
 from scpi_control import exceptions
-from scpi_control.scpi_commands import mode_from_wire, mode_to_wire, normalize_status, slope_from_wire, slope_to_wire
+from scpi_control.scpi_commands import (
+    channel_token,
+    is_flat_trigger,
+    mode_from_wire,
+    mode_to_wire,
+    normalize_status,
+    slope_from_wire,
+    slope_to_wire,
+    source_from_wire,
+)
 
 if TYPE_CHECKING:
     from scpi_control.oscilloscope import Oscilloscope
@@ -63,9 +72,10 @@ class Trigger:
         Returns:
             Trigger mode: 'AUTO', 'NORM', 'SINGLE', or 'STOP'
         """
-        if self._dialect == "modern":
-            # Modern scopes have no STOP mode token; a stopped scope is
-            # detected via the acquisition status (guide p.483)
+        if not is_flat_trigger(self._dialect):
+            # Global-style dialects (modern, tektronix) have no STOP mode
+            # token; a stopped scope is detected via the acquisition status
+            # (guide p.483 / TBS p.162, MSO2 p.2-686)
             status = normalize_status(self._scope.query(self._cmd("get_acq_status")))
             if status == "STOP":
                 return "STOP"
@@ -89,7 +99,13 @@ class Trigger:
 
         if mode == "STOP":
             self._scope.write(self._cmd("stop"))
+        elif self._dialect == "tektronix" and mode == "SINGLE":
+            # Single-shot is a stop-after sequence, not a trigger mode (Tek PM)
+            self._scope.write(self._cmd("set_stop_after", mode="SEQuence"))
+            self._scope.write(self._cmd("run"))
         else:
+            if self._dialect == "tektronix":
+                self._scope.write(self._cmd("set_stop_after", mode="RUNSTop"))
             self._scope.write(self._cmd("set_trigger_mode", mode=mode_to_wire(self._dialect, mode)))
         logger.info(f"Trigger mode set to {mode}")
 
@@ -125,8 +141,8 @@ class Trigger:
         Returns:
             Trigger source (e.g., 'C1', 'C2', 'C3', 'C4', 'EX', 'EX5', 'LINE')
         """
-        if self._dialect == "modern":
-            return self._scope.query(self._cmd("get_trigger_source")).strip()
+        if not is_flat_trigger(self._dialect):
+            return source_from_wire(self._dialect, self._scope.query(self._cmd("get_trigger_source")).strip())
         response = self._scope.query(self._cmd("get_trigger_select"))
         # Response format typically: "EDGE,SR,C1,..."
         parts = response.split(",")
@@ -147,8 +163,8 @@ class Trigger:
         if channel not in valid_sources:
             raise exceptions.InvalidParameterError(f"Invalid trigger source: {channel}. Must be one of {valid_sources}.")
 
-        if self._dialect == "modern":
-            self._scope.write(self._cmd("set_trigger_source", src=channel))
+        if not is_flat_trigger(self._dialect):
+            self._scope.write(self._cmd("set_trigger_source", src=channel_token(self._dialect, channel)))
         else:
             # Get current trigger type to preserve it
             current_type = self.trigger_type
@@ -166,7 +182,7 @@ class Trigger:
         Returns:
             Trigger type: 'EDGE', 'SLEW', 'GLIT', 'INTV', 'RUNT', 'PATTERN', etc.
         """
-        if self._dialect == "modern":
+        if not is_flat_trigger(self._dialect):
             return self._scope.query(self._cmd("get_trigger_type")).strip().upper()
         response = self._scope.query(self._cmd("get_trigger_select"))
         # Response format: "EDGE,SR,C1,..."
@@ -188,7 +204,7 @@ class Trigger:
         if trig_type not in valid_types:
             raise exceptions.InvalidParameterError(f"Invalid trigger type: {trig_type}. Must be one of {valid_types}.")
 
-        if self._dialect == "modern":
+        if not is_flat_trigger(self._dialect):
             self._scope.write(self._cmd("set_trigger_type", type=trig_type))
         else:
             # Get current source to preserve it
@@ -204,9 +220,9 @@ class Trigger:
             slope: Trigger slope - 'POS' (rising), 'NEG' (falling) (default: 'POS')
         """
         source = source.upper()
-        if self._dialect == "modern":
+        if not is_flat_trigger(self._dialect):
             self._scope.write(self._cmd("set_trigger_type", type="EDGE"))
-            self._scope.write(self._cmd("set_trigger_source", src=source))
+            self._scope.write(self._cmd("set_trigger_source", src=channel_token(self._dialect, source)))
         else:
             self._scope.write(self._cmd("set_trigger_select", type="EDGE", src=source))
         self.slope = slope
@@ -219,7 +235,13 @@ class Trigger:
         Returns:
             Trigger level in volts
         """
-        if self._dialect == "modern":
+        if not is_flat_trigger(self._dialect):
+            if self._dialect == "tektronix":
+                source = self.source  # public token like "C3"
+                if not source.startswith("C") or not source[1:].isdigit():
+                    logger.warning(f"Cannot get trigger level for source {source}")
+                    return 0.0
+                return self._parse_float_response(self._scope.query(self._cmd("get_trigger_level", ch=int(source[1:]))))
             return self._parse_float_response(self._scope.query(self._cmd("get_trigger_level")))
         source = self.source
         if source.startswith("C"):
@@ -233,8 +255,15 @@ class Trigger:
         Args:
             voltage: Trigger level in volts
         """
-        if self._dialect == "modern":
-            self._scope.write(self._cmd("set_trigger_level", level=voltage))
+        if not is_flat_trigger(self._dialect):
+            if self._dialect == "tektronix":
+                source = self.source  # public token like "C3"
+                if not source.startswith("C") or not source[1:].isdigit():
+                    logger.warning(f"Cannot set trigger level for source {source}")
+                    return
+                self._scope.write(self._cmd("set_trigger_level", ch=int(source[1:]), level=voltage))
+            else:
+                self._scope.write(self._cmd("set_trigger_level", level=voltage))
             logger.info(f"Trigger level set to {voltage}V")
             return
         source = self.source
@@ -256,10 +285,10 @@ class Trigger:
         Returns:
             Trigger slope: 'POS', 'NEG', or 'WINDOW'
         """
-        if self._dialect == "modern":
-            return slope_from_wire("modern", self._scope.query(self._cmd("get_trigger_slope")))
+        if not is_flat_trigger(self._dialect):
+            return slope_from_wire(self._dialect, self._scope.query(self._cmd("get_trigger_slope")))
         source = self.source
-        return slope_from_wire("legacy", self._scope.query(self._cmd("get_trigger_slope", src=source)))
+        return slope_from_wire(self._dialect, self._scope.query(self._cmd("get_trigger_slope", src=source)))
 
     @slope.setter
     def slope(self, slope: TriggerSlopeType) -> None:
@@ -271,7 +300,7 @@ class Trigger:
         # NOTE: WINDOW maps to the modern ALTernate slope, which triggers on
         # alternating edges rather than either edge - approximate parity only
         wire = slope_to_wire(self._dialect, slope)
-        if self._dialect == "modern":
+        if not is_flat_trigger(self._dialect):
             self._scope.write(self._cmd("set_trigger_slope", slope=wire))
         else:
             source = self.source
@@ -289,10 +318,14 @@ class Trigger:
         Returns:
             Coupling: 'DC', 'AC', 'HFREJ', 'LFREJ'
         """
-        if self._dialect == "modern":
+        if not is_flat_trigger(self._dialect):
             token = self._scope.query(self._cmd("get_trigger_coupling")).strip().upper()
-            # Reverse of the setter's HFREJ->HFREJect mapping (guide p.486)
-            return {"HFREJECT": "HFREJ", "LFREJECT": "LFREJ"}.get(token, token)
+            if self._dialect == "modern":
+                # Reverse of the setter's HFREJ->HFREJect mapping (guide p.486)
+                return {"HFREJECT": "HFREJ", "LFREJECT": "LFREJ"}.get(token, token)
+            # tektronix wire tokens (HFRej/LFRej) already match the public
+            # vocabulary uppercased -- TBS p.151 / MSO2 p.2-661
+            return token
         source = self.source
         return self._scope.query(self._cmd("get_trigger_coupling", src=source)).strip().split()[-1].upper()
 
@@ -307,9 +340,13 @@ class Trigger:
         if coupling not in ["DC", "AC", "HFREJ", "LFREJ"]:
             raise exceptions.InvalidParameterError(f"Invalid trigger coupling: {coupling}. Must be DC, AC, HFREJ, or LFREJ.")
 
-        if self._dialect == "modern":
-            # Modern wire tokens spell out the reject modes (guide p.486)
-            wire = {"HFREJ": "HFREJect", "LFREJ": "LFREJect"}.get(coupling, coupling)
+        if not is_flat_trigger(self._dialect):
+            if self._dialect == "modern":
+                # Modern wire tokens spell out the reject modes (guide p.486)
+                wire = {"HFREJ": "HFREJect", "LFREJ": "LFREJect"}.get(coupling, coupling)
+            else:
+                # tektronix wire tokens: DC|HFRej|LFRej|NOISErej -- TBS p.151 / MSO2 p.2-661
+                wire = {"HFREJ": "HFRej", "LFREJ": "LFRej"}.get(coupling, coupling)
             self._scope.write(self._cmd("set_trigger_coupling", coupling=wire))
         else:
             source = self.source
@@ -324,12 +361,13 @@ class Trigger:
         Returns:
             Holdoff time in seconds
         """
-        response = self._scope.query("TRIG_DELAY?")
+        if not self._scope._has_command("get_trigger_holdoff"):
+            raise exceptions.FeatureNotSupportedError(f"trigger holdoff is not supported on the {self._dialect} dialect")
+        response = self._scope.query(self._cmd("get_trigger_holdoff"))
         # Response may include echo like "TRIG_DELAY 0.0E+00S"
         if " " in response:
             response = response.split(" ", 1)[1]
-        value = response.replace("S", "").strip()
-        return float(value)
+        return float(response.replace("S", "").strip())
 
     @holdoff.setter
     def holdoff(self, time_seconds: float) -> None:
@@ -340,8 +378,9 @@ class Trigger:
         """
         if time_seconds < 0:
             raise exceptions.InvalidParameterError(f"Holdoff time must be non-negative: {time_seconds}")
-
-        self._scope.write(f"TRIG_DELAY {time_seconds}")
+        if not self._scope._has_command("set_trigger_holdoff"):
+            raise exceptions.FeatureNotSupportedError(f"trigger holdoff is not supported on the {self._dialect} dialect")
+        self._scope.write(self._cmd("set_trigger_holdoff", t=time_seconds))
         logger.info(f"Trigger holdoff set to {time_seconds}s")
 
     def get_configuration(self) -> dict:
@@ -350,15 +389,19 @@ class Trigger:
         Returns:
             Dictionary with all trigger settings
         """
-        return {
+        config = {
             "mode": self.mode,
             "type": self.trigger_type,
             "source": self.source,
             "level": self.level,
             "slope": self.slope,
             "coupling": self.coupling,
-            "holdoff": self.holdoff,
         }
+        try:
+            config["holdoff"] = self.holdoff
+        except exceptions.FeatureNotSupportedError:
+            config["holdoff"] = None
+        return config
 
     def __repr__(self) -> str:
         """String representation."""

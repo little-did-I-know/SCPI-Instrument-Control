@@ -4,7 +4,7 @@ import logging
 from typing import TYPE_CHECKING, Literal, Optional
 
 from scpi_control import exceptions
-from scpi_control.scpi_commands import coupling_from_wire, coupling_to_wire
+from scpi_control.scpi_commands import coupling_from_wire, coupling_to_wire, probe_from_wire, probe_to_wire
 
 if TYPE_CHECKING:
     from scpi_control.oscilloscope import Oscilloscope
@@ -31,7 +31,6 @@ class Channel:
         """
         self._scope = oscilloscope
         self._channel = channel_number
-        self._prefix = f"C{channel_number}"
 
         if not 1 <= channel_number <= 4:
             raise exceptions.InvalidParameterError(f"Invalid channel number: {channel_number}. Must be 1-4.")
@@ -51,9 +50,10 @@ class Channel:
             True if channel is displayed, False otherwise
         """
         response = self._scope.query(self._cmd("get_channel_display", ch=self._channel))
-        # Response format: "C1:TRA ON" or "C1:TRA OFF"
-        # Extract the last word
-        return "ON" in response.upper()
+        # Response format: "C1:TRA ON"/"C1:TRA OFF" (legacy/modern) or a bare
+        # "1"/"0" numeric select (tektronix SELect:CH<x>? -- TBS p.144)
+        token = response.strip().split()[-1].upper() if response.strip() else ""
+        return token in ("ON", "1")
 
     @enabled.setter
     def enabled(self, value: bool) -> None:
@@ -171,13 +171,18 @@ class Channel:
         Returns:
             Probe ratio (e.g., 1.0 for 1X, 10.0 for 10X)
         """
+        # Probe commands are family-split on Tek (tek_tbs/tek_mso) and absent
+        # from the plain base table; gate before querying so a forced-dialect
+        # variant fallback raises cleanly instead of a raw KeyError.
+        if not self._scope._has_command("get_probe_ratio"):
+            raise exceptions.FeatureNotSupportedError(f"probe ratio is not supported on the {self._dialect} dialect")
         response = self._scope.query(self._cmd("get_probe_ratio", ch=self._channel))
         # Response may include echo like "C1:ATTN 10"
         if ":" in response:
             response = response.split(":", 1)[1]
         if " " in response:
             response = response.split(" ", 1)[1]
-        return float(response.strip())
+        return probe_from_wire(self._dialect, response.strip())
 
     @probe_ratio.setter
     def probe_ratio(self, ratio: float) -> None:
@@ -190,7 +195,14 @@ class Channel:
         """
         if ratio <= 0:
             raise exceptions.InvalidParameterError(f"Probe ratio must be positive: {ratio}")
-        self._scope.write(self._cmd("set_probe_ratio", ch=self._channel, ratio=ratio))
+        if not self._scope._has_command("set_probe_ratio"):
+            raise exceptions.FeatureNotSupportedError(f"probe ratio is not supported on the {self._dialect} dialect")
+        if self._dialect == "tektronix":
+            # Tek speaks probe attenuation as a gain factor (1/ratio); the
+            # tek_tbs/tek_mso family templates use the {gain} placeholder
+            self._scope.write(self._cmd("set_probe_ratio", ch=self._channel, gain=probe_to_wire(self._dialect, ratio)))
+        else:
+            self._scope.write(self._cmd("set_probe_ratio", ch=self._channel, ratio=probe_to_wire(self._dialect, ratio)))
         logger.info(f"Channel {self._channel} probe ratio set to {ratio}X")
 
     @property
@@ -200,9 +212,21 @@ class Channel:
         Returns:
             Bandwidth limit: 'ON', 'OFF', or frequency limit
         """
+        if self._dialect == "lecroy":
+            # BWL? is global: "C1,OFF,C2,20MHZ,..." pairs (MAUI p.7-18). The
+            # real LeCroy <mode> vocabulary is {OFF,20MHZ,200MHZ,...} -- there
+            # is no "ON" token, so any non-OFF wire token maps to the public
+            # "ON" (mirrors the modern/tektronix ON/OFF normalization below).
+            tokens = [t.strip().upper() for t in self._scope.query(self._cmd("get_bandwidth_limit")).split(",")]
+            try:
+                wire = tokens[tokens.index(f"C{self._channel}") + 1]
+            except (ValueError, IndexError):
+                return "OFF"
+            return "OFF" if wire == "OFF" else "ON"
         response = self._scope.query(self._cmd("get_bandwidth_limit", ch=self._channel)).strip().upper()
-        if self._dialect == "modern":
-            # Modern wire tokens are FULL/20M/200M; the API speaks ON/OFF
+        if self._dialect in ("modern", "tektronix"):
+            # Modern wire tokens are FULL/20M/200M; Tek's are FULl/TWENty (or
+            # a hertz value on MSO2) -- both speak ON/OFF at the public layer
             return "OFF" if response == "FULL" else "ON"
         return response
 
@@ -218,6 +242,21 @@ class Channel:
             raise exceptions.InvalidParameterError(f"Invalid bandwidth limit: {limit}. Must be ON, OFF, or FULL.")
         if self._dialect == "modern":
             wire = "FULL" if limit in ("OFF", "FULL") else "20M"
+        elif self._dialect == "tektronix":
+            if limit in ("OFF", "FULL"):
+                wire = "FULL"
+            elif getattr(getattr(self._scope, "model_capability", None), "scpi_variant", None) == "tek_mso":
+                # MSO 2-Series bandwidth vocabulary is {<NR3>|FULl} -- it has no
+                # TWENty keyword, so send 20 MHz as an explicit hertz value
+                # (2 Series MSO PM 077-1776-07 p.2-183).
+                wire = "20E6"
+            else:
+                # TBS1000C accepts the TWEnty keyword (TBS PM 077-1691-01 p.53).
+                wire = "TWENty"
+        elif self._dialect == "lecroy":
+            # LeCroy BWL <mode> vocabulary has no "ON" token -- {OFF,20MHZ,
+            # 200MHZ,...} (MAUI p.7-18). Map public ON to the 20MHz limit.
+            wire = "OFF" if limit in ("OFF", "FULL") else "20MHZ"
         else:
             wire = "OFF" if limit == "FULL" else limit
         self._scope.write(self._cmd("set_bandwidth_limit", ch=self._channel, limit=wire))
@@ -230,8 +269,9 @@ class Channel:
         Returns:
             Unit string (typically 'V' for volts)
         """
-        # legacy-only command; not routed
-        response = self._scope.query(f"{self._prefix}:UNIT?")
+        if not self._scope._has_command("get_channel_unit"):
+            raise exceptions.FeatureNotSupportedError(f"channel unit is not supported on the {self._dialect} dialect")
+        response = self._scope.query(self._cmd("get_channel_unit", ch=self._channel))
         return response.strip()
 
     @unit.setter
@@ -241,7 +281,9 @@ class Channel:
         Args:
             unit: Unit string ('V' for volts, 'A' for amps)
         """
-        self._scope.write(f"{self._prefix}:UNIT {unit}")
+        if not self._scope._has_command("set_channel_unit"):
+            raise exceptions.FeatureNotSupportedError(f"channel unit is not supported on the {self._dialect} dialect")
+        self._scope.write(self._cmd("set_channel_unit", ch=self._channel, unit=unit))
         logger.info(f"Channel {self._channel} unit set to {unit}")
 
     def auto_scale(self) -> None:
@@ -261,16 +303,23 @@ class Channel:
         Returns:
             Dictionary with all channel settings
         """
-        return {
+        config = {
             "channel": self._channel,
             "enabled": self.enabled,
             "coupling": self.coupling,
             "voltage_scale": self.voltage_scale,
             "voltage_offset": self.voltage_offset,
-            "probe_ratio": self.probe_ratio,
-            "bandwidth_limit": self.bandwidth_limit,
-            "unit": self.unit,
         }
+        try:
+            config["probe_ratio"] = self.probe_ratio
+        except exceptions.FeatureNotSupportedError:
+            config["probe_ratio"] = None
+        config["bandwidth_limit"] = self.bandwidth_limit
+        try:
+            config["unit"] = self.unit
+        except exceptions.FeatureNotSupportedError:
+            config["unit"] = None
+        return config
 
     def __repr__(self) -> str:
         """String representation."""

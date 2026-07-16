@@ -9,6 +9,8 @@ from scpi_control.connection.mock import MockConnection
 IDN = {
     "legacy": "Siglent Technologies,SDS1104X-E,MOCK0001,1.0.0.0",
     "modern": "Siglent Technologies,SDS824X HD,MOCK0002,3.8.12",
+    "tektronix": "TEKTRONIX,MSO24,MOCK0100,CF:91.1CT FV:1.28",
+    "lecroy": "LECROY,WAVESURFER3024Z,MOCK0200,8.5.0",
 }
 
 WIRE = {
@@ -34,10 +36,32 @@ WIRE = {
         "stop": ":TRIGger:STOP",
         "status_q": ":TRIGger:STATus?",
     },
+    "tektronix": {
+        "chdr": False,
+        "mode_norm": "TRIGger:A:MODe NORMal",
+        "source": "TRIGger:A:EDGE:SOUrce CH2",
+        "vdiv": "CH1:SCAle 0.5",
+        "coupling_ac": "CH1:COUPling AC",
+        "tdiv": "HORizontal:SCAle 0.002",
+        "run": "ACQuire:STATE RUN",
+        "stop": "ACQuire:STATE STOP",
+        "status_q": "TRIGger:STATE?",
+    },
+    "lecroy": {
+        "chdr": True,  # CHDR is LeCroy's own COMM_HEADER short form
+        "mode_norm": "TRIG_MODE NORM",
+        "source": "TRIG_SELECT EDGE,SR,C2",
+        "vdiv": "C1:VDIV 0.5",
+        "coupling_ac": "C1:CPL A1M",
+        "tdiv": "TDIV 0.002",
+        "run": "TRIG_MODE AUTO",
+        "stop": "STOP",
+        "status_q": "TRIG_MODE?",  # STOP probe of the lecroy acquisition_status path
+    },
 }
 
 
-@pytest.fixture(params=["legacy", "modern"])
+@pytest.fixture(params=["legacy", "modern", "tektronix", "lecroy"])
 def rig(request):
     dialect = request.param
     conn = MockConnection("mock", idn=IDN[dialect], channel_states={1: True, 2: True}, trigger_status=["Ready", "Trig'd", "Stop"], sample_rate=1_000.0, timebase=1e-3)
@@ -94,9 +118,17 @@ def test_get_waveform_wire_and_value(rig):
     assert len(waveform.voltage) > 0
 
 
-@pytest.mark.parametrize("dialect", ["legacy", "modern"])
+STATUS_SEQ = {
+    "legacy": ["Ready", "Ready", "Trig'd"],
+    "modern": ["Ready", "Ready", "Trig'd"],
+    "tektronix": ["READY", "READY", "TRIGGER"],
+    "lecroy": ["Ready", "Ready", "Trig'd"],  # lecroy mock's INR? maps Trig'd -> "1"
+}
+
+
+@pytest.mark.parametrize("dialect", ["legacy", "modern", "tektronix", "lecroy"])
 def test_wait_for_trigger_normal_mode_both_dialects(monkeypatch, dialect):
-    conn = MockConnection("mock", idn=IDN[dialect], channel_states={1: True}, trigger_status=["Ready", "Ready", "Trig'd"], sample_rate=1_000.0)
+    conn = MockConnection("mock", idn=IDN[dialect], channel_states={1: True}, trigger_status=STATUS_SEQ[dialect], sample_rate=1_000.0)
     tc = TriggerWaitCollector("mock", connection=conn)
     tc.collector.connect()
 

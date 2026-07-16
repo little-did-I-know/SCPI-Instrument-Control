@@ -4,6 +4,7 @@ import logging
 from typing import TYPE_CHECKING, Any, Dict, Literal, Optional
 
 from scpi_control import exceptions
+from scpi_control.scpi_commands import measurement_to_wire
 
 if TYPE_CHECKING:
     from scpi_control.oscilloscope import Oscilloscope
@@ -46,6 +47,15 @@ class Measurement:
         """
         self._scope = oscilloscope
 
+    @property
+    def _dialect(self) -> str:
+        """Wire dialect of the parent scope; defaults to legacy before connect."""
+        return getattr(self._scope, "dialect", None) or "legacy"
+
+    def _require(self, command_name: str) -> None:
+        if not self._scope._has_command(command_name):
+            raise exceptions.FeatureNotSupportedError(f"{command_name} is not supported on the {self._dialect} dialect")
+
     def measure(self, mtype: MeasurementType, channel: int) -> float:
         """Perform a measurement on a channel.
 
@@ -63,10 +73,34 @@ class Measurement:
             raise exceptions.InvalidParameterError(f"Invalid channel number: {channel}. Must be 1-4.")
 
         mtype = mtype.upper()
-        ch = f"C{channel}"
+        wire_type = measurement_to_wire(self._dialect, mtype)
+
+        if self._dialect == "tektronix":
+            if not self._scope._has_command("set_meas_immed_type"):
+                raise exceptions.FeatureNotSupportedError(
+                    f"measure({mtype!r}) is not supported: this Tektronix family/configuration lacks the " "MEASUrement:IMMed subsystem (badge-based measurements are a follow-up)"
+                )
+            # Immediate measurement: configure type+source, then read the value
+            self._scope.write(self._scope._get_command("set_meas_immed_type", type=wire_type))
+            self._scope.write(self._scope._get_command("set_meas_immed_source", ch=channel))
+            response = self._scope.query(self._scope._get_command("get_meas_immed_value"))
+            try:
+                return float(response.strip())
+            except ValueError as e:
+                raise exceptions.CommandError(f"Failed to parse measurement: {e}")
 
         # Query parameter value
-        response = self._scope.query(f"PAVA? {mtype},{ch}")
+        response = self._scope.query(self._scope._get_command("get_parameter_value", ch=channel, param=wire_type))
+
+        if self._dialect == "lecroy":
+            # LeCroy's PAVA? answers its own native shape "<param>,<value>,
+            # <state>" (3 fields; CHDR OFF strips the unit suffix) -- MAUI
+            # remote manual p.7-70. Value is the 2nd field (parts[1]).
+            try:
+                parts = response.split(",")
+                return float(parts[1].strip())
+            except (ValueError, IndexError) as e:
+                raise exceptions.CommandError(f"Failed to parse measurement: {e}")
 
         # Parse response (format typically: "PAVA PKPK,C1,1.23V")
         try:
@@ -275,35 +309,41 @@ class Measurement:
         if not 1 <= channel <= 4:
             raise exceptions.InvalidParameterError(f"Invalid channel number: {channel}. Must be 1-4.")
 
+        self._require("add_measurement")
+        wire_type = measurement_to_wire(self._dialect, mtype.upper())
         ch = f"C{channel}"
-        stat_flag = "ON" if stat else "OFF"
 
         # Add measurement (command format may vary by model)
-        self._scope.write(f"PACU {mtype},{ch}")
+        self._scope.write(self._scope._get_command("add_measurement", mtype=wire_type, ch=channel))
 
         if stat:
-            self._scope.write(f"PAST {stat_flag}")
+            self._require("set_statistics")
+            self._scope.write(self._scope._get_command("set_statistics", state="ON"))
 
         logger.info(f"Added measurement {mtype} for {ch}")
 
     def clear_measurements(self) -> None:
         """Clear all measurements from the measurement table."""
-        self._scope.write("PACL")
+        self._require("clear_measurements")
+        self._scope.write(self._scope._get_command("clear_measurements"))
         logger.info("Cleared all measurements")
 
     def enable_statistics(self) -> None:
         """Enable measurement statistics."""
-        self._scope.write("PAST ON")
+        self._require("set_statistics")
+        self._scope.write(self._scope._get_command("set_statistics", state="ON"))
         logger.info("Measurement statistics enabled")
 
     def disable_statistics(self) -> None:
         """Disable measurement statistics."""
-        self._scope.write("PAST OFF")
+        self._require("set_statistics")
+        self._scope.write(self._scope._get_command("set_statistics", state="OFF"))
         logger.info("Measurement statistics disabled")
 
     def reset_statistics(self) -> None:
         """Reset measurement statistics."""
-        self._scope.write("PASTAT RESET")
+        self._require("reset_statistics")
+        self._scope.write(self._scope._get_command("reset_statistics"))
         logger.info("Measurement statistics reset")
 
     def set_cursor_type(self, cursor_type: str) -> None:
@@ -322,7 +362,8 @@ class Measurement:
         if cursor_type not in valid_types:
             raise exceptions.InvalidParameterError(f"Invalid cursor type: {cursor_type}. Must be one of {valid_types}.")
 
-        self._scope.write(f"CRST {cursor_type}")
+        self._require("set_cursor_type")
+        self._scope.write(self._scope._get_command("set_cursor_type", type=cursor_type))
         logger.info(f"Cursor type set to {cursor_type}")
 
     def get_cursor_value(self) -> Dict[str, Any]:
@@ -331,7 +372,8 @@ class Measurement:
         Returns:
             Dictionary with cursor measurements
         """
-        response = self._scope.query("CRVA?")
+        self._require("get_cursor_value")
+        response = self._scope.query(self._scope._get_command("get_cursor_value"))
 
         # Parse cursor values
         # Response format varies by cursor type

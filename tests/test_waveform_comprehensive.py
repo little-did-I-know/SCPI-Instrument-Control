@@ -66,8 +66,16 @@ def mock_scope():
 
 @pytest.fixture
 def waveform_handler(mock_scope):
-    """Create a Waveform instance."""
-    return Waveform(mock_scope)
+    """Create a Waveform instance.
+
+    Mirrors real Oscilloscope wiring (self.waveform = Waveform(self)) so
+    that SiglentTransfer's `scope.waveform._get_voltage_scale(...)` calls
+    resolve back to this same handler instead of an unconfigured auto-Mock
+    child of mock_scope.
+    """
+    handler = Waveform(mock_scope)
+    mock_scope.waveform = handler
+    return handler
 
 
 class TestWaveformInitialization:

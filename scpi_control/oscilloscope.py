@@ -14,7 +14,7 @@ from scpi_control.connection import BaseConnection, SocketConnection
 from scpi_control.math_channel import MathChannel
 from scpi_control.measurement import Measurement
 from scpi_control.models import ModelCapability, detect_model_from_idn
-from scpi_control.scpi_commands import SCPICommandSet, normalize_status
+from scpi_control.scpi_commands import CONNECT_SETUP, SUPPORTED_DIALECTS, SCPICommandSet, normalize_status
 from scpi_control.screen_capture import ScreenCapture
 from scpi_control.trigger import Trigger
 from scpi_control.waveform import Waveform, WaveformData
@@ -72,8 +72,8 @@ class Oscilloscope:
         self.port = port
         self.timeout = timeout
 
-        if dialect not in (None, "legacy", "modern"):
-            raise exceptions.InvalidParameterError(f"Invalid dialect: {dialect}. Must be 'legacy', 'modern', or None for auto-detect.")
+        if dialect is not None and dialect not in SUPPORTED_DIALECTS:
+            raise exceptions.InvalidParameterError(f"Invalid dialect: {dialect}. Must be one of {SUPPORTED_DIALECTS} or None for auto-detect.")
         self._dialect_override = dialect
         self.dialect: Optional[str] = None
 
@@ -171,10 +171,9 @@ class Oscilloscope:
             self._scpi_commands = SCPICommandSet(self.dialect, self.model_capability.scpi_variant)
             logger.info(f"Using SCPI dialect: {self.dialect} (variant: {self.model_capability.scpi_variant})")
 
-            # Legacy scopes echo command headers by default; turn that off so
-            # every response arrives as a bare value
-            if self.dialect == "legacy":
-                self.write("CHDR OFF")
+            # Per-dialect connect-time setup (e.g. response-header suppression)
+            for setup_command in CONNECT_SETUP.get(self.dialect, []):
+                self.write(setup_command)
 
             # Create channels dynamically based on model capability
             self._create_channels()
@@ -301,7 +300,10 @@ class Oscilloscope:
 
     def trigger_single(self) -> None:
         """Arm a one-shot (single) acquisition."""
-        if self.dialect == "modern":
+        if self.dialect == "tektronix":
+            self.write(self._get_command("set_stop_after", mode="SEQuence"))
+            self.write(self._get_command("run"))
+        elif self.dialect == "modern":
             # SINGle self-arms on the modern dialect; there is no ARM command (guide p.482)
             self.write(self._get_command("set_trigger_mode", mode="SINGle"))
         else:
@@ -314,6 +316,9 @@ class Oscilloscope:
 
     def run(self) -> None:
         """Start acquisition."""
+        if self.dialect == "tektronix":
+            # A prior single-shot leaves STOPAfter latched to SEQuence
+            self.write(self._get_command("set_stop_after", mode="RUNSTop"))
         self.write(self._get_command("run"))
 
     def stop(self) -> None:
@@ -326,6 +331,16 @@ class Oscilloscope:
         Returns:
             One of 'ARM', 'READY', 'AUTO', 'TRIGD', 'STOP', 'ROLL'.
         """
+        if self.dialect == "lecroy":
+            # LeCroy has no SAST-style status query. TRIG_MODE? exposes STOP;
+            # INR? bit 0 reports "new signal acquired" (MAUI remote manual).
+            mode = self.query(self._get_command("get_trigger_mode")).strip().upper()
+            if mode.endswith("STOP"):
+                return "STOP"
+            inr = int(self.query(self._get_command("get_acq_status")).strip().split()[-1])
+            if inr & 1:
+                return "TRIGD"
+            return "AUTO" if mode.endswith("AUTO") else "READY"
         return normalize_status(self.query(self._get_command("get_acq_status")))
 
     @property
@@ -472,6 +487,10 @@ class Oscilloscope:
             raise RuntimeError("SCPI commands not initialized. Call connect() first.")
 
         return self._scpi_commands.get_command(command_name, **kwargs)
+
+    def _has_command(self, command_name: str) -> bool:
+        """True if the active dialect/variant defines this command."""
+        return self._scpi_commands is not None and self._scpi_commands.has_command(command_name)
 
     def __enter__(self):
         """Context manager entry."""

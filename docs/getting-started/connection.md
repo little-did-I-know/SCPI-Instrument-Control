@@ -39,7 +39,10 @@ SCPI Instrument Control communicates with oscilloscopes using the SCPI (Standard
 
 **Oscilloscope:**
 
-- Siglent SDS1000X-E, SDS2000X-E, or SDS5000X series
+- A supported Siglent, Tektronix, or LeCroy oscilloscope (see
+  [Supported Models](https://github.com/little-did-I-know/SCPI-Instrument-Control#supported-models)
+  in the README, and the [SCPI Dialects](../user-guide/scpi-dialects.md)
+  guide for how the wire dialect is detected per vendor)
 - Ethernet port
 - Network connectivity enabled
 
