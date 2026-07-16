@@ -5,6 +5,7 @@ Supports loading waveform data from NPZ, CSV, MAT, and HDF5 files
 created by the Siglent oscilloscope library.
 """
 
+import logging
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional
@@ -13,6 +14,8 @@ import numpy as np
 
 from scpi_control import waveform_schema as ws
 from scpi_control.report_generator.models.report_data import WaveformData
+
+logger = logging.getLogger(__name__)
 
 
 def _looks_like_ours(keys: Iterable[str]) -> bool:
@@ -343,24 +346,29 @@ class WaveformLoader:
             return waveforms
 
     @staticmethod
-    def load_multiple(filepaths: List[Path]) -> List[WaveformData]:
-        """
-        Load waveforms from multiple files.
+    def load_multiple(filepaths: List[Path], *, strict: bool = True) -> List[WaveformData]:
+        """Load waveforms from several files.
 
         Args:
-            filepaths: List of file paths to load
+            filepaths: Files to load
+            strict: Raise on the first failure (default). When False, skip the
+                failed file and log a warning -- the historical behaviour, which
+                silently turned a broken file into an empty report.
 
         Returns:
             Combined list of all waveform data
+
+        Raises:
+            Exception: The underlying load error, when strict is True
         """
         all_waveforms = []
 
         for filepath in filepaths:
             try:
-                waveforms = WaveformLoader.load(filepath)
-                all_waveforms.extend(waveforms)
+                all_waveforms.extend(WaveformLoader.load(filepath))
             except Exception as e:
-                print(f"Warning: Failed to load {filepath}: {e}")
-                continue
+                if strict:
+                    raise
+                logger.warning(f"Failed to load {filepath}: {e}")
 
         return all_waveforms

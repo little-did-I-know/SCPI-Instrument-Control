@@ -280,3 +280,38 @@ def test_hdf5_with_user_metadata_loads(tmp_path):
     assert len(loaded) == 1
     assert loaded[0].channel_name == "C1"
     np.testing.assert_allclose(loaded[0].voltage_data, wf.voltage)
+
+
+def test_load_multiple_raises_on_a_bad_file(tmp_path):
+    """A failed load must not silently become an empty report."""
+    good = tmp_path / "good.npz"
+    saver()._save_npy(make_waveform(), str(good))
+    bad = tmp_path / "bad.npz"
+    bad.write_text("not an npz at all")
+
+    with pytest.raises(Exception):
+        WaveformLoader.load_multiple([good, bad])
+
+
+def test_load_multiple_lenient_mode_skips_and_logs(tmp_path, caplog):
+    good = tmp_path / "good.npz"
+    saver()._save_npy(make_waveform(), str(good))
+    bad = tmp_path / "bad.npz"
+    bad.write_text("not an npz at all")
+
+    with caplog.at_level("WARNING"):
+        loaded = WaveformLoader.load_multiple([good, bad], strict=False)
+
+    assert len(loaded) == 1
+    assert any("bad.npz" in r.message for r in caplog.records)
+
+
+def test_load_multiple_happy_path(tmp_path):
+    a = tmp_path / "a.npz"
+    b = tmp_path / "b.npz"
+    saver()._save_npy(make_waveform(channel="C1"), str(a))
+    saver()._save_npy(make_waveform(channel="C2"), str(b))
+
+    loaded = WaveformLoader.load_multiple([a, b])
+
+    assert [w.channel_name for w in loaded] == ["C1", "C2"]
