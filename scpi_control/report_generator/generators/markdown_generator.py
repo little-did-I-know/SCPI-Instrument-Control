@@ -5,6 +5,7 @@ Generates human-readable Markdown reports that can be viewed in text editors,
 converted to other formats, or committed to documentation repositories.
 """
 
+import logging
 from pathlib import Path
 from typing import List, Optional
 
@@ -14,6 +15,8 @@ import numpy as np
 from scpi_control.report_generator.generators.base import BaseReportGenerator
 from scpi_control.report_generator.models.plot_style import PlotStyle
 from scpi_control.report_generator.models.report_data import MeasurementResult, TestReport, TestSection, WaveformData
+
+logger = logging.getLogger(__name__)
 
 
 class MarkdownReportGenerator(BaseReportGenerator):
@@ -48,7 +51,7 @@ class MarkdownReportGenerator(BaseReportGenerator):
             True if successful, False otherwise
         """
         if not self.validate_report(report):
-            print("Report validation failed")
+            logger.error("Report validation failed")
             return False
 
         try:
@@ -68,7 +71,7 @@ class MarkdownReportGenerator(BaseReportGenerator):
             return True
 
         except Exception as e:
-            print(f"Failed to generate Markdown report: {e}")
+            logger.exception(f"Failed to generate Markdown report: {e}")
             return False
 
     def _generate_content(self, report: TestReport, base_path: Path) -> str:
@@ -447,7 +450,7 @@ class MarkdownReportGenerator(BaseReportGenerator):
             return f"{self.plots_dir}/{filename}"
 
         except Exception as e:
-            print(f"Error generating region plot: {e}")
+            logger.exception(f"Error generating region plot: {e}")
             return None
 
     def _generate_measurements_table(self, measurements: List[MeasurementResult]) -> str:
