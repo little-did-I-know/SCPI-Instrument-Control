@@ -21,9 +21,9 @@ def make_report():
     """A minimal but complete TestReport, including one waveform."""
     t = np.arange(100) / 1e6
     waveform = WaveformData(
-        channel_name="C1",
-        time_data=t,
-        voltage_data=np.sin(2 * np.pi * 10_000 * t),
+        channel="C1",
+        time=t,
+        voltage=np.sin(2 * np.pi * 10_000 * t),
         sample_rate=1e6,
         record_length=100,
     )

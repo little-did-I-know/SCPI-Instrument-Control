@@ -185,9 +185,9 @@ class WaveformRegion:
 class WaveformData:
     """Waveform data for inclusion in reports."""
 
-    channel_name: str
-    time_data: np.ndarray
-    voltage_data: np.ndarray
+    channel: str
+    time: np.ndarray
+    voltage: np.ndarray
     sample_rate: float
     record_length: int
 
@@ -217,7 +217,7 @@ class WaveformData:
     def __post_init__(self):
         """Set default label if not provided."""
         if self.label is None:
-            self.label = self.channel_name
+            self.label = self.channel
 
     def analyze(self) -> None:
         """
@@ -291,11 +291,11 @@ class WaveformData:
             region: WaveformRegion to extract
 
         Returns:
-            Tuple of (time_data, voltage_data) for the region
+            Tuple of (time, voltage) for the region
         """
         # Find indices for this time range
-        mask = (self.time_data >= region.start_time) & (self.time_data <= region.end_time)
-        return self.time_data[mask], self.voltage_data[mask]
+        mask = (self.time >= region.start_time) & (self.time <= region.end_time)
+        return self.time[mask], self.voltage[mask]
 
     def remove_region(self, region: WaveformRegion) -> bool:
         """
@@ -332,7 +332,7 @@ class WaveformData:
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary (excludes numpy arrays for JSON serialization)."""
         data = {
-            "channel_name": self.channel_name,
+            "channel_name": self.channel,
             "sample_rate": self.sample_rate,
             "record_length": self.record_length,
             "color": self.color,

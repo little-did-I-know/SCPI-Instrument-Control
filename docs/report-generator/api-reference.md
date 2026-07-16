@@ -72,9 +72,9 @@ ReportMetadata(
 
 ```python
 WaveformData(
-    channel_name: str,         # e.g., "CH1"
-    time_data: np.ndarray,     # Time values
-    voltage_data: np.ndarray,  # Voltage values
+    channel: str,               # e.g., "CH1"
+    time: np.ndarray,           # Time values
+    voltage: np.ndarray,        # Voltage values
     sample_rate: float,        # Samples per second
     record_length: int,        # Number of samples
     timebase: Optional[float],  # s/div
@@ -404,14 +404,14 @@ def generate_automated_report(waveform_files, output_path):
     # 5. Add measurements (calculate from waveforms)
     for wf in waveforms:
         # Calculate measurements
-        vpp = np.ptp(wf.voltage_data)
-        mean = np.mean(wf.voltage_data)
-        rms = np.sqrt(np.mean(wf.voltage_data**2))
+        vpp = np.ptp(wf.voltage)
+        mean = np.mean(wf.voltage)
+        rms = np.sqrt(np.mean(wf.voltage**2))
 
         section.measurements.extend([
-            MeasurementResult(name="Vpp", value=vpp, unit="V", channel=wf.channel_name),
-            MeasurementResult(name="Mean", value=mean, unit="V", channel=wf.channel_name),
-            MeasurementResult(name="RMS", value=rms, unit="V", channel=wf.channel_name),
+            MeasurementResult(name="Vpp", value=vpp, unit="V", channel=wf.channel),
+            MeasurementResult(name="Mean", value=mean, unit="V", channel=wf.channel),
+            MeasurementResult(name="RMS", value=rms, unit="V", channel=wf.channel),
         ])
 
     report.add_section(section)
@@ -525,11 +525,11 @@ with ThreadPoolExecutor(max_workers=4) as executor:
 ```python
 def validate_waveform(wf: WaveformData) -> bool:
     """Validate waveform data before adding to report."""
-    if len(wf.time_data) != len(wf.voltage_data):
+    if len(wf.time) != len(wf.voltage):
         return False
     if wf.sample_rate <= 0:
         return False
-    if wf.record_length != len(wf.voltage_data):
+    if wf.record_length != len(wf.voltage):
         return False
     return True
 

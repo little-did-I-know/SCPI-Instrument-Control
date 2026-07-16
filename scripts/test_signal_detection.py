@@ -72,9 +72,9 @@ def test_waveform(name, time_data, voltage_data, sample_rate, expected_type=None
 
     # Create waveform data
     waveform = WaveformData(
-        channel_name="CH1",
-        time_data=time_data,
-        voltage_data=voltage_data,
+        channel="CH1",
+        time=time_data,
+        voltage=voltage_data,
         sample_rate=sample_rate,
         record_length=len(time_data)
     )

@@ -51,9 +51,9 @@ def create_sample_waveform() -> WaveformData:
     voltage_data += 0.1 * np.random.randn(num_samples)  # Add noise
 
     return WaveformData(
-        channel_name="CH1",
-        time_data=time_data,
-        voltage_data=voltage_data,
+        channel="CH1",
+        time=time_data,
+        voltage=voltage_data,
         sample_rate=sample_rate,
         record_length=num_samples,
         timebase=100e-6,  # 100 μs/div

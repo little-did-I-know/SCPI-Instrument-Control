@@ -81,7 +81,7 @@ class WaveformAnalyzer:
     @staticmethod
     def calculate_amplitude_stats(waveform: WaveformData) -> Dict[str, float]:
         """Calculate amplitude-related statistics."""
-        v = waveform.voltage_data
+        v = waveform.voltage
 
         vmax = np.max(v)
         vmin = np.min(v)
@@ -104,7 +104,7 @@ class WaveformAnalyzer:
     def calculate_frequency_stats(waveform: WaveformData) -> Dict[str, Optional[float]]:
         """Calculate frequency and period using FFT."""
         try:
-            v = waveform.voltage_data
+            v = waveform.voltage
             sample_rate = waveform.sample_rate
 
             # Compute FFT
@@ -145,8 +145,8 @@ class WaveformAnalyzer:
     def calculate_timing_stats(waveform: WaveformData) -> Dict[str, Optional[float]]:
         """Calculate timing measurements (rise time, fall time, pulse width, duty cycle)."""
         try:
-            v = waveform.voltage_data
-            t = waveform.time_data
+            v = waveform.voltage
+            t = waveform.time
             dt = np.mean(np.diff(t))  # Average time step
 
             vmax = np.max(v)
@@ -227,7 +227,7 @@ class WaveformAnalyzer:
     def calculate_quality_stats(waveform: WaveformData) -> Dict[str, Optional[float]]:
         """Calculate signal quality metrics (SNR, noise, overshoot, undershoot, jitter)."""
         try:
-            v = waveform.voltage_data
+            v = waveform.voltage
 
             # Estimate noise level (high-frequency component)
             # Use standard deviation of detrended signal
@@ -259,7 +259,7 @@ class WaveformAnalyzer:
             if len(rising_edges) > 2:
                 # Calculate period jitter
                 periods = np.diff(rising_edges)
-                jitter = np.std(periods) * np.mean(np.diff(waveform.time_data))
+                jitter = np.std(periods) * np.mean(np.diff(waveform.time))
 
             return {
                 "noise_level": noise_level,
@@ -361,7 +361,7 @@ class WaveformAnalyzer:
             Tuple of (signal_type, confidence) where confidence is 0-100%
         """
         try:
-            v = waveform.voltage_data
+            v = waveform.voltage
 
             # Check for DC signal first
             if WaveformAnalyzer._is_dc_signal(v):
@@ -449,7 +449,7 @@ class WaveformAnalyzer:
         Values are normalized so fundamental = 1.0 for periodic signals.
         """
         try:
-            v = waveform.voltage_data
+            v = waveform.voltage
             sample_rate = waveform.sample_rate
 
             # Compute FFT
@@ -643,8 +643,8 @@ class WaveformAnalyzer:
             Dictionary with plateau stability metrics
         """
         try:
-            v = waveform.voltage_data
-            t = waveform.time_data
+            v = waveform.voltage
+            t = waveform.time
 
             vmax = np.max(v)
             vmin = np.min(v)
@@ -795,8 +795,8 @@ class WaveformAnalyzer:
         """
         from scpi_control.report_generator.models.report_data import WaveformRegion
 
-        t = waveform.time_data
-        v = waveform.voltage_data
+        t = waveform.time
+        v = waveform.voltage
 
         if len(v) < 10:
             return []
@@ -882,8 +882,8 @@ class WaveformAnalyzer:
         """
         from scpi_control.report_generator.models.report_data import WaveformRegion
 
-        t = waveform.time_data
-        v = waveform.voltage_data
+        t = waveform.time
+        v = waveform.voltage
 
         if len(v) < 10:
             return []
@@ -959,8 +959,8 @@ class WaveformAnalyzer:
         """
         from scpi_control.report_generator.models.report_data import WaveformRegion
 
-        t = waveform.time_data
-        v = waveform.voltage_data
+        t = waveform.time
+        v = waveform.voltage
 
         if len(v) < 20:
             return []
