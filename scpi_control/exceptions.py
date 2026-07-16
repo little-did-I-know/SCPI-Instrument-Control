@@ -31,6 +31,12 @@ class InvalidParameterError(SiglentError):
     pass
 
 
+class FeatureNotSupportedError(SiglentError):
+    """Raised when an operation is not supported by the connected instrument's dialect."""
+
+    pass
+
+
 # Backward compatibility aliases (deprecated in 0.3.0)
 # These will be removed in a future version
 ConnectionError = SiglentConnectionError
