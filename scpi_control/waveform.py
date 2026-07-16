@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Optional, Tuple, Union
 import numpy as np
 
 from scpi_control import exceptions
+from scpi_control import waveform_schema as ws
 from scpi_control.scpi_commands import BARE_NR3_DIALECTS
 
 if TYPE_CHECKING:
@@ -381,18 +382,18 @@ class Waveform:
         with open(filename, "w", newline="") as f:
             if include_metadata:
                 # Write metadata header as comments
-                f.write("# Siglent Oscilloscope Waveform Data\n")
-                f.write(f"# Captured: {datetime.now().isoformat()}\n")
-                f.write(f"# Channel: {waveform.channel}\n")
-                f.write(f"# Sample Rate: {waveform.sample_rate} Sa/s\n")
-                f.write(f"# Samples: {len(waveform.time)}\n")
+                f.write(f"{ws.CSV_COMMENT} SCPI Instrument Control Waveform Data\n")
+                f.write(f"{ws.CSV_COMMENT} Captured: {datetime.now().isoformat()}\n")
+                f.write(f"{ws.CSV_COMMENT} {ws.CSV_HEADER_CHANNEL}: {waveform.channel}\n")
+                f.write(f"{ws.CSV_COMMENT} {ws.CSV_HEADER_SAMPLE_RATE}: {waveform.sample_rate} Sa/s\n")
+                f.write(f"{ws.CSV_COMMENT} Samples: {len(waveform.time)}\n")
 
                 if metadata:
-                    f.write("#\n# Additional Metadata:\n")
+                    f.write(f"{ws.CSV_COMMENT}\n{ws.CSV_COMMENT} Additional Metadata:\n")
                     for key, value in metadata.items():
-                        f.write(f"# {key}: {value}\n")
+                        f.write(f"{ws.CSV_COMMENT} {key}: {value}\n")
 
-                f.write("#\n")
+                f.write(f"{ws.CSV_COMMENT}\n")
 
             # Write data
             writer = csv.writer(f)
@@ -414,11 +415,11 @@ class Waveform:
 
         # Build data dictionary
         data = {
-            "time": waveform.time,
-            "voltage": waveform.voltage,
-            "channel": waveform.channel,
-            "sample_rate": waveform.sample_rate,
-            "timestamp": datetime.now().isoformat(),
+            ws.TIME: waveform.time,
+            ws.VOLTAGE: waveform.voltage,
+            ws.CHANNEL: waveform.channel,
+            ws.SAMPLE_RATE: waveform.sample_rate,
+            ws.TIMESTAMP: datetime.now().isoformat(),
         }
 
         # Add optional metadata
@@ -426,7 +427,7 @@ class Waveform:
             for key, value in metadata.items():
                 # Convert to numpy-compatible types
                 if isinstance(value, (str, int, float)):
-                    data[f"meta_{key}"] = value
+                    data[f"{ws.NPZ_META_PREFIX}{key}"] = value
 
         np.savez(filename, **data)
         logger.info(f"Waveform saved to {filename} (NPY format)")
@@ -451,11 +452,11 @@ class Waveform:
 
         # Build data dictionary for MATLAB
         data = {
-            "time": waveform.time,
-            "voltage": waveform.voltage,
-            "channel": waveform.channel,
-            "sample_rate": waveform.sample_rate,
-            "timestamp": datetime.now().isoformat(),
+            ws.TIME: waveform.time,
+            ws.VOLTAGE: waveform.voltage,
+            ws.CHANNEL: waveform.channel,
+            ws.SAMPLE_RATE: waveform.sample_rate,
+            ws.TIMESTAMP: datetime.now().isoformat(),
         }
 
         # Add metadata
@@ -466,7 +467,7 @@ class Waveform:
                 safe_key = key.replace(" ", "_").replace("-", "_")
                 if isinstance(value, (int, float, str)):
                     meta_dict[safe_key] = value
-            data["metadata"] = meta_dict
+            data[ws.MAT_META_KEY] = meta_dict
 
         savemat(filename, data)
         logger.info(f"Waveform saved to {filename} (MAT format)")
@@ -491,18 +492,18 @@ class Waveform:
 
         with h5py.File(filename, "w") as f:
             # Create datasets
-            f.create_dataset("time", data=waveform.time, compression="gzip")
-            f.create_dataset("voltage", data=waveform.voltage, compression="gzip")
+            f.create_dataset(ws.TIME, data=waveform.time, compression="gzip")
+            f.create_dataset(ws.VOLTAGE, data=waveform.voltage, compression="gzip")
 
             # Store metadata as attributes
-            f.attrs["channel"] = waveform.channel
-            f.attrs["sample_rate"] = waveform.sample_rate
-            f.attrs["num_samples"] = len(waveform.time)
-            f.attrs["timestamp"] = datetime.now().isoformat()
+            f.attrs[ws.CHANNEL] = waveform.channel
+            f.attrs[ws.SAMPLE_RATE] = waveform.sample_rate
+            f.attrs[ws.HDF5_NUM_SAMPLES] = len(waveform.time)
+            f.attrs[ws.TIMESTAMP] = datetime.now().isoformat()
 
             # Add optional metadata
             if metadata:
-                meta_group = f.create_group("metadata")
+                meta_group = f.create_group(ws.HDF5_META_GROUP)
                 for key, value in metadata.items():
                     if isinstance(value, (int, float, str, bool)):
                         meta_group.attrs[key] = value
