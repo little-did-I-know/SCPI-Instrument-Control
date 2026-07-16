@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Tektronix and LeCroy oscilloscope support (core control, waveform
+  acquisition, measurements): two more wire dialects (`tektronix`, `lecroy`)
+  alongside the existing Siglent legacy/modern pair, auto-detected from
+  `*IDN?` via a manufacturer-first routing step. Covers the Tektronix
+  TBS1000C Series and 2 Series MSO, and the LeCroy WaveSurfer 3000z and
+  WaveRunner 8000 series. See the
+  [SCPI Dialects guide](docs/user-guide/scpi-dialects.md) for the full
+  per-vendor command tables and known gaps (e.g. MSO 2-Series automated
+  measurements, LeCroy statistics/cursors/holdoff, Tek 16-bit waveform
+  transfer).
+
 ## [2.0.0] - 2026-07-15
 
 ### ⚠️ Breaking Changes
