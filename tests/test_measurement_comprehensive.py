@@ -371,3 +371,43 @@ def test_statistics_raise_cleanly_on_modern_dialect():
     with pytest.raises(exceptions.FeatureNotSupportedError):
         scope.trigger.holdoff = 0.001
     scope.disconnect()
+
+
+def test_tektronix_immediate_measurement():
+    from scpi_control import Oscilloscope
+    from scpi_control.connection.mock import MockConnection
+
+    conn = MockConnection("mock", idn="TEKTRONIX,TBS1102C,MOCK0101,CF:91.1CT FV:1.10", channel_states={1: True})
+    scope = Oscilloscope("mock", connection=conn)
+    scope.connect()
+    assert scope.measurement.measure_vpp(1) == pytest.approx(2.0)
+    assert scope.measurement.measure_frequency(1) == pytest.approx(1000.0)
+    assert "MEASUrement:IMMed:TYPe PK2Pk" in conn.writes
+    assert "MEASUrement:IMMed:SOUrce1 CH1" in conn.writes
+    scope.disconnect()
+
+
+def test_tektronix_immediate_measurement_not_supported_on_mso():
+    from scpi_control import Oscilloscope, exceptions
+    from scpi_control.connection.mock import MockConnection
+
+    conn = MockConnection("mock", idn="TEKTRONIX,MSO24,MOCK0100,FV:1.28", channel_states={1: True})
+    scope = Oscilloscope("mock", connection=conn)
+    scope.connect()
+    with pytest.raises(exceptions.FeatureNotSupportedError):
+        scope.measurement.measure_vpp(1)
+    scope.disconnect()
+
+
+def test_tektronix_statistics_not_supported():
+    from scpi_control import Oscilloscope, exceptions
+    from scpi_control.connection.mock import MockConnection
+
+    conn = MockConnection("mock", idn="TEKTRONIX,MSO24,MOCK0100,FV:1.28")
+    scope = Oscilloscope("mock", connection=conn)
+    scope.connect()
+    with pytest.raises(exceptions.FeatureNotSupportedError):
+        scope.measurement.enable_statistics()
+    with pytest.raises(exceptions.FeatureNotSupportedError):
+        scope.measurement.set_cursor_type("HREL")
+    scope.disconnect()

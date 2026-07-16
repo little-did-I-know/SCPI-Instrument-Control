@@ -75,6 +75,21 @@ class Measurement:
         mtype = mtype.upper()
         wire_type = measurement_to_wire(self._dialect, mtype)
 
+        if self._dialect == "tektronix":
+            if not self._scope._has_command("set_meas_immed_type"):
+                raise exceptions.FeatureNotSupportedError(
+                    f"measure({mtype!r}) is not supported: this Tektronix family lacks the "
+                    "MEASUrement:IMMed subsystem (badge-based measurements are a follow-up)"
+                )
+            # Immediate measurement: configure type+source, then read the value
+            self._scope.write(self._scope._get_command("set_meas_immed_type", type=wire_type))
+            self._scope.write(self._scope._get_command("set_meas_immed_source", ch=channel))
+            response = self._scope.query(self._scope._get_command("get_meas_immed_value"))
+            try:
+                return float(response.strip())
+            except ValueError as e:
+                raise exceptions.CommandError(f"Failed to parse measurement: {e}")
+
         # Query parameter value
         response = self._scope.query(self._scope._get_command("get_parameter_value", ch=channel, param=wire_type))
 
