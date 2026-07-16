@@ -39,6 +39,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   instead of a fixed 1-4 range. Scopes with fewer than four channels now raise
   `InvalidParameterError` for a channel they do not have, where they
   previously queried it.
+- `WaveformData.timebase` and `WaveformData.voltage_scale` are now `None` unless an
+  instrument actually reported them. They were previously derived by assuming a
+  14-division horizontal grid and an 8-division vertical one — Siglent's geometry,
+  applied to Tektronix and LeCroy captures too — and a flat trace was given a bare
+  1.0 V/div. All three vendor backends pass real values, so only synthetic
+  waveforms (math channels, hand-built test data) are affected.
+- The report generator's `WaveformData` is now a subclass of
+  `scpi_control.waveform.WaveformData`, and its `channel_name`, `time_data` and
+  `voltage_data` fields are renamed to `channel`, `time` and `voltage` to match.
+  Report waveforms now inherit the library's array-shape validation, and `channel`
+  is coerced to `str` by the type rather than at each loader call site.
+
+### Removed
+
+- `WaveformData.source` and `WaveformData.description`. Both were write-only —
+  set by a manual test script and read by nothing.
 
 ## [2.0.0] - 2026-07-15
 
