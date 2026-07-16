@@ -1,5 +1,5 @@
 """
-Siglent Report Generator
+SCPI Report Generator
 
 A standalone application for generating professional test reports from
 oscilloscope waveform data with optional AI-powered analysis.

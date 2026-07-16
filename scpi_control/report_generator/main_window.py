@@ -88,7 +88,7 @@ class MainWindow(QMainWindow):
                 # Template may have been deleted, ignore
                 pass
 
-        self.setWindowTitle("Siglent Report Generator")
+        self.setWindowTitle("SCPI Report Generator")
         self.resize(1400, 900)
 
         self._setup_ui()
@@ -678,8 +678,8 @@ class MainWindow(QMainWindow):
         """Show about dialog."""
         QMessageBox.about(
             self,
-            "About Siglent Report Generator",
-            "<h2>Siglent Report Generator</h2>"
+            "About SCPI Report Generator",
+            "<h2>SCPI Report Generator</h2>"
             "<p>Generate professional test reports from oscilloscope data.</p>"
             "<p><b>Features:</b></p>"
             "<ul>"
@@ -689,7 +689,7 @@ class MainWindow(QMainWindow):
             "<li>Interactive chat for data insights</li>"
             "<li>Customizable report templates</li>"
             "</ul>"
-            "<p>Part of the <b>Siglent Oscilloscope Control</b> project.</p>",
+            "<p>Part of the <b>SCPI Instrument Control</b> project.</p>",
         )
 
     def _load_template(self):

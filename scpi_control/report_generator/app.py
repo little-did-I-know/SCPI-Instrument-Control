@@ -2,7 +2,7 @@
 Application entry point for the Report Generator.
 
 Launch with:
-    python -m siglent.report_generator.app
+    python -m scpi_control.report_generator.app
 
 Or after installation:
     siglent-report-generator
@@ -92,8 +92,8 @@ def main():
     QCoreApplication.setAttribute(Qt.ApplicationAttribute.AA_ShareOpenGLContexts)
 
     app = QApplication(sys.argv)
-    app.setApplicationName("Siglent Report Generator")
-    app.setOrganizationName("Siglent")
+    app.setApplicationName("SCPI Report Generator")
+    app.setOrganizationName("SCPI Instrument Control")
 
     # Create and show main window
     window = MainWindow()
