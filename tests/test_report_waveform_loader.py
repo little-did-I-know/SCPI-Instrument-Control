@@ -37,9 +37,9 @@ def test_npz_round_trip_preserves_everything(tmp_path):
 
     assert len(loaded) == 1
     got = loaded[0]
-    assert got.channel_name == "C1"                      # was 'voltage'
+    assert got.channel_name == "C1"  # was 'voltage'
     assert got.sample_rate == pytest.approx(SAMPLE_RATE)  # was a fabricated 1e9
-    np.testing.assert_allclose(got.time_data, wf.time)    # was a 0-dim timestamp STRING
+    np.testing.assert_allclose(got.time_data, wf.time)  # was a 0-dim timestamp STRING
     np.testing.assert_allclose(got.voltage_data, wf.voltage)
     assert got.record_length == 100
 
@@ -283,8 +283,8 @@ def test_hdf5_round_trip_preserves_everything(tmp_path):
 
     assert len(loaded) == 1
     got = loaded[0]
-    assert got.channel_name == "C1"                       # was 'voltage'
-    assert got.sample_rate == pytest.approx(SAMPLE_RATE)   # was 1e9: read from the wrong attrs
+    assert got.channel_name == "C1"  # was 'voltage'
+    assert got.sample_rate == pytest.approx(SAMPLE_RATE)  # was 1e9: read from the wrong attrs
     np.testing.assert_allclose(got.time_data, wf.time)
     np.testing.assert_allclose(got.voltage_data, wf.voltage)
 
@@ -317,6 +317,23 @@ def test_foreign_hdf5_still_loads_heuristically(tmp_path):
 
     assert len(loaded) == 1
     assert len(loaded[0].time_data) == 10
+
+
+def test_foreign_hdf5_with_a_string_time_dataset_is_rejected_cleanly(tmp_path):
+    """A foreign file can use our dataset names without our numeric contract.
+
+    The quasi-schema branch derives sample_rate from the time axis when the attr
+    is absent, so a string 'time' dataset must raise our ValueError rather than
+    an opaque numpy TypeError -- mirroring the NPZ and MAT string-key tests.
+    """
+    h5py = pytest.importorskip("h5py")
+    p = tmp_path / "stringy.h5"
+    with h5py.File(p, "w") as f:
+        f.create_dataset("time", data=np.array([b"2026-01-01", b"2026-01-02"]))
+        f.create_dataset("voltage", data=np.ones(2))
+
+    with pytest.raises(ValueError):
+        WaveformLoader.load(p)
 
 
 def test_load_multiple_raises_on_a_bad_file(tmp_path):

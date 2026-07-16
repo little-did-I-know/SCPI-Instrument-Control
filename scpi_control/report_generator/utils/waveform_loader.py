@@ -30,9 +30,10 @@ def _require_numeric_time(time_data: np.ndarray, filepath: Path) -> np.ndarray:
     """Reject a non-numeric time axis with the loader's own error.
 
     `_pick_time_key`'s last-resort branch can select a string key on a foreign
-    file. Without this, `_rate_from_time` raises an opaque numpy TypeError
-    instead of the ValueError callers expect. Shared by every heuristic
-    loader path (NPZ, MAT, and future HDF5) so the guard lives in one place.
+    file, and a foreign file can also name a dataset 'time' outright. Without
+    this, `_rate_from_time` raises an opaque numpy TypeError instead of the
+    ValueError callers expect. Shared by every path that derives a rate from a
+    time axis it did not write (NPZ, MAT, HDF5) so the guard lives in one place.
     """
     time_data = np.asarray(time_data)
     if not np.issubdtype(time_data.dtype, np.number):
@@ -312,7 +313,9 @@ class WaveformLoader:
                 # Core fields live on the FILE's attrs, not the dataset's.
                 attrs = dict(f.attrs)
                 voltage = f[ws.VOLTAGE][:]
-                time_data = f[ws.TIME][:]
+                # Foreign files can name a dataset 'time' and fill it with strings;
+                # the sample_rate default below feeds it to `_rate_from_time`.
+                time_data = _require_numeric_time(f[ws.TIME][:], filepath)
                 channel = attrs.get(ws.CHANNEL, ws.VOLTAGE)
                 if isinstance(channel, bytes):
                     channel = channel.decode()
