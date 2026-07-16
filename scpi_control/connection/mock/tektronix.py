@@ -208,7 +208,10 @@ def handle_query(conn, command: str) -> Optional[str]:
     if upper == "MEASUREMENT:IMMED:VALUE?":
         return _MOCK_IMMED_VALUES.get(getattr(conn, "meas_immed_type", ""), "0.0E0")
     if upper == "MEASUREMENT:LIST?":
-        # Real scopes answer NONE when no measurements exist (4/5/6 p.607).
+        # MSO2 PM 077-1776-07 p.2-411 states explicitly: "When no measurements
+        # are defined, the command returns NONE." The 4/5/6 PM 077-1305-11
+        # p.2-592 doesn't document this case, but is consistent-but-silent,
+        # not contradictory, so the same NONE spelling is used here.
         return ",".join(f"MEAS{n}" for n in sorted(conn.badges)) if conn.badges else "NONE"
     if match := re.match(r"MEASUREMENT:MEAS(\d+):RESULTS:CURRENTACQ:MEAN\?", upper):
         badge = conn.badges.get(int(match.group(1)))

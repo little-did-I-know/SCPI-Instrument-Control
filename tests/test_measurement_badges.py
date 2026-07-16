@@ -59,16 +59,20 @@ def test_same_type_on_another_channel_gets_its_own_slot():
 
 
 def test_user_badges_are_never_reused_or_deleted():
-    scope, conn = _mso_scope(tek_badges={1: {"type": "FREQUENCY", "source": "CH1"}})
+    # Seed a user badge on MEAS2, not MEAS1, so lowest-free-slot allocation
+    # (which should land on MEAS1) is distinguishable from a naive max+1
+    # strategy (which would also land on MEAS2, colliding with the user's
+    # badge). This also covers the non-contiguous-gap case.
+    scope, conn = _mso_scope(tek_badges={2: {"type": "FREQUENCY", "source": "CH1"}})
     scope.measurement.measure_vpp(1)
 
-    assert 'MEASUrement:ADDNew "MEAS1"' not in conn.writes  # skipped the user's slot
-    assert 'MEASUrement:ADDNew "MEAS2"' in conn.writes
+    assert 'MEASUrement:ADDNew "MEAS1"' in conn.writes  # took the lowest free slot
+    assert 'MEASUrement:ADDNew "MEAS2"' not in conn.writes  # skipped the user's slot
 
     scope.disconnect()
-    assert 'MEASUrement:DELete "MEAS2"' in conn.writes  # ours is removed
-    assert 'MEASUrement:DELete "MEAS1"' not in conn.writes  # theirs survives
-    assert 1 in conn.badges
+    assert 'MEASUrement:DELete "MEAS1"' in conn.writes  # ours is removed
+    assert 'MEASUrement:DELete "MEAS2"' not in conn.writes  # theirs survives
+    assert 2 in conn.badges
 
 
 def test_disconnect_removes_every_badge_we_created():
@@ -78,6 +82,59 @@ def test_disconnect_removes_every_badge_we_created():
     scope.disconnect()
     assert 'MEASUrement:DELete "MEAS1"' in conn.writes
     assert 'MEASUrement:DELete "MEAS2"' in conn.writes
+    assert conn.badges == {}
+
+
+def test_badge_created_but_not_configured_is_still_cleaned_up(monkeypatch):
+    scope, conn = _mso_scope()
+    # Fail the TYPe write so the badge exists on the instrument (ADDNew already
+    # went through) but was never configured -- this must not leak.
+    real_write = scope.write
+
+    def flaky_write(command):
+        if ":TYPe " in command:
+            raise exceptions.CommandError("simulated link glitch")
+        return real_write(command)
+
+    monkeypatch.setattr(scope, "write", flaky_write)
+    with pytest.raises(exceptions.CommandError):
+        scope.measurement.measure_vpp(1)
+    monkeypatch.setattr(scope, "write", real_write)
+
+    scope.disconnect()
+    assert 'MEASUrement:DELete "MEAS1"' in conn.writes  # created -> cleaned up
+    assert conn.badges == {}
+
+
+def test_retry_after_failed_type_write_reconfigures_a_fresh_slot(monkeypatch):
+    # The half-configured MEAS1 from the failed attempt must never be handed
+    # back out and read as-is -- that would silently return a value for a
+    # badge whose type was never set. The retry must configure a new slot.
+    scope, conn = _mso_scope()
+    real_write = scope.write
+    state = {"failed_once": False}
+
+    def flaky_write(command):
+        if ":TYPe " in command and not state["failed_once"]:
+            state["failed_once"] = True
+            raise exceptions.CommandError("simulated link glitch")
+        return real_write(command)
+
+    monkeypatch.setattr(scope, "write", flaky_write)
+    with pytest.raises(exceptions.CommandError):
+        scope.measurement.measure_vpp(1)
+
+    # Retry: should succeed by configuring a fresh slot, not by reading the
+    # unconfigured MEAS1 as if it were already set up.
+    assert scope.measurement.measure_vpp(1) == pytest.approx(2.0)
+    monkeypatch.setattr(scope, "write", real_write)
+
+    assert 'MEASUrement:ADDNew "MEAS2"' in conn.writes
+    assert "MEASUrement:MEAS2:TYPe PK2Pk" in conn.writes
+
+    scope.disconnect()
+    assert 'MEASUrement:DELete "MEAS1"' in conn.writes  # leaked half-configured slot, cleaned up
+    assert 'MEASUrement:DELete "MEAS2"' in conn.writes  # fully-configured slot, cleaned up
     assert conn.badges == {}
 
 

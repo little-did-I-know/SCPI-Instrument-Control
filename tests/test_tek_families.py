@@ -1,4 +1,4 @@
-"""Per-model coverage for the Tektronix families (TBS1000C, MSO 2/4/5/6)."""
+"""Per-model coverage for the Tektronix MSO 4/5/6 family (MSO44/46/54/56/58/58LP/64)."""
 
 import pytest
 
