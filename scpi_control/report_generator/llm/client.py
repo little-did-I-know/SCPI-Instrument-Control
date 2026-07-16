@@ -240,7 +240,7 @@ class LLMClient:
 
             return data["choices"][0]["message"]["content"]
 
-        except requests.exceptions.RequestException as e:
+        except (requests.exceptions.RequestException, OSError) as e:
             print(f"LLM request failed: {e}")
             return None
         except (KeyError, IndexError, json.JSONDecodeError) as e:
@@ -340,66 +340,6 @@ class LLMClient:
         except (KeyError, IndexError, json.JSONDecodeError) as e:
             print(f"Failed to parse LLM response: {e}")
             return None
-
-    def stream_chat(
-        self,
-        messages: List[Dict[str, str]],
-        temperature: Optional[float] = None,
-        max_tokens: Optional[int] = None,
-    ):
-        """
-        Send a streaming chat request to the LLM.
-
-        Args:
-            messages: List of message dictionaries with 'role' and 'content'
-            temperature: Override default temperature
-            max_tokens: Override default max tokens
-
-        Yields:
-            Response chunks as they arrive
-        """
-        url = f"{self.config.endpoint.rstrip('/')}/chat/completions"
-
-        payload = {
-            "model": self.config.model,
-            "messages": messages,
-            "temperature": temperature if temperature is not None else self.config.temperature,
-            "max_tokens": max_tokens if max_tokens is not None else self.config.max_tokens,
-            "stream": True,
-        }
-
-        try:
-            response = self._session.post(
-                url,
-                json=payload,
-                timeout=self.config.timeout,
-                stream=True,
-            )
-            response.raise_for_status()
-
-            for line in response.iter_lines():
-                if not line:
-                    continue
-
-                line = line.decode("utf-8")
-
-                if line.startswith("data: "):
-                    line = line[6:]  # Remove "data: " prefix
-
-                if line == "[DONE]":
-                    break
-
-                try:
-                    chunk = json.loads(line)
-                    if "choices" in chunk and len(chunk["choices"]) > 0:
-                        delta = chunk["choices"][0].get("delta", {})
-                        if "content" in delta:
-                            yield delta["content"]
-                except json.JSONDecodeError:
-                    continue
-
-        except requests.exceptions.RequestException as e:
-            print(f"LLM streaming request failed: {e}")
 
     def get_available_models(self) -> List[str]:
         """

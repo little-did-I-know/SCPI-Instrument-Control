@@ -7,7 +7,7 @@ Provides methods for trend analysis, threshold suggestions, and session summarie
 import logging
 from typing import Dict, List, Optional
 
-from scpi_control.report_generator.llm.client import LLMClient
+from scpi_control.report_generator.llm.client import LLMClient, LLMConfig
 from scpi_control.report_generator.llm.daq_context_builder import DAQContextBuilder
 from scpi_control.report_generator.llm.daq_prompts import get_daq_system_prompt
 
@@ -294,23 +294,28 @@ class DAQAnalyzer:
         return None
 
 
-def create_daq_analyzer(
-    provider: str = "ollama",
-    model: Optional[str] = None,
-    **kwargs,
-) -> DAQAnalyzer:
-    """
-    Factory function to create a DAQ analyzer with the specified LLM provider.
+def create_daq_analyzer(provider: str = "ollama", model: str = "llama3.2", **kwargs) -> DAQAnalyzer:
+    """Build a DAQAnalyzer for a provider the client can actually serve.
 
     Args:
-        provider: LLM provider ('ollama', 'openai', 'anthropic')
-        model: Model name (defaults to provider's default)
-        **kwargs: Additional arguments for the LLM client
+        provider: "ollama", "lm_studio", or "openai" (see LLMConfig's factories)
+        model: Model name for that provider
+        **kwargs: Passed through to the provider's config factory
+            (e.g. api_key for openai, hostname/port for ollama)
 
     Returns:
-        Configured DAQAnalyzer instance
-    """
-    from scpi_control.report_generator.llm.client import LLMClient
+        A DAQAnalyzer wrapping a configured LLMClient
 
-    client = LLMClient(provider=provider, model=model, **kwargs)
-    return DAQAnalyzer(client)
+    Raises:
+        ValueError: If the provider is not one this client supports
+    """
+    if provider == "ollama":
+        config = LLMConfig.create_ollama_config(model=model, **kwargs)
+    elif provider == "lm_studio":
+        config = LLMConfig.create_lm_studio_config(model=model, **kwargs)
+    elif provider == "openai":
+        config = LLMConfig.create_openai_config(model=model, **kwargs)
+    else:
+        raise ValueError(f"Unknown provider: {provider!r}. Supported: ollama, lm_studio, openai.")
+
+    return DAQAnalyzer(LLMClient(config))
