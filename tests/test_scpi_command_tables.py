@@ -139,3 +139,27 @@ class TestDialectInfrastructure:
             assert cmds.get_command("reset") == "*RST"
             assert cmds.get_command("clear_status") == "*CLS"
             assert cmds.get_command("operation_complete") == "*OPC?"
+
+
+from scpi_control.scpi_commands import BARE_NR3_DIALECTS, channel_token, is_flat_trigger, source_from_wire
+
+
+class TestDialectHelpers:
+    def test_channel_token_passthrough_for_siglent(self):
+        assert channel_token("legacy", 2) == "C2"
+        assert channel_token("legacy", "C2") == "C2"
+        assert channel_token("modern", "C1") == "C1"
+        assert channel_token("legacy", "EX") == "EX"
+        assert channel_token("legacy", "LINE") == "LINE"
+
+    def test_source_from_wire_passthrough_for_siglent(self):
+        assert source_from_wire("legacy", "C2") == "C2"
+        assert source_from_wire("modern", " C3 ") == "C3"
+
+    def test_flat_trigger_dialects(self):
+        assert is_flat_trigger("legacy") is True
+        assert is_flat_trigger("modern") is False
+
+    def test_bare_nr3_dialects(self):
+        assert "modern" in BARE_NR3_DIALECTS
+        assert "legacy" not in BARE_NR3_DIALECTS

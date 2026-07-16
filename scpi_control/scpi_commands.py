@@ -10,6 +10,7 @@ This module holds the per-dialect command tables and the enum conversions
 between the library's public vocabulary and each dialect's wire tokens.
 """
 
+import re
 from typing import Dict
 
 # Wire dialects with a command table. Grows as vendor tables land.
@@ -256,96 +257,136 @@ class SCPICommandSet:
 
 # ---- Public-vocabulary <-> wire-token conversions -------------------------
 # The library's public API always speaks: modes AUTO|NORM|SINGLE|STOP,
-# slopes POS|NEG|WINDOW, coupling DC|AC|GND. These helpers convert at the
-# dialect boundary and are the only place wire enums are spelled out.
+# slopes POS|NEG|WINDOW, coupling DC|AC|GND, sources C1..C4|EX|EX5|LINE.
+# These tables convert at the dialect boundary and are the only place wire
+# enums are spelled out. A missing (dialect, token) pair means the dialect
+# cannot express that public token -> FeatureNotSupportedError.
 
-_MODE_TO_MODERN = {"AUTO": "AUTO", "NORM": "NORMal", "SINGLE": "SINGle"}
-_MODE_FROM_MODERN = {"AUTO": "AUTO", "NORMAL": "NORM", "SINGLE": "SINGLE", "FTRIG": "AUTO"}
-_LEGACY_MODES = {"AUTO", "NORM", "SINGLE", "STOP"}
+from scpi_control import exceptions
 
-_SLOPE_TO_MODERN = {"POS": "RISing", "NEG": "FALLing", "WINDOW": "ALTernate"}
-_SLOPE_FROM_MODERN = {"RISING": "POS", "FALLING": "NEG", "ALTERNATE": "WINDOW"}
-_LEGACY_SLOPES = {"POS", "NEG", "WINDOW"}
+# Dialects whose trigger commands are per-source-prefixed (C1:TRLV ...) rather
+# than global (:TRIGger:EDGE:LEVel ...). These also have a STOP trigger-mode
+# wire token; the global-style dialects detect STOP via acquisition status.
+FLAT_TRIGGER_DIALECTS = frozenset({"legacy"})
 
-_COUPLING_TO_LEGACY = {"DC": "D1M", "AC": "A1M", "GND": "GND"}
-_COUPLING_FROM_LEGACY = {"D1M": "DC", "A1M": "AC", "D50": "DC", "A50": "AC", "GND": "GND"}
-_MODERN_COUPLINGS = {"DC", "AC", "GND"}
+# Dialects whose numeric queries return a bare NR3 value with no unit suffix.
+BARE_NR3_DIALECTS = frozenset({"modern"})
 
-# :TRIGger:STATus? enum (guide p.483) plus legacy SAST? responses share this space
+
+def is_flat_trigger(dialect: str) -> bool:
+    return dialect in FLAT_TRIGGER_DIALECTS
+
+
+_MODE_TO_WIRE = {
+    "legacy": {"AUTO": "AUTO", "NORM": "NORM", "SINGLE": "SINGLE", "STOP": "STOP"},
+    "modern": {"AUTO": "AUTO", "NORM": "NORMal", "SINGLE": "SINGle"},
+}
+_MODE_FROM_WIRE = {
+    "legacy": {"AUTO": "AUTO", "NORM": "NORM", "SINGLE": "SINGLE", "STOP": "STOP"},
+    "modern": {"AUTO": "AUTO", "NORMAL": "NORM", "SINGLE": "SINGLE", "FTRIG": "AUTO"},
+}
+_SLOPE_TO_WIRE = {
+    "legacy": {"POS": "POS", "NEG": "NEG", "WINDOW": "WINDOW"},
+    "modern": {"POS": "RISing", "NEG": "FALLing", "WINDOW": "ALTernate"},
+}
+_SLOPE_FROM_WIRE = {
+    "legacy": {"POS": "POS", "NEG": "NEG", "WINDOW": "WINDOW"},
+    "modern": {"RISING": "POS", "FALLING": "NEG", "ALTERNATE": "WINDOW"},
+}
+_COUPLING_TO_WIRE = {
+    "legacy": {"DC": "D1M", "AC": "A1M", "GND": "GND"},
+    "modern": {"DC": "DC", "AC": "AC", "GND": "GND"},
+}
+_COUPLING_FROM_WIRE = {
+    "legacy": {"D1M": "DC", "A1M": "AC", "D50": "DC", "A50": "AC", "GND": "GND"},
+    "modern": {"DC": "DC", "AC": "AC", "GND": "GND"},
+}
+
+_PUBLIC_MODES = {"AUTO", "NORM", "SINGLE", "STOP"}
+_PUBLIC_SLOPES = {"POS", "NEG", "WINDOW"}
+_PUBLIC_COUPLINGS = {"DC", "AC", "GND"}
+
+# Acquisition-status vocabulary shared by every dialect's status query.
 _STATUS_MAP = {"ARM": "ARM", "ARMED": "ARM", "READY": "READY", "AUTO": "AUTO", "TRIG'D": "TRIGD", "STOP": "STOP", "ROLL": "ROLL"}
 
 
-def mode_to_wire(dialect: str, mode: str) -> str:
-    """Convert a public trigger mode (AUTO|NORM|SINGLE) to the wire token.
+def _last_token(raw: str) -> str:
+    return raw.strip().split()[-1].upper() if raw.strip() else ""
 
-    STOP is not a wire mode on the modern dialect (it is the :TRIGger:STOP
-    command); callers handle it before converting.
+
+def _to_wire(table, public_values, dialect: str, token: str, what: str) -> str:
+    token = token.upper()
+    if token not in public_values:
+        raise ValueError(f"Invalid {what}: {token}. Must be one of {sorted(public_values)}.")
+    try:
+        return table[dialect][token]
+    except KeyError:
+        raise exceptions.FeatureNotSupportedError(f"{what} {token} is not supported on the {dialect} dialect")
+
+
+def _from_wire(table, dialect: str, raw: str, what: str) -> str:
+    token = _last_token(raw)
+    try:
+        return table[dialect][token]
+    except KeyError:
+        raise ValueError(f"Unrecognized {dialect} {what} response: {raw!r}")
+
+
+def mode_to_wire(dialect: str, mode: str) -> str:
+    """Convert a public trigger mode to the wire token.
+
+    STOP is only a wire mode on flat-trigger dialects; global-style dialects
+    implement it via their stop command, and callers handle it before converting.
     """
-    mode = mode.upper()
-    if dialect == "legacy":
-        if mode not in _LEGACY_MODES:
-            raise ValueError(f"Invalid trigger mode: {mode}")
-        return mode
-    if mode not in _MODE_TO_MODERN:
-        raise ValueError(f"Invalid trigger mode for modern dialect: {mode}")
-    return _MODE_TO_MODERN[mode]
+    return _to_wire(_MODE_TO_WIRE, _PUBLIC_MODES, dialect, mode, "trigger mode")
 
 
 def mode_from_wire(dialect: str, raw: str) -> str:
     """Normalize a trigger-mode query response to AUTO|NORM|SINGLE|STOP."""
-    token = raw.strip().split()[-1].upper() if raw.strip() else ""
-    if dialect == "legacy":
-        if token not in _LEGACY_MODES:
-            raise ValueError(f"Unrecognized legacy trigger mode response: {raw!r}")
-        return token
-    if token not in _MODE_FROM_MODERN:
-        raise ValueError(f"Unrecognized modern trigger mode response: {raw!r}")
-    return _MODE_FROM_MODERN[token]
+    return _from_wire(_MODE_FROM_WIRE, dialect, raw, "trigger mode")
 
 
 def slope_to_wire(dialect: str, slope: str) -> str:
-    slope = slope.upper()
-    if slope not in _LEGACY_SLOPES:
-        raise ValueError(f"Invalid trigger slope: {slope}. Must be POS, NEG, or WINDOW.")
-    return slope if dialect == "legacy" else _SLOPE_TO_MODERN[slope]
+    return _to_wire(_SLOPE_TO_WIRE, _PUBLIC_SLOPES, dialect, slope, "trigger slope")
 
 
 def slope_from_wire(dialect: str, raw: str) -> str:
-    token = raw.strip().split()[-1].upper() if raw.strip() else ""
-    if dialect == "legacy":
-        if token not in _LEGACY_SLOPES:
-            raise ValueError(f"Unrecognized legacy slope response: {raw!r}")
-        return token
-    if token not in _SLOPE_FROM_MODERN:
-        raise ValueError(f"Unrecognized modern slope response: {raw!r}")
-    return _SLOPE_FROM_MODERN[token]
+    return _from_wire(_SLOPE_FROM_WIRE, dialect, raw, "trigger slope")
 
 
 def coupling_to_wire(dialect: str, coupling: str) -> str:
-    coupling = coupling.upper()
-    if coupling not in _MODERN_COUPLINGS:
-        raise ValueError(f"Invalid coupling mode: {coupling}. Must be DC, AC, or GND.")
-    return _COUPLING_TO_LEGACY[coupling] if dialect == "legacy" else coupling
+    return _to_wire(_COUPLING_TO_WIRE, _PUBLIC_COUPLINGS, dialect, coupling, "coupling mode")
 
 
 def coupling_from_wire(dialect: str, raw: str) -> str:
-    token = raw.strip().split()[-1].upper() if raw.strip() else ""
-    if dialect == "legacy":
-        if token not in _COUPLING_FROM_LEGACY:
-            raise ValueError(f"Unrecognized legacy coupling response: {raw!r}")
-        return _COUPLING_FROM_LEGACY[token]
-    if token not in _MODERN_COUPLINGS:
-        raise ValueError(f"Unrecognized modern coupling response: {raw!r}")
+    return _from_wire(_COUPLING_FROM_WIRE, dialect, raw, "coupling mode")
+
+
+def channel_token(dialect: str, source) -> str:
+    """Convert a public channel source (int, 'C2', 'EX', 'LINE') to the wire token."""
+    if isinstance(source, int):
+        number = source
+    else:
+        token = str(source).strip().upper()
+        match = re.fullmatch(r"C(?:H)?(\d+)", token)
+        if not match:
+            return token  # EX, EX5, LINE and friends pass through
+        number = int(match.group(1))
+    return f"CH{number}" if dialect == "tektronix" else f"C{number}"
+
+
+def source_from_wire(dialect: str, raw: str) -> str:
+    """Normalize a trigger-source query response to the public vocabulary."""
+    token = raw.strip().upper()
+    match = re.fullmatch(r"C(?:H)?(\d+)", token)
+    if match:
+        return f"C{int(match.group(1))}"
     return token
 
 
 def normalize_status(raw: str) -> str:
-    """Normalize an acquisition-status response to ARM|READY|AUTO|TRIGD|STOP|ROLL.
-
-    Accepts modern ':TRIGger:STATus?' responses (Arm|Ready|Auto|Trig'd|Stop|Roll,
-    guide p.483) and legacy 'SAST?' responses, with or without the 'SAST ' echo.
-    """
-    token = raw.strip().split()[-1].upper() if raw.strip() else ""
+    """Normalize an acquisition-status response to ARM|READY|AUTO|TRIGD|STOP|ROLL."""
+    token = _last_token(raw)
     if token not in _STATUS_MAP:
         raise ValueError(f"Unrecognized acquisition status response: {raw!r}")
     return _STATUS_MAP[token]
