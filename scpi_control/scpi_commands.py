@@ -438,15 +438,15 @@ class SCPICommandSet:
             # Badge measurements. The modern MSO families have no
             # MEASUrement:IMMed subsystem -- measurements are stateful "badges"
             # that are added, configured, then read. Verified on both families:
-            # MSO2 PM 077-1776-07 (ADDNew p.414, TYPe p.487, SOUrce p.483,
-            # RESUlts p.481, DELete p.424, LIST p.430) and 4/5/6 PM 077-1305-11
-            # (ADDNew p.576, TYPe p.717, SOUrce p.709, RESUlts p.705,
-            # DELete p.596, LIST p.607).
+            # MSO2 PM 077-1776-07 (ADDNew p.2-395, TYPe p.2-468, SOUrce p.2-464,
+            # RESUlts p.2-462, DELete p.2-405, LIST p.2-411) and 4/5/6 PM 077-1305-11
+            # (ADDNew p.2-561, TYPe p.2-702, SOUrce p.2-694, RESUlts p.2-690,
+            # DELete p.2-581, LIST p.2-592).
             "add_measurement_badge": 'MEASUrement:ADDNew "MEAS{n}"',
             "set_badge_type": "MEASUrement:MEAS{n}:TYPe {type}",
             "set_badge_source": "MEASUrement:MEAS{n}:SOUrce {src}",
             # Plain result query -- the SUBGROUP form needs the 5-DPM/5-IMDA/
-            # 6-DPM options, this one does not (4/5/6 p.705).
+            # 6-DPM options, this one does not (4/5/6 p.2-690).
             "get_badge_value": "MEASUrement:MEAS{n}:RESUlts:CURRentacq:MEAN?",
             "delete_badge": 'MEASUrement:DELete "MEAS{n}"',
             "list_badges": "MEASUrement:LIST?",
@@ -718,18 +718,23 @@ def measurement_to_wire(dialect: str, mtype: str) -> str:
 
 # Badge measurement vocabulary (MEASUrement:MEAS<x>:TYPe). Distinct from the
 # IMMed vocabulary above -- e.g. RISe/FALL there vs RISETIME/FALLTIME here.
-# Only the tokens BOTH modern-MSO manuals list are mapped:
-#   MSO2 PM 077-1776-07 p.487 and 4/5/6 PM 077-1305-11 p.717.
+# Verified by parsing each manual's MEASUrement:MEAS<x>:TYPe argument list
+# (the brace-delimited, |-separated token set) directly:
+#   MSO2 PM 077-1776-07 p.2-468 and 4/5/6 PM 077-1305-11 p.2-702.
+# TOP and BASE are listed by BOTH manuals and are mapped below. 4/5/6 adds
+# HIGH and LOW as a superset; our public vocabulary has no HIGH/LOW equivalent,
+# so those extra tokens are simply never reached.
 # Deliberately unmapped, so they gate as FeatureNotSupportedError:
-#   TOP/BASE  -- the families diverge (MSO2 has TOP|BASE, 4/5/6 has HIGH|LOW|BASE)
-#   CMEAN     -- neither manual lists a cycle-mean badge token
-#   CRMS      -- ACRMS is AC-coupled RMS, a different measurement
+#   CMEAN -- neither manual lists a cycle-mean badge token
+#   CRMS  -- ACRMS is AC-coupled RMS, a different measurement
 _BADGE_TYPE_TO_WIRE = {
     "tektronix": {
         "PKPK": "PK2Pk",
         "MAX": "MAXIMUM",
         "MIN": "MINIMUM",
         "AMPL": "AMPLITUDE",
+        "TOP": "TOP",
+        "BASE": "BASE",
         "MEAN": "MEAN",
         "RMS": "RMS",
         "FREQ": "FREQUENCY",

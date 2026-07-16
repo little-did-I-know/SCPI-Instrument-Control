@@ -437,10 +437,15 @@ class TestBadgeTypeMap:
         assert badge_type_to_wire("tektronix", "FALL") == "FALLTIME"
         assert measurement_to_wire("tektronix", "RISE") == "RISe"
 
-    def test_family_divergent_and_absent_types_gate(self):
-        # TOP/BASE exist on MSO2 but not 4/5/6 (and vice versa for HIGH/LOW);
-        # CMEAN has no badge token; ACRMS is AC-coupled RMS, not cycle RMS.
-        for mtype in ("TOP", "BASE", "CMEAN", "CRMS"):
+    def test_top_and_base_map_on_both_families(self):
+        # Both MSO2 and 4/5/6 list TOP and BASE as badge types.
+        assert badge_type_to_wire("tektronix", "TOP") == "TOP"
+        assert badge_type_to_wire("tektronix", "BASE") == "BASE"
+
+    def test_absent_types_gate(self):
+        # CMEAN has no badge token in either manual; ACRMS is AC-coupled RMS,
+        # not cycle RMS, so CRMS stays unmapped rather than mapped to a lie.
+        for mtype in ("CMEAN", "CRMS"):
             with pytest.raises(exc.FeatureNotSupportedError):
                 badge_type_to_wire("tektronix", mtype)
 
