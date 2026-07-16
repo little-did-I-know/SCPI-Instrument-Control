@@ -5,9 +5,10 @@ queries answer in CHDR OFF format: bare values, no unit suffixes.
 """
 
 import re
+import struct
 from typing import Optional
 
-from scpi_control.connection.mock.helpers import _format_nr3
+from scpi_control.connection.mock.helpers import _build_ieee_block, _format_nr3
 from scpi_control.connection.mock.siglent import _MOCK_PAVA_VALUES, handle_write as _legacy_write
 
 _INR_MAP = {"TRIG'D": "1"}  # INR bit 0: new signal acquired
@@ -73,4 +74,18 @@ def handle_query(conn, command: str) -> Optional[str]:
 
 
 def build_waveform_response(conn) -> bytes:
-    raise NotImplementedError  # Task 15
+    """Construct a LeCroy WAVEDESC + sample-array block (WF? ALL, CORD LO)."""
+    channel = conn._last_waveform_channel or next(iter(conn._waveform_payloads))
+    codes = conn._waveform_payloads.get(channel, bytes())
+    gain = conn._voltage_scales.get(channel, 1.0) / 25.0  # mirror Siglent scaling for comparable volts
+    desc = bytearray(346)
+    desc[0:8] = b"WAVEDESC"
+    struct.pack_into("<h", desc, 32, 0)
+    struct.pack_into("<i", desc, 36, 346)
+    struct.pack_into("<i", desc, 40, 0)
+    struct.pack_into("<i", desc, 116, len(codes))
+    struct.pack_into("<f", desc, 156, gain)
+    struct.pack_into("<f", desc, 160, conn._voltage_offsets.get(channel, 0.0))
+    struct.pack_into("<f", desc, 176, 1.0 / conn.sample_rate)
+    struct.pack_into("<d", desc, 180, 0.0)
+    return _build_ieee_block(bytes(desc) + codes)

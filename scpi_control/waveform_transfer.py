@@ -8,6 +8,7 @@ definite-length block framing is shared by all of them.
 
 import logging
 import re
+import struct
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -268,9 +269,76 @@ class TektronixTransfer:
         )
 
 
+# WAVEDESC field offsets, per the MAUI remote manual's TEMPLATE? definition.
+_WAVEDESC_COMM_TYPE = 32       # int16: 0 = byte, 1 = word
+_WAVEDESC_DESC_LEN = 36        # int32: descriptor block length (typ. 346)
+_WAVEDESC_USER_TEXT_LEN = 40   # int32
+_WAVEDESC_ARRAY_COUNT = 116    # int32: number of samples
+_WAVEDESC_VERTICAL_GAIN = 156  # float32
+_WAVEDESC_VERTICAL_OFFSET = 160  # float32
+_WAVEDESC_HORIZ_INTERVAL = 176   # float32
+_WAVEDESC_HORIZ_OFFSET = 180     # float64
+
+
+def parse_wavedesc(payload: bytes, *, error_context: str = "") -> dict:
+    """Parse the WAVEDESC descriptor out of a LeCroy WF? ALL payload (CORD LO)."""
+    start = payload.find(b"WAVEDESC")
+    if start == -1:
+        raise exceptions.CommandError(f"Invalid LeCroy waveform: no WAVEDESC descriptor found ({error_context})")
+    desc_len = struct.unpack_from("<i", payload, start + _WAVEDESC_DESC_LEN)[0]
+    user_text_len = struct.unpack_from("<i", payload, start + _WAVEDESC_USER_TEXT_LEN)[0]
+    return {
+        "comm_type": struct.unpack_from("<h", payload, start + _WAVEDESC_COMM_TYPE)[0],
+        "desc_len": desc_len,
+        "user_text_len": user_text_len,
+        "wave_array_count": struct.unpack_from("<i", payload, start + _WAVEDESC_ARRAY_COUNT)[0],
+        "vertical_gain": struct.unpack_from("<f", payload, start + _WAVEDESC_VERTICAL_GAIN)[0],
+        "vertical_offset": struct.unpack_from("<f", payload, start + _WAVEDESC_VERTICAL_OFFSET)[0],
+        "horiz_interval": struct.unpack_from("<f", payload, start + _WAVEDESC_HORIZ_INTERVAL)[0],
+        "horiz_offset": struct.unpack_from("<d", payload, start + _WAVEDESC_HORIZ_OFFSET)[0],
+        "data_offset": start + desc_len + user_text_len,
+    }
+
+
+class LeCroyTransfer:
+    """WF? ALL transfer scaled by the WAVEDESC descriptor (MAUI remote manual)."""
+
+    def __init__(self, scope: "Oscilloscope"):
+        self._scope = scope
+
+    def acquire(self, channel: int, format: str = "BYTE") -> WaveformData:
+        scope = self._scope
+        fmt = "WORD" if format.upper() == "WORD" else "BYTE"
+        scope.write(scope._get_command("set_comm_format", fmt=fmt))
+        scope.write(scope._get_command("set_comm_order"))
+        command = scope._get_command("get_waveform", ch=channel)
+        with scope._connection.lock:
+            scope.write(command)
+            raw = scope.read_raw()
+        context = f"host {scope.host}:{scope.port}, command '{command}'"
+        payload = parse_ieee_block(raw, np.uint8, error_context=context).tobytes()
+        meta = parse_wavedesc(payload, error_context=context)
+        dtype = np.int16 if meta["comm_type"] == 1 else np.int8
+        codes = np.frombuffer(payload, dtype=dtype, count=meta["wave_array_count"], offset=meta["data_offset"])
+        voltage = meta["vertical_gain"] * codes.astype(np.float64) - meta["vertical_offset"]
+        time = meta["horiz_offset"] + np.arange(len(codes)) * meta["horiz_interval"]
+        logger.info(f"Acquired {len(codes)} samples from channel {channel} (lecroy)")
+        return WaveformData(
+            time=time,
+            voltage=voltage,
+            channel=channel,
+            sample_rate=1.0 / meta["horiz_interval"] if meta["horiz_interval"] else None,
+            record_length=len(codes),
+            timebase=scope.waveform._get_timebase(),
+            voltage_scale=scope.waveform._get_voltage_scale(f"C{channel}"),
+        )
+
+
 def make_transfer(scope: "Oscilloscope"):
     """Select the waveform transfer strategy for a connected scope's dialect."""
     dialect = getattr(scope, "dialect", None) or "legacy"
     if dialect == "tektronix":
         return TektronixTransfer(scope)
+    if dialect == "lecroy":
+        return LeCroyTransfer(scope)
     return SiglentTransfer(scope)
