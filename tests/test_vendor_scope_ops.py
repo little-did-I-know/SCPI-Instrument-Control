@@ -343,3 +343,86 @@ def test_tek_trigger_level_getter_non_channel_source_returns_zero(tek_scope):
     tek_scope.query.return_value = "AUX"
     assert trig.level == 0.0
     assert not any("LEVel" in c.args[0] for c in tek_scope.query.call_args_list)
+
+
+def test_validate_channel_uses_model_capability():
+    from scpi_control import exceptions
+    from scpi_control.models import MODEL_REGISTRY, validate_channel
+
+    class _Scope:
+        pass
+
+    scope = _Scope()
+    scope.model_capability = MODEL_REGISTRY["SDS1202X-E"]  # 2-channel Siglent
+    validate_channel(scope, 1)
+    validate_channel(scope, 2)
+    # Previously channels 3-4 sailed through the hardcoded 1-4 guard and queried
+    # a channel this scope does not physically have.
+    with pytest.raises(exceptions.InvalidParameterError, match="Invalid channel number"):
+        validate_channel(scope, 3)
+    with pytest.raises(exceptions.InvalidParameterError, match="Invalid channel number"):
+        validate_channel(scope, 0)
+
+
+def test_validate_channel_falls_back_when_capability_missing():
+    from unittest.mock import Mock
+
+    from scpi_control import exceptions
+    from scpi_control.models import MAX_SUPPORTED_CHANNELS, validate_channel
+
+    assert MAX_SUPPORTED_CHANNELS == 8
+
+    # A Mock scope's model_capability.num_channels is itself a Mock, which cannot
+    # be compared numerically; the guard must fall back, not raise TypeError.
+    validate_channel(Mock(), 8)
+    with pytest.raises(exceptions.InvalidParameterError):
+        validate_channel(Mock(), 9)
+
+    # No capability attribute at all (pre-connect scope)
+    class _Bare:
+        model_capability = None
+
+    validate_channel(_Bare(), 8)
+    with pytest.raises(exceptions.InvalidParameterError):
+        validate_channel(_Bare(), 9)
+
+
+def test_eight_channel_scope_creates_all_channels_and_cleans_up():
+    from scpi_control import Oscilloscope, exceptions
+    from scpi_control.connection.mock import MockConnection
+
+    # MSO58 is an 8-channel scope (registry entry lands in Task 2); this test
+    # asserts the ceiling machinery, so it builds the capability directly.
+    from scpi_control.models import ModelCapability
+
+    cap = ModelCapability(
+        model_name="FAKE8",
+        series="Test",
+        num_channels=8,
+        max_sample_rate=1.0,
+        memory_depth=1000,
+        bandwidth_mhz=100,
+        has_math_channels=True,
+        has_fft=True,
+        has_protocol_decode=False,
+        supported_decode_types=[],
+        scpi_variant="standard",
+        dialect="legacy",
+    )
+    conn = MockConnection("mock", channel_states={i: True for i in range(1, 9)})
+    scope = Oscilloscope("mock", connection=conn)
+    scope.connect()
+    # Swap in an 8-channel capability and re-create channels
+    scope.model_capability = cap
+    for i in range(1, 5):
+        if hasattr(scope, f"channel{i}"):
+            delattr(scope, f"channel{i}")
+    scope._create_channels()
+
+    assert scope.channel8._channel == 8
+    assert scope.supported_channels == list(range(1, 9))
+    with pytest.raises(exceptions.InvalidParameterError):
+        scope.measurement.measure("PKPK", 9)
+
+    scope.disconnect()
+    assert not hasattr(scope, "channel8")  # disconnect must clear beyond channel 4

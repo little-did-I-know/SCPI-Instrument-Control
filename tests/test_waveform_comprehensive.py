@@ -58,6 +58,9 @@ def mock_scope():
     scope.send_command = Mock()
     scope.query = Mock()
     scope.query_binary = Mock()
+    # An int (not a Mock) so models.validate_channel binds the channel range to
+    # 4 instead of falling back to MAX_SUPPORTED_CHANNELS.
+    scope.model_capability.num_channels = 4
     # Configure the lock to support context manager protocol
     scope._connection.lock.__enter__ = Mock(return_value=None)
     scope._connection.lock.__exit__ = Mock(return_value=None)

@@ -4,6 +4,7 @@ import logging
 from typing import TYPE_CHECKING, Any, Dict, Literal, Optional
 
 from scpi_control import exceptions
+from scpi_control.models import validate_channel
 from scpi_control.scpi_commands import measurement_to_wire
 
 if TYPE_CHECKING:
@@ -69,8 +70,7 @@ class Measurement:
         Raises:
             InvalidParameterError: If parameters are invalid
         """
-        if not 1 <= channel <= 4:
-            raise exceptions.InvalidParameterError(f"Invalid channel number: {channel}. Must be 1-4.")
+        validate_channel(self._scope, channel)
 
         mtype = mtype.upper()
         wire_type = measurement_to_wire(self._dialect, mtype)
@@ -306,8 +306,7 @@ class Measurement:
             channel: Channel number (1-4)
             stat: Enable statistics for this measurement
         """
-        if not 1 <= channel <= 4:
-            raise exceptions.InvalidParameterError(f"Invalid channel number: {channel}. Must be 1-4.")
+        validate_channel(self._scope, channel)
 
         self._require("add_measurement")
         wire_type = measurement_to_wire(self._dialect, mtype.upper())

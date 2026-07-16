@@ -5,6 +5,8 @@ import re
 from dataclasses import dataclass
 from typing import List, Optional
 
+from scpi_control import exceptions
+
 logger = logging.getLogger(__name__)
 
 
@@ -35,6 +37,34 @@ class ModelCapability:
     def __str__(self) -> str:
         """String representation of model capability."""
         return f"{self.model_name} ({self.num_channels}ch, {self.bandwidth_mhz}MHz, {self.series})"
+
+
+# Widest scope in the registry (MSO58 / MSO58LP are 8-channel). Used as the
+# channel-range fallback when a scope's capability is not resolved yet.
+MAX_SUPPORTED_CHANNELS = 8
+
+
+def validate_channel(scope, channel: int) -> None:
+    """Raise unless `channel` exists on `scope`'s model.
+
+    The bound comes from the connected model's ``num_channels``. When that is
+    unavailable or not an int -- an unconnected scope, or a ``unittest.mock.Mock``
+    stand-in whose attribute access yields Mocks that cannot be compared
+    numerically -- fall back to MAX_SUPPORTED_CHANNELS so the guard degrades to a
+    range check instead of raising TypeError.
+
+    Args:
+        scope: Oscilloscope (or stand-in) whose model_capability bounds the range
+        channel: 1-based channel number to validate
+
+    Raises:
+        InvalidParameterError: If the channel is outside 1..num_channels
+    """
+    num_channels = getattr(getattr(scope, "model_capability", None), "num_channels", None)
+    if not isinstance(num_channels, int):
+        num_channels = MAX_SUPPORTED_CHANNELS
+    if not 1 <= channel <= num_channels:
+        raise exceptions.InvalidParameterError(f"Invalid channel number: {channel}. Must be 1-{num_channels}.")
 
 
 # Model Registry - Add new models here

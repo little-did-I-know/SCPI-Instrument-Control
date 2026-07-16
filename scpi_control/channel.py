@@ -4,6 +4,7 @@ import logging
 from typing import TYPE_CHECKING, Literal, Optional
 
 from scpi_control import exceptions
+from scpi_control.models import validate_channel
 from scpi_control.scpi_commands import coupling_from_wire, coupling_to_wire, probe_from_wire, probe_to_wire
 
 if TYPE_CHECKING:
@@ -32,8 +33,7 @@ class Channel:
         self._scope = oscilloscope
         self._channel = channel_number
 
-        if not 1 <= channel_number <= 4:
-            raise exceptions.InvalidParameterError(f"Invalid channel number: {channel_number}. Must be 1-4.")
+        validate_channel(oscilloscope, channel_number)
 
     @property
     def _dialect(self) -> str:
