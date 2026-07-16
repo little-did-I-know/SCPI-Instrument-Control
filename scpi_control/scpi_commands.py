@@ -281,10 +281,10 @@ class SCPICommandSet:
         "get_probe_ratio": "C{ch}:ATTN?",  # MAUI p.7-17
         # Bandwidth limit differs from legacy: BWL is global, ch/mode pairs.
         # NOTE: LeCroy <mode> is {OFF,20MHZ,200MHZ,...} -- there is NO "ON"
-        # token; channel.py's public "ON" sends a literal "ON" a real LeCroy
-        # rejects (map ON->20MHZ in a follow-up; see task-13 report).
+        # token; channel.py maps public ON->20MHZ (and any non-OFF wire
+        # token back to public ON on the getter) -- see task-16 report.
         "set_bandwidth_limit": "BWL C{ch},{limit}",  # BANDWIDTH_LIMIT (BWL) -- MAUI p.7-18
-        "get_bandwidth_limit": "BWL?",  # returns "C1,OFF,C2,ON,..." pairs -- MAUI p.7-18
+        "get_bandwidth_limit": "BWL?",  # returns "C1,OFF,C2,20MHZ,..." pairs -- MAUI p.7-18
         # Timebase control
         "set_time_div": "TDIV {tdiv}",  # TIME_DIV (TDIV) -- MAUI p.7-29
         "get_time_div": "TDIV?",  # MAUI p.7-29
@@ -315,8 +315,8 @@ class SCPICommandSet:
         # "C{ch}:PAVA? {param}" (MAUI p.7-70), NOT the Siglent "PAVA? p,C{ch}"
         # form. LeCroy's PAVA? response is "<param>,<value>,<state>" (3 fields);
         # measurement.py's parser reads parts[2] (=value on Siglent, =state on
-        # LeCroy), so measure() needs a lecroy branch (parts[1]) -- documented
-        # gap for Tasks 14-16 (see task-13 report). Vocabulary = PARAMETER_VALUE.
+        # LeCroy), so measure() has a lecroy branch reading parts[1] instead
+        # (see task-16 report). Vocabulary = PARAMETER_VALUE.
         "get_parameter_value": "C{ch}:PAVA? {param}",  # PARAMETER_VALUE? (PAVA?) -- MAUI p.7-70
         "clear_measurements": "PACL",  # PARAMETER_CLR (PACL / PARAMETER_CLEAR), no args -- MAUI p.7-58
         # add_measurement OMITTED: LeCroy PACU is "PACU <slot>,<measurement>,

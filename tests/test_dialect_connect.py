@@ -62,6 +62,13 @@ def test_dialect_override_accepts_tektronix():
     scope.disconnect()
 
 
+def test_lecroy_scope_resolves_and_sends_chdr_off():
+    scope, conn = make_scope("LECROY,WAVESURFER3024Z,MOCK0200,8.5.0")
+    assert scope.dialect == "lecroy"
+    assert "CHDR OFF" in conn.writes
+    scope.disconnect()
+
+
 def test_datacollector_forwards_dialect_override():
     from scpi_control.automation import DataCollector
 

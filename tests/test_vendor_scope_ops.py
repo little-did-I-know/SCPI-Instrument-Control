@@ -168,15 +168,33 @@ def test_lecroy_acquisition_status_auto_and_ready():
 
 
 def test_lecroy_bandwidth_getter_parses_global_pairs():
+    # Real LeCroy BWL? vocabulary has no "ON" token -- {OFF,20MHZ,200MHZ,...}
+    # (MAUI p.7-18). Any non-OFF wire token maps to the public "ON".
     from scpi_control.channel import Channel
 
     scope = make_dialect_scope("lecroy")
-    scope.query.return_value = "C1,OFF,C2,ON,C3,OFF,C4,OFF"
+    scope.query.return_value = "C1,OFF,C2,20MHZ,C3,OFF,C4,OFF"
     assert Channel(scope, 2).bandwidth_limit == "ON"
     assert Channel(scope, 1).bandwidth_limit == "OFF"
     # Missing channel in the pair list falls back to OFF.
     scope.query.return_value = "C1,OFF"
     assert Channel(scope, 3).bandwidth_limit == "OFF"
+
+
+def test_lecroy_bandwidth_setter_maps_on_to_20mhz():
+    # LeCroy has no "ON" token (MAUI p.7-18): public ON -> wire "20MHZ",
+    # OFF/FULL -> wire "OFF".
+    from scpi_control.channel import Channel
+
+    scope = make_dialect_scope("lecroy")
+    scope._has_command.side_effect = lambda name: True
+    ch = Channel(scope, 1)
+    ch.bandwidth_limit = "ON"
+    scope.write.assert_called_with("BWL C1,20MHZ")
+    ch.bandwidth_limit = "OFF"
+    scope.write.assert_called_with("BWL C1,OFF")
+    ch.bandwidth_limit = "FULL"
+    scope.write.assert_called_with("BWL C1,OFF")
 
 
 def test_lecroy_window_slope_rejected():

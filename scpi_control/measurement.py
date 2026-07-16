@@ -93,6 +93,16 @@ class Measurement:
         # Query parameter value
         response = self._scope.query(self._scope._get_command("get_parameter_value", ch=channel, param=wire_type))
 
+        if self._dialect == "lecroy":
+            # LeCroy's PAVA? answers its own native shape "<param>,<value>,
+            # <state>" (3 fields; CHDR OFF strips the unit suffix) -- MAUI
+            # remote manual p.7-70. Value is the 2nd field (parts[1]).
+            try:
+                parts = response.split(",")
+                return float(parts[1].strip())
+            except (ValueError, IndexError) as e:
+                raise exceptions.CommandError(f"Failed to parse measurement: {e}")
+
         # Parse response (format typically: "PAVA PKPK,C1,1.23V")
         try:
             # Extract value from response

@@ -207,12 +207,16 @@ class Channel:
             Bandwidth limit: 'ON', 'OFF', or frequency limit
         """
         if self._dialect == "lecroy":
-            # BWL? is global: "C1,OFF,C2,ON,..." (MAUI remote manual)
+            # BWL? is global: "C1,OFF,C2,20MHZ,..." pairs (MAUI p.7-18). The
+            # real LeCroy <mode> vocabulary is {OFF,20MHZ,200MHZ,...} -- there
+            # is no "ON" token, so any non-OFF wire token maps to the public
+            # "ON" (mirrors the modern/tektronix ON/OFF normalization below).
             tokens = [t.strip().upper() for t in self._scope.query(self._cmd("get_bandwidth_limit")).split(",")]
             try:
-                return tokens[tokens.index(f"C{self._channel}") + 1]
+                wire = tokens[tokens.index(f"C{self._channel}") + 1]
             except (ValueError, IndexError):
                 return "OFF"
+            return "OFF" if wire == "OFF" else "ON"
         response = self._scope.query(self._cmd("get_bandwidth_limit", ch=self._channel)).strip().upper()
         if self._dialect in ("modern", "tektronix"):
             # Modern wire tokens are FULL/20M/200M; Tek's are FULl/TWENty (or
@@ -234,6 +238,10 @@ class Channel:
             wire = "FULL" if limit in ("OFF", "FULL") else "20M"
         elif self._dialect == "tektronix":
             wire = "FULL" if limit in ("OFF", "FULL") else "TWENty"
+        elif self._dialect == "lecroy":
+            # LeCroy BWL <mode> vocabulary has no "ON" token -- {OFF,20MHZ,
+            # 200MHZ,...} (MAUI p.7-18). Map public ON to the 20MHz limit.
+            wire = "OFF" if limit in ("OFF", "FULL") else "20MHZ"
         else:
             wire = "OFF" if limit == "FULL" else limit
         self._scope.write(self._cmd("set_bandwidth_limit", ch=self._channel, limit=wire))

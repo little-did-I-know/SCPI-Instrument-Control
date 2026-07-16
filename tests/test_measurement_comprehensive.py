@@ -411,3 +411,33 @@ def test_tektronix_statistics_not_supported():
     with pytest.raises(exceptions.FeatureNotSupportedError):
         scope.measurement.set_cursor_type("HREL")
     scope.disconnect()
+
+
+def test_lecroy_pava_measurement():
+    from scpi_control import Oscilloscope
+    from scpi_control.connection.mock import MockConnection
+
+    conn = MockConnection("mock", idn="LECROY,WAVESURFER3024Z,MOCK0200,8.5.0", channel_states={1: True})
+    scope = Oscilloscope("mock", connection=conn)
+    scope.connect()
+    assert scope.measurement.measure_vpp(1) == pytest.approx(2.0)
+    assert "C1:PAVA? PKPK" in conn.queries
+    scope.disconnect()
+
+
+def test_lecroy_add_measurement_and_holdoff_not_supported():
+    # LeCroy PACU is slot-addressed ("PACU <slot>,<measurement>,<qualifier>",
+    # MAUI p.7-59) and holdoff lives in TRIG_SELECT HT/HV, not a Siglent-style
+    # PACU/TRDL pair -- both entries were dropped from the lecroy table
+    # (scpi_commands.py LECROY_COMMANDS comments), so both gate cleanly.
+    from scpi_control import Oscilloscope, exceptions
+    from scpi_control.connection.mock import MockConnection
+
+    conn = MockConnection("mock", idn="LECROY,WAVESURFER3024Z,MOCK0200,8.5.0", channel_states={1: True})
+    scope = Oscilloscope("mock", connection=conn)
+    scope.connect()
+    with pytest.raises(exceptions.FeatureNotSupportedError):
+        scope.measurement.add_measurement("PKPK", 1)
+    with pytest.raises(exceptions.FeatureNotSupportedError):
+        scope.trigger.holdoff = 0.001
+    scope.disconnect()
