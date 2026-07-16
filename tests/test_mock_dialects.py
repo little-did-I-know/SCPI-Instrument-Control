@@ -194,3 +194,51 @@ def test_tek_mock_probe_gain_family_split():
     assert conn.query("CH2:PROBEFunc:EXTAtten?") == "1.00E+01"
     assert conn.probe_gains[1] == 0.1
     assert conn.probe_gains[2] == 10.0
+
+
+LECROY_IDN = "LECROY,WAVESURFER3024Z,MOCK0200,8.5.0"
+
+
+def _lecroy_conn(**kwargs):
+    from scpi_control.connection.mock import MockConnection
+
+    conn = MockConnection("mock", idn=LECROY_IDN, **kwargs)
+    conn.connect()
+    return conn
+
+
+def test_lecroy_mock_answers_bare_nr3():
+    conn = _lecroy_conn()
+    conn.write("C1:VDIV 0.5")
+    assert conn.query("C1:VDIV?") == "5.00E-01"  # no V suffix, unlike Siglent legacy
+    conn.write("TDIV 0.002")
+    assert conn.query("TDIV?") == "2.00E-03"
+
+
+def test_lecroy_mock_status_and_vbs():
+    conn = _lecroy_conn()
+    conn.write("TRIG_MODE AUTO")
+    assert conn.query("TRIG_MODE?") == "AUTO"
+    assert conn.query("INR?") in {"0", "1"}
+    assert float(conn.query("VBS? 'return=app.Acquisition.Horizontal.SamplingRate'")) == 1000.0
+
+
+def test_lecroy_mock_times_out_on_wrong_dialect():
+    import pytest
+
+    from scpi_control import exceptions
+
+    conn = _lecroy_conn()
+    with pytest.raises(exceptions.TimeoutError):
+        conn.query("SAST?")
+    with pytest.raises(exceptions.TimeoutError):
+        conn.query(":TIMebase:SCALe?")
+
+
+def test_lecroy_mock_pava():
+    conn = _lecroy_conn()
+    resp = conn.query("C1:PAVA? PKPK")
+    parts = resp.split(",")
+    assert parts[0] == "PKPK"
+    assert float(parts[1]) == 2.0
+    assert parts[2] == "OK"

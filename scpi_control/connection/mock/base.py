@@ -9,12 +9,13 @@ from typing import Dict, Iterable, List, Optional, Union
 from scpi_control import exceptions
 from scpi_control.connection.base import BaseConnection
 from scpi_control.connection.mock.helpers import MOCK_SCREENSHOT_BMP, _build_ieee_block
-from scpi_control.connection.mock import siglent, tektronix
+from scpi_control.connection.mock import lecroy, siglent, tektronix
 from scpi_control.models import detect_model_from_idn
 
 _PERSONALITIES = {
     "siglent": siglent,
     "tektronix": tektronix,
+    "lecroy": lecroy,
 }
 
 
