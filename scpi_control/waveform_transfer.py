@@ -285,16 +285,16 @@ class TektronixTransfer:
 
 
 # WAVEDESC field offsets, per the MAUI remote manual's TEMPLATE? definition.
-_WAVEDESC_COMM_TYPE = 32       # int16: 0 = byte, 1 = word
-_WAVEDESC_DESC_LEN = 36        # int32: descriptor block length (typ. 346)
-_WAVEDESC_USER_TEXT_LEN = 40   # int32
-_WAVEDESC_TRIGTIME_LEN = 48    # int32: TRIGTIME_ARRAY byte length (0 unless sequence/segment mode)
-_WAVEDESC_RISTIME_LEN = 52     # int32: RIS_TIME_ARRAY byte length (0 unless RIS mode)
-_WAVEDESC_ARRAY_COUNT = 116    # int32: number of samples
+_WAVEDESC_COMM_TYPE = 32  # int16: 0 = byte, 1 = word
+_WAVEDESC_DESC_LEN = 36  # int32: descriptor block length (typ. 346)
+_WAVEDESC_USER_TEXT_LEN = 40  # int32
+_WAVEDESC_TRIGTIME_LEN = 48  # int32: TRIGTIME_ARRAY byte length (0 unless sequence/segment mode)
+_WAVEDESC_RISTIME_LEN = 52  # int32: RIS_TIME_ARRAY byte length (0 unless RIS mode)
+_WAVEDESC_ARRAY_COUNT = 116  # int32: number of samples
 _WAVEDESC_VERTICAL_GAIN = 156  # float32
 _WAVEDESC_VERTICAL_OFFSET = 160  # float32
-_WAVEDESC_HORIZ_INTERVAL = 176   # float32
-_WAVEDESC_HORIZ_OFFSET = 180     # float64
+_WAVEDESC_HORIZ_INTERVAL = 176  # float32
+_WAVEDESC_HORIZ_OFFSET = 180  # float64
 
 
 def parse_wavedesc(payload: bytes, *, error_context: str = "") -> dict:

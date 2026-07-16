@@ -427,8 +427,7 @@ class SCPICommandSet:
         # table. Fall back to the plain base table instead.
         if variant not in DIALECT_VARIANTS[dialect]:
             logger.warning(
-                "SCPI variant %r does not belong to the %r dialect; ignoring "
-                "family overrides and using the plain base table.",
+                "SCPI variant %r does not belong to the %r dialect; ignoring " "family overrides and using the plain base table.",
                 variant,
                 dialect,
             )
@@ -630,10 +629,23 @@ _MEASUREMENT_TO_WIRE = {
     # IMMed subsystem is TBS-only; MSO2's MEAS<x> badge vocabulary differs
     # and is a follow-up when badge measurements land).
     "tektronix": {
-        "PKPK": "PK2Pk", "MAX": "MAXimum", "MIN": "MINImum", "AMPL": "AMPlitude",
-        "TOP": "HIGH", "BASE": "LOW", "CMEAN": "CMEan", "MEAN": "MEAN",
-        "RMS": "RMS", "CRMS": "CRMs", "FREQ": "FREQuency", "PER": "PERIod",
-        "RISE": "RISe", "FALL": "FALL", "WID": "PWIdth", "NWID": "NWIdth", "DUTY": "PDUty",
+        "PKPK": "PK2Pk",
+        "MAX": "MAXimum",
+        "MIN": "MINImum",
+        "AMPL": "AMPlitude",
+        "TOP": "HIGH",
+        "BASE": "LOW",
+        "CMEAN": "CMEan",
+        "MEAN": "MEAN",
+        "RMS": "RMS",
+        "CRMS": "CRMs",
+        "FREQ": "FREQuency",
+        "PER": "PERIod",
+        "RISE": "RISe",
+        "FALL": "FALL",
+        "WID": "PWIdth",
+        "NWID": "NWIdth",
+        "DUTY": "PDUty",
     },
 }
 

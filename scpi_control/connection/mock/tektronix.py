@@ -12,10 +12,23 @@ from scpi_control.connection.mock.helpers import _build_ieee_block, _format_nr3
 # Immediate-measurement values mirror _MOCK_PAVA_VALUES semantically (same
 # synthetic 1 kHz, 2 Vpp signal) but keyed by Tek IMMed type names.
 _MOCK_IMMED_VALUES = {
-    "PK2PK": "2.0E0", "MAXIMUM": "1.0E0", "MINIMUM": "-1.0E0", "AMPLITUDE": "2.0E0",
-    "HIGH": "1.0E0", "LOW": "-1.0E0", "CMEAN": "0.0E0", "MEAN": "0.0E0",
-    "RMS": "7.07E-1", "CRMS": "7.07E-1", "FREQUENCY": "1.0E3", "PERIOD": "1.0E-3",
-    "RISE": "3.5E-5", "FALL": "3.5E-5", "PWIDTH": "5.0E-4", "NWIDTH": "5.0E-4", "PDUTY": "5.0E1",
+    "PK2PK": "2.0E0",
+    "MAXIMUM": "1.0E0",
+    "MINIMUM": "-1.0E0",
+    "AMPLITUDE": "2.0E0",
+    "HIGH": "1.0E0",
+    "LOW": "-1.0E0",
+    "CMEAN": "0.0E0",
+    "MEAN": "0.0E0",
+    "RMS": "7.07E-1",
+    "CRMS": "7.07E-1",
+    "FREQUENCY": "1.0E3",
+    "PERIOD": "1.0E-3",
+    "RISE": "3.5E-5",
+    "FALL": "3.5E-5",
+    "PWIDTH": "5.0E-4",
+    "NWIDTH": "5.0E-4",
+    "PDUTY": "5.0E1",
 }
 
 
