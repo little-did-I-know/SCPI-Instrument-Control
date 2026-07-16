@@ -464,7 +464,7 @@ class MainWindow(QMainWindow):
                 QMessageBox.critical(
                     self,
                     "Generation Error",
-                    f"Error generating PDF:\n{str(e)}\n\nCheck console for full traceback.",
+                    f"Error generating PDF:\n{str(e)}\n\n" f"Full traceback written to report_generator.log in {AppSettings.get_settings_file().parent}",
                 )
                 return
 
