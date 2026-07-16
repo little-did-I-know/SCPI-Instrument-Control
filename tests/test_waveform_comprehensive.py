@@ -18,13 +18,12 @@ class TestWaveformData:
         time = np.linspace(0, 1e-3, 1000)
         voltage = np.sin(2 * np.pi * 1000 * time)
 
-        waveform = WaveformData(time=time, voltage=voltage, channel=1, sample_rate=1e6, record_length=1000, source="Test", description="Test waveform")
+        waveform = WaveformData(time=time, voltage=voltage, channel=1, sample_rate=1e6, record_length=1000)
 
         assert len(waveform.time) == 1000
         assert len(waveform.voltage) == 1000
         assert waveform.channel == 1
         assert waveform.sample_rate == 1e6
-        assert waveform.source == "Test"
 
     def test_waveform_data_minimal(self):
         """Test creating WaveformData with minimal parameters."""

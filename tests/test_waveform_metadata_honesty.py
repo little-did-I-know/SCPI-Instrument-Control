@@ -82,3 +82,29 @@ def test_math_channel_still_derives_sample_rate():
     src = WaveformData(time=t, voltage=v, channel=1)
     result = MathOperations._create_result_waveform(src, v * 2)
     assert result.sample_rate == pytest.approx(1e6)
+
+
+def test_dead_metadata_fields_are_gone():
+    """`source` and `description` were write-only: set by a manual script and a few
+    tests, read by nothing. Removing them leaves the library type as exactly the
+    core the report type shares, which is what lets the report type subclass it."""
+    t, v = make()
+    with pytest.raises(TypeError):
+        WaveformData(time=t, voltage=v, channel=1, source="Test")
+    with pytest.raises(TypeError):
+        WaveformData(time=t, voltage=v, channel=1, description="1kHz Sine")
+
+
+def test_the_canonical_field_set_is_exactly_the_shared_core():
+    from dataclasses import fields
+
+    assert [f.name for f in fields(WaveformData)] == [
+        "time",
+        "voltage",
+        "channel",
+        "sample_rate",
+        "record_length",
+        "timebase",
+        "voltage_scale",
+        "voltage_offset",
+    ]

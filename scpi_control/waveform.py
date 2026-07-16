@@ -47,8 +47,6 @@ class WaveformData:
     timebase: Optional[float] = None
     voltage_scale: Optional[float] = None
     voltage_offset: float = 0.0
-    source: Optional[str] = None
-    description: Optional[str] = None
 
     def __len__(self) -> int:
         """Get number of samples."""
