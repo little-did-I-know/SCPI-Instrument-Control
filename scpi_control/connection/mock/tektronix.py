@@ -31,6 +31,26 @@ _MOCK_IMMED_VALUES = {
     "PDUTY": "5.0E1",
 }
 
+# Badge TYPe vocabulary differs from IMMed (RISETIME vs RISe, etc.), so the
+# badge results need their own lookup keyed by the uppercased badge token.
+_MOCK_BADGE_VALUES = {
+    "PK2PK": "2.0E0",
+    "MAXIMUM": "1.0E0",
+    "MINIMUM": "-1.0E0",
+    "AMPLITUDE": "2.0E0",
+    "TOP": "1.0E0",
+    "BASE": "-1.0E0",
+    "MEAN": "0.0E0",
+    "RMS": "7.07E-1",
+    "FREQUENCY": "1.0E3",
+    "PERIOD": "1.0E-3",
+    "RISETIME": "3.5E-5",
+    "FALLTIME": "3.5E-5",
+    "PWIDTH": "5.0E-4",
+    "NWIDTH": "5.0E-4",
+    "PDUTY": "5.0E1",
+}
+
 
 def handle_write(conn, command: str) -> bool:
     upper = command.upper()
@@ -116,6 +136,18 @@ def handle_write(conn, command: str) -> bool:
         if match := re.match(r"MEASUREMENT:IMMED:TYPE\s+(\w+)", upper):
             conn.meas_immed_type = match.group(1)
         return True
+    if match := re.match(r'MEASUREMENT:ADDNEW\s+"MEAS(\d+)"', upper):
+        conn.badges.setdefault(int(match.group(1)), {})
+        return True
+    if match := re.match(r"MEASUREMENT:MEAS(\d+):TYPE\s+(\w+)", upper):
+        conn.badges.setdefault(int(match.group(1)), {})["type"] = match.group(2)
+        return True
+    if match := re.match(r"MEASUREMENT:MEAS(\d+):SOURCE\s+(\w+)", upper):
+        conn.badges.setdefault(int(match.group(1)), {})["source"] = match.group(2)
+        return True
+    if match := re.match(r'MEASUREMENT:DELETE\s+"MEAS(\d+)"', upper):
+        conn.badges.pop(int(match.group(1)), None)
+        return True
     return False
 
 
@@ -175,6 +207,14 @@ def handle_query(conn, command: str) -> Optional[str]:
         return "0.0E0"
     if upper == "MEASUREMENT:IMMED:VALUE?":
         return _MOCK_IMMED_VALUES.get(getattr(conn, "meas_immed_type", ""), "0.0E0")
+    if upper == "MEASUREMENT:LIST?":
+        # Real scopes answer NONE when no measurements exist (4/5/6 p.607).
+        return ",".join(f"MEAS{n}" for n in sorted(conn.badges)) if conn.badges else "NONE"
+    if match := re.match(r"MEASUREMENT:MEAS(\d+):RESULTS:CURRENTACQ:MEAN\?", upper):
+        badge = conn.badges.get(int(match.group(1)))
+        if badge is None:
+            return None  # no such badge -> caller times out, as on real hardware
+        return _MOCK_BADGE_VALUES.get(badge.get("type", ""), "0.0E0")
     return None
 
 
