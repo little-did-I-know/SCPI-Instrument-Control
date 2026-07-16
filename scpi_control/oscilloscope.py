@@ -14,7 +14,7 @@ from scpi_control.connection import BaseConnection, SocketConnection
 from scpi_control.math_channel import MathChannel
 from scpi_control.measurement import Measurement
 from scpi_control.models import ModelCapability, detect_model_from_idn
-from scpi_control.scpi_commands import SCPICommandSet, normalize_status
+from scpi_control.scpi_commands import CONNECT_SETUP, SUPPORTED_DIALECTS, SCPICommandSet, normalize_status
 from scpi_control.screen_capture import ScreenCapture
 from scpi_control.trigger import Trigger
 from scpi_control.waveform import Waveform, WaveformData
@@ -72,8 +72,8 @@ class Oscilloscope:
         self.port = port
         self.timeout = timeout
 
-        if dialect not in (None, "legacy", "modern"):
-            raise exceptions.InvalidParameterError(f"Invalid dialect: {dialect}. Must be 'legacy', 'modern', or None for auto-detect.")
+        if dialect is not None and dialect not in SUPPORTED_DIALECTS:
+            raise exceptions.InvalidParameterError(f"Invalid dialect: {dialect}. Must be one of {SUPPORTED_DIALECTS} or None for auto-detect.")
         self._dialect_override = dialect
         self.dialect: Optional[str] = None
 
@@ -171,10 +171,9 @@ class Oscilloscope:
             self._scpi_commands = SCPICommandSet(self.dialect, self.model_capability.scpi_variant)
             logger.info(f"Using SCPI dialect: {self.dialect} (variant: {self.model_capability.scpi_variant})")
 
-            # Legacy scopes echo command headers by default; turn that off so
-            # every response arrives as a bare value
-            if self.dialect == "legacy":
-                self.write("CHDR OFF")
+            # Per-dialect connect-time setup (e.g. response-header suppression)
+            for setup_command in CONNECT_SETUP.get(self.dialect, []):
+                self.write(setup_command)
 
             # Create channels dynamically based on model capability
             self._create_channels()

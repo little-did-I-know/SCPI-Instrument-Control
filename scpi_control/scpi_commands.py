@@ -12,16 +12,30 @@ between the library's public vocabulary and each dialect's wire tokens.
 
 from typing import Dict
 
+# Wire dialects with a command table. Grows as vendor tables land.
+SUPPORTED_DIALECTS = ("legacy", "modern")
+
+# IEEE-488.2 mandated common commands, identical on every instrument.
+IEEE488_BASE = {
+    "identify": "*IDN?",
+    "reset": "*RST",
+    "clear_status": "*CLS",
+    "operation_complete": "*OPC?",
+}
+
+# Commands written once right after connect-time dialect resolution.
+# legacy: response headers off (Siglent legacy echoes headers by default)
+# modern: nothing needed
+CONNECT_SETUP = {
+    "legacy": ["CHDR OFF"],
+    "modern": [],
+}
+
 
 class SCPICommandSet:
     """Per-model SCPI command table (dialect base + family overrides)."""
 
     LEGACY_COMMANDS = {
-        # Identification and system
-        "identify": "*IDN?",
-        "reset": "*RST",
-        "clear_status": "*CLS",
-        "operation_complete": "*OPC?",
         # Trigger control
         "set_trigger_mode": "TRIG_MODE {mode}",  # mode: AUTO, NORM, SINGLE, STOP
         "get_trigger_mode": "TRIG_MODE?",
@@ -83,11 +97,6 @@ class SCPICommandSet:
     # Modern colon-form dialect, verbatim from the SDS Series Programming
     # Guide EN11G (page references in the design spec's command table).
     MODERN_COMMANDS = {
-        # Identification and system
-        "identify": "*IDN?",
-        "reset": "*RST",
-        "clear_status": "*CLS",
-        "operation_complete": "*OPC?",
         # Trigger control (p.482-484; no standalone ARM/force — FTRIG forces)
         "set_trigger_mode": ":TRIGger:MODE {mode}",  # wire modes: AUTO, NORMal, SINGle, FTRIG
         "get_trigger_mode": ":TRIGger:MODE?",
@@ -139,34 +148,37 @@ class SCPICommandSet:
         "hardcopy_print": "HCSU PRINT",
     }
 
+    # Dialect base tables, keyed by dialect name. Tek/LeCroy tables added later.
+    DIALECT_TABLES = {
+        "legacy": LEGACY_COMMANDS,
+        "modern": MODERN_COMMANDS,
+    }
+
     # Family overrides applied on top of the dialect base table.
-    HD_SERIES_OVERRIDES: Dict[str, str] = {}
-    X_SERIES_OVERRIDES: Dict[str, str] = {}  # HCSU? screen-dump override removed: it was a hardcopy SETUP query, not a dump
-    PLUS_SERIES_OVERRIDES: Dict[str, str] = {}
-    STANDARD_OVERRIDES: Dict[str, str] = {}
+    VARIANT_OVERRIDES: Dict[str, Dict[str, str]] = {
+        "standard": {},
+        "hd_series": {},
+        "x_series": {},  # HCSU? screen-dump override removed: it was a hardcopy SETUP query, not a dump
+        "plus_series": {},
+    }
 
     def __init__(self, dialect: str = "legacy", scpi_variant: str = "standard"):
         """Build the command set for a dialect + model family.
 
         Args:
-            dialect: "legacy" or "modern" — selects the base table
+            dialect: wire dialect (one of SUPPORTED_DIALECTS) — selects the base table
             scpi_variant: family identifier ("standard", "hd_series", "x_series", "plus_series") for overrides
         """
-        if dialect not in ("legacy", "modern"):
-            raise ValueError(f"Unknown SCPI dialect: {dialect}. Must be 'legacy' or 'modern'.")
+        if dialect not in SUPPORTED_DIALECTS:
+            raise ValueError(f"Unknown SCPI dialect: {dialect}. Must be one of {SUPPORTED_DIALECTS}.")
         self.dialect = dialect
         self.scpi_variant = scpi_variant
         self._command_set = self._build_command_set(dialect, scpi_variant)
 
     def _build_command_set(self, dialect: str, variant: str) -> Dict[str, str]:
-        command_set = (self.LEGACY_COMMANDS if dialect == "legacy" else self.MODERN_COMMANDS).copy()
-        overrides = {
-            "hd_series": self.HD_SERIES_OVERRIDES,
-            "x_series": self.X_SERIES_OVERRIDES,
-            "plus_series": self.PLUS_SERIES_OVERRIDES,
-            "standard": self.STANDARD_OVERRIDES,
-        }.get(variant, {})
-        command_set.update(overrides)
+        command_set = dict(IEEE488_BASE)
+        command_set.update(self.DIALECT_TABLES[dialect])
+        command_set.update(self.VARIANT_OVERRIDES.get(variant, {}))
         return command_set
 
     def get_command(self, command_name: str, **kwargs) -> str:

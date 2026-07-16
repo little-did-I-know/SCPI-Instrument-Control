@@ -116,3 +116,26 @@ class TestEnumMappers:
             mode_to_wire("modern", "BOGUS")
         with pytest.raises(ValueError):
             normalize_status("???")
+
+
+from scpi_control.scpi_commands import CONNECT_SETUP, SUPPORTED_DIALECTS
+
+
+class TestDialectInfrastructure:
+    def test_supported_dialects_drive_validation(self):
+        assert "legacy" in SUPPORTED_DIALECTS
+        assert "modern" in SUPPORTED_DIALECTS
+        with pytest.raises(ValueError):
+            SCPICommandSet("klingon")
+
+    def test_connect_setup_per_dialect(self):
+        assert CONNECT_SETUP["legacy"] == ["CHDR OFF"]
+        assert CONNECT_SETUP["modern"] == []
+
+    def test_ieee488_base_present_in_every_dialect(self):
+        for dialect in SUPPORTED_DIALECTS:
+            cmds = SCPICommandSet(dialect)
+            assert cmds.get_command("identify") == "*IDN?"
+            assert cmds.get_command("reset") == "*RST"
+            assert cmds.get_command("clear_status") == "*CLS"
+            assert cmds.get_command("operation_complete") == "*OPC?"
