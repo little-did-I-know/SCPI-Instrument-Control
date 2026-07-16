@@ -173,3 +173,36 @@ class TestDialectHelpers:
 
         with pytest.raises(exceptions.FeatureNotSupportedError):
             mode_to_wire("modern", "STOP")
+
+
+from scpi_control.scpi_commands import measurement_to_wire
+
+
+class TestMeasurementRouting:
+    def test_legacy_measurement_table_entries(self):
+        cmds = SCPICommandSet("legacy")
+        # NOTE: get_parameter_value's wire form is "PAVA? {param},C{ch}", not
+        # "C{ch}:PAVA? {param}" -- this matches the wire string measurement.py
+        # actually sent pre-refactor (and what the legacy mock's PAVA? regex
+        # parses); the table previously held an unreachable, never-exercised
+        # value here.
+        assert cmds.get_command("get_parameter_value", ch=1, param="PKPK") == "PAVA? PKPK,C1"
+        assert cmds.get_command("add_measurement", mtype="FREQ", ch=2) == "PACU FREQ,C2"
+        assert cmds.get_command("set_statistics", state="ON") == "PAST ON"
+        assert cmds.get_command("clear_measurements") == "PACL"
+        assert cmds.get_command("reset_statistics") == "PASTAT RESET"
+        assert cmds.get_command("set_trigger_holdoff", t=0.001) == "TRIG_DELAY 0.001"
+        assert cmds.get_command("set_channel_unit", ch=1, unit="A") == "C1:UNIT A"
+
+    def test_modern_lacks_statistics_and_holdoff(self):
+        cmds = SCPICommandSet("modern")
+        assert not cmds.has_command("add_measurement")
+        assert not cmds.has_command("set_statistics")
+        assert not cmds.has_command("set_trigger_holdoff")
+        assert not cmds.has_command("set_channel_unit")
+
+    def test_measurement_to_wire_identity_for_siglent(self):
+        assert measurement_to_wire("legacy", "PKPK") == "PKPK"
+        assert measurement_to_wire("modern", "FREQ") == "FREQ"
+        with pytest.raises(ValueError):
+            measurement_to_wire("legacy", "BOGUS")

@@ -324,12 +324,13 @@ class Trigger:
         Returns:
             Holdoff time in seconds
         """
-        response = self._scope.query("TRIG_DELAY?")
+        if not self._scope._has_command("get_trigger_holdoff"):
+            raise exceptions.FeatureNotSupportedError(f"trigger holdoff is not supported on the {self._dialect} dialect")
+        response = self._scope.query(self._cmd("get_trigger_holdoff"))
         # Response may include echo like "TRIG_DELAY 0.0E+00S"
         if " " in response:
             response = response.split(" ", 1)[1]
-        value = response.replace("S", "").strip()
-        return float(value)
+        return float(response.replace("S", "").strip())
 
     @holdoff.setter
     def holdoff(self, time_seconds: float) -> None:
@@ -340,8 +341,9 @@ class Trigger:
         """
         if time_seconds < 0:
             raise exceptions.InvalidParameterError(f"Holdoff time must be non-negative: {time_seconds}")
-
-        self._scope.write(f"TRIG_DELAY {time_seconds}")
+        if not self._scope._has_command("set_trigger_holdoff"):
+            raise exceptions.FeatureNotSupportedError(f"trigger holdoff is not supported on the {self._dialect} dialect")
+        self._scope.write(self._cmd("set_trigger_holdoff", t=time_seconds))
         logger.info(f"Trigger holdoff set to {time_seconds}s")
 
     def get_configuration(self) -> dict:
@@ -350,15 +352,19 @@ class Trigger:
         Returns:
             Dictionary with all trigger settings
         """
-        return {
+        config = {
             "mode": self.mode,
             "type": self.trigger_type,
             "source": self.source,
             "level": self.level,
             "slope": self.slope,
             "coupling": self.coupling,
-            "holdoff": self.holdoff,
         }
+        try:
+            config["holdoff"] = self.holdoff
+        except exceptions.FeatureNotSupportedError:
+            config["holdoff"] = None
+        return config
 
     def __repr__(self) -> str:
         """String representation."""

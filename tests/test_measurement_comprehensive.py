@@ -6,15 +6,13 @@ import pytest
 
 from scpi_control.exceptions import CommandError
 from scpi_control.measurement import Measurement
+from tests.dialect_helpers import make_dialect_scope
 
 
 @pytest.fixture
 def mock_scope():
-    """Create a mock oscilloscope for testing."""
-    scope = Mock()
-    scope.write = Mock()
-    scope.query = Mock()
-    return scope
+    """Create a mock oscilloscope for testing (legacy dialect, real command table)."""
+    return make_dialect_scope("legacy")
 
 
 @pytest.fixture
@@ -359,3 +357,17 @@ class TestMeasurementStringRepresentation:
     def test_repr(self, measurement):
         """Test repr."""
         assert "Measurement" in repr(measurement)
+
+
+def test_statistics_raise_cleanly_on_modern_dialect():
+    from scpi_control import Oscilloscope, exceptions
+    from scpi_control.connection.mock import MockConnection
+
+    conn = MockConnection("mock", idn="Siglent Technologies,SDS824X HD,MOCK0002,3.8.12")
+    scope = Oscilloscope("mock", connection=conn)
+    scope.connect()
+    with pytest.raises(exceptions.FeatureNotSupportedError):
+        scope.measurement.enable_statistics()
+    with pytest.raises(exceptions.FeatureNotSupportedError):
+        scope.trigger.holdoff = 0.001
+    scope.disconnect()

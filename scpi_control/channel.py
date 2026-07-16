@@ -230,8 +230,9 @@ class Channel:
         Returns:
             Unit string (typically 'V' for volts)
         """
-        # legacy-only command; not routed
-        response = self._scope.query(f"{self._prefix}:UNIT?")
+        if not self._scope._has_command("get_channel_unit"):
+            raise exceptions.FeatureNotSupportedError(f"channel unit is not supported on the {self._dialect} dialect")
+        response = self._scope.query(self._cmd("get_channel_unit", ch=self._channel))
         return response.strip()
 
     @unit.setter
@@ -241,7 +242,9 @@ class Channel:
         Args:
             unit: Unit string ('V' for volts, 'A' for amps)
         """
-        self._scope.write(f"{self._prefix}:UNIT {unit}")
+        if not self._scope._has_command("set_channel_unit"):
+            raise exceptions.FeatureNotSupportedError(f"channel unit is not supported on the {self._dialect} dialect")
+        self._scope.write(self._cmd("set_channel_unit", ch=self._channel, unit=unit))
         logger.info(f"Channel {self._channel} unit set to {unit}")
 
     def auto_scale(self) -> None:
@@ -261,7 +264,7 @@ class Channel:
         Returns:
             Dictionary with all channel settings
         """
-        return {
+        config = {
             "channel": self._channel,
             "enabled": self.enabled,
             "coupling": self.coupling,
@@ -269,8 +272,12 @@ class Channel:
             "voltage_offset": self.voltage_offset,
             "probe_ratio": self.probe_ratio,
             "bandwidth_limit": self.bandwidth_limit,
-            "unit": self.unit,
         }
+        try:
+            config["unit"] = self.unit
+        except exceptions.FeatureNotSupportedError:
+            config["unit"] = None
+        return config
 
     def __repr__(self) -> str:
         """String representation."""

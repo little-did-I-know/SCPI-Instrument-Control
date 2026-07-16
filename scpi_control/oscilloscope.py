@@ -472,6 +472,10 @@ class Oscilloscope:
 
         return self._scpi_commands.get_command(command_name, **kwargs)
 
+    def _has_command(self, command_name: str) -> bool:
+        """True if the active dialect/variant defines this command."""
+        return self._scpi_commands is not None and self._scpi_commands.has_command(command_name)
+
     def __enter__(self):
         """Context manager entry."""
         self.connect()

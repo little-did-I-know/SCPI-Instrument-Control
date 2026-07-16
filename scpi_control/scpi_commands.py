@@ -79,13 +79,28 @@ class SCPICommandSet:
         # sub-project; the DAT2 path works on both scope generations)
         "get_waveform": "C{ch}:WF? DAT2",
         "get_waveform_preamble": "C{ch}:WF? DESC",
-        # Measurements (routing deferred to the waveform/measurement sub-project)
-        "get_parameter_value": "C{ch}:PAVA? {param}",
-        "clear_measurements": "PACU CLEAR",
+        # Measurements
+        # NOTE: get_parameter_value's wire form is "PAVA? {param},C{ch}" (mtype
+        # first, then a C-prefixed channel) -- this is what measurement.py
+        # actually sent pre-refactor and what the legacy mock's PAVA? regex
+        # parses; do not "correct" it to "C{ch}:PAVA? {param}".
+        "get_parameter_value": "PAVA? {param},C{ch}",
+        "add_measurement": "PACU {mtype},C{ch}",
+        "set_statistics": "PAST {state}",
+        "clear_measurements": "PACL",
+        "reset_statistics": "PASTAT RESET",
         # Cursor control
         "set_cursor_type": "CRST {type}",
         "get_cursor_type": "CRST?",
-        "get_cursor_value": "CRVA? {cursor}",
+        # NOTE: bare query -- no cursor id is ever passed by measurement.py.
+        "get_cursor_value": "CRVA?",
+        # Trigger holdoff (AUDIT M4: TRIG_DELAY is really trigger delay, not
+        # holdoff; legacy-only, routing deferred to a trigger-rework follow-up)
+        "set_trigger_holdoff": "TRIG_DELAY {t}",
+        "get_trigger_holdoff": "TRIG_DELAY?",
+        # Channel vertical unit (legacy-only)
+        "set_channel_unit": "C{ch}:UNIT {unit}",
+        "get_channel_unit": "C{ch}:UNIT?",
         # Math operations (basic)
         "set_math_display": "MATH{n}:TRA {state}",
         "get_math_display": "MATH{n}:TRA?",
@@ -140,9 +155,10 @@ class SCPICommandSet:
         # Waveform acquisition — unchanged until the waveform sub-project
         "get_waveform": "C{ch}:WF? DAT2",
         "get_waveform_preamble": "C{ch}:WF? DESC",
-        # Measurements — routing deferred to the waveform/measurement sub-project
+        # Measurements — get_parameter_value stays available (measure() keeps
+        # working on modern, a documented gap); statistics/cursors/holdoff/unit
+        # are legacy-only and intentionally absent so they gate cleanly.
         "get_parameter_value": "C{ch}:PAVA? {param}",
-        "clear_measurements": "PACU CLEAR",
         # Screen capture (legacy strings accepted on modern scopes today; revisit with screen-capture overhaul)
         "screen_dump": "SCDP",
         "set_hardcopy_format": "HCSU DEV,FORMAT,{format}",
@@ -330,6 +346,20 @@ def _from_wire(table, dialect: str, raw: str, what: str) -> str:
         return table[dialect][token]
     except KeyError:
         raise ValueError(f"Unrecognized {dialect} {what} response: {raw!r}")
+
+
+# Public measurement vocabulary (PAVA parameter names). Identity for Siglent
+# dialects; vendor dialects map or reject per their manuals.
+_MEASUREMENT_TYPES = {"PKPK", "MAX", "MIN", "AMPL", "TOP", "BASE", "CMEAN", "MEAN", "RMS", "CRMS", "FREQ", "PER", "RISE", "FALL", "WID", "NWID", "DUTY"}
+_MEASUREMENT_TO_WIRE = {
+    "legacy": {m: m for m in _MEASUREMENT_TYPES},
+    "modern": {m: m for m in _MEASUREMENT_TYPES},
+}
+
+
+def measurement_to_wire(dialect: str, mtype: str) -> str:
+    """Convert a public measurement type to the dialect's wire token."""
+    return _to_wire(_MEASUREMENT_TO_WIRE, _MEASUREMENT_TYPES, dialect, mtype, "measurement type")
 
 
 def mode_to_wire(dialect: str, mode: str) -> str:
