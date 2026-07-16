@@ -5127,9 +5127,12 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   TBS1000C Series and 2 Series MSO, and the LeCroy WaveSurfer 3000z and
   WaveRunner 8000 series. See the
   <a href="docs/user-guide/scpi-dialects.md">SCPI Dialects guide</a> for the full
-  per-vendor command tables and known gaps (e.g. MSO 2-Series automated
-  measurements, LeCroy statistics/cursors/holdoff, Tek 16-bit waveform
-  transfer).</li>
+  per-vendor command tables and known gaps (e.g. LeCroy
+  statistics/cursors/holdoff, Tek 16-bit waveform transfer).</li>
+<li>Tektronix MSO &#8536;/6 Series support (MSO44, MSO46, MSO54, MSO56, MSO58,
+  MSO58LP, MSO64), including 6- and 8-channel models.</li>
+<li>Badge-based measurements for the modern Tektronix MSO families, which also
+  enables <code>measure()</code> on the MSO 2-Series.</li>
 </ul>
 <h3 id="changed">Changed<a class="headerlink" href="#changed" title="Permanent link">&para;</a></h3>
 <ul>
@@ -5143,6 +5146,10 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   value back.</li>
 <li><code>add_measurement</code> now validates and case-normalizes its measurement type
   (unknown types raise instead of being sent verbatim to the instrument).</li>
+<li>Channel numbers are validated against the connected model's channel count
+  instead of a fixed 1-4 range. Scopes with fewer than four channels now raise
+  <code>InvalidParameterError</code> for a channel they do not have, where they
+  previously queried it.</li>
 </ul>
 <h2 id="200-2026-07-15">[2.0.0] - 2026-07-15<a class="headerlink" href="#200-2026-07-15" title="Permanent link">&para;</a></h2>
 <h3 id="breaking-changes">⚠️ Breaking Changes<a class="headerlink" href="#breaking-changes" title="Permanent link">&para;</a></h3>

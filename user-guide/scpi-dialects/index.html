@@ -854,6 +854,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#measurement-badges" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Measurement badges
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#mock-sessions" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3316,6 +3327,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#measurement-badges" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Measurement badges
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#mock-sessions" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3365,8 +3387,8 @@ Siglent legacy, Siglent modern, Tektronix, and LeCroy.</p>
 flat, LeCroy-derived commands like <code>C1:VDIV 500mV</code>, <code>TDIV</code>, and <code>PAVA?</code>.
 Newer HD-generation Siglent scopes (SDS800X HD and later) speak <strong>modern</strong>
 colon-form SCPI — <code>:CHANnel1:SCALe 0.5</code>, <code>:TIMebase:SCALe</code>, <code>:MEASure...</code>.
-<strong>Tektronix</strong> scopes (TBS1000C, 2 Series MSO) speak a headerless SCPI dialect
-of their own — <code>CH1:SCAle</code>, <code>HORizontal:SCAle</code>, <code>TRIGger:A:...</code>. <strong>LeCroy</strong>
+<strong>Tektronix</strong> scopes (TBS1000C, 2/&#8536;/6 Series MSO) speak a headerless SCPI
+dialect of their own — <code>CH1:SCAle</code>, <code>HORizontal:SCAle</code>, <code>TRIGger:A:...</code>. <strong>LeCroy</strong>
 scopes (WaveSurfer, WaveRunner) speak the MAUI remote-control command set —
 <code>C1:VDIV</code>, <code>TDIV</code>, <code>TRIG_MODE</code>.</p>
 <p>Worth calling out explicitly: LeCroy's dialect is the direct ancestor of
@@ -3399,6 +3421,79 @@ when you call <code>scope.connect()</code>, in two stages:</p>
    space) or ending in <code>HD</code>, containing <code>PLUS</code>, or containing
    <code>SDS5</code>/<code>SDS6</code>/<code>SDS7</code> are treated as modern, everything else as legacy.</li>
 </ol>
+<p>The built-in Tektronix registry, and the command-set variant (<code>scpi_variant</code>)
+each model gets:</p>
+<table>
+<thead>
+<tr>
+<th>Model</th>
+<th>Series</th>
+<th>Channels</th>
+<th><code>scpi_variant</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>TBS1102C</td>
+<td>TBS1000C</td>
+<td>2</td>
+<td><code>tek_tbs</code></td>
+</tr>
+<tr>
+<td>MSO24</td>
+<td>2 Series MSO</td>
+<td>4</td>
+<td><code>tek_mso</code></td>
+</tr>
+<tr>
+<td>MSO44</td>
+<td>4 Series MSO</td>
+<td>4</td>
+<td><code>tek_mso</code></td>
+</tr>
+<tr>
+<td>MSO46</td>
+<td>4 Series MSO</td>
+<td>6</td>
+<td><code>tek_mso</code></td>
+</tr>
+<tr>
+<td>MSO54</td>
+<td>5 Series MSO</td>
+<td>4</td>
+<td><code>tek_mso</code></td>
+</tr>
+<tr>
+<td>MSO56</td>
+<td>5 Series MSO</td>
+<td>6</td>
+<td><code>tek_mso</code></td>
+</tr>
+<tr>
+<td>MSO58</td>
+<td>5 Series MSO</td>
+<td>8</td>
+<td><code>tek_mso</code></td>
+</tr>
+<tr>
+<td>MSO58LP</td>
+<td>5 Series MSO (Low Profile)</td>
+<td>8</td>
+<td><code>tek_mso</code></td>
+</tr>
+<tr>
+<td>MSO64</td>
+<td>6 Series MSO</td>
+<td>4</td>
+<td><code>tek_mso</code></td>
+</tr>
+</tbody>
+</table>
+<p>All modern MSO models — 2, 4, 5, and 6 Series alike — share the single
+<code>tek_mso</code> command variant; only the TBS1000C gets its own <code>tek_tbs</code> variant.
+Channel numbers passed to the API are validated against the connected
+model's <code>num_channels</code> above (an <code>MSO44</code> rejects channel 5 with
+<code>InvalidParameterError</code>, for instance), not a fixed 1-4 range.</p>
 <p>Check what was detected after connecting:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">scpi_control</span><span class="w"> </span><span class="kn">import</span> <span class="n">Oscilloscope</span>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
@@ -3531,8 +3626,18 @@ timeouts rather than gating, the appropriate timeout/parse error) —
 </tr>
 <tr>
 <td><code>measure()</code> automated measurements</td>
-<td>legacy, lecroy, tektronix (TBS1000C family only)</td>
-<td><strong>Modern:</strong> <code>measure()</code> calls still time out and raise <code>SiglentTimeoutError</code> — a longstanding, unchanged gap. <strong>Tektronix 2 Series MSO:</strong> <code>measure()</code> raises <code>FeatureNotSupportedError</code> with a clear message; the MSO2 command set has no <code>MEASUrement:IMMed</code> subsystem (badge-based <code>MEASUrement:MEAS&lt;x&gt;</code> measurements are a follow-up).</td>
+<td>legacy, lecroy, tektronix (all families)</td>
+<td><strong>Modern (Siglent):</strong> <code>measure()</code> calls still time out and raise <code>SiglentTimeoutError</code> — a longstanding, unchanged gap. <strong>Tektronix:</strong> the TBS1000C uses the <code>MEASUrement:IMMed</code> subsystem; the 2/&#8536;/6 Series MSO families have no <code>IMMed</code> subsystem and use stateful "badges" instead (<code>MEASUrement:MEAS&lt;n&gt;</code>) — see <a href="#measurement-badges">Measurement badges</a> below. This closes the previous MSO 2-Series gap: <code>measure()</code> now works there too.</td>
+</tr>
+<tr>
+<td>Badge measurement types <code>CMEAN</code>, <code>CRMS</code></td>
+<td>not available on badge families (2/&#8536;/6 Series MSO)</td>
+<td>Both raise <code>FeatureNotSupportedError</code>. <code>CMEAN</code>: neither manual's <code>MEASUrement:MEAS&lt;x&gt;:TYPe</code> argument list (MSO2 PM 077-1776-07 p.2-468; &#8536;/6 PM 077-1305-11 p.2-702) lists a cycle-mean badge token. <code>CRMS</code>: the badge vocabulary's <code>ACRMS</code> is AC-coupled RMS, a different measurement than cycle RMS — mapping it would misrepresent what's measured. <strong><code>TOP</code> and <code>BASE</code> are supported</strong> on badge families (both manuals list <code>TOP</code>/<code>BASE</code> tokens; see the model table above) — they are not a gap.</td>
+</tr>
+<tr>
+<td><code>LINE</code> trigger source</td>
+<td>not available on the <code>tektronix</code> dialect (gated for all families)</td>
+<td>TBS1000C (PM 077-1691-01 p.152) and the &#8536;/6 Series (PM 077-1305-11 p.2-1406) both support a <code>LINE</code> edge-trigger source; only the 2 Series MSO (PM 077-1776-07 p.2-663) lacks it. That divergence runs <em>inside</em> the shared <code>tek_mso</code> variant (2 Series vs. &#8536;/6), which the current <code>channel_token(dialect, source)</code> signature — it branches on dialect only — cannot express, so <code>LINE</code> is gated dialect-wide rather than risk sending a token the 2 Series would reject. A deliberate, conservative gap; adding <code>LINE</code> for the families that do have it is a follow-up (needs a <code>tek_mso</code> split or a per-model capability flag). <code>EX</code> passes through as <code>AUX</code> (the SCPI short form of <code>AUXiliary</code>, present on every Tek family); <code>EX5</code> has no token on any Tek family and is also gated.</td>
 </tr>
 <tr>
 <td>Waveform transfer bit depth</td>
@@ -3555,6 +3660,45 @@ timeouts rather than gating, the appropriate timeout/parse error) —
 documented, unchanged gap: <code>scope.measurement.measure(...)</code> calls time out
 and raise <code>SiglentTimeoutError</code>. The web gateway catches this internally and
 shows measurements as unavailable in its UI.</p>
+<h2 id="measurement-badges">Measurement badges<a class="headerlink" href="#measurement-badges" title="Permanent link">&para;</a></h2>
+<p>The 2/&#8536;/6 Series MSO families have no <code>MEASUrement:IMMed</code> subsystem. A
+measurement is a stateful "badge" — added to the instrument, configured with
+a type and source, then read — verified against both manuals: MSO2 PM
+077-1776-07 (<code>ADDNew</code> p.2-395, <code>TYPe</code> p.2-468, <code>SOUrce</code> p.2-464, <code>RESUlts</code>
+p.2-462, <code>DELete</code> p.2-405, <code>LIST</code> p.2-411) and &#8536;/6 PM 077-1305-11 (<code>ADDNew</code>
+p.2-561, <code>TYPe</code> p.2-702, <code>SOUrce</code> p.2-694, <code>RESUlts</code> p.2-690, <code>DELete</code>
+p.2-581, <code>LIST</code> p.2-592). <code>scope.measurement.measure(mtype, channel)</code> hides
+this lifecycle behind the same call used on every other dialect:</p>
+<ul>
+<li><strong>Lazy allocation.</strong> No badges are created on connect. The first call for a
+  given measurement type + channel pair allocates one; every later call for
+  that same pair reuses it — a single query per read instead of a full
+  add/configure/read cycle, which matters for something like the web gateway
+  polling measurements at ~1 Hz.</li>
+<li><strong>One badge per type + channel.</strong> <code>MEASUrement:ADDNew "MEAS{n}"</code> creates
+  the badge, <code>MEASUrement:MEAS{n}:TYPe {type}</code> and
+  <code>MEASUrement:MEAS{n}:SOUrce {src}</code> configure it, and
+  <code>MEASUrement:MEAS{n}:RESUlts:CURRentacq:MEAN?</code> reads the current value (the
+  plain, non-<code>SUBGROUP</code> result query — the <code>SUBGROUP</code> form needs the
+  5-DPM/5-IMDA/6-DPM options, which this library doesn't gate on).</li>
+<li><strong>User badges are never touched.</strong> Before allocating its first badge, the
+  library reads <code>MEASUrement:LIST?</code> once to learn which slots already exist
+  on the instrument, and only ever allocates around them — badges you added
+  yourself, from the front panel or another client, are never reused or
+  deleted. (An empty list answers <code>NONE</code>; that's documented explicitly in
+  the MSO2 manual, p.2-411 — the &#8536;/6 manual doesn't call out the empty
+  case, though nothing suggests it behaves differently.)</li>
+<li><strong>Cleanup is scoped to what this session created.</strong> <code>disconnect()</code> deletes
+  (<code>MEASUrement:DELete "MEAS{n}"</code>) only the badges this library allocated;
+  anything pre-existing (user badges, or another session's) is left alone.</li>
+<li><strong>First-read acquisition caveat.</strong> Badge results accumulate across
+  acquisitions. The first read of a freshly created badge may need a
+  running acquisition (<code>scope.run()</code>) before it returns a real value instead
+  of a stale or non-numeric one. <strong>The mock scope returns badge values
+  immediately on the first read and does not simulate this</strong> — code that
+  passes against the mock isn't proof the same call will succeed against
+  real hardware with acquisition stopped.</li>
+</ul>
 <h2 id="mock-sessions">Mock sessions<a class="headerlink" href="#mock-sessions" title="Permanent link">&para;</a></h2>
 <p>Mock sessions (<code>mock: true</code> in the web gateway, or <code>MockConnection</code> in code)
 default to a <strong>legacy</strong>-dialect Siglent scope. Pass a different <code>idn</code> to
@@ -3596,6 +3740,9 @@ committed to this repo — consult the vendor for the current version:</p>
   077-1691-01) — <a href="https://www.tek.com/">tek.com</a></li>
 <li><em>Tektronix 2 Series MSO Programmer Manual</em> (Tektronix part number
   077-1776-07) — <a href="https://www.tek.com/">tek.com</a></li>
+<li><em>&#8536;/6 Series MSO, 6 Series LPD Programmer Manual</em> (Tektronix part number
+  077-1305-11) — <a href="https://www.tek.com/">tek.com</a>, covering the MSO44, MSO46,
+  MSO54, MSO56, MSO58, MSO58LP, and MSO64</li>
 <li><em>Teledyne LeCroy MAUI Oscilloscopes Remote Control and Automation Manual</em> —
   <a href="https://www.teledynelecroy.com/">teledynelecroy.com</a></li>
 </ul>
