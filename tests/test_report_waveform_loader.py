@@ -249,3 +249,34 @@ def test_csv_header_with_an_empty_channel_value_falls_back(tmp_path):
 
     assert got.channel_name == "CH1"
     assert got.sample_rate == pytest.approx(1e6)
+
+
+def test_hdf5_round_trip_preserves_everything(tmp_path):
+    pytest.importorskip("h5py")
+    wf = make_waveform()
+    p = tmp_path / "cap.h5"
+    saver()._save_hdf5(wf, str(p))
+
+    loaded = WaveformLoader.load(p)
+
+    assert len(loaded) == 1
+    got = loaded[0]
+    assert got.channel_name == "C1"                       # was 'voltage'
+    assert got.sample_rate == pytest.approx(SAMPLE_RATE)   # was 1e9: read from the wrong attrs
+    np.testing.assert_allclose(got.time_data, wf.time)
+    np.testing.assert_allclose(got.voltage_data, wf.voltage)
+
+
+def test_hdf5_with_user_metadata_loads(tmp_path):
+    """The bug: the writer adds a 'metadata' GROUP, the loader sliced it ->
+    TypeError: Accessing a group is done with bytes or str, not <class 'slice'>."""
+    pytest.importorskip("h5py")
+    wf = make_waveform()
+    p = tmp_path / "cap_meta.h5"
+    saver()._save_hdf5(wf, str(p), metadata={"dut": "board7", "operator": "robin"})
+
+    loaded = WaveformLoader.load(p)
+
+    assert len(loaded) == 1
+    assert loaded[0].channel_name == "C1"
+    np.testing.assert_allclose(loaded[0].voltage_data, wf.voltage)

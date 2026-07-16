@@ -290,65 +290,57 @@ class WaveformLoader:
 
     @staticmethod
     def _load_hdf5(filepath: Path) -> List[WaveformData]:
-        """Load waveform data from HDF5 file."""
+        """Load an HDF5 file, reading this library's schema exactly when present."""
         try:
             import h5py
         except ImportError:
-            raise ImportError("h5py is required to load HDF5 files. " "Install with: pip install h5py")
-
-        waveforms = []
+            raise ImportError("h5py is required to load HDF5 files. Install with: pip install h5py")
 
         with h5py.File(filepath, "r") as f:
-            # Try to find time and voltage datasets
-            time_data = None
-            time_key = None
+            # Datasets only -- the writer also creates a 'metadata' GROUP, and
+            # slicing a group raises TypeError.
+            datasets = [k for k in f.keys() if isinstance(f[k], h5py.Dataset)]
 
-            # Look for time data
-            for key in f.keys():
-                if "time" in key.lower():
-                    time_data = f[key][:]
-                    time_key = key
-                    break
+            if ws.TIME in datasets and ws.VOLTAGE in datasets:
+                # Core fields live on the FILE's attrs, not the dataset's.
+                attrs = dict(f.attrs)
+                voltage = f[ws.VOLTAGE][:]
+                channel = attrs.get(ws.CHANNEL, ws.VOLTAGE)
+                if isinstance(channel, bytes):
+                    channel = channel.decode()
+                return [
+                    WaveformData(
+                        channel_name=str(channel),
+                        time_data=f[ws.TIME][:],
+                        voltage_data=voltage,
+                        sample_rate=float(attrs.get(ws.SAMPLE_RATE, 0.0)),
+                        record_length=len(voltage),
+                        source_file=filepath,
+                    )
+                ]
 
-            # If no time data found, look for any dataset
-            if time_data is None and len(f.keys()) > 0:
-                time_key = list(f.keys())[0]
-                time_data = f[time_key][:]
+            time_key = WaveformLoader._pick_time_key(datasets)
+            if time_key is None:
+                raise ValueError(f"Could not find time data in {filepath}")
+            time_data = _require_numeric_time(f[time_key][:], filepath)
 
-            if time_data is None:
-                raise ValueError("Could not find time data in HDF5 file")
-
-            # Load voltage data from all other datasets
-            for key in f.keys():
+            waveforms = []
+            for key in datasets:
                 if key == time_key:
                     continue
-
-                dataset = f[key]
-                voltage_data = dataset[:]
-
-                # Try to read metadata from attributes
-                attrs = dict(dataset.attrs)
-
-                sample_rate = attrs.get("sample_rate", 1e9)
-                if isinstance(sample_rate, np.ndarray):
-                    sample_rate = float(sample_rate)
-
-                waveform = WaveformData(
-                    channel_name=key,
-                    time_data=time_data,
-                    voltage_data=voltage_data,
-                    sample_rate=sample_rate,
-                    record_length=len(voltage_data),
-                    timebase=attrs.get("timebase"),
-                    voltage_scale=attrs.get("voltage_scale"),
-                    voltage_offset=attrs.get("voltage_offset"),
-                    probe_ratio=attrs.get("probe_ratio"),
-                    coupling=attrs.get("coupling"),
-                    source_file=filepath,
+                voltage = f[key][:]
+                attrs = dict(f[key].attrs)
+                waveforms.append(
+                    WaveformData(
+                        channel_name=key,
+                        time_data=time_data,
+                        voltage_data=voltage,
+                        sample_rate=float(attrs.get(ws.SAMPLE_RATE, WaveformLoader._rate_from_time(time_data))),
+                        record_length=len(voltage),
+                        source_file=filepath,
+                    )
                 )
-                waveforms.append(waveform)
-
-        return waveforms
+            return waveforms
 
     @staticmethod
     def load_multiple(filepaths: List[Path]) -> List[WaveformData]:
