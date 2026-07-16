@@ -130,3 +130,67 @@ def test_mock_answers_scdp_with_a_valid_image():
         assert buf.getvalue().startswith(b"\x89PNG\r\n\x1a\n")
     finally:
         scope.disconnect()
+
+
+TEK_IDN = "TEKTRONIX,MSO24,MOCK0100,CF:91.1CT FV:1.28"
+
+
+def _tek_conn(**kwargs):
+    from scpi_control.connection.mock import MockConnection
+
+    conn = MockConnection("mock", idn=TEK_IDN, **kwargs)
+    conn.connect()
+    return conn
+
+
+def test_tek_mock_answers_tek_queries():
+    conn = _tek_conn()
+    conn.write("CH1:SCAle 0.5")
+    assert conn.query("CH1:SCAle?") == "5.00E-01"
+    conn.write("HORizontal:SCAle 0.002")
+    assert conn.query("HORizontal:SCAle?") == "2.00E-03"
+    assert conn.query("TRIGger:STATE?") in {"ARMED", "AUTO", "READY", "SAVE", "TRIGGER"}
+
+
+def test_tek_mock_times_out_on_siglent_commands():
+    import pytest
+
+    from scpi_control import exceptions
+
+    conn = _tek_conn()
+    with pytest.raises(exceptions.TimeoutError):
+        conn.query("TDIV?")
+    with pytest.raises(exceptions.TimeoutError):
+        conn.query(":TIMebase:SCALe?")
+
+
+def test_tek_mock_trigger_state_machine():
+    conn = _tek_conn()
+    conn.write("ACQuire:STOPAfter SEQuence")
+    conn.write("ACQuire:STATE RUN")
+    assert conn.tek_stop_after == "SEQUENCE"
+    conn.write("TRIGger:A:EDGE:SOUrce CH2")
+    assert conn.trigger_source == "CH2"
+    conn.write("TRIGger:A:LEVel:CH2 0.5")
+    assert conn.trigger_level[2] == 0.5
+
+
+def test_tek_mock_serves_curve_block():
+    conn = _tek_conn(waveform_payloads={1: bytes([0, 25, 50, 75])})
+    conn.write("DATa:SOUrce CH1")
+    assert conn.query("WFMOutpre:NR_Pt?") == "4"
+    conn.write("CURVe?")
+    raw = conn.read_raw()
+    assert raw.startswith(b"#")  # bare IEEE block, no DESC prefix
+
+
+def test_tek_mock_probe_gain_family_split():
+    """Task 7 correction: tek_tbs writes CH{ch}:PRObe:GAIN, tek_mso writes
+    CH{ch}:PROBEFunc:EXTAtten -- both must land in the same probe_gains state."""
+    conn = _tek_conn()
+    conn.write("CH1:PRObe:GAIN 0.1")
+    assert conn.query("CH1:PRObe:GAIN?") == "1.00E-01"
+    conn.write("CH2:PROBEFunc:EXTAtten 10")
+    assert conn.query("CH2:PROBEFunc:EXTAtten?") == "1.00E+01"
+    assert conn.probe_gains[1] == 0.1
+    assert conn.probe_gains[2] == 10.0

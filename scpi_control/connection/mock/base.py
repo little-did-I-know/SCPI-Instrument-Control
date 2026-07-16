@@ -9,11 +9,12 @@ from typing import Dict, Iterable, List, Optional, Union
 from scpi_control import exceptions
 from scpi_control.connection.base import BaseConnection
 from scpi_control.connection.mock.helpers import MOCK_SCREENSHOT_BMP, _build_ieee_block
-from scpi_control.connection.mock import siglent
+from scpi_control.connection.mock import siglent, tektronix
 from scpi_control.models import detect_model_from_idn
 
 _PERSONALITIES = {
     "siglent": siglent,
+    "tektronix": tektronix,
 }
 
 
@@ -81,6 +82,22 @@ class MockConnection(BaseConnection):
         self.trigger_coupling = "DC"
         self.trigger_level: Dict[int, float] = {ch: 0.0 for ch in channels}
         self.trigger_status: List[str] = trigger_status[:] if trigger_status else ["Stop"]
+
+        # Tektronix wire-vocabulary state (shared across tek_tbs/tek_mso variants)
+        self.tek_stop_after = "RUNSTOP"
+        self.data_source: int = 1
+        self.probe_gains: Dict[int, float] = {ch: 0.1 for ch in channels}
+        self.holdoff_time = 0.0
+        if self.scope_vendor == "tektronix":
+            # Tek vocabulary differs from both Siglent dialects (guide TEKTRONIX_COMMANDS table)
+            self.trigger_mode = "AUTO"
+            self.trigger_slope = "RISE"
+            self.trigger_source = "CH1"
+            self._channel_coupling = {ch: "DC" for ch in channels}
+            if not trigger_status:
+                # "SAVE" is the Tek TRIGger:STATE? token for stopped; the shared
+                # default ["Stop"] is Siglent vocabulary and not a valid Tek state.
+                self.trigger_status = ["SAVE"]
 
         self.custom_responses = custom_responses or {}
         self.writes: List[str] = []
