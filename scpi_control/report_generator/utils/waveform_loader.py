@@ -24,6 +24,20 @@ def _looks_like_ours(keys: Iterable[str]) -> bool:
     return ws.TIME in keys and ws.VOLTAGE in keys and ws.CHANNEL in keys and ws.SAMPLE_RATE in keys
 
 
+def _require_numeric_time(time_data: np.ndarray, filepath: Path) -> np.ndarray:
+    """Reject a non-numeric time axis with the loader's own error.
+
+    `_pick_time_key`'s last-resort branch can select a string key on a foreign
+    file. Without this, `_rate_from_time` raises an opaque numpy TypeError
+    instead of the ValueError callers expect. Shared by every heuristic
+    loader path (NPZ, MAT, and future HDF5) so the guard lives in one place.
+    """
+    time_data = np.asarray(time_data)
+    if not np.issubdtype(time_data.dtype, np.number):
+        raise ValueError(f"Time data in {filepath} is not numeric (found dtype {time_data.dtype})")
+    return time_data
+
+
 class WaveformLoader:
     """Loader for various waveform file formats."""
 
@@ -93,9 +107,7 @@ class WaveformLoader:
         if time_key is None or not voltage_keys:
             raise ValueError(f"Could not identify time and voltage data in {filepath}")
 
-        time_data = np.asarray(data[time_key])
-        if not np.issubdtype(time_data.dtype, np.number):
-            raise ValueError(f"Could not identify time and voltage data in {filepath}")
+        time_data = _require_numeric_time(data[time_key], filepath)
 
         waveforms = []
         for voltage_key in voltage_keys:
@@ -225,7 +237,7 @@ class WaveformLoader:
         if time_key is None or not voltage_keys:
             raise ValueError(f"Could not identify time and voltage data in {filepath}")
 
-        time_data = np.asarray(data[time_key]).flatten()
+        time_data = _require_numeric_time(np.asarray(data[time_key]).flatten(), filepath)
         waveforms = []
         for voltage_key in voltage_keys:
             voltage = np.asarray(data[voltage_key]).flatten()

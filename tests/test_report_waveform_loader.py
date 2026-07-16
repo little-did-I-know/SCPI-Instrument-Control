@@ -138,6 +138,18 @@ def test_foreign_npz_with_a_string_first_key_is_rejected_cleanly(tmp_path):
         WaveformLoader.load(p)
 
 
+def test_foreign_mat_with_a_string_first_key_is_rejected_cleanly(tmp_path):
+    """A string array must never become the time axis on the MAT path either."""
+    pytest.importorskip("scipy")
+    from scipy.io import savemat
+
+    p = tmp_path / "stringy.mat"
+    savemat(str(p), {"label": np.array(["aa", "bb"]), "signal": np.arange(10.0) + 1})
+
+    with pytest.raises(ValueError):
+        WaveformLoader.load(p)
+
+
 def test_foreign_mat_scalar_fields_do_not_become_waveforms(tmp_path):
     """A scalar like sample_rate must not flatten into a 1-sample 'waveform'."""
     pytest.importorskip("scipy")
