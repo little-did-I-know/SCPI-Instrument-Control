@@ -168,6 +168,8 @@ class WaveformLoader:
         data = np.loadtxt(filepath, delimiter=",", comments=ws.CSV_COMMENT, skiprows=skip, ndmin=2)
         if data.size == 0:
             raise ValueError(f"No numeric data found in {filepath}")
+        if data.shape[1] < 2:
+            raise ValueError(f"Expected a time column and at least one voltage column in {filepath}, found {data.shape[1]}")
 
         time_data = data[:, 0]
         derived_rate = WaveformLoader._rate_from_time(time_data)
@@ -176,7 +178,7 @@ class WaveformLoader:
             voltage = data[:, i]
             # A single-channel enhanced CSV names its channel; multi-column CSVs
             # and plain CSVs cannot, so synthesize CHn.
-            if data.shape[1] == 2 and ws.CSV_HEADER_CHANNEL in header:
+            if data.shape[1] == 2 and header.get(ws.CSV_HEADER_CHANNEL):
                 channel_name = header[ws.CSV_HEADER_CHANNEL]
             else:
                 channel_name = f"CH{i}"

@@ -229,3 +229,23 @@ def test_csv_with_legacy_siglent_header_still_loads(tmp_path):
     assert got.channel_name == "C2"
     assert got.sample_rate == pytest.approx(1e6)
     assert len(got.time_data) == 3
+
+
+def test_single_column_csv_raises_rather_than_returning_nothing(tmp_path):
+    """A file with no voltage column must fail loudly, not yield an empty report."""
+    p = tmp_path / "one_col.csv"
+    p.write_text("Voltage (V)\n0.0\n0.5\n1.0\n")
+
+    with pytest.raises(ValueError):
+        WaveformLoader.load(p)
+
+
+def test_csv_header_with_an_empty_channel_value_falls_back(tmp_path):
+    """A malformed '# Channel:' line must not produce an empty channel name."""
+    p = tmp_path / "empty_ch.csv"
+    p.write_text("# Channel:\n# Sample Rate: 1000000.0 Sa/s\nTime (s),Voltage (V)\n0.0,0.0\n1e-06,0.5\n")
+
+    got = WaveformLoader.load(p)[0]
+
+    assert got.channel_name == "CH1"
+    assert got.sample_rate == pytest.approx(1e6)
