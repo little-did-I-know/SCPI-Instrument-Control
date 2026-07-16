@@ -54,6 +54,7 @@ class MockConnection(BaseConnection):
         daq_mode: bool = False,
         daq_idn: str = "Keysight Technologies,34970A,MY12345678,A.01.02",
         daq_readings: str = "1.234,2.345,3.456",
+        tek_badges: Optional[Dict[int, Dict[str, str]]] = None,
     ):
         super().__init__(host, port, timeout)
         channels = channel_states.keys() if channel_states else range(1, 3)
@@ -89,6 +90,9 @@ class MockConnection(BaseConnection):
         self.data_source: int = 1
         self.probe_gains: Dict[int, float] = {ch: 0.1 for ch in channels}
         self.holdoff_time = 0.0
+        # Measurement badges: slot -> {"type": ..., "source": ...}. Seed via
+        # tek_badges to model badges a user created on the instrument.
+        self.badges: Dict[int, Dict[str, str]] = {n: dict(cfg) for n, cfg in (tek_badges or {}).items()}
         if self.scope_vendor == "tektronix":
             # Tek vocabulary differs from both Siglent dialects (guide TEKTRONIX_COMMANDS table)
             self.trigger_mode = "AUTO"

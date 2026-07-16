@@ -93,6 +93,9 @@ class Oscilloscope:
         # Channels will be created dynamically based on model capability
         # After connection, channels will be available as self.channel1, self.channel2, etc.
 
+        # Channel numbers created by _create_channels(), cleared on disconnect
+        self._channel_numbers: List[int] = []
+
         # Initialize trigger control
         self.trigger = Trigger(self)
 
@@ -194,6 +197,11 @@ class Oscilloscope:
     def disconnect(self) -> None:
         """Close connection to the oscilloscope."""
         logger.info("Disconnecting from oscilloscope")
+        # Release instrument-side state while the link is still up
+        try:
+            self.measurement.cleanup()
+        except Exception as e:
+            logger.debug(f"Measurement cleanup skipped: {e}")
         self._connection.disconnect()
         self._device_info = None
         self.model_capability = None
@@ -201,10 +209,11 @@ class Oscilloscope:
         self.dialect = None
 
         # Remove dynamically created channels
-        for i in range(1, 5):  # Check all possible channels
+        for i in self._channel_numbers:
             channel_attr = f"channel{i}"
             if hasattr(self, channel_attr):
                 delattr(self, channel_attr)
+        self._channel_numbers = []
 
         # Clear math channels
         self.math1 = None
@@ -413,9 +422,11 @@ class Oscilloscope:
         num_channels = self.model_capability.num_channels
         logger.info(f"Creating {num_channels} channel(s)")
 
+        self._channel_numbers = []
         for i in range(1, num_channels + 1):
             channel = Channel(self, i)
             setattr(self, f"channel{i}", channel)
+            self._channel_numbers.append(i)
             logger.debug(f"Created channel{i}")
 
     def _create_math_channels(self) -> None:

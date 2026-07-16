@@ -242,3 +242,45 @@ def test_lecroy_mock_pava():
     assert parts[0] == "PKPK"
     assert float(parts[1]) == 2.0
     assert parts[2] == "OK"
+
+
+MSO58_IDN = "TEKTRONIX,MSO58,MOCK0300,CF:91.1CT FV:2.0"
+
+
+def _mso_conn(**kwargs):
+    from scpi_control.connection.mock import MockConnection
+
+    conn = MockConnection("mock", idn=MSO58_IDN, **kwargs)
+    conn.connect()
+    return conn
+
+
+def test_badge_mock_add_configure_read_delete():
+    conn = _mso_conn()
+    assert conn.query("MEASUrement:LIST?") == "NONE"
+    conn.write('MEASUrement:ADDNew "MEAS1"')
+    conn.write("MEASUrement:MEAS1:TYPe PK2Pk")
+    conn.write("MEASUrement:MEAS1:SOUrce CH1")
+    assert conn.badges[1] == {"type": "PK2PK", "source": "CH1"}
+    assert conn.query("MEASUrement:LIST?") == "MEAS1"
+    assert float(conn.query("MEASUrement:MEAS1:RESUlts:CURRentacq:MEAN?")) == 2.0
+    conn.write('MEASUrement:DELete "MEAS1"')
+    assert 1 not in conn.badges
+    assert conn.query("MEASUrement:LIST?") == "NONE"
+
+
+def test_badge_mock_reports_seeded_user_badges():
+    conn = _mso_conn(tek_badges={1: {"type": "FREQUENCY", "source": "CH1"}, 4: {"type": "MEAN", "source": "CH2"}})
+    assert conn.query("MEASUrement:LIST?") == "MEAS1,MEAS4"
+    assert float(conn.query("MEASUrement:MEAS1:RESUlts:CURRentacq:MEAN?")) == 1000.0
+
+
+def test_badge_mock_unknown_slot_times_out():
+    import pytest
+
+    from scpi_control import exceptions
+
+    conn = _mso_conn()
+    # A real scope answers nothing for a badge that does not exist
+    with pytest.raises(exceptions.TimeoutError):
+        conn.query("MEASUrement:MEAS7:RESUlts:CURRentacq:MEAN?")

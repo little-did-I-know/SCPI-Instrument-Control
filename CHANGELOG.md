@@ -16,9 +16,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   TBS1000C Series and 2 Series MSO, and the LeCroy WaveSurfer 3000z and
   WaveRunner 8000 series. See the
   [SCPI Dialects guide](docs/user-guide/scpi-dialects.md) for the full
-  per-vendor command tables and known gaps (e.g. MSO 2-Series automated
-  measurements, LeCroy statistics/cursors/holdoff, Tek 16-bit waveform
-  transfer).
+  per-vendor command tables and known gaps (e.g. LeCroy
+  statistics/cursors/holdoff, Tek 16-bit waveform transfer).
+- Tektronix MSO 4/5/6 Series support (MSO44, MSO46, MSO54, MSO56, MSO58,
+  MSO58LP, MSO64), including 6- and 8-channel models.
+- Badge-based measurements for the modern Tektronix MSO families, which also
+  enables `measure()` on the MSO 2-Series.
 
 ### Changed
 
@@ -32,6 +35,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   value back.
 - `add_measurement` now validates and case-normalizes its measurement type
   (unknown types raise instead of being sent verbatim to the instrument).
+- Channel numbers are validated against the connected model's channel count
+  instead of a fixed 1-4 range. Scopes with fewer than four channels now raise
+  `InvalidParameterError` for a channel they do not have, where they
+  previously queried it.
 
 ## [2.0.0] - 2026-07-15
 

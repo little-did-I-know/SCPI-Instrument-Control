@@ -283,14 +283,22 @@ def test_tbs_bandwidth_on_uses_twenty_keyword():
 
 
 def test_tek_external_trigger_maps_ex_to_aux():
-    # Both Tek families accept AUX (TBS p.152 / MSO2 p.2-663).
+    # All three Tek families accept AUX / its long form AUXiliary
+    # (TBS p.152 / MSO2 p.2-663 / MSO456 p.2-1406).
     from scpi_control.scpi_commands import channel_token
 
     assert channel_token("tektronix", "EX") == "AUX"
 
 
 def test_tek_external_trigger_gates_ex5_and_line():
-    # EX5 has no Tek token and LINE is TBS-only (absent on MSO2) -- both gate.
+    # EX5 has no token on any Tek family.
+    #
+    # LINE is NOT TBS-only: TBS (077-1691-01 p.152) and the 4/5/6 Series
+    # (077-1305-11 p.2-1406) both list it; the 2 Series (077-1776-07 p.2-663)
+    # does not. Because MSO2 and MSO 4/5/6 share the tek_mso variant, neither
+    # the dialect nor the variant says whether LINE is legal, so it stays gated
+    # dialect-wide rather than being sent to a scope that would reject it.
+    # This test pins the conservative gate, NOT the claim that Tek lacks LINE.
     from scpi_control.scpi_commands import channel_token
 
     for src in ("EX5", "LINE"):
@@ -343,3 +351,86 @@ def test_tek_trigger_level_getter_non_channel_source_returns_zero(tek_scope):
     tek_scope.query.return_value = "AUX"
     assert trig.level == 0.0
     assert not any("LEVel" in c.args[0] for c in tek_scope.query.call_args_list)
+
+
+def test_validate_channel_uses_model_capability():
+    from scpi_control import exceptions
+    from scpi_control.models import MODEL_REGISTRY, validate_channel
+
+    class _Scope:
+        pass
+
+    scope = _Scope()
+    scope.model_capability = MODEL_REGISTRY["SDS1202X-E"]  # 2-channel Siglent
+    validate_channel(scope, 1)
+    validate_channel(scope, 2)
+    # Previously channels 3-4 sailed through the hardcoded 1-4 guard and queried
+    # a channel this scope does not physically have.
+    with pytest.raises(exceptions.InvalidParameterError, match="Invalid channel number"):
+        validate_channel(scope, 3)
+    with pytest.raises(exceptions.InvalidParameterError, match="Invalid channel number"):
+        validate_channel(scope, 0)
+
+
+def test_validate_channel_falls_back_when_capability_missing():
+    from unittest.mock import Mock
+
+    from scpi_control import exceptions
+    from scpi_control.models import MAX_SUPPORTED_CHANNELS, validate_channel
+
+    assert MAX_SUPPORTED_CHANNELS == 8
+
+    # A Mock scope's model_capability.num_channels is itself a Mock, which cannot
+    # be compared numerically; the guard must fall back, not raise TypeError.
+    validate_channel(Mock(), 8)
+    with pytest.raises(exceptions.InvalidParameterError):
+        validate_channel(Mock(), 9)
+
+    # No capability attribute at all (pre-connect scope)
+    class _Bare:
+        model_capability = None
+
+    validate_channel(_Bare(), 8)
+    with pytest.raises(exceptions.InvalidParameterError):
+        validate_channel(_Bare(), 9)
+
+
+def test_eight_channel_scope_creates_all_channels_and_cleans_up():
+    from scpi_control import Oscilloscope, exceptions
+    from scpi_control.connection.mock import MockConnection
+
+    # MSO58 is an 8-channel scope (registry entry lands in Task 2); this test
+    # asserts the ceiling machinery, so it builds the capability directly.
+    from scpi_control.models import ModelCapability
+
+    cap = ModelCapability(
+        model_name="FAKE8",
+        series="Test",
+        num_channels=8,
+        max_sample_rate=1.0,
+        memory_depth=1000,
+        bandwidth_mhz=100,
+        has_math_channels=True,
+        has_fft=True,
+        has_protocol_decode=False,
+        supported_decode_types=[],
+        scpi_variant="standard",
+        dialect="legacy",
+    )
+    conn = MockConnection("mock", channel_states={i: True for i in range(1, 9)})
+    scope = Oscilloscope("mock", connection=conn)
+    scope.connect()
+    # Swap in an 8-channel capability and re-create channels
+    scope.model_capability = cap
+    for i in range(1, 5):
+        if hasattr(scope, f"channel{i}"):
+            delattr(scope, f"channel{i}")
+    scope._create_channels()
+
+    assert scope.channel8._channel == 8
+    assert scope.supported_channels == list(range(1, 9))
+    with pytest.raises(exceptions.InvalidParameterError):
+        scope.measurement.measure("PKPK", 9)
+
+    scope.disconnect()
+    assert not hasattr(scope, "channel8")  # disconnect must clear beyond channel 4

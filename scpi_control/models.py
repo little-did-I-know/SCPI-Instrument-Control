@@ -5,6 +5,8 @@ import re
 from dataclasses import dataclass
 from typing import List, Optional
 
+from scpi_control import exceptions
+
 logger = logging.getLogger(__name__)
 
 
@@ -35,6 +37,34 @@ class ModelCapability:
     def __str__(self) -> str:
         """String representation of model capability."""
         return f"{self.model_name} ({self.num_channels}ch, {self.bandwidth_mhz}MHz, {self.series})"
+
+
+# Widest scope in the registry (MSO58 / MSO58LP are 8-channel). Used as the
+# channel-range fallback when a scope's capability is not resolved yet.
+MAX_SUPPORTED_CHANNELS = 8
+
+
+def validate_channel(scope, channel: int) -> None:
+    """Raise unless `channel` exists on `scope`'s model.
+
+    The bound comes from the connected model's ``num_channels``. When that is
+    unavailable or not an int -- an unconnected scope, or a ``unittest.mock.Mock``
+    stand-in whose attribute access yields Mocks that cannot be compared
+    numerically -- fall back to MAX_SUPPORTED_CHANNELS so the guard degrades to a
+    range check instead of raising TypeError.
+
+    Args:
+        scope: Oscilloscope (or stand-in) whose model_capability bounds the range
+        channel: 1-based channel number to validate
+
+    Raises:
+        InvalidParameterError: If the channel is outside 1..num_channels
+    """
+    num_channels = getattr(getattr(scope, "model_capability", None), "num_channels", None)
+    if not isinstance(num_channels, int):
+        num_channels = MAX_SUPPORTED_CHANNELS
+    if not 1 <= channel <= num_channels:
+        raise exceptions.InvalidParameterError(f"Invalid channel number: {channel}. Must be 1-{num_channels}.")
 
 
 # Model Registry - Add new models here
@@ -223,6 +253,134 @@ MODEL_REGISTRY = {
         max_sample_rate=2.5,
         memory_depth=10_000_000,
         bandwidth_mhz=200,
+        has_math_channels=True,
+        has_fft=True,
+        has_protocol_decode=False,
+        supported_decode_types=[],
+        scpi_variant="tek_mso",
+        dialect="tektronix",
+        vendor="tektronix",
+        horiz_divisions=10,
+        vert_divisions=10,
+    ),
+    # Tektronix 4 Series MSO (datasheet: 1.5 GHz max BW, 6.25 GSa/s, 62.5 Mpts, 10x10 grid)
+    "MSO44": ModelCapability(
+        model_name="MSO44",
+        series="MSO4",
+        num_channels=4,
+        max_sample_rate=6.25,
+        memory_depth=62_500_000,
+        bandwidth_mhz=1500,
+        has_math_channels=True,
+        has_fft=True,
+        has_protocol_decode=False,
+        supported_decode_types=[],
+        scpi_variant="tek_mso",
+        dialect="tektronix",
+        vendor="tektronix",
+        horiz_divisions=10,
+        vert_divisions=10,
+    ),
+    "MSO46": ModelCapability(
+        model_name="MSO46",
+        series="MSO4",
+        num_channels=6,
+        max_sample_rate=6.25,
+        memory_depth=62_500_000,
+        bandwidth_mhz=1500,
+        has_math_channels=True,
+        has_fft=True,
+        has_protocol_decode=False,
+        supported_decode_types=[],
+        scpi_variant="tek_mso",
+        dialect="tektronix",
+        vendor="tektronix",
+        horiz_divisions=10,
+        vert_divisions=10,
+    ),
+    # Tektronix 5 Series MSO (datasheet: 2 GHz max BW, 6.25 GSa/s, 125 Mpts, 10x10 grid)
+    "MSO54": ModelCapability(
+        model_name="MSO54",
+        series="MSO5",
+        num_channels=4,
+        max_sample_rate=6.25,
+        memory_depth=125_000_000,
+        bandwidth_mhz=2000,
+        has_math_channels=True,
+        has_fft=True,
+        has_protocol_decode=False,
+        supported_decode_types=[],
+        scpi_variant="tek_mso",
+        dialect="tektronix",
+        vendor="tektronix",
+        horiz_divisions=10,
+        vert_divisions=10,
+    ),
+    "MSO56": ModelCapability(
+        model_name="MSO56",
+        series="MSO5",
+        num_channels=6,
+        max_sample_rate=6.25,
+        memory_depth=125_000_000,
+        bandwidth_mhz=2000,
+        has_math_channels=True,
+        has_fft=True,
+        has_protocol_decode=False,
+        supported_decode_types=[],
+        scpi_variant="tek_mso",
+        dialect="tektronix",
+        vendor="tektronix",
+        horiz_divisions=10,
+        vert_divisions=10,
+    ),
+    "MSO58": ModelCapability(
+        model_name="MSO58",
+        series="MSO5",
+        num_channels=8,
+        max_sample_rate=6.25,
+        memory_depth=125_000_000,
+        bandwidth_mhz=2000,
+        has_math_channels=True,
+        has_fft=True,
+        has_protocol_decode=False,
+        supported_decode_types=[],
+        scpi_variant="tek_mso",
+        dialect="tektronix",
+        vendor="tektronix",
+        horiz_divisions=10,
+        vert_divisions=10,
+    ),
+    # 5 Series MSO Low Profile: same acquisition system, no front panel/display
+    "MSO58LP": ModelCapability(
+        model_name="MSO58LP",
+        series="MSO5LP",
+        num_channels=8,
+        max_sample_rate=6.25,
+        memory_depth=125_000_000,
+        bandwidth_mhz=2000,
+        has_math_channels=True,
+        has_fft=True,
+        has_protocol_decode=False,
+        supported_decode_types=[],
+        scpi_variant="tek_mso",
+        dialect="tektronix",
+        vendor="tektronix",
+        horiz_divisions=10,
+        vert_divisions=10,
+    ),
+    # Tektronix 6 Series MSO (datasheet: 8 GHz max BW, 25 GSa/s, 125 Mpts, 10x10 grid).
+    # bandwidth_mhz is the top BW option: the MSO64 ships as BW-1000/2500/4000/
+    # 6000/8000, and "MSO64 BW-8000 ... DC - 8 GHz" is the maximum -- 6 Series
+    # MSO MSO64 Specifications and Performance Verification 077-1461-00,
+    # "Analog bandwidth 50 ohm DC coupled" table. 25 GS/s matches "8 bits at
+    # 25 GS/s; 8 GHz on all channels" in the same document.
+    "MSO64": ModelCapability(
+        model_name="MSO64",
+        series="MSO6",
+        num_channels=4,
+        max_sample_rate=25.0,
+        memory_depth=125_000_000,
+        bandwidth_mhz=8000,
         has_math_channels=True,
         has_fft=True,
         has_protocol_decode=False,
