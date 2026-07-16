@@ -8,6 +8,7 @@ company branding, and AI-generated insights.
 from __future__ import annotations
 
 import io
+import logging
 import re
 from datetime import datetime
 from pathlib import Path
@@ -38,6 +39,8 @@ from scpi_control.report_generator.models.plot_style import PlotStyle
 from scpi_control.report_generator.models.report_data import MeasurementResult, TestReport, TestSection, WaveformData, WaveformRegion
 from scpi_control.report_generator.models.report_options import ReportOptions
 from scpi_control.report_generator.utils.waveform_analyzer import WaveformAnalyzer
+
+logger = logging.getLogger(__name__)
 
 
 class PDFReportGenerator(BaseReportGenerator):
@@ -166,7 +169,7 @@ class PDFReportGenerator(BaseReportGenerator):
 
     def _report_progress(self, percent: int, message: str = "") -> None:
         """
-        Report progress to callback if available, otherwise print to console.
+        Report progress to callback if available, otherwise log at debug level.
 
         Args:
             percent: Progress percentage (0-100)
@@ -175,11 +178,11 @@ class PDFReportGenerator(BaseReportGenerator):
         if self.progress_callback:
             self.progress_callback(percent, message)
         else:
-            # Fallback to console output
+            # Fallback to debug logging
             if message:
-                print(f"Generating PDF... {percent}% - {message}")
+                logger.debug(f"Generating PDF... {percent}% - {message}")
             else:
-                print(f"Generating PDF... {percent}%")
+                logger.debug(f"Generating PDF... {percent}%")
 
     def _markdown_to_reportlab(self, text: str) -> str:
         """
@@ -287,7 +290,7 @@ class PDFReportGenerator(BaseReportGenerator):
             True if successful, False otherwise
         """
         if not self.validate_report(report):
-            print("Report validation failed")
+            logger.error("Report validation failed")
             return False
 
         try:
@@ -380,10 +383,7 @@ class PDFReportGenerator(BaseReportGenerator):
             return True
 
         except Exception as e:
-            print(f"Failed to generate PDF report: {e}")
-            import traceback
-
-            traceback.print_exc()
+            logger.exception(f"Failed to generate PDF report: {e}")
             return False
 
     def _generate_header(self, report: TestReport) -> List:
@@ -922,7 +922,7 @@ class PDFReportGenerator(BaseReportGenerator):
             return img
 
         except Exception as e:
-            print(f"Error generating region plot: {e}")
+            logger.exception(f"Error generating region plot: {e}")
             return None
 
     def _generate_statistics_table(self, waveform: WaveformData) -> Optional[Table]:
@@ -1136,7 +1136,7 @@ class PDFReportGenerator(BaseReportGenerator):
             return img
 
         except Exception as e:
-            print(f"Failed to generate waveform plot: {e}")
+            logger.exception(f"Failed to generate waveform plot: {e}")
             return None
 
     def _generate_fft_plot(self, frequency: np.ndarray, magnitude: np.ndarray) -> Optional[RLImage]:
@@ -1172,7 +1172,7 @@ class PDFReportGenerator(BaseReportGenerator):
             return img
 
         except Exception as e:
-            print(f"Failed to generate FFT plot: {e}")
+            logger.exception(f"Failed to generate FFT plot: {e}")
             return None
 
     def _generate_recommendations(self, report: TestReport) -> List:

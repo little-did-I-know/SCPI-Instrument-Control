@@ -5,6 +5,7 @@ Automatically computes frequency, amplitude, timing, and quality metrics
 from oscilloscope waveform data.
 """
 
+import logging
 from typing import Dict, Optional, Tuple
 
 import numpy as np
@@ -12,6 +13,8 @@ from scipy import signal as scipy_signal
 from scipy.fft import fft, fftfreq
 
 from scpi_control.report_generator.models.report_data import WaveformData, WaveformRegion
+
+logger = logging.getLogger(__name__)
 
 
 class SignalType:
@@ -132,7 +135,7 @@ class WaveformAnalyzer:
                 }
 
         except Exception as e:
-            print(f"Error calculating frequency: {e}")
+            logger.exception(f"Error calculating frequency: {e}")
             return {
                 "frequency": None,
                 "period": None,
@@ -212,7 +215,7 @@ class WaveformAnalyzer:
             }
 
         except Exception as e:
-            print(f"Error calculating timing stats: {e}")
+            logger.exception(f"Error calculating timing stats: {e}")
             return {
                 "rise_time": None,
                 "fall_time": None,
@@ -267,7 +270,7 @@ class WaveformAnalyzer:
             }
 
         except Exception as e:
-            print(f"Error calculating quality stats: {e}")
+            logger.exception(f"Error calculating quality stats: {e}")
             return {
                 "noise_level": None,
                 "snr": None,
@@ -409,7 +412,7 @@ class WaveformAnalyzer:
             return SignalType.UNKNOWN, 50.0
 
         except Exception as e:
-            print(f"Error detecting signal type: {e}")
+            logger.exception(f"Error detecting signal type: {e}")
             return SignalType.UNKNOWN, 0.0
 
     @staticmethod
@@ -621,7 +624,7 @@ class WaveformAnalyzer:
             return thd
 
         except Exception as e:
-            print(f"Error calculating THD: {e}")
+            logger.exception(f"Error calculating THD: {e}")
             return None
 
     @staticmethod
@@ -726,7 +729,7 @@ class WaveformAnalyzer:
             }
 
         except Exception as e:
-            print(f"Error calculating plateau stability: {e}")
+            logger.exception(f"Error calculating plateau stability: {e}")
             return {
                 "plateau_high_noise": None,
                 "plateau_low_noise": None,

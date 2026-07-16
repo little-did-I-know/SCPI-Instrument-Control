@@ -5,6 +5,7 @@ Provides the main user interface for importing data, configuring reports,
 and generating PDF/Markdown output.
 """
 
+import logging
 import platform
 import shutil
 import tempfile
@@ -58,6 +59,8 @@ from scpi_control.report_generator.widgets.pdf_preview_dialog import PDFPreviewD
 from scpi_control.report_generator.widgets.report_options_dialog import ReportOptionsDialog
 from scpi_control.report_generator.widgets.template_manager_dialog import TemplateManagerDialog
 
+logger = logging.getLogger(__name__)
+
 
 class MainWindow(QMainWindow):
     """Main application window."""
@@ -85,7 +88,7 @@ class MainWindow(QMainWindow):
                 # Template may have been deleted, ignore
                 pass
 
-        self.setWindowTitle("Siglent Report Generator")
+        self.setWindowTitle("SCPI Report Generator")
         self.resize(1400, 900)
 
         self._setup_ui()
@@ -103,7 +106,7 @@ class MainWindow(QMainWindow):
             try:
                 temp_path.unlink(missing_ok=True)
                 if attempt > 0:
-                    print(f"Successfully deleted temp file after {attempt + 1} attempts")
+                    logger.debug(f"Successfully deleted temp file after {attempt + 1} attempts")
                 return  # Success
             except PermissionError:
                 if attempt < max_retries - 1:
@@ -113,10 +116,9 @@ class MainWindow(QMainWindow):
                     time.sleep(delay)
                 else:
                     # Last attempt failed, log but don't crash
-                    print(f"Warning: Could not delete temp file {temp_path} after {max_retries} attempts")
-                    print(f"The file will be cleaned up when you close the application or by system temp cleanup")
+                    logger.warning(f"Could not delete temp file {temp_path} after {max_retries} attempts; it will be cleaned up when you close the application or by system temp cleanup")
             except Exception as e:
-                print(f"Warning: Error deleting temp file: {e}")
+                logger.exception(f"Error deleting temp file: {e}")
                 break
 
     def _setup_ui(self):
@@ -385,13 +387,6 @@ class MainWindow(QMainWindow):
 
                 page_size = A4 if self.current_options.page_size == "a4" else letter
 
-                print(f"\n=== PDF Generation Debug ===")
-                print(f"Temp PDF path: {temp_pdf_path}")
-                print(f"Report title: {report.metadata.title}")
-                print(f"Sections: {len(report.sections)}")
-                print(f"Waveforms: {sum(len(s.waveforms) for s in report.sections)}")
-                print(f"Page size: {self.current_options.page_size}")
-
                 # Create progress dialog with proper range
                 progress = QProgressDialog("Starting PDF generation...", None, 0, 100, self)
                 progress.setWindowModality(Qt.WindowModality.WindowModal)
@@ -420,9 +415,7 @@ class MainWindow(QMainWindow):
                     progress_callback=update_progress,
                 )
 
-                print(f"Calling generator.generate()...")
                 success = generator.generate(report, temp_pdf_path)
-                print(f"Generation success: {success}")
 
                 progress.close()
 
@@ -433,28 +426,16 @@ class MainWindow(QMainWindow):
 
                 # Verify PDF was actually created and has content
                 if not temp_pdf_path.exists():
-                    print(f"ERROR: PDF file does not exist after generation!")
                     QMessageBox.critical(self, "Generation Failed", f"PDF file was not created.\n\nExpected location: {temp_pdf_path}")
                     self._safe_delete_temp_file(temp_pdf_path)
                     return
 
                 file_size = temp_pdf_path.stat().st_size
-                print(f"PDF file size: {file_size} bytes")
 
                 if file_size == 0:
                     QMessageBox.critical(self, "Generation Failed", f"PDF file is empty (0 bytes).\n\nCheck that waveforms are loaded and report data is valid.")
                     self._safe_delete_temp_file(temp_pdf_path)
                     return
-
-                # Check PDF header
-                try:
-                    with open(temp_pdf_path, "rb") as f:
-                        header = f.read(10)
-                        print(f"PDF header: {header}")
-                except Exception as e:
-                    print(f"ERROR reading PDF: {e}")
-
-                print(f"=== End Debug ===\n")
 
                 # Show preview dialog
                 preview_dialog = PDFPreviewDialog(temp_pdf_path, self)
@@ -479,14 +460,11 @@ class MainWindow(QMainWindow):
 
             except Exception as e:
                 self._safe_delete_temp_file(temp_pdf_path)
-                import traceback
-
-                error_details = traceback.format_exc()
-                print(f"PDF Generation Error:\n{error_details}")
+                logger.exception("PDF Generation Error")
                 QMessageBox.critical(
                     self,
                     "Generation Error",
-                    f"Error generating PDF:\n{str(e)}\n\nCheck console for full traceback.",
+                    f"Error generating PDF:\n{str(e)}\n\n" f"Full traceback written to report_generator.log in {AppSettings.get_settings_file().parent}",
                 )
                 return
 
@@ -616,9 +594,6 @@ class MainWindow(QMainWindow):
         """Build a test report from current data."""
         metadata = self.metadata_panel.get_metadata()
 
-        # Debug: Print test type being used
-        print(f"[DEBUG _build_report] Building report with test type: {metadata.test_type}")
-
         report = TestReport(metadata=metadata)
 
         # Create waveform section
@@ -703,8 +678,8 @@ class MainWindow(QMainWindow):
         """Show about dialog."""
         QMessageBox.about(
             self,
-            "About Siglent Report Generator",
-            "<h2>Siglent Report Generator</h2>"
+            "About SCPI Report Generator",
+            "<h2>SCPI Report Generator</h2>"
             "<p>Generate professional test reports from oscilloscope data.</p>"
             "<p><b>Features:</b></p>"
             "<ul>"
@@ -714,7 +689,7 @@ class MainWindow(QMainWindow):
             "<li>Interactive chat for data insights</li>"
             "<li>Customizable report templates</li>"
             "</ul>"
-            "<p>Part of the <b>Siglent Oscilloscope Control</b> project.</p>",
+            "<p>Part of the <b>SCPI Instrument Control</b> project.</p>",
         )
 
     def _load_template(self):

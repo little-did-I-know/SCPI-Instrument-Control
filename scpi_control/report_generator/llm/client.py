@@ -6,6 +6,7 @@ Uses the official Ollama Python client for Ollama connections.
 """
 
 import json
+import logging
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -19,6 +20,8 @@ try:
     OLLAMA_CLIENT_AVAILABLE = True
 except ImportError:
     OLLAMA_CLIENT_AVAILABLE = False
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -126,18 +129,18 @@ class LLMClient:
                 # Extract host from endpoint (e.g., "http://192.168.1.4:11434/api" -> "http://192.168.1.4:11434")
                 host = config.endpoint.rsplit("/api", 1)[0] if "/api" in config.endpoint else config.endpoint
                 self._ollama_client = ollama.Client(host=host)
-                print(f"Using Ollama Python SDK (host: {host})")
+                logger.debug(f"Using Ollama Python SDK (host: {host})")
 
                 # Verify connection by listing models
                 try:
                     models = self._ollama_client.list()
-                    print(f"Connected to Ollama ({len(models.models)} models available)")
+                    logger.debug(f"Connected to Ollama ({len(models.models)} models available)")
                 except Exception as e:
-                    print(f"Warning: Ollama client created but can't connect: {e}")
+                    logger.warning(f"Ollama client created but can't connect: {e}")
                     # Keep the client anyway - maybe it'll work later
             except Exception as e:
-                print(f"Failed to initialize Ollama client: {e}")
-                print("Falling back to HTTP requests")
+                logger.exception(f"Failed to initialize Ollama client: {e}")
+                logger.warning("Falling back to HTTP requests")
                 self._ollama_client = None
 
     def test_connection(self) -> bool:
@@ -235,16 +238,16 @@ class LLMClient:
 
             # Check for errors in response
             if "error" in data:
-                print(f"LLM API error: {data['error']}")
+                logger.error(f"LLM API error: {data['error']}")
                 return None
 
             return data["choices"][0]["message"]["content"]
 
         except requests.exceptions.RequestException as e:
-            print(f"LLM request failed: {e}")
+            logger.exception(f"LLM request failed: {e}")
             return None
         except (KeyError, IndexError, json.JSONDecodeError) as e:
-            print(f"Failed to parse LLM response: {e}")
+            logger.exception(f"Failed to parse LLM response: {e}")
             return None
 
     def _chat_ollama_python_client(
@@ -273,23 +276,17 @@ class LLMClient:
             return response["message"]["content"]
 
         except ollama.ResponseError as e:
-            print(f"Ollama API error: {e}")
-            print(f"Model: {self.config.model}")
+            logger.exception(f"Ollama API error: {e} (model: {self.config.model})")
             if "do load request" in str(e):
-                print("\n" + "=" * 60)
-                print("ERROR: Ollama server cannot load the model")
-                print("=" * 60)
-                print("This is an Ollama server issue, not the application.")
-                print("\nPossible causes:")
-                print("  1. Not enough VRAM/RAM for the model")
-                print("  2. Ollama service needs restart")
-                print("  3. Model files are corrupted")
-                print("\nTry on your Ollama server:")
-                print(f"  ollama run {self.config.model} 'test'")
-                print("=" * 60 + "\n")
+                logger.error(
+                    "Ollama server cannot load the model. This is an Ollama server issue, not the "
+                    "application. Possible causes: (1) not enough VRAM/RAM for the model, (2) Ollama "
+                    "service needs restart, (3) model files are corrupted. Try on your Ollama server: "
+                    f"ollama run {self.config.model} 'test'"
+                )
             return None
         except Exception as e:
-            print(f"Unexpected error with Ollama client: {type(e).__name__}: {e}")
+            logger.exception(f"Unexpected error with Ollama client: {type(e).__name__}: {e}")
             return None
 
     def _chat_ollama_native(
@@ -326,80 +323,18 @@ class LLMClient:
 
             # Check for errors
             if "error" in data:
-                print(f"Ollama API error: {data['error']}")
+                logger.error(f"Ollama API error: {data['error']}")
                 return None
 
             # Ollama native format returns message in different structure
             return data.get("message", {}).get("content", None)
 
         except requests.exceptions.RequestException as e:
-            print(f"LLM request failed: {e}")
-            print(f"Endpoint: {url}")
-            print(f"Model: {self.config.model}")
+            logger.exception(f"LLM request failed: {e} (endpoint: {url}, model: {self.config.model})")
             return None
         except (KeyError, IndexError, json.JSONDecodeError) as e:
-            print(f"Failed to parse LLM response: {e}")
+            logger.exception(f"Failed to parse LLM response: {e}")
             return None
-
-    def stream_chat(
-        self,
-        messages: List[Dict[str, str]],
-        temperature: Optional[float] = None,
-        max_tokens: Optional[int] = None,
-    ):
-        """
-        Send a streaming chat request to the LLM.
-
-        Args:
-            messages: List of message dictionaries with 'role' and 'content'
-            temperature: Override default temperature
-            max_tokens: Override default max tokens
-
-        Yields:
-            Response chunks as they arrive
-        """
-        url = f"{self.config.endpoint.rstrip('/')}/chat/completions"
-
-        payload = {
-            "model": self.config.model,
-            "messages": messages,
-            "temperature": temperature if temperature is not None else self.config.temperature,
-            "max_tokens": max_tokens if max_tokens is not None else self.config.max_tokens,
-            "stream": True,
-        }
-
-        try:
-            response = self._session.post(
-                url,
-                json=payload,
-                timeout=self.config.timeout,
-                stream=True,
-            )
-            response.raise_for_status()
-
-            for line in response.iter_lines():
-                if not line:
-                    continue
-
-                line = line.decode("utf-8")
-
-                if line.startswith("data: "):
-                    line = line[6:]  # Remove "data: " prefix
-
-                if line == "[DONE]":
-                    break
-
-                try:
-                    chunk = json.loads(line)
-                    if "choices" in chunk and len(chunk["choices"]) > 0:
-                        delta = chunk["choices"][0].get("delta", {})
-                        if "content" in delta:
-                            yield delta["content"]
-                except json.JSONDecodeError:
-                    continue
-
-        except requests.exceptions.RequestException as e:
-            print(f"LLM streaming request failed: {e}")
 
     def get_available_models(self) -> List[str]:
         """
@@ -415,7 +350,7 @@ class LLMClient:
                 # Extract model names from Model objects
                 return [model.model for model in response.models]
             except Exception as e:
-                print(f"Failed to get models from Ollama: {e}")
+                logger.exception(f"Failed to get models from Ollama: {e}")
                 return []
 
         # HTTP-based approach for other services
@@ -442,5 +377,5 @@ class LLMClient:
             return models
 
         except Exception as e:
-            print(f"Failed to get models: {e}")
+            logger.exception(f"Failed to get models: {e}")
             return []

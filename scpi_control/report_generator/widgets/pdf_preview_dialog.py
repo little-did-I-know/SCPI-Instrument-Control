@@ -6,6 +6,7 @@ for editing options, saving, printing, or copying the report.
 """
 
 import io
+import logging
 from pathlib import Path
 from typing import List, Optional
 
@@ -26,6 +27,8 @@ try:
     PRINT_SUPPORT_AVAILABLE = True
 except ImportError:
     PRINT_SUPPORT_AVAILABLE = False
+
+logger = logging.getLogger(__name__)
 
 
 class PDFPreviewDialog(QDialog):
@@ -73,7 +76,7 @@ class PDFPreviewDialog(QDialog):
         try:
             self.pdf_document = fitz.open(str(self.pdf_path))
             self.page_count = len(self.pdf_document)
-            print(f"Loaded PDF: {self.page_count} pages")
+            logger.debug(f"Loaded PDF: {self.page_count} pages")
         except Exception as e:
             raise RuntimeError(f"Failed to load PDF: {e}")
 
@@ -280,7 +283,7 @@ class PDFPreviewDialog(QDialog):
             self._render_current_page()
 
         except Exception as e:
-            print(f"Error fitting to width: {e}")
+            logger.exception(f"Error fitting to width: {e}")
 
     def _edit_options(self):
         """Signal that user wants to edit report options."""

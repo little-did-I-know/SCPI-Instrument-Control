@@ -5,6 +5,7 @@ Provides a streamlined interface for enabling AI features and generating
 analysis before creating the final report.
 """
 
+import logging
 from typing import Dict, Optional
 
 import markdown
@@ -15,6 +16,8 @@ from PyQt6.QtWidgets import QCheckBox, QFrame, QGroupBox, QHBoxLayout, QLabel, Q
 from scpi_control.report_generator.llm.analyzer import ReportAnalyzer
 from scpi_control.report_generator.llm.client import LLMClient, LLMConfig
 from scpi_control.report_generator.models.report_data import TestReport
+
+logger = logging.getLogger(__name__)
 
 # System monitoring
 try:
@@ -140,6 +143,12 @@ class AIAnalysisPanel(QWidget):
         }
         self.worker = None
         self.errors_occurred = False  # Track if errors occurred during generation
+
+        # Track whether a missing GPU sensor has already been logged, so the
+        # 500ms monitor timer doesn't spam a traceback twice a second for the
+        # whole duration of an AI-analysis run.
+        self._gpu_temp_unavailable_logged = False
+        self._gpu_mem_unavailable_logged = False
 
         self._setup_ui()
 
@@ -321,7 +330,13 @@ class AIAnalysisPanel(QWidget):
                 try:
                     temp = pynvml.nvmlDeviceGetTemperature(handle, pynvml.NVML_TEMPERATURE_GPU)
                     temp_str = f" | {temp}°C"
-                except:
+                except Exception:
+                    # A missing temperature sensor is an expected, recoverable
+                    # condition on some drivers/GPUs - log it once (not on every
+                    # 500ms tick of monitor_timer) and fall back silently.
+                    if not self._gpu_temp_unavailable_logged:
+                        logger.debug("Failed to read GPU temperature (will not repeat this log)", exc_info=True)
+                        self._gpu_temp_unavailable_logged = True
                     temp_str = ""
 
                 # Get memory info for more accurate memory percentage
@@ -330,7 +345,11 @@ class AIAnalysisPanel(QWidget):
                     mem_used_gb = mem_info.used / 1024**3
                     mem_total_gb = mem_info.total / 1024**3
                     mem_str = f" | Mem: {mem_util:5.1f}% ({mem_used_gb:.1f}/{mem_total_gb:.1f} GB)"
-                except:
+                except Exception:
+                    # Same reasoning as the temperature sensor above: log once.
+                    if not self._gpu_mem_unavailable_logged:
+                        logger.debug("Failed to read GPU memory info (will not repeat this log)", exc_info=True)
+                        self._gpu_mem_unavailable_logged = True
                     mem_str = f" | Mem: {mem_util:5.1f}%"
 
                 self.gpu_label.setText(f"GPU: {gpu_util:5.1f}%{mem_str}{temp_str}")
@@ -485,7 +504,7 @@ class AIAnalysisPanel(QWidget):
         """Handle error."""
         # Track that errors occurred
         self.errors_occurred = True
-        print(f"AI Analysis Error: {error_message}")
+        logger.error(f"AI Analysis Error: {error_message}")
 
     def _on_analysis_complete(self, results: Dict):
         """

@@ -65,7 +65,7 @@ pip install -e ".[all]"
 siglent-report-generator
 
 # Or using Python module
-python -m siglent.report_generator.app
+python -m scpi_control.report_generator.app
 ```
 
 ### Basic Workflow
@@ -204,7 +204,7 @@ See `BUILD_EXECUTABLE.md` for detailed AppImage creation instructions.
 ## 📁 Project Structure
 
 ```
-siglent/report_generator/
+scpi_control/report_generator/
 ├── __init__.py
 ├── app.py                      # Application entry point
 ├── main_window.py              # Main GUI window
@@ -432,8 +432,8 @@ Contributions welcome! Areas for improvement:
 
 For issues and questions:
 
-- GitHub Issues: https://github.com/little-did-I-know/Siglent-Oscilloscope/issues
-- Documentation: See docs/report-generator/ (coming soon)
+- GitHub Issues: https://github.com/little-did-I-know/SCPI-Instrument-Control/issues
+- Documentation: See docs/report-generator/
 
 ---
 

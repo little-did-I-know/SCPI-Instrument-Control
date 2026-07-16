@@ -5,12 +5,15 @@ Prepares measurement data, waveform statistics, and test information
 in a format suitable for LLM consumption.
 """
 
+import logging
 from typing import Any, Dict, List, Optional
 
 import numpy as np
 
 from scpi_control.report_generator.models.report_data import MeasurementResult, TestReport, TestSection, WaveformData
 from scpi_control.report_generator.models.test_types import get_test_type
+
+logger = logging.getLogger(__name__)
 
 
 class ContextBuilder:
@@ -196,8 +199,7 @@ class ContextBuilder:
         test_type_context = ""
         if report.metadata.test_type:
             test_type_def = get_test_type(report.metadata.test_type)
-            print(f"[DEBUG] Test type ID: {report.metadata.test_type}")
-            print(f"[DEBUG] Test type definition: {test_type_def.name if test_type_def else 'None'}")
+            logger.debug(f"Test type ID: {report.metadata.test_type}, definition: {test_type_def.name if test_type_def else 'None'}")
             if test_type_def and test_type_def.id != "general":
                 test_type_context = (
                     "=== TEST TYPE CONTEXT ===\n\n"
@@ -209,9 +211,9 @@ class ContextBuilder:
                     "- In power supply ripple tests, small AC ripple on DC is EXPECTED\n"
                     "- In clock signal tests, periodic square waves are EXPECTED\n\n"
                 )
-                print(f"[DEBUG] Adding test type context for: {test_type_def.name}")
+                logger.debug(f"Adding test type context for: {test_type_def.name}")
         else:
-            print("[DEBUG] No test type set in report metadata")
+            logger.debug("No test type set in report metadata")
 
         if analysis_type == "summary":
             prompt = (
@@ -247,12 +249,7 @@ class ContextBuilder:
         prompt += "=== TEST REPORT DATA ===\n\n"
         prompt += context
 
-        # Debug: Print full prompt
-        print("\n" + "=" * 80)
-        print("FULL PROMPT BEING SENT TO LLM:")
-        print("=" * 80)
-        print(prompt[:1000] + "..." if len(prompt) > 1000 else prompt)
-        print("=" * 80 + "\n")
+        logger.debug("Full prompt being sent to LLM:\n%s", prompt[:1000] + "..." if len(prompt) > 1000 else prompt)
 
         return prompt
 
