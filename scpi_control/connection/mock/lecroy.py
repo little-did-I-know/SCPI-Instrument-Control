@@ -83,6 +83,11 @@ def build_waveform_response(conn) -> bytes:
     struct.pack_into("<h", desc, 32, 0)
     struct.pack_into("<i", desc, 36, 346)
     struct.pack_into("<i", desc, 40, 0)
+    # TRIGTIME_ARRAY (offset 48) and RIS_TIME_ARRAY (offset 52) lengths: 0 for
+    # this single-shot mock (the bytearray is already zero-filled; packed
+    # explicitly to document the layout parse_wavedesc now skips).
+    struct.pack_into("<i", desc, 48, 0)
+    struct.pack_into("<i", desc, 52, 0)
     struct.pack_into("<i", desc, 116, len(codes))
     struct.pack_into("<f", desc, 156, gain)
     struct.pack_into("<f", desc, 160, conn._voltage_offsets.get(channel, 0.0))

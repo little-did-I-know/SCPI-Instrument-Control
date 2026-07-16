@@ -80,18 +80,31 @@ class TestSiglentPathUnchanged:
         scope.disconnect()
 
 
-def build_wavedesc(codes: bytes, gain: float = 0.04, offset: float = 0.0, hinterval: float = 1e-3, hoffset: float = -2e-3, comm_type: int = 0) -> bytes:
+def build_wavedesc(
+    codes: bytes,
+    gain: float = 0.04,
+    offset: float = 0.0,
+    hinterval: float = 1e-3,
+    hoffset: float = -2e-3,
+    comm_type: int = 0,
+    trigtime_len: int = 0,
+    ristime_len: int = 0,
+) -> bytes:
     desc = bytearray(346)
     desc[0:8] = b"WAVEDESC"
     struct.pack_into("<h", desc, 32, comm_type)          # COMM_TYPE: 0=byte, 1=word
     struct.pack_into("<i", desc, 36, 346)                # WAVE_DESCRIPTOR length
     struct.pack_into("<i", desc, 40, 0)                  # USER_TEXT length
+    struct.pack_into("<i", desc, 48, trigtime_len)       # TRIGTIME_ARRAY length
+    struct.pack_into("<i", desc, 52, ristime_len)        # RIS_TIME_ARRAY length
     struct.pack_into("<i", desc, 116, len(codes))        # WAVE_ARRAY_COUNT
     struct.pack_into("<f", desc, 156, gain)              # VERTICAL_GAIN
     struct.pack_into("<f", desc, 160, offset)            # VERTICAL_OFFSET
     struct.pack_into("<f", desc, 176, hinterval)         # HORIZ_INTERVAL
     struct.pack_into("<d", desc, 180, hoffset)           # HORIZ_OFFSET
-    return bytes(desc) + codes
+    # DATA_ARRAY_1 follows the two optional time arrays; pad them with the
+    # declared number of filler bytes so data_offset has something to skip.
+    return bytes(desc) + b"\x00" * (trigtime_len + ristime_len) + codes
 
 
 class TestWavedescGoldenBlob:
@@ -106,6 +119,20 @@ class TestWavedescGoldenBlob:
     def test_missing_wavedesc_raises(self):
         with pytest.raises(exceptions.CommandError):
             parse_wavedesc(b"\x00" * 400)
+
+    def test_parse_wavedesc_skips_trigtime_array(self):
+        # A non-zero TRIGTIME_ARRAY sits between USER_TEXT and the sample data;
+        # data_offset must skip WAVEDESC + USER_TEXT + TRIGTIME_ARRAY +
+        # RIS_TIME_ARRAY so the codes still decode to the correct volts.
+        trigtime = 24
+        payload = build_wavedesc(bytes([0, 25, 50, 75]), trigtime_len=trigtime)
+        meta = parse_wavedesc(payload)
+        assert meta["trigtime_len"] == trigtime
+        assert meta["ristime_len"] == 0
+        assert meta["data_offset"] == 346 + trigtime
+        codes = np.frombuffer(payload, dtype=np.int8, count=meta["wave_array_count"], offset=meta["data_offset"])
+        voltage = meta["vertical_gain"] * codes.astype(np.float64) - meta["vertical_offset"]
+        assert voltage == pytest.approx([0.0, 1.0, 2.0, 3.0])
 
 
 class TestLeCroyAcquire:

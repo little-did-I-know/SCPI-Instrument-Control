@@ -78,7 +78,7 @@ class Measurement:
         if self._dialect == "tektronix":
             if not self._scope._has_command("set_meas_immed_type"):
                 raise exceptions.FeatureNotSupportedError(
-                    f"measure({mtype!r}) is not supported: this Tektronix family lacks the "
+                    f"measure({mtype!r}) is not supported: this Tektronix family/configuration lacks the "
                     "MEASUrement:IMMed subsystem (badge-based measurements are a follow-up)"
                 )
             # Immediate measurement: configure type+source, then read the value

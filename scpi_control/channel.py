@@ -172,6 +172,11 @@ class Channel:
         Returns:
             Probe ratio (e.g., 1.0 for 1X, 10.0 for 10X)
         """
+        # Probe commands are family-split on Tek (tek_tbs/tek_mso) and absent
+        # from the plain base table; gate before querying so a forced-dialect
+        # variant fallback raises cleanly instead of a raw KeyError.
+        if not self._scope._has_command("get_probe_ratio"):
+            raise exceptions.FeatureNotSupportedError(f"probe ratio is not supported on the {self._dialect} dialect")
         response = self._scope.query(self._cmd("get_probe_ratio", ch=self._channel))
         # Response may include echo like "C1:ATTN 10"
         if ":" in response:
@@ -191,6 +196,8 @@ class Channel:
         """
         if ratio <= 0:
             raise exceptions.InvalidParameterError(f"Probe ratio must be positive: {ratio}")
+        if not self._scope._has_command("set_probe_ratio"):
+            raise exceptions.FeatureNotSupportedError(f"probe ratio is not supported on the {self._dialect} dialect")
         if self._dialect == "tektronix":
             # Tek speaks probe attenuation as a gain factor (1/ratio); the
             # tek_tbs/tek_mso family templates use the {gain} placeholder
@@ -237,7 +244,16 @@ class Channel:
         if self._dialect == "modern":
             wire = "FULL" if limit in ("OFF", "FULL") else "20M"
         elif self._dialect == "tektronix":
-            wire = "FULL" if limit in ("OFF", "FULL") else "TWENty"
+            if limit in ("OFF", "FULL"):
+                wire = "FULL"
+            elif getattr(getattr(self._scope, "model_capability", None), "scpi_variant", None) == "tek_mso":
+                # MSO 2-Series bandwidth vocabulary is {<NR3>|FULl} -- it has no
+                # TWENty keyword, so send 20 MHz as an explicit hertz value
+                # (2 Series MSO PM 077-1776-07 p.2-183).
+                wire = "20E6"
+            else:
+                # TBS1000C accepts the TWEnty keyword (TBS PM 077-1691-01 p.53).
+                wire = "TWENty"
         elif self._dialect == "lecroy":
             # LeCroy BWL <mode> vocabulary has no "ON" token -- {OFF,20MHZ,
             # 200MHZ,...} (MAUI p.7-18). Map public ON to the 20MHz limit.
@@ -294,9 +310,12 @@ class Channel:
             "coupling": self.coupling,
             "voltage_scale": self.voltage_scale,
             "voltage_offset": self.voltage_offset,
-            "probe_ratio": self.probe_ratio,
-            "bandwidth_limit": self.bandwidth_limit,
         }
+        try:
+            config["probe_ratio"] = self.probe_ratio
+        except exceptions.FeatureNotSupportedError:
+            config["probe_ratio"] = None
+        config["bandwidth_limit"] = self.bandwidth_limit
         try:
             config["unit"] = self.unit
         except exceptions.FeatureNotSupportedError:

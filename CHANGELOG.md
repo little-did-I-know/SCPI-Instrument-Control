@@ -20,6 +20,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   measurements, LeCroy statistics/cursors/holdoff, Tek 16-bit waveform
   transfer).
 
+### Changed
+
+- On the Siglent modern dialect, `trigger.holdoff`, measurement statistics,
+  cursors, and `channel.unit` now raise `FeatureNotSupportedError` immediately
+  instead of writing an unsupported command and timing out
+  (`SiglentTimeoutError`). Code that caught the timeout to detect these
+  unsupported operations must now catch `FeatureNotSupportedError` instead.
+- Probe-ratio wire format on the legacy and modern dialects now serializes
+  floats compactly (`10.0` is sent as `10`), matching how real scopes echo the
+  value back.
+- `add_measurement` now validates and case-normalizes its measurement type
+  (unknown types raise instead of being sent verbatim to the instrument).
+
 ## [2.0.0] - 2026-07-15
 
 ### ⚠️ Breaking Changes

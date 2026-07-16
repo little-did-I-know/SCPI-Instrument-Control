@@ -13,8 +13,11 @@ This module holds the per-dialect command tables and the enum conversions
 between the library's public vocabulary and each dialect's wire tokens.
 """
 
+import logging
 import re
 from typing import Dict
+
+logger = logging.getLogger(__name__)
 
 # Wire dialects with a command table. Grows as vendor tables land.
 SUPPORTED_DIALECTS = ("legacy", "modern", "tektronix", "lecroy")
@@ -39,6 +42,17 @@ CONNECT_SETUP = {
     # CHDR is LeCroy's own short form of COMM_HEADER; OFF omits response
     # headers AND suppresses unit suffixes (MAUI p.7-46). Siglent inherited CHDR.
     "lecroy": ["CHDR OFF"],
+}
+
+# Which model families (scpi_variant) belong to which dialect. Variants only
+# apply to their own dialect; a forced-dialect override (e.g. a Tek-detected
+# scope run with dialect="modern") on a mismatched instrument falls back to the
+# plain base table instead of contaminating it with the wrong family overrides.
+DIALECT_VARIANTS = {
+    "legacy": frozenset({"standard", "hd_series", "x_series", "plus_series"}),
+    "modern": frozenset({"standard", "hd_series", "x_series", "plus_series"}),
+    "tektronix": frozenset({"standard", "tek_tbs", "tek_mso"}),
+    "lecroy": frozenset({"standard", "lecroy_maui"}),
 }
 
 
@@ -403,6 +417,19 @@ class SCPICommandSet:
     def _build_command_set(self, dialect: str, variant: str) -> Dict[str, str]:
         command_set = dict(IEEE488_BASE)
         command_set.update(self.DIALECT_TABLES[dialect])
+        # Only apply family overrides that belong to this dialect. A forced
+        # dialect override can pair a variant with the wrong base table (e.g.
+        # dialect="modern" over an MSO24-detected scope, variant "tek_mso");
+        # applying those overrides would write Tek commands onto the modern
+        # table. Fall back to the plain base table instead.
+        if variant not in DIALECT_VARIANTS[dialect]:
+            logger.warning(
+                "SCPI variant %r does not belong to the %r dialect; ignoring "
+                "family overrides and using the plain base table.",
+                variant,
+                dialect,
+            )
+            variant = "standard"
         command_set.update(self.VARIANT_OVERRIDES.get(variant, {}))
         return command_set
 
@@ -651,6 +678,17 @@ def channel_token(dialect: str, source) -> str:
         token = str(source).strip().upper()
         match = re.fullmatch(r"C(?:H)?(\d+)", token)
         if not match:
+            if dialect == "tektronix":
+                # Both Tek families expose a single external ("Aux In") trigger
+                # and accept the SCPI short form AUX for it -- TBS1000C PM
+                # 077-1691-01 p.152 {CH1|CH2|LINE|AUX}; 2 Series MSO PM
+                # 077-1776-07 p.2-663 {CH<x>|DCH<x>_D<x>|INTernal|AUXiliary}.
+                if token == "EX":
+                    return "AUX"
+                # EX5 (external /5) has no Tek token, and LINE is a TBS-only
+                # source (absent from the MSO2 edge-source vocabulary), so
+                # neither is expressible portably across the Tek families.
+                raise exceptions.FeatureNotSupportedError(f"trigger source {token} is not supported on the tektronix dialect")
             return token  # EX, EX5, LINE and friends pass through
         number = int(match.group(1))
     return f"CH{number}" if dialect == "tektronix" else f"C{number}"

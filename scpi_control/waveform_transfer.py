@@ -273,6 +273,8 @@ class TektronixTransfer:
 _WAVEDESC_COMM_TYPE = 32       # int16: 0 = byte, 1 = word
 _WAVEDESC_DESC_LEN = 36        # int32: descriptor block length (typ. 346)
 _WAVEDESC_USER_TEXT_LEN = 40   # int32
+_WAVEDESC_TRIGTIME_LEN = 48    # int32: TRIGTIME_ARRAY byte length (0 unless sequence/segment mode)
+_WAVEDESC_RISTIME_LEN = 52     # int32: RIS_TIME_ARRAY byte length (0 unless RIS mode)
 _WAVEDESC_ARRAY_COUNT = 116    # int32: number of samples
 _WAVEDESC_VERTICAL_GAIN = 156  # float32
 _WAVEDESC_VERTICAL_OFFSET = 160  # float32
@@ -287,16 +289,24 @@ def parse_wavedesc(payload: bytes, *, error_context: str = "") -> dict:
         raise exceptions.CommandError(f"Invalid LeCroy waveform: no WAVEDESC descriptor found ({error_context})")
     desc_len = struct.unpack_from("<i", payload, start + _WAVEDESC_DESC_LEN)[0]
     user_text_len = struct.unpack_from("<i", payload, start + _WAVEDESC_USER_TEXT_LEN)[0]
+    # Per the WAVEDESC template, DATA_ARRAY_1 follows WAVEDESC + USER_TEXT +
+    # TRIGTIME_ARRAY + RIS_TIME_ARRAY. The two array lengths are 0 for a plain
+    # single-shot capture but non-zero in sequence/RIS modes, and must be
+    # skipped or the sample data is read from the wrong offset.
+    trigtime_len = struct.unpack_from("<i", payload, start + _WAVEDESC_TRIGTIME_LEN)[0]
+    ristime_len = struct.unpack_from("<i", payload, start + _WAVEDESC_RISTIME_LEN)[0]
     return {
         "comm_type": struct.unpack_from("<h", payload, start + _WAVEDESC_COMM_TYPE)[0],
         "desc_len": desc_len,
         "user_text_len": user_text_len,
+        "trigtime_len": trigtime_len,
+        "ristime_len": ristime_len,
         "wave_array_count": struct.unpack_from("<i", payload, start + _WAVEDESC_ARRAY_COUNT)[0],
         "vertical_gain": struct.unpack_from("<f", payload, start + _WAVEDESC_VERTICAL_GAIN)[0],
         "vertical_offset": struct.unpack_from("<f", payload, start + _WAVEDESC_VERTICAL_OFFSET)[0],
         "horiz_interval": struct.unpack_from("<f", payload, start + _WAVEDESC_HORIZ_INTERVAL)[0],
         "horiz_offset": struct.unpack_from("<d", payload, start + _WAVEDESC_HORIZ_OFFSET)[0],
-        "data_offset": start + desc_len + user_text_len,
+        "data_offset": start + desc_len + user_text_len + trigtime_len + ristime_len,
     }
 
 

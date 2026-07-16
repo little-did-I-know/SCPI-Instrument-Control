@@ -205,3 +205,117 @@ def test_lecroy_window_slope_rejected():
 
     with pytest.raises(exceptions.FeatureNotSupportedError):
         Trigger(scope).slope = "WINDOW"
+
+
+# --- A1: dialect-scoped variant overrides + probe_ratio gating -------------
+
+MSO24_IDN = "TEKTRONIX,MSO24,MOCK0100,CF:91.1CT FV:1.28"
+TBS_IDN = "TEKTRONIX,TBS1102C,MOCK0002,CF:91.1CT FV:1.10"
+SIGLENT_LEGACY_IDN = "Siglent Technologies,SDS1104X-E,MOCK0001,1.0.0.0"
+
+
+def _real_scope(idn, dialect=None):
+    from scpi_control.connection.mock import MockConnection
+    from scpi_control.oscilloscope import Oscilloscope
+
+    conn = MockConnection("mock", idn=idn)
+    scope = Oscilloscope("mock", connection=conn, dialect=dialect)
+    scope.connect()
+    return scope, conn
+
+
+def test_forced_tektronix_over_siglent_gates_probe_ratio_not_keyerror():
+    # Forcing dialect="tektronix" onto a non-Tek (Siglent) IDN yields variant
+    # "standard" (x_series does not belong to the tektronix dialect), and the
+    # base Tek table has no probe commands. probe_ratio must raise
+    # FeatureNotSupportedError, never a raw KeyError (never-KeyError contract).
+    scope, conn = _real_scope(SIGLENT_LEGACY_IDN, dialect="tektronix")
+    with pytest.raises(exceptions.FeatureNotSupportedError):
+        _ = scope.channel1.probe_ratio
+    with pytest.raises(exceptions.FeatureNotSupportedError):
+        scope.channel1.probe_ratio = 10.0
+    scope.disconnect()
+
+
+def test_forced_modern_over_mso24_uses_modern_table_no_tek_contamination():
+    # dialect="modern" over an MSO24 (tek_mso) scope must fall back to the plain
+    # modern base table -- no tek_mso override contaminating it. Use a write-only
+    # path (the tek mock won't answer modern queries).
+    scope, conn = _real_scope(MSO24_IDN, dialect="modern")
+    scope.channel1.enabled = True
+    assert ":CHANnel1:SWITch ON" in conn.writes
+    assert not any("DISplay:GLObal" in w for w in conn.writes)  # tek_mso override absent
+    scope.disconnect()
+
+
+def test_forced_modern_over_tek_mso_variant_unit_level():
+    # Unit-level check of the same fallback: SCPICommandSet drops the mismatched
+    # tek_mso overrides and serves the plain modern channel-display command.
+    from scpi_control.scpi_commands import SCPICommandSet
+
+    cmds = SCPICommandSet("modern", "tek_mso")
+    assert cmds.get_command("set_channel_display", ch=1, state="ON") == ":CHANnel1:SWITch ON"
+
+
+# --- A2: MSO2 bandwidth vocabulary (NR3 hertz vs TBS TWENty) ---------------
+
+
+def test_mso2_bandwidth_on_uses_nr3_hertz():
+    # MSO 2-Series has no TWENty keyword; ON must serialize as a hertz value
+    # (MSO2 PM 077-1776-07 p.2-183).
+    scope, conn = _real_scope(MSO24_IDN)
+    scope.channel1.bandwidth_limit = "ON"
+    assert "CH1:BANdwidth 20E6" in conn.writes
+    scope.channel1.bandwidth_limit = "OFF"
+    assert "CH1:BANdwidth FULL" in conn.writes
+    scope.disconnect()
+
+
+def test_tbs_bandwidth_on_uses_twenty_keyword():
+    # TBS1000C keeps the TWEnty keyword (TBS PM 077-1691-01 p.53).
+    scope, conn = _real_scope(TBS_IDN)
+    scope.channel1.bandwidth_limit = "ON"
+    assert "CH1:BANdwidth TWENty" in conn.writes
+    scope.disconnect()
+
+
+# --- A4: EX/EX5/LINE trigger sources on tektronix --------------------------
+
+
+def test_tek_external_trigger_maps_ex_to_aux():
+    # Both Tek families accept AUX (TBS p.152 / MSO2 p.2-663).
+    from scpi_control.scpi_commands import channel_token
+
+    assert channel_token("tektronix", "EX") == "AUX"
+
+
+def test_tek_external_trigger_gates_ex5_and_line():
+    # EX5 has no Tek token and LINE is TBS-only (absent on MSO2) -- both gate.
+    from scpi_control.scpi_commands import channel_token
+
+    for src in ("EX5", "LINE"):
+        with pytest.raises(exceptions.FeatureNotSupportedError):
+            channel_token("tektronix", src)
+
+
+def test_non_tek_dialects_pass_external_trigger_through():
+    from scpi_control.scpi_commands import channel_token
+
+    assert channel_token("modern", "EX") == "EX"
+    assert channel_token("modern", "EX5") == "EX5"
+    assert channel_token("legacy", "LINE") == "LINE"
+
+
+def test_tek_trigger_source_ex_writes_aux(tek_scope):
+    from scpi_control.trigger import Trigger
+
+    Trigger(tek_scope).source = "EX"
+    tek_scope.write.assert_called_with("TRIGger:A:EDGE:SOUrce AUX")
+
+
+def test_tek_trigger_source_ex5_raises_before_write(tek_scope):
+    from scpi_control.trigger import Trigger
+
+    with pytest.raises(exceptions.FeatureNotSupportedError):
+        Trigger(tek_scope).source = "EX5"
+    assert not any("EDGE:SOUrce" in c.args[0] for c in tek_scope.write.call_args_list)
