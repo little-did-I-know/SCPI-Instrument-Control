@@ -206,6 +206,13 @@ class Channel:
         Returns:
             Bandwidth limit: 'ON', 'OFF', or frequency limit
         """
+        if self._dialect == "lecroy":
+            # BWL? is global: "C1,OFF,C2,ON,..." (MAUI remote manual)
+            tokens = [t.strip().upper() for t in self._scope.query(self._cmd("get_bandwidth_limit")).split(",")]
+            try:
+                return tokens[tokens.index(f"C{self._channel}") + 1]
+            except (ValueError, IndexError):
+                return "OFF"
         response = self._scope.query(self._cmd("get_bandwidth_limit", ch=self._channel)).strip().upper()
         if self._dialect in ("modern", "tektronix"):
             # Modern wire tokens are FULL/20M/200M; Tek's are FULl/TWENty (or

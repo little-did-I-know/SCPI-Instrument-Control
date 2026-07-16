@@ -310,3 +310,42 @@ class TestTektronixConverters:
         assert measurement_to_wire("tektronix", "FREQ") == "FREQuency"
         assert measurement_to_wire("tektronix", "TOP") == "HIGH"
         assert measurement_to_wire("tektronix", "DUTY") == "PDUty"
+
+
+class TestLeCroyTable:
+    def setup_method(self):
+        self.cmds = SCPICommandSet("lecroy", "lecroy_maui")
+
+    def test_inherits_lecroy_flat_syntax(self):
+        assert self.cmds.get_command("set_voltage_div", ch=1, vdiv=0.5) == "C1:VDIV 0.5"
+        assert self.cmds.get_command("set_trigger_select", type="EDGE", src="C2") == "TRIG_SELECT EDGE,SR,C2"
+        assert self.cmds.get_command("set_time_div", tdiv=0.002) == "TDIV 0.002"
+        assert self.cmds.get_command("run") == "TRIG_MODE AUTO"
+        assert self.cmds.get_command("stop") == "STOP"
+        assert self.cmds.get_command("arm_trigger") == "ARM"
+
+    def test_lecroy_specific_diffs(self):
+        assert self.cmds.get_command("get_acq_status") == "INR?"
+        assert self.cmds.get_command("get_waveform", ch=1) == "C1:WF? ALL"
+        assert self.cmds.get_command("set_comm_format", fmt="BYTE") == "CFMT DEF9,BYTE,BIN"
+        assert self.cmds.get_command("set_comm_order") == "CORD LO"
+        assert self.cmds.get_command("set_bandwidth_limit", ch=1, limit="ON") == "BWL C1,ON"
+        assert not self.cmds.has_command("set_statistics")
+        assert not self.cmds.has_command("set_trigger_holdoff")
+        # add_measurement dropped: LeCroy PACU is slot-first (see task-13 report)
+        assert not self.cmds.has_command("add_measurement")
+        # PAVA form: manual mandates the LeCroy-native trace-prefix form
+        # "C{ch}:PAVA? {param}" (MAUI p.7-70), NOT the Siglent "PAVA? p,C{ch}"
+        # form -- decided from the manual (see task-13 report, PAVA-form decision).
+        assert self.cmds.get_command("get_parameter_value", ch=1, param="PKPK") == "C1:PAVA? PKPK"
+
+    def test_lecroy_converters_match_legacy(self):
+        assert mode_to_wire("lecroy", "NORM") == "NORM"
+        assert slope_to_wire("lecroy", "POS") == "POS"
+        assert coupling_to_wire("lecroy", "AC") == "A1M"
+        assert measurement_to_wire("lecroy", "PKPK") == "PKPK"
+        assert is_flat_trigger("lecroy") is True
+        assert "lecroy" in BARE_NR3_DIALECTS
+
+    def test_connect_setup(self):
+        assert CONNECT_SETUP["lecroy"] == ["CHDR OFF"]

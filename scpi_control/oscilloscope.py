@@ -331,6 +331,16 @@ class Oscilloscope:
         Returns:
             One of 'ARM', 'READY', 'AUTO', 'TRIGD', 'STOP', 'ROLL'.
         """
+        if self.dialect == "lecroy":
+            # LeCroy has no SAST-style status query. TRIG_MODE? exposes STOP;
+            # INR? bit 0 reports "new signal acquired" (MAUI remote manual).
+            mode = self.query(self._get_command("get_trigger_mode")).strip().upper()
+            if mode.endswith("STOP"):
+                return "STOP"
+            inr = int(self.query(self._get_command("get_acq_status")).strip().split()[-1])
+            if inr & 1:
+                return "TRIGD"
+            return "AUTO" if mode.endswith("AUTO") else "READY"
         return normalize_status(self.query(self._get_command("get_acq_status")))
 
     @property

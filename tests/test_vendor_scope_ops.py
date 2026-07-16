@@ -112,3 +112,78 @@ def test_dcreject_coupling_normalizes_to_ac():
     # it normalizes to the public AC token -- MSO2 PM 077-1776-07 p.2-184.
     assert coupling_from_wire("tektronix", "DCREJ") == "AC"
     assert coupling_from_wire("tektronix", "DCREJECT") == "AC"
+
+
+def test_lecroy_trigger_wire_matches_legacy_shape():
+    scope = make_dialect_scope("lecroy")
+    scope._has_command.side_effect = lambda name: True
+    from scpi_control.trigger import Trigger
+
+    trig = Trigger(scope)
+    scope.query.return_value = "EDGE,SR,C1"
+    trig.mode = "NORM"
+    scope.write.assert_called_with("TRIG_MODE NORM")
+
+
+def _lecroy_scope():
+    from unittest.mock import Mock
+
+    from scpi_control.oscilloscope import Oscilloscope
+    from scpi_control.scpi_commands import SCPICommandSet
+
+    scope = Oscilloscope("mock", connection=Mock())
+    scope.dialect = "lecroy"
+    scope._scpi_commands = SCPICommandSet("lecroy", "lecroy_maui")
+    return scope
+
+
+def test_lecroy_acquisition_status_stop_via_trig_mode():
+    # TRIG_MODE? ending in STOP short-circuits to STOP without an INR? read.
+    from unittest.mock import Mock
+
+    scope = _lecroy_scope()
+    scope.query = Mock(return_value="STOP")
+    assert scope.acquisition_status() == "STOP"
+    assert scope.query.call_count == 1  # no INR? read once STOP is seen
+
+
+def test_lecroy_acquisition_status_trigd_via_inr_bit0():
+    # TRIG_MODE? -> NORM, then INR? with bit 0 set == a new signal acquired.
+    from unittest.mock import Mock
+
+    scope = _lecroy_scope()
+    scope.query = Mock(side_effect=["NORM", "1"])
+    assert scope.acquisition_status() == "TRIGD"
+
+
+def test_lecroy_acquisition_status_auto_and_ready():
+    from unittest.mock import Mock
+
+    scope = _lecroy_scope()
+    scope.query = Mock(side_effect=["AUTO", "0"])
+    assert scope.acquisition_status() == "AUTO"
+    scope2 = _lecroy_scope()
+    scope2.query = Mock(side_effect=["NORM", "0"])
+    assert scope2.acquisition_status() == "READY"
+
+
+def test_lecroy_bandwidth_getter_parses_global_pairs():
+    from scpi_control.channel import Channel
+
+    scope = make_dialect_scope("lecroy")
+    scope.query.return_value = "C1,OFF,C2,ON,C3,OFF,C4,OFF"
+    assert Channel(scope, 2).bandwidth_limit == "ON"
+    assert Channel(scope, 1).bandwidth_limit == "OFF"
+    # Missing channel in the pair list falls back to OFF.
+    scope.query.return_value = "C1,OFF"
+    assert Channel(scope, 3).bandwidth_limit == "OFF"
+
+
+def test_lecroy_window_slope_rejected():
+    # LeCroy TRIG_SLOPE is {NEG, POS} only (MAUI p.7-40) -- WINDOW gates.
+    scope = make_dialect_scope("lecroy")
+    scope._has_command.side_effect = lambda name: True
+    from scpi_control.trigger import Trigger
+
+    with pytest.raises(exceptions.FeatureNotSupportedError):
+        Trigger(scope).slope = "WINDOW"

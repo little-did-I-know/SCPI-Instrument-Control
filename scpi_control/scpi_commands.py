@@ -17,7 +17,7 @@ import re
 from typing import Dict
 
 # Wire dialects with a command table. Grows as vendor tables land.
-SUPPORTED_DIALECTS = ("legacy", "modern", "tektronix")
+SUPPORTED_DIALECTS = ("legacy", "modern", "tektronix", "lecroy")
 
 # IEEE-488.2 mandated common commands, identical on every instrument.
 IEEE488_BASE = {
@@ -36,6 +36,9 @@ CONNECT_SETUP = {
     "legacy": ["CHDR OFF"],
     "modern": [],
     "tektronix": ["HEADer OFF"],
+    # CHDR is LeCroy's own short form of COMM_HEADER; OFF omits response
+    # headers AND suppresses unit suffixes (MAUI p.7-46). Siglent inherited CHDR.
+    "lecroy": ["CHDR OFF"],
 }
 
 
@@ -247,11 +250,106 @@ class SCPICommandSet:
         # MEASUrement:MEAS<x> instead) -- see tek_tbs override.
     }
 
-    # Dialect base tables, keyed by dialect name. LeCroy table added later.
+    # LeCroy MAUI dialect, per the MAUI Oscilloscopes Remote Control and
+    # Automation Manual (cited "MAUI p.<part>-<section>" by printed page number;
+    # command reference is Part 7, VBS?/automation wrapper is Part 2). Every
+    # entry was verified against that manual (see task-13 report). Siglent's
+    # legacy dialect is derived from this one; entries below are the LeCroy
+    # originals.
+    LECROY_COMMANDS = {
+        # Trigger control -- all page cites are printed "Part-Section" numbers
+        # from Part 7 (IEEE 488.2 Command Reference) unless noted.
+        "set_trigger_mode": "TRIG_MODE {mode}",  # TRIG_MODE (TRMD) {AUTO,NORM,SINGLE,STOP} -- MAUI p.7-34
+        "get_trigger_mode": "TRIG_MODE?",  # resp "TRIG_MODE <mode>" -- MAUI p.7-34
+        "arm_trigger": "ARM",  # ARM_ACQUISITION (ARM) -- MAUI p.7-15
+        "force_trigger": "FRTR",  # FORCE_TRIGGER (FRTR) -- MAUI p.7-21
+        "stop": "STOP",  # STOP: sets Stopped trigger mode -- MAUI p.7-28
+        "run": "TRIG_MODE AUTO",  # continuous acquisition via TRIG_MODE -- MAUI p.7-34
+        "get_acq_status": "INR?",  # INR? reads+clears INTERNAL_STATE_CHANGE reg (p.7-132); bit0="new signal acquired" (p.7-133). Siglent invented SAST.
+        # Auto setup: bare ASET performs a normal auto-setup (channel prefix optional) -- MAUI p.7-16
+        "auto_setup": "ASET",  # AUTO_SETUP (ASET) -- MAUI p.7-16
+        # Channel control
+        "set_channel_display": "C{ch}:TRA {state}",  # TRACE (TRA) {ON,OFF} -- MAUI p.7-88
+        "get_channel_display": "C{ch}:TRA?",  # MAUI p.7-88
+        "set_voltage_div": "C{ch}:VDIV {vdiv}",  # VOLT_DIV (VDIV) -- MAUI p.7-41
+        "get_voltage_div": "C{ch}:VDIV?",  # MAUI p.7-41
+        "set_voltage_offset": "C{ch}:OFST {offset}",  # OFFSET (OFST) -- MAUI p.7-24
+        "get_voltage_offset": "C{ch}:OFST?",  # MAUI p.7-24
+        "set_coupling": "C{ch}:CPL {coupling}",  # COUPLING (CPL) {A1M,D1M,D50,GND} -- MAUI p.7-20
+        "get_coupling": "C{ch}:CPL?",  # query may also return OVL (overload) -- MAUI p.7-20
+        "set_probe_ratio": "C{ch}:ATTN {ratio}",  # ATTENUATION (ATTN) {1..10000} -- MAUI p.7-17
+        "get_probe_ratio": "C{ch}:ATTN?",  # MAUI p.7-17
+        # Bandwidth limit differs from legacy: BWL is global, ch/mode pairs.
+        # NOTE: LeCroy <mode> is {OFF,20MHZ,200MHZ,...} -- there is NO "ON"
+        # token; channel.py's public "ON" sends a literal "ON" a real LeCroy
+        # rejects (map ON->20MHZ in a follow-up; see task-13 report).
+        "set_bandwidth_limit": "BWL C{ch},{limit}",  # BANDWIDTH_LIMIT (BWL) -- MAUI p.7-18
+        "get_bandwidth_limit": "BWL?",  # returns "C1,OFF,C2,ON,..." pairs -- MAUI p.7-18
+        # Timebase control
+        "set_time_div": "TDIV {tdiv}",  # TIME_DIV (TDIV) -- MAUI p.7-29
+        "get_time_div": "TDIV?",  # MAUI p.7-29
+        "set_time_offset": "TRDL {offset}",  # TRIG_DELAY (TRDL) = horizontal delay -- MAUI p.7-31
+        "get_time_offset": "TRDL?",  # MAUI p.7-31
+        # Sample rate: no legacy-style query on LeCroy -- read via the MAUI
+        # automation (VBS?) object model. The VBS? 'return=app...' wrapper is
+        # documented at MAUI p.2-12..2-18; the exact cvar SamplingRate is NOT
+        # enumerated in this manual's Part 4 reference (UNVERIFIED, see report).
+        "get_sample_rate": "VBS? 'return=app.Acquisition.Horizontal.SamplingRate'",  # VBS? wrapper -- MAUI p.2-13
+        # Trigger settings
+        "set_trigger_select": "TRIG_SELECT {type},SR,{src}",  # TRIG_SELECT (TRSE); SR=Trigger Source param, EDGE type -- MAUI p.7-36
+        "get_trigger_select": "TRIG_SELECT?",  # MAUI p.7-36
+        "set_trigger_level": "{src}:TRLV {level}",  # TRIG_LEVEL (TRLV) -- MAUI p.7-33
+        "get_trigger_level": "{src}:TRLV?",  # MAUI p.7-33
+        "set_trigger_slope": "{src}:TRSL {slope}",  # TRIG_SLOPE (TRSL) {NEG,POS} -- MAUI p.7-40
+        "get_trigger_slope": "{src}:TRSL?",  # MAUI p.7-40
+        "set_trigger_coupling": "{src}:TRCP {coupling}",  # TRIG_COUPLING (TRCP) {AC,DC,HFREJ,LFREJ} -- MAUI p.7-30
+        "get_trigger_coupling": "{src}:TRCP?",  # MAUI p.7-30
+        # Waveform acquisition: WF? ALL returns descriptor+data in one block;
+        # CFMT/CORD pin the binary block encoding for the transfer sub-project.
+        "get_waveform": "C{ch}:WF? ALL",  # WAVEFORM (WF) ALL block -- MAUI p.7-150
+        "get_waveform_preamble": "C{ch}:WF? DESC",  # WAVEFORM (WF) DESC block -- MAUI p.7-150
+        "set_comm_format": "CFMT DEF9,{fmt},BIN",  # COMM_FORMAT (CFMT) DEF9,{BYTE,WORD},BIN -- MAUI p.7-44
+        "set_comm_order": "CORD LO",  # COMM_ORDER (CORD) {HI,LO}, LO=LSB first -- MAUI p.7-49
+        # Measurements
+        # PAVA-form decision: use the LeCroy-native trace-prefix form
+        # "C{ch}:PAVA? {param}" (MAUI p.7-70), NOT the Siglent "PAVA? p,C{ch}"
+        # form. LeCroy's PAVA? response is "<param>,<value>,<state>" (3 fields);
+        # measurement.py's parser reads parts[2] (=value on Siglent, =state on
+        # LeCroy), so measure() needs a lecroy branch (parts[1]) -- documented
+        # gap for Tasks 14-16 (see task-13 report). Vocabulary = PARAMETER_VALUE.
+        "get_parameter_value": "C{ch}:PAVA? {param}",  # PARAMETER_VALUE? (PAVA?) -- MAUI p.7-70
+        "clear_measurements": "PACL",  # PARAMETER_CLR (PACL / PARAMETER_CLEAR), no args -- MAUI p.7-58
+        # add_measurement OMITTED: LeCroy PACU is "PACU <slot>,<measurement>,
+        #   <qualifier>" (slot number first, MAUI p.7-59), NOT the Siglent
+        #   "PACU {mtype},C{ch}" form -> FeatureNotSupportedError until a
+        #   slot-aware implementation lands.
+        # set_statistics/reset_statistics OMITTED: PAST/PASTAT are Siglent
+        #   spellings, not LeCroy commands -> FeatureNotSupportedError.
+        # set_cursor_type/get_cursor_value OMITTED: LeCroy CRST is CURSOR_SET
+        #   (positioning) and CRVA? is trace-prefixed with {HABS,HREL,VABS,VREL}
+        #   modes (MAUI p.7-55) -- neither matches the Siglent cursor path.
+        # set_trigger_holdoff/get_trigger_holdoff OMITTED: TRDL is trigger delay,
+        #   not holdoff; LeCroy holdoff lives in TRIG_SELECT HT/HV (MAUI p.7-36).
+        # set_channel_unit/get_channel_unit OMITTED: no LeCroy C<n>:UNIT command.
+        # Math operations: LeCroy math traces are F1..Fn (TRACE, MAUI p.7-88),
+        # NOT Siglent's MATH<n> (math module out of scope; corrected for honesty)
+        "set_math_display": "F{n}:TRA {state}",  # TRACE (TRA) on F<n> -- MAUI p.7-88
+        "get_math_display": "F{n}:TRA?",  # MAUI p.7-88
+        # Screen capture -- keep (LeCroy-origin; screen module out of scope).
+        # NOTE: HCSU arg grammar below is the Siglent-adapted form; LeCroy HCSU
+        # uses "DEV,<device>,FORMAT,<format>,..." pairs and has no PRINT keyword
+        # (print = SCDP to a PRINTER destination) -- rework with the screen module.
+        "screen_dump": "SCDP",  # SCREEN_DUMP (SCDP) -- MAUI p.7-104
+        "set_hardcopy_format": "HCSU DEV,FORMAT,{format}",  # HARDCOPY_SETUP (HCSU) -- MAUI p.7-102
+        "hardcopy_print": "HCSU PRINT",  # HARDCOPY_SETUP (HCSU) -- MAUI p.7-102
+    }
+
+    # Dialect base tables, keyed by dialect name.
     DIALECT_TABLES = {
         "legacy": LEGACY_COMMANDS,
         "modern": MODERN_COMMANDS,
         "tektronix": TEKTRONIX_COMMANDS,
+        "lecroy": LECROY_COMMANDS,
     }
 
     # Family overrides applied on top of the dialect base table.
@@ -283,6 +381,10 @@ class SCPICommandSet:
             # Preamble trigger-point offset, MSO2-only -- MSO2 p.2-701
             "get_wfm_pt_off": "WFMOutpre:PT_Off?",
         },
+        # LeCroy MAUI family: the base table is already MAUI-correct, so no
+        # per-family overrides are needed today (placeholder for future splits
+        # between WaveRunner/HDO/WaveSurfer generations).
+        "lecroy_maui": {},
     }
 
     def __init__(self, dialect: str = "legacy", scpi_variant: str = "standard"):
@@ -389,10 +491,13 @@ from scpi_control import exceptions
 # Dialects whose trigger commands are per-source-prefixed (C1:TRLV ...) rather
 # than global (:TRIGger:EDGE:LEVel ...). These also have a STOP trigger-mode
 # wire token; the global-style dialects detect STOP via acquisition status.
-FLAT_TRIGGER_DIALECTS = frozenset({"legacy"})
+FLAT_TRIGGER_DIALECTS = frozenset({"legacy", "lecroy"})
 
 # Dialects whose numeric queries return a bare NR3 value with no unit suffix.
-BARE_NR3_DIALECTS = frozenset({"modern", "tektronix"})
+# LeCroy joins because CHDR OFF also suppresses the trailing unit token on
+# LeCroy responses -- e.g. C1:VDIV? returns "200E-3", not "200E-3 V" (MAUI
+# p.7-46) -- unlike Siglent legacy, which keeps the unit.
+BARE_NR3_DIALECTS = frozenset({"modern", "tektronix", "lecroy"})
 
 
 def is_flat_trigger(dialect: str) -> bool:
@@ -404,11 +509,14 @@ _MODE_TO_WIRE = {
     "modern": {"AUTO": "AUTO", "NORM": "NORMal", "SINGLE": "SINGle"},
     # AUTO|NORMal (TBS p.155 / MSO2 p.2-684); SINGLE/STOP are command sequences
     "tektronix": {"AUTO": "AUTO", "NORM": "NORMal"},
+    # LeCroy TRIG_MODE {AUTO,NORM,SINGLE,STOP} -- ancestor of legacy tokens (MAUI p.7-34)
+    "lecroy": {"AUTO": "AUTO", "NORM": "NORM", "SINGLE": "SINGLE", "STOP": "STOP"},
 }
 _MODE_FROM_WIRE = {
     "legacy": {"AUTO": "AUTO", "NORM": "NORM", "SINGLE": "SINGLE", "STOP": "STOP"},
     "modern": {"AUTO": "AUTO", "NORMAL": "NORM", "SINGLE": "SINGLE", "FTRIG": "AUTO"},
     "tektronix": {"AUTO": "AUTO", "NORMAL": "NORM", "NORM": "NORM"},
+    "lecroy": {"AUTO": "AUTO", "NORM": "NORM", "SINGLE": "SINGLE", "STOP": "STOP"},
 }
 _SLOPE_TO_WIRE = {
     "legacy": {"POS": "POS", "NEG": "NEG", "WINDOW": "WINDOW"},
@@ -416,11 +524,15 @@ _SLOPE_TO_WIRE = {
     # RISe|FALL (TBS p.151 / MSO2 p.2-662); WINDOW has no Tek edge equivalent
     # (MSO2's third token is EITher, which is absent on TBS)
     "tektronix": {"POS": "RISe", "NEG": "FALL"},
+    # LeCroy TRIG_SLOPE is {NEG, POS} only (MAUI p.7-40) -- no WINDOW edge slope,
+    # so WINDOW gates as FeatureNotSupportedError (mirrors the Tek GND removal).
+    "lecroy": {"POS": "POS", "NEG": "NEG"},
 }
 _SLOPE_FROM_WIRE = {
     "legacy": {"POS": "POS", "NEG": "NEG", "WINDOW": "WINDOW"},
     "modern": {"RISING": "POS", "FALLING": "NEG", "ALTERNATE": "WINDOW"},
     "tektronix": {"RISE": "POS", "FALL": "NEG"},
+    "lecroy": {"POS": "POS", "NEG": "NEG"},
 }
 _COUPLING_TO_WIRE = {
     "legacy": {"DC": "D1M", "AC": "A1M", "GND": "GND"},
@@ -428,6 +540,8 @@ _COUPLING_TO_WIRE = {
     # No GND coupling on either Tek family: TBS is {AC|DC} (p.53), MSO2 is
     # {AC|DC|DCREJect} (p.2-184) -- GND gates as FeatureNotSupportedError
     "tektronix": {"DC": "DC", "AC": "AC"},
+    # LeCroy COUPLING {A1M,D1M,D50,GND} (MAUI p.7-20) -- ancestor of legacy tokens
+    "lecroy": {"DC": "D1M", "AC": "A1M", "GND": "GND"},
 }
 _COUPLING_FROM_WIRE = {
     "legacy": {"D1M": "DC", "A1M": "AC", "D50": "DC", "A50": "AC", "GND": "GND"},
@@ -435,6 +549,10 @@ _COUPLING_FROM_WIRE = {
     # DCREJect (MSO2 PM 077-1776-07 p.2-184) passes AC only -- normalize to
     # the public AC token rather than surfacing the Tek-specific spelling.
     "tektronix": {"DC": "DC", "AC": "AC", "DCREJ": "AC", "DCREJECT": "AC"},
+    # LeCroy CPL? returns {A1M,D1M,D50,GND} (D50=DC 50 ohm; also OVL on overload,
+    # which is intentionally unmapped -> ValueError). A50 is not a LeCroy token
+    # but is kept as a harmless superset. -- MAUI p.7-20
+    "lecroy": {"D1M": "DC", "A1M": "AC", "D50": "DC", "A50": "AC", "GND": "GND"},
 }
 
 _PUBLIC_MODES = {"AUTO", "NORM", "SINGLE", "STOP"}
@@ -475,6 +593,9 @@ _MEASUREMENT_TYPES = {"PKPK", "MAX", "MIN", "AMPL", "TOP", "BASE", "CMEAN", "MEA
 _MEASUREMENT_TO_WIRE = {
     "legacy": {m: m for m in _MEASUREMENT_TYPES},
     "modern": {m: m for m in _MEASUREMENT_TYPES},
+    # LeCroy PARAMETER_VALUE (PAVA) parameter names -- identity, the ancestor
+    # of the Siglent legacy vocabulary (MAUI p.7-70).
+    "lecroy": {m: m for m in _MEASUREMENT_TYPES},
     # Tek MEASUrement:IMMed:TYPe vocabulary, verbatim from TBS p.119 (the
     # IMMed subsystem is TBS-only; MSO2's MEAS<x> badge vocabulary differs
     # and is a follow-up when badge measurements land).
