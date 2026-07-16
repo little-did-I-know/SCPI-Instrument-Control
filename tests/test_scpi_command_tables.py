@@ -4,6 +4,7 @@ import pytest
 
 from scpi_control.scpi_commands import (
     SCPICommandSet,
+    badge_type_to_wire,
     coupling_from_wire,
     coupling_to_wire,
     mode_from_wire,
@@ -282,9 +283,10 @@ class TestTektronixConverters:
         assert coupling_to_wire("tektronix", "DC") == "DC"
         assert coupling_to_wire("tektronix", "AC") == "AC"
         assert coupling_from_wire("tektronix", "AC") == "AC"
-        # Neither Tek family has GND coupling (TBS1000C PM p.53: {AC|DC};
-        # MSO2 PM p.2-184: {AC|DC|DCREJect}) -- valid public token, so it
-        # gates as FeatureNotSupportedError rather than ValueError.
+        # No Tek family has GND coupling (TBS1000C PM p.53: {AC|DC}; MSO2 PM
+        # p.2-184: {AC|DC|DCREJect}; 4/5/6 PM 077-1305-11 p.2-299:
+        # {AC|DC|DCREJ}) -- valid public token, so it gates as
+        # FeatureNotSupportedError rather than ValueError.
         with pytest.raises(exc.FeatureNotSupportedError):
             coupling_to_wire("tektronix", "GND")
 
@@ -349,3 +351,104 @@ class TestLeCroyTable:
 
     def test_connect_setup(self):
         assert CONNECT_SETUP["lecroy"] == ["CHDR OFF"]
+
+
+# --- Task 3: tektronix base table verified against 4/5/6 PM 077-1305-11 ------
+
+
+def test_tek_mso_variant_serves_all_modern_mso_families():
+    # MSO 2/4/5/6 all resolve to tek_mso and therefore to the same overrides;
+    # verified against MSO2 PM 077-1776-07 and 4/5/6 PM 077-1305-11.
+    from scpi_control.models import MODEL_REGISTRY
+
+    for model in ("MSO24", "MSO44", "MSO46", "MSO54", "MSO56", "MSO58", "MSO58LP", "MSO64"):
+        assert MODEL_REGISTRY[model].scpi_variant == "tek_mso"
+
+    cmds = SCPICommandSet("tektronix", "tek_mso")
+    # DISplay:GLObal:CH<x>:STATE {<NR1>|OFF|ON} -- MSO2 p.2-225 / MSO456 p.2-352
+    assert cmds.get_command("set_channel_display", ch=8, state="ON") == "DISplay:GLObal:CH8:STATE ON"
+    # CH<x>:PROBEFunc:EXTAtten <NR3> -- MSO2 p.2-192 / MSO456 p.2-316
+    assert cmds.get_command("set_probe_ratio", ch=8, gain="0.1") == "CH8:PROBEFunc:EXTAtten 0.1"
+    # WFMOutpre:PT_Off? -- MSO2 p.2-701 / MSO456 p.2-1462
+    assert cmds.get_command("get_wfm_pt_off") == "WFMOutpre:PT_Off?"
+    # MEASUrement:IMMed has no command-reference entry in either MSO manual.
+    assert not cmds.has_command("set_meas_immed_type")
+
+
+def test_tek_line_trigger_source_gate_is_conservative_not_absence():
+    """LINE exists on 2 of the 3 Tek families; the gate is a portability gate.
+
+    Edge-source vocabularies, verbatim from the manuals:
+      TBS1000C  077-1691-01 p.152    {CH1|CH2|LINE|AUX}       -> LINE
+      2 Series  077-1776-07 p.2-663  {CH<x>|DCH<x>_D<x>|INTernal|AUXiliary}
+      4/5/6     077-1305-11 p.2-1406 {CH<x>|CH<x>_D<y>|LINE|AUXiliary} -> LINE
+
+    The LINE divergence falls *inside* the tek_mso variant (MSO2 lacks it, the
+    4/5/6 has it), so the variant cannot express it and LINE stays gated
+    dialect-wide. If tek_mso is ever split, or a per-model capability flag
+    lands, this test is the one to revisit -- see the task-3 report.
+    """
+    from scpi_control.scpi_commands import channel_token
+
+    with pytest.raises(exc.FeatureNotSupportedError):
+        channel_token("tektronix", "LINE")
+
+    # The AUX mapping is family-independent and stays available.
+    assert channel_token("tektronix", "EX") == "AUX"
+
+
+class TestBadgeMeasurementTable:
+    def setup_method(self):
+        self.cmds = SCPICommandSet("tektronix", "tek_mso")
+
+    def test_badge_entries(self):
+        assert self.cmds.get_command("add_measurement_badge", n=3) == 'MEASUrement:ADDNew "MEAS3"'
+        assert self.cmds.get_command("set_badge_type", n=3, type="PK2Pk") == "MEASUrement:MEAS3:TYPe PK2Pk"
+        assert self.cmds.get_command("set_badge_source", n=3, src="CH2") == "MEASUrement:MEAS3:SOUrce CH2"
+        assert self.cmds.get_command("get_badge_value", n=3) == "MEASUrement:MEAS3:RESUlts:CURRentacq:MEAN?"
+        assert self.cmds.get_command("delete_badge", n=3) == 'MEASUrement:DELete "MEAS3"'
+        assert self.cmds.get_command("list_badges") == "MEASUrement:LIST?"
+
+    def test_badges_are_mso_only_not_tbs(self):
+        # TBS1000C has MEASUrement:IMMed instead; the two are mutually exclusive.
+        tbs = SCPICommandSet("tektronix", "tek_tbs")
+        assert not tbs.has_command("add_measurement_badge")
+        assert tbs.has_command("set_meas_immed_type")
+        assert not self.cmds.has_command("set_meas_immed_type")
+
+
+class TestBadgeTypeMap:
+    def test_maps_the_types_both_manuals_share(self):
+        assert badge_type_to_wire("tektronix", "PKPK") == "PK2Pk"
+        assert badge_type_to_wire("tektronix", "AMPL") == "AMPLITUDE"
+        assert badge_type_to_wire("tektronix", "MAX") == "MAXIMUM"
+        assert badge_type_to_wire("tektronix", "MIN") == "MINIMUM"
+        assert badge_type_to_wire("tektronix", "MEAN") == "MEAN"
+        assert badge_type_to_wire("tektronix", "RMS") == "RMS"
+        assert badge_type_to_wire("tektronix", "FREQ") == "FREQUENCY"
+        assert badge_type_to_wire("tektronix", "PER") == "PERIOD"
+        assert badge_type_to_wire("tektronix", "WID") == "PWIDTH"
+        assert badge_type_to_wire("tektronix", "NWID") == "NWIDTH"
+        assert badge_type_to_wire("tektronix", "DUTY") == "PDUTY"
+
+    def test_badge_vocabulary_differs_from_immed(self):
+        # IMMed spells these RISe/FALL; the badge subsystem spells them out.
+        assert badge_type_to_wire("tektronix", "RISE") == "RISETIME"
+        assert badge_type_to_wire("tektronix", "FALL") == "FALLTIME"
+        assert measurement_to_wire("tektronix", "RISE") == "RISe"
+
+    def test_top_and_base_map_on_both_families(self):
+        # Both MSO2 and 4/5/6 list TOP and BASE as badge types.
+        assert badge_type_to_wire("tektronix", "TOP") == "TOP"
+        assert badge_type_to_wire("tektronix", "BASE") == "BASE"
+
+    def test_absent_types_gate(self):
+        # CMEAN has no badge token in either manual; ACRMS is AC-coupled RMS,
+        # not cycle RMS, so CRMS stays unmapped rather than mapped to a lie.
+        for mtype in ("CMEAN", "CRMS"):
+            with pytest.raises(exc.FeatureNotSupportedError):
+                badge_type_to_wire("tektronix", mtype)
+
+    def test_unknown_public_type_is_a_value_error(self):
+        with pytest.raises(ValueError):
+            badge_type_to_wire("tektronix", "BOGUS")

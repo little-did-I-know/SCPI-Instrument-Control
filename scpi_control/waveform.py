@@ -9,6 +9,7 @@ import numpy as np
 
 from scpi_control import exceptions
 from scpi_control import waveform_schema as ws
+from scpi_control.models import validate_channel
 from scpi_control.scpi_commands import BARE_NR3_DIALECTS
 
 if TYPE_CHECKING:
@@ -118,8 +119,7 @@ class Waveform:
             InvalidParameterError: If channel number is invalid
             CommandError: If acquisition fails
         """
-        if not 1 <= channel <= 4:
-            raise exceptions.InvalidParameterError(f"Invalid channel number: {channel}. Must be 1-4.")
+        validate_channel(self._scope, channel)
 
         logger.info(f"Acquiring waveform from channel {channel}")
 
@@ -289,8 +289,7 @@ class Waveform:
         Returns:
             Dictionary with waveform metadata
         """
-        if not 1 <= channel <= 4:
-            raise exceptions.InvalidParameterError(f"Invalid channel number: {channel}. Must be 1-4.")
+        validate_channel(self._scope, channel)
 
         ch = f"C{channel}"
 

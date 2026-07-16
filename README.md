@@ -813,17 +813,23 @@ See the `examples/` directory for complete working examples:
 ### Tektronix and LeCroy (core control + measurements)
 
 - **Tektronix TBS1000C Series**: TBS1102C
-- **Tektronix 2 Series MSO**: MSO24 (automated measurements not yet supported on this family — see the [SCPI Dialects guide](https://little-did-I-know.github.io/SCPI-Instrument-Control/user-guide/scpi-dialects/) for the full per-vendor gap list)
+- **Tektronix 2 Series MSO**: MSO24
+- **Tektronix 4 Series MSO**: MSO44, MSO46
+- **Tektronix 5 Series MSO**: MSO54, MSO56, MSO58, MSO58LP
+- **Tektronix 6 Series MSO**: MSO64
 - **LeCroy WaveSurfer 3000z Series**: WaveSurfer 3024z
 - **LeCroy WaveRunner 8000 Series**: WaveRunner 8104
 
-Command tables were verified command-by-command against the vendor programmer manuals (Tektronix TBS1000C and 2 Series MSO manuals; the Teledyne LeCroy MAUI Remote Control and Automation Manual) and exercised against a dialect-aware mock; not yet run against real Tektronix or LeCroy hardware.
+All Tektronix MSO models (2/4/5/6 Series) share one command variant and
+support automated measurements — see the [SCPI Dialects guide](https://little-did-I-know.github.io/SCPI-Instrument-Control/user-guide/scpi-dialects/) for the full per-vendor gap list.
+
+Command tables were verified command-by-command against the vendor programmer manuals (Tektronix TBS1000C, 2 Series MSO, and 4/5/6 Series MSO/6 Series LPD manuals; the Teledyne LeCroy MAUI Remote Control and Automation Manual) and exercised against a dialect-aware mock; not yet run against real Tektronix or LeCroy hardware.
 
 ### Compatibility
 
 Should work with other Siglent oscilloscopes that support SCPI commands over Ethernet. Model-specific features are auto-detected via the `ModelCapability` registry. Unrecognized Tektronix or LeCroy models fall back to a conservative generic profile for that vendor (with a logged warning) rather than being rejected outright.
 
-**Note**: Some SCPI commands vary between models. The library includes model-specific command variants for HD, X, and Plus series (Siglent) and for TBS vs. MSO2 (Tektronix).
+**Note**: Some SCPI commands vary between models. The library includes model-specific command variants for HD, X, and Plus series (Siglent) and for TBS vs. MSO (2/4/5/6 Series share one variant) (Tektronix).
 
 ## Contributing
 

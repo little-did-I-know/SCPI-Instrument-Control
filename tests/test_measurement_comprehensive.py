@@ -387,15 +387,17 @@ def test_tektronix_immediate_measurement():
     scope.disconnect()
 
 
-def test_tektronix_immediate_measurement_not_supported_on_mso():
-    from scpi_control import Oscilloscope, exceptions
+def test_tektronix_mso2_measures_via_badges():
+    """MSO 2-Series has no IMMed subsystem; it measures via badges like the 4/5/6."""
+    from scpi_control import Oscilloscope
     from scpi_control.connection.mock import MockConnection
 
     conn = MockConnection("mock", idn="TEKTRONIX,MSO24,MOCK0100,FV:1.28", channel_states={1: True})
     scope = Oscilloscope("mock", connection=conn)
     scope.connect()
-    with pytest.raises(exceptions.FeatureNotSupportedError):
-        scope.measurement.measure_vpp(1)
+    assert scope.measurement.measure_vpp(1) == pytest.approx(2.0)
+    assert 'MEASUrement:ADDNew "MEAS1"' in conn.writes
+    assert "MEASUrement:MEAS1:TYPe PK2Pk" in conn.writes
     scope.disconnect()
 
 
