@@ -432,7 +432,9 @@ _COUPLING_TO_WIRE = {
 _COUPLING_FROM_WIRE = {
     "legacy": {"D1M": "DC", "A1M": "AC", "D50": "DC", "A50": "AC", "GND": "GND"},
     "modern": {"DC": "DC", "AC": "AC", "GND": "GND"},
-    "tektronix": {"DC": "DC", "AC": "AC"},
+    # DCREJect (MSO2 PM 077-1776-07 p.2-184) passes AC only -- normalize to
+    # the public AC token rather than surfacing the Tek-specific spelling.
+    "tektronix": {"DC": "DC", "AC": "AC", "DCREJ": "AC", "DCREJECT": "AC"},
 }
 
 _PUBLIC_MODES = {"AUTO", "NORM", "SINGLE", "STOP"}

@@ -300,7 +300,10 @@ class Oscilloscope:
 
     def trigger_single(self) -> None:
         """Arm a one-shot (single) acquisition."""
-        if self.dialect == "modern":
+        if self.dialect == "tektronix":
+            self.write(self._get_command("set_stop_after", mode="SEQuence"))
+            self.write(self._get_command("run"))
+        elif self.dialect == "modern":
             # SINGle self-arms on the modern dialect; there is no ARM command (guide p.482)
             self.write(self._get_command("set_trigger_mode", mode="SINGle"))
         else:
@@ -313,6 +316,9 @@ class Oscilloscope:
 
     def run(self) -> None:
         """Start acquisition."""
+        if self.dialect == "tektronix":
+            # A prior single-shot leaves STOPAfter latched to SEQuence
+            self.write(self._get_command("set_stop_after", mode="RUNSTop"))
         self.write(self._get_command("run"))
 
     def stop(self) -> None:

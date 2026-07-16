@@ -4,7 +4,7 @@ import logging
 from typing import TYPE_CHECKING, Literal, Optional
 
 from scpi_control import exceptions
-from scpi_control.scpi_commands import coupling_from_wire, coupling_to_wire
+from scpi_control.scpi_commands import coupling_from_wire, coupling_to_wire, probe_from_wire, probe_to_wire
 
 if TYPE_CHECKING:
     from scpi_control.oscilloscope import Oscilloscope
@@ -51,9 +51,10 @@ class Channel:
             True if channel is displayed, False otherwise
         """
         response = self._scope.query(self._cmd("get_channel_display", ch=self._channel))
-        # Response format: "C1:TRA ON" or "C1:TRA OFF"
-        # Extract the last word
-        return "ON" in response.upper()
+        # Response format: "C1:TRA ON"/"C1:TRA OFF" (legacy/modern) or a bare
+        # "1"/"0" numeric select (tektronix SELect:CH<x>? -- TBS p.144)
+        token = response.strip().split()[-1].upper() if response.strip() else ""
+        return token in ("ON", "1")
 
     @enabled.setter
     def enabled(self, value: bool) -> None:
@@ -177,7 +178,7 @@ class Channel:
             response = response.split(":", 1)[1]
         if " " in response:
             response = response.split(" ", 1)[1]
-        return float(response.strip())
+        return probe_from_wire(self._dialect, response.strip())
 
     @probe_ratio.setter
     def probe_ratio(self, ratio: float) -> None:
@@ -190,7 +191,12 @@ class Channel:
         """
         if ratio <= 0:
             raise exceptions.InvalidParameterError(f"Probe ratio must be positive: {ratio}")
-        self._scope.write(self._cmd("set_probe_ratio", ch=self._channel, ratio=ratio))
+        if self._dialect == "tektronix":
+            # Tek speaks probe attenuation as a gain factor (1/ratio); the
+            # tek_tbs/tek_mso family templates use the {gain} placeholder
+            self._scope.write(self._cmd("set_probe_ratio", ch=self._channel, gain=probe_to_wire(self._dialect, ratio)))
+        else:
+            self._scope.write(self._cmd("set_probe_ratio", ch=self._channel, ratio=probe_to_wire(self._dialect, ratio)))
         logger.info(f"Channel {self._channel} probe ratio set to {ratio}X")
 
     @property
@@ -201,8 +207,9 @@ class Channel:
             Bandwidth limit: 'ON', 'OFF', or frequency limit
         """
         response = self._scope.query(self._cmd("get_bandwidth_limit", ch=self._channel)).strip().upper()
-        if self._dialect == "modern":
-            # Modern wire tokens are FULL/20M/200M; the API speaks ON/OFF
+        if self._dialect in ("modern", "tektronix"):
+            # Modern wire tokens are FULL/20M/200M; Tek's are FULl/TWENty (or
+            # a hertz value on MSO2) -- both speak ON/OFF at the public layer
             return "OFF" if response == "FULL" else "ON"
         return response
 
@@ -218,6 +225,8 @@ class Channel:
             raise exceptions.InvalidParameterError(f"Invalid bandwidth limit: {limit}. Must be ON, OFF, or FULL.")
         if self._dialect == "modern":
             wire = "FULL" if limit in ("OFF", "FULL") else "20M"
+        elif self._dialect == "tektronix":
+            wire = "FULL" if limit in ("OFF", "FULL") else "TWENty"
         else:
             wire = "OFF" if limit == "FULL" else limit
         self._scope.write(self._cmd("set_bandwidth_limit", ch=self._channel, limit=wire))

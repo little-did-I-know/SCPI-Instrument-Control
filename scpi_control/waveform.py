@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Optional, Tuple, Union
 import numpy as np
 
 from scpi_control import exceptions
+from scpi_control.scpi_commands import BARE_NR3_DIALECTS
 
 if TYPE_CHECKING:
     from scpi_control.oscilloscope import Oscilloscope
@@ -399,15 +400,17 @@ class Waveform:
                 except ValueError as exc:
                     raise exceptions.CommandError(self._format_scope_error(f"Invalid {quantity} response: '{response}'", command)) from exc
 
-        # Modern-dialect numeric queries (:CHANnel:SCALe?, :CHANnel:OFFSet?,
-        # :TIMebase:SCALe?, :ACQuire:SRATe?) return a bare NR3 value with no
-        # unit suffix at all (guide pp.46,56,58,476); legacy always echoes a
-        # unit and keeps the strict check above (audit-pinned, see
+        # Bare-NR3 dialects return a numeric value with no unit suffix at
+        # all: modern Siglent (:CHANnel:SCALe?, :CHANnel:OFFSet?,
+        # :TIMebase:SCALe?, :ACQuire:SRATe? -- guide pp.46,56,58,476),
+        # Tektronix (HEADer OFF strips the echo, leaving a bare NR3), and
+        # LeCroy (CHDR OFF). Legacy Siglent always echoes a unit and keeps
+        # the strict check above (audit-pinned, see
         # test_value_parsing_requires_units).
-        if self._dialect == "modern":
+        if self._dialect in BARE_NR3_DIALECTS:
             try:
                 value = float(cleaned)
-                logger.debug(f"Parsed {quantity}: {value} (bare NR3, modern dialect)")
+                logger.debug(f"Parsed {quantity}: {value} (bare NR3, {self._dialect} dialect)")
                 return value
             except ValueError:
                 pass
