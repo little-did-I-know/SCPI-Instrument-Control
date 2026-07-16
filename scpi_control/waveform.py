@@ -1,7 +1,6 @@
 """Waveform acquisition and data processing for Siglent oscilloscopes."""
 
 import logging
-import re
 import struct
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Optional, Tuple, Union
@@ -68,7 +67,8 @@ class WaveformData:
             if dt > 0:
                 self.sample_rate = 1.0 / dt
 
-        # Estimate timebase using standard 14 horizontal divisions if possible
+        # generic fallback; real acquisitions carry explicit timebase --
+        # per-model grids live in ModelCapability
         if self.timebase is None and self.sample_rate:
             total_time = self.record_length / self.sample_rate
             self.timebase = total_time / 14.0
@@ -122,44 +122,9 @@ class Waveform:
 
         logger.info(f"Acquiring waveform from channel {channel}")
 
-        # Get channel configuration
-        ch = f"C{channel}"
-        voltage_scale = self._get_voltage_scale(ch)
-        voltage_offset = self._get_voltage_offset(ch)
-        timebase = self._get_timebase()
-        sample_rate = self._get_sample_rate()
+        from scpi_control.waveform_transfer import make_transfer
 
-        # Request waveform data; hold the connection lock so no other thread
-        # can slip a query between the command and its binary response
-        waveform_command = f"{ch}:WF? DAT2"  # DAT2 is binary format
-        with self._scope._connection.lock:
-            self._scope.write(waveform_command)
-            raw_data = self._scope.read_raw()
-
-        # Parse waveform data
-        voltage_data = self._parse_waveform(raw_data, format, waveform_command)
-        record_length = len(voltage_data)
-
-        # Convert to voltage using scale and offset
-        # Formula: Voltage = (code - code_offset) * code_scale + voltage_offset
-        # For 8-bit data: typically code_offset = 127 (or 128), code_scale = voltage_scale / 25
-        voltage = self._convert_to_voltage(voltage_data, voltage_scale, voltage_offset)
-
-        # Generate time axis
-        time = self._generate_time_axis(record_length, sample_rate, timebase)
-
-        logger.info(f"Acquired {record_length} samples from channel {channel}")
-
-        return WaveformData(
-            time=time,
-            voltage=voltage,
-            channel=channel,
-            sample_rate=sample_rate,
-            record_length=record_length,
-            timebase=timebase,
-            voltage_scale=voltage_scale,
-            voltage_offset=voltage_offset,
-        )
+        return make_transfer(self._scope).acquire(channel, format)
 
     def _get_voltage_scale(self, channel: str) -> float:
         """Get voltage scale for channel.
@@ -226,133 +191,29 @@ class Waveform:
     def _parse_waveform(self, raw_data: bytes, format: str = "BYTE", command: Optional[str] = None) -> np.ndarray:
         """Parse waveform data from oscilloscope.
 
+        Compatibility wrapper around waveform_transfer.parse_ieee_block, kept
+        for callers (internal and external) that still use the format-string
+        + command-string signature.
+
         Args:
             raw_data: Raw binary data from oscilloscope
             format: Data format - 'BYTE' or 'WORD'
+            command: Command that produced raw_data (used for error context)
 
         Returns:
             Numpy array of raw data codes
         """
-        # Siglent waveform format:
-        # Header: DESC,#9000000346...
-        # Find the start of binary data (after header)
+        from scpi_control.waveform_transfer import parse_ieee_block
 
-        if not raw_data:
-            raise exceptions.CommandError(self._format_scope_error("Invalid waveform format: empty response", command))
-
-        # Look for the # character indicating block data
-        header_end = raw_data.find(b"#")
-        if header_end == -1:
-            raise exceptions.CommandError(self._format_scope_error("Invalid waveform format: no # found in block header", command))
-
-        if header_end + 2 > len(raw_data):
-            raise exceptions.CommandError(self._format_scope_error("Invalid waveform format: truncated block header", command))
-
-        # Parse IEEE 488.2 definite length block
-        # Format: #<n><length><data>
-        # where n is number of digits in length
-        n_digit_char = chr(raw_data[header_end + 1])
-        if not n_digit_char.isdigit():
-            raise exceptions.CommandError(self._format_scope_error(f"Invalid waveform format: non-numeric length digit '{n_digit_char}'", command))
-
-        n_digits = int(n_digit_char)
-        if n_digits <= 0:
-            raise exceptions.CommandError(
-                self._format_scope_error(
-                    f"Invalid waveform format: length digit must be positive (got {n_digits})",
-                    command,
-                )
-            )
-
-        length_field_start = header_end + 2
-        length_field_end = length_field_start + n_digits
-        if length_field_end > len(raw_data):
-            raise exceptions.CommandError(self._format_scope_error("Invalid waveform format: truncated length field", command))
-
-        length_field = raw_data[length_field_start:length_field_end]
-        if not re.fullmatch(rb"\d+", length_field):
-            raise exceptions.CommandError(
-                self._format_scope_error(
-                    f"Invalid waveform format: non-numeric length field '{length_field.decode(errors='ignore')}'",
-                    command,
-                )
-            )
-
-        data_length = int(length_field)
-        data_start = length_field_end
-        data_end = data_start + data_length
-
-        if data_end > len(raw_data):
-            raise exceptions.CommandError(self._format_scope_error("Invalid waveform format: declared data length exceeds available data", command))
-
-        # Extract binary data
-        binary_data = raw_data[data_start:data_end]
-
-        # Convert to numpy array
         if format == "BYTE":
-            # 8-bit signed data
-            data = np.frombuffer(binary_data, dtype=np.int8)
+            dtype = np.int8
         elif format == "WORD":
-            # 16-bit signed data
-            if data_length % 2:
-                raise exceptions.CommandError(self._format_scope_error("Invalid waveform format: WORD data length must be even", command))
-            data = np.frombuffer(binary_data, dtype=np.int16)
+            dtype = np.int16
         else:
             raise exceptions.InvalidParameterError(f"Invalid format: {format}")
 
-        return data
-
-    def _convert_to_voltage(self, codes: np.ndarray, voltage_scale: float, voltage_offset: float) -> np.ndarray:
-        """Convert raw ADC codes to voltage values.
-
-        Uses conversion formula from Siglent SCPI programming manual:
-        voltage = (code - code_center) * (voltage_scale / code_per_div) - voltage_offset
-
-        For 8-bit ADC:  25 codes per vertical division
-        For 16-bit ADC: 6400 codes per vertical division
-
-        Args:
-            codes: Raw ADC code values (signed int8 or int16)
-            voltage_scale: Voltage scale in volts/division
-            voltage_offset: Voltage offset in volts
-
-        Returns:
-            Voltage array in volts
-        """
-        # Select conversion constants based on ADC resolution
-        if codes.dtype == np.int8:
-            code_per_div = WAVEFORM_CODE_PER_DIV_8BIT
-        else:  # 16-bit data
-            code_per_div = WAVEFORM_CODE_PER_DIV_16BIT
-
-        # Convert codes to voltage using Siglent formula
-        # Since we use signed integers, center code is 0
-        voltage = (codes.astype(np.float64) - WAVEFORM_CODE_CENTER) * (voltage_scale / code_per_div) - voltage_offset
-
-        return voltage
-
-    def _generate_time_axis(self, num_samples: int, sample_rate: float, timebase: float) -> np.ndarray:
-        """Generate time axis for waveform.
-
-        Args:
-            num_samples: Number of samples
-            sample_rate: Sample rate in Sa/s
-            timebase: Timebase in s/div
-
-        Returns:
-            Time array in seconds
-        """
-        # Calculate time interval
-        dt = 1.0 / sample_rate
-
-        # Generate time axis (centered at trigger point)
-        # Typically trigger is at center of screen (14 divisions total, 7 left of trigger)
-        total_time = num_samples * dt
-        trigger_position = total_time / 2  # Assume trigger at center
-
-        time = np.arange(num_samples) * dt - trigger_position
-
-        return time
+        context = f"host {self._scope.host}:{self._scope.port}" + (f", command '{command}'" if command else "")
+        return parse_ieee_block(raw_data, dtype, error_context=context)
 
     def _parse_value_with_units(
         self,
