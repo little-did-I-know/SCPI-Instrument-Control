@@ -12,6 +12,8 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 
+from scpi_control.waveform import WaveformData as CaptureWaveform
+
 
 @dataclass
 class ReportMetadata:
@@ -182,19 +184,23 @@ class WaveformRegion:
 
 
 @dataclass
-class WaveformData:
-    """Waveform data for inclusion in reports."""
+class WaveformData(CaptureWaveform):
+    """A captured waveform plus everything a report needs to present it.
 
-    channel: str
-    time: np.ndarray
-    voltage: np.ndarray
-    sample_rate: float
-    record_length: int
+    Subclasses the library's WaveformData so the physics -- time, voltage, channel,
+    sample_rate, record_length and the instrument's timebase/voltage_scale -- is
+    defined once, in scpi_control.waveform. Only report concerns live here.
+    """
 
-    # Optional metadata
-    timebase: Optional[float] = None
-    voltage_scale: Optional[float] = None
-    voltage_offset: Optional[float] = None
+    # `field()` with no default is REQUIRED, and is the only spelling that works.
+    # A bare `sample_rate: float` does NOT re-require the field: @dataclass keeps
+    # defaults as class attributes, so the annotation inherits the base's None and
+    # the field silently stays optional. The report pipeline divides by sample_rate
+    # and record_length, so both must be present.
+    sample_rate: float = field()
+    record_length: int = field()
+
+    # Instrument metadata the library does not carry
     probe_ratio: Optional[float] = None
     coupling: Optional[str] = None
 
@@ -215,7 +221,9 @@ class WaveformData:
     regions: List[WaveformRegion] = field(default_factory=list)
 
     def __post_init__(self):
-        """Set default label if not provided."""
+        """Validate via the library's rules, then apply report defaults."""
+        super().__post_init__()
+        self.channel = str(self.channel)
         if self.label is None:
             self.label = self.channel
 
