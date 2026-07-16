@@ -157,55 +157,88 @@ class WaveformLoader:
 
     @staticmethod
     def _load_csv(filepath: Path) -> List[WaveformData]:
-        """Load waveform data from CSV file."""
-        # CSV format: typically first column is time, subsequent columns are channels
-        try:
-            data = np.loadtxt(filepath, delimiter=",", skiprows=1)
-        except Exception:
-            # Try without header
-            data = np.loadtxt(filepath, delimiter=",")
+        """Load a CSV, honouring the CSV_ENHANCED '#' metadata header if present."""
+        header = WaveformLoader._read_csv_header(filepath)
 
-        if data.ndim == 1:
-            # Single column - treat as voltage data, generate time
-            voltage_data = data
-            sample_rate = 1e9  # Default 1 GS/s
-            time_data = np.arange(len(voltage_data)) / sample_rate
+        # Skip the '#' block and the column-name row. Generic on purpose: files
+        # written before the rename carry a different first line, and they must
+        # still load. `comments=` alone is not enough -- the "Time (s),Voltage (V)"
+        # row is not a comment and loadtxt chokes on it.
+        skip = WaveformLoader._count_leading_non_numeric(filepath)
+        data = np.loadtxt(filepath, delimiter=",", comments=ws.CSV_COMMENT, skiprows=skip, ndmin=2)
+        if data.size == 0:
+            raise ValueError(f"No numeric data found in {filepath}")
 
-            waveform = WaveformData(
-                channel_name="CH1",
-                time_data=time_data,
-                voltage_data=voltage_data,
-                sample_rate=sample_rate,
-                record_length=len(voltage_data),
-                source_file=filepath,
-            )
-            return [waveform]
-
-        # Multiple columns
         time_data = data[:, 0]
+        derived_rate = WaveformLoader._rate_from_time(time_data)
         waveforms = []
-
         for i in range(1, data.shape[1]):
-            voltage_data = data[:, i]
-
-            # Calculate sample rate from time data
-            if len(time_data) > 1:
-                dt = time_data[1] - time_data[0]
-                sample_rate = 1.0 / dt if dt > 0 else 1e9
+            voltage = data[:, i]
+            # A single-channel enhanced CSV names its channel; multi-column CSVs
+            # and plain CSVs cannot, so synthesize CHn.
+            if data.shape[1] == 2 and ws.CSV_HEADER_CHANNEL in header:
+                channel_name = header[ws.CSV_HEADER_CHANNEL]
             else:
-                sample_rate = 1e9
-
-            waveform = WaveformData(
-                channel_name=f"CH{i}",
-                time_data=time_data,
-                voltage_data=voltage_data,
-                sample_rate=sample_rate,
-                record_length=len(voltage_data),
-                source_file=filepath,
+                channel_name = f"CH{i}"
+            waveforms.append(
+                WaveformData(
+                    channel_name=channel_name,
+                    time_data=time_data,
+                    voltage_data=voltage,
+                    sample_rate=WaveformLoader._rate_from_header(header, derived_rate),
+                    record_length=len(voltage),
+                    source_file=filepath,
+                )
             )
-            waveforms.append(waveform)
-
         return waveforms
+
+    @staticmethod
+    def _read_csv_header(filepath: Path) -> Dict[str, str]:
+        """Parse a CSV_ENHANCED '# <label>: <value>' block. Empty for plain CSV."""
+        header: Dict[str, str] = {}
+        with open(filepath, "r") as f:
+            for line in f:
+                if not line.startswith(ws.CSV_COMMENT):
+                    break
+                body = line[len(ws.CSV_COMMENT) :].strip()
+                if ":" in body:
+                    label, _, value = body.partition(":")
+                    header[label.strip()] = value.strip()
+        return header
+
+    @staticmethod
+    def _rate_from_header(header: Dict[str, str], fallback: float) -> float:
+        """Use the header's stated sample rate when present; else the derived one."""
+        raw = header.get(ws.CSV_HEADER_SAMPLE_RATE)
+        if not raw:
+            return fallback
+        # Stored as e.g. "1000000.0 Sa/s"
+        try:
+            return float(raw.split()[0])
+        except (ValueError, IndexError):
+            return fallback
+
+    @staticmethod
+    def _count_leading_non_numeric(filepath: Path) -> int:
+        """Rows to skip: the '#' block plus a column-name row, if any."""
+        skip = 0
+        with open(filepath, "r") as f:
+            for line in f:
+                stripped = line.strip()
+                if not stripped:
+                    skip += 1
+                    continue
+                if stripped.startswith(ws.CSV_COMMENT):
+                    skip += 1
+                    continue
+                first = stripped.split(",")[0]
+                try:
+                    float(first)
+                except ValueError:
+                    skip += 1  # a column-name row like "Time (s),Voltage (V)"
+                    continue
+                break
+        return skip
 
     @staticmethod
     def _load_mat(filepath: Path) -> List[WaveformData]:

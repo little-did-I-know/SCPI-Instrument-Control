@@ -162,3 +162,70 @@ def test_foreign_mat_scalar_fields_do_not_become_waveforms(tmp_path):
 
     assert len(loaded) == 1
     assert loaded[0].record_length == 10
+
+
+def test_plain_csv_round_trip(tmp_path):
+    """Plain CSV carries no metadata; deriving the rate and synthesizing the
+    name is CORRECT behaviour, not a gap. Pin it so nobody 'fixes' it."""
+    wf = make_waveform()
+    p = tmp_path / "cap.csv"
+    saver()._save_csv(wf, str(p), include_metadata=False)
+
+    loaded = WaveformLoader.load(p)
+
+    assert len(loaded) == 1
+    got = loaded[0]
+    assert got.channel_name == "CH1"  # synthesized: the format cannot carry 'C1'
+    assert got.sample_rate == pytest.approx(SAMPLE_RATE, rel=1e-6)  # derived from the time axis
+    np.testing.assert_allclose(got.time_data, wf.time)
+    np.testing.assert_allclose(got.voltage_data, wf.voltage)
+
+
+def test_csv_enhanced_loads_at_all(tmp_path):
+    """The bug: np.loadtxt(skiprows=1) could not skip the '#' block, so the
+    richest CSV variant raised ValueError: could not convert string 'Time (s)'."""
+    wf = make_waveform()
+    p = tmp_path / "cap_enh.csv"
+    saver()._save_csv(wf, str(p), include_metadata=True, metadata={"dut": "board7"})
+
+    loaded = WaveformLoader.load(p)
+
+    assert len(loaded) == 1
+    np.testing.assert_allclose(loaded[0].time_data, wf.time)
+    np.testing.assert_allclose(loaded[0].voltage_data, wf.voltage)
+
+
+def test_csv_enhanced_reads_channel_and_rate_from_its_header(tmp_path):
+    """CSV_ENHANCED is the one CSV variant that carries them -- read, don't fabricate."""
+    wf = make_waveform(channel="C3")
+    p = tmp_path / "cap_enh2.csv"
+    saver()._save_csv(wf, str(p), include_metadata=True)
+
+    got = WaveformLoader.load(p)[0]
+
+    assert got.channel_name == "C3"
+    assert got.sample_rate == pytest.approx(SAMPLE_RATE)
+
+
+def test_csv_with_legacy_siglent_header_still_loads(tmp_path):
+    """Files written before the rename carry '# Siglent Oscilloscope Waveform
+    Data'. Comment-skipping is generic, so they must still load."""
+    p = tmp_path / "legacy.csv"
+    p.write_text(
+        "# Siglent Oscilloscope Waveform Data\n"
+        "# Captured: 2026-01-01T00:00:00\n"
+        "# Channel: C2\n"
+        "# Sample Rate: 1000000.0 Sa/s\n"
+        "# Samples: 3\n"
+        "#\n"
+        "Time (s),Voltage (V)\n"
+        "0.0,0.0\n"
+        "1e-06,0.5\n"
+        "2e-06,1.0\n"
+    )
+
+    got = WaveformLoader.load(p)[0]
+
+    assert got.channel_name == "C2"
+    assert got.sample_rate == pytest.approx(1e6)
+    assert len(got.time_data) == 3
