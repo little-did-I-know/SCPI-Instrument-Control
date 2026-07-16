@@ -832,10 +832,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#side-by-side-legacy-vs-modern-wire-commands" class="md-nav__link">
+  <a href="#side-by-side-wire-commands-across-dialects" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Side-by-side: legacy vs. modern wire commands
+        Side-by-side: wire commands across dialects
       
     </span>
   </a>
@@ -858,6 +858,17 @@
     <span class="md-ellipsis">
       
         Mock sessions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#manuals" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Manuals
       
     </span>
   </a>
@@ -3283,10 +3294,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#side-by-side-legacy-vs-modern-wire-commands" class="md-nav__link">
+  <a href="#side-by-side-wire-commands-across-dialects" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Side-by-side: legacy vs. modern wire commands
+        Side-by-side: wire commands across dialects
       
     </span>
   </a>
@@ -3315,6 +3326,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#manuals" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Manuals
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -3336,47 +3358,73 @@
 
 
 <h1 id="scpi-dialects">SCPI Dialects<a class="headerlink" href="#scpi-dialects" title="Permanent link">&para;</a></h1>
-<p>Siglent's oscilloscope line spans two generations of wire protocol, and this
-library speaks both through the exact same Python API.</p>
+<p>This library speaks four oscilloscope wire dialects behind one Python API:
+Siglent legacy, Siglent modern, Tektronix, and LeCroy.</p>
 <h2 id="why-dialects-exist">Why dialects exist<a class="headerlink" href="#why-dialects-exist" title="Permanent link">&para;</a></h2>
-<p>Older scopes from the SDS1000X-E era speak a <strong>legacy</strong> command set — flat,
-LeCroy-derived commands like <code>C1:VDIV 500mV</code>, <code>TDIV</code>, and <code>PAVA?</code>. Newer
-HD-generation scopes (SDS800X HD and later) speak <strong>modern</strong> colon-form
-SCPI — <code>:CHANnel1:SCALe 0.5</code>, <code>:TIMebase:SCALe</code>, <code>:MEASure...</code>. Whichever
-generation you connect to, you call the same <code>scope.channel1.voltage_scale</code>,
-<code>scope.timebase</code>, <code>scope.trigger.mode</code>, and so on — the library translates
-to the right wire commands underneath.</p>
+<p>Older Siglent scopes from the SDS1000X-E era speak a <strong>legacy</strong> command set —
+flat, LeCroy-derived commands like <code>C1:VDIV 500mV</code>, <code>TDIV</code>, and <code>PAVA?</code>.
+Newer HD-generation Siglent scopes (SDS800X HD and later) speak <strong>modern</strong>
+colon-form SCPI — <code>:CHANnel1:SCALe 0.5</code>, <code>:TIMebase:SCALe</code>, <code>:MEASure...</code>.
+<strong>Tektronix</strong> scopes (TBS1000C, 2 Series MSO) speak a headerless SCPI dialect
+of their own — <code>CH1:SCAle</code>, <code>HORizontal:SCAle</code>, <code>TRIGger:A:...</code>. <strong>LeCroy</strong>
+scopes (WaveSurfer, WaveRunner) speak the MAUI remote-control command set —
+<code>C1:VDIV</code>, <code>TDIV</code>, <code>TRIG_MODE</code>.</p>
+<p>Worth calling out explicitly: LeCroy's dialect is the direct ancestor of
+Siglent's legacy dialect. Siglent's early scopes borrowed LeCroy's flat
+command grammar wholesale, which is why the legacy and LeCroy columns in the
+table below look so similar — and why the differences that remain (see
+<a href="#known-dialect-gaps">Known dialect gaps</a>) are worth knowing about instead of
+assuming the two are interchangeable.</p>
+<p>Whichever scope you connect to, you call the same
+<code>scope.channel1.voltage_scale</code>, <code>scope.timebase</code>, <code>scope.trigger.mode</code>, and
+so on — the library translates to the right wire commands underneath.</p>
 <h2 id="auto-detection">Auto-detection<a class="headerlink" href="#auto-detection" title="Permanent link">&para;</a></h2>
 <p>The dialect is detected automatically from the instrument's <code>*IDN?</code> response
-when you call <code>scope.connect()</code>. Detection first checks the built-in model
-registry (which pins the dialect for every officially supported model); for
-an unrecognized model it falls back to a heuristic — model names containing
-<code>HD</code> (with the space) or ending in <code>HD</code>, containing <code>PLUS</code>, or containing
-<code>SDS5</code>/<code>SDS6</code>/<code>SDS7</code> are treated as modern, everything else as legacy.</p>
+when you call <code>scope.connect()</code>, in two stages:</p>
+<ol>
+<li><strong>Vendor routing on the manufacturer field.</strong> A manufacturer field
+   containing <code>TEKTRONIX</code> routes detection to the Tektronix registry.
+   <code>LECROY</code> (which also matches <code>TELEDYNE LECROY</code>) routes to the LeCroy
+   registry. Every other manufacturer string — including all Siglent scopes —
+   takes the historic Siglent detection path unchanged.</li>
+<li><strong>Model matching within that vendor.</strong> Within the routed vendor, the model
+   field is matched against the built-in registry (exact match, then a
+   whitespace/case-insensitive fuzzy match, then a partial/substring match).
+   A recognized model gets its pinned dialect and family variant
+   (<code>scpi_variant</code>). An unrecognized model of a <em>known</em> vendor (Tektronix or
+   LeCroy) falls back to a conservative generic profile for that vendor —
+   4 channels assumed (2 for TBS1-pattern Tektronix models), a logged
+   warning — rather than guessing wrong. An unrecognized Siglent model falls
+   back to the original heuristic: model names containing <code>HD</code> (with the
+   space) or ending in <code>HD</code>, containing <code>PLUS</code>, or containing
+   <code>SDS5</code>/<code>SDS6</code>/<code>SDS7</code> are treated as modern, everything else as legacy.</li>
+</ol>
 <p>Check what was detected after connecting:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">scpi_control</span><span class="w"> </span><span class="kn">import</span> <span class="n">Oscilloscope</span>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
 </span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="k">with</span> <span class="n">Oscilloscope</span><span class="p">(</span><span class="s1">&#39;192.168.1.100&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">scope</span><span class="p">:</span>
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="nb">print</span><span class="p">(</span><span class="n">scope</span><span class="o">.</span><span class="n">dialect</span><span class="p">)</span>  <span class="c1"># &quot;legacy&quot; or &quot;modern&quot;</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="nb">print</span><span class="p">(</span><span class="n">scope</span><span class="o">.</span><span class="n">dialect</span><span class="p">)</span>  <span class="c1"># &quot;legacy&quot;, &quot;modern&quot;, &quot;tektronix&quot;, or &quot;lecroy&quot;</span>
 </span></code></pre></div>
 <h2 id="overriding-detection">Overriding detection<a class="headerlink" href="#overriding-detection" title="Permanent link">&para;</a></h2>
 <p>If detection guesses wrong — an unlisted model that doesn't match the
 heuristic, for instance — force the dialect explicitly:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="n">scope</span> <span class="o">=</span> <span class="n">Oscilloscope</span><span class="p">(</span><span class="s2">&quot;192.168.1.100&quot;</span><span class="p">,</span> <span class="n">dialect</span><span class="o">=</span><span class="s2">&quot;modern&quot;</span><span class="p">)</span>   <span class="c1"># or dialect=&quot;legacy&quot;</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="n">scope</span> <span class="o">=</span> <span class="n">Oscilloscope</span><span class="p">(</span><span class="s2">&quot;192.168.1.100&quot;</span><span class="p">,</span> <span class="n">dialect</span><span class="o">=</span><span class="s2">&quot;modern&quot;</span><span class="p">)</span>
 </span></code></pre></div>
-<p>An explicit <code>dialect=</code> always wins over the model registry and the
-fallback heuristic.</p>
-<h2 id="side-by-side-legacy-vs-modern-wire-commands">Side-by-side: legacy vs. modern wire commands<a class="headerlink" href="#side-by-side-legacy-vs-modern-wire-commands" title="Permanent link">&para;</a></h2>
+<p><code>dialect=</code> accepts <code>"legacy"</code>, <code>"modern"</code>, <code>"tektronix"</code>, or <code>"lecroy"</code>. An
+explicit <code>dialect=</code> always wins over the model registry and the fallback
+heuristic.</p>
+<h2 id="side-by-side-wire-commands-across-dialects">Side-by-side: wire commands across dialects<a class="headerlink" href="#side-by-side-wire-commands-across-dialects" title="Permanent link">&para;</a></h2>
 <p>The library's command tables (<code>scpi_control/scpi_commands.py</code>) hold the
-exact strings sent to each dialect. A sample of the underlying wire
-commands (<code>{ch}</code> and other braces are template placeholders the library
-fills in):</p>
+exact strings sent to each dialect. A sample of the underlying wire commands
+(<code>{ch}</code> and other braces are template placeholders the library fills in):</p>
 <table>
 <thead>
 <tr>
 <th>Operation</th>
-<th>Legacy wire command</th>
-<th>Modern wire command</th>
+<th>Legacy</th>
+<th>Modern</th>
+<th>Tektronix</th>
+<th>LeCroy</th>
 </tr>
 </thead>
 <tbody>
@@ -3384,36 +3432,50 @@ fills in):</p>
 <td>Voltage scale</td>
 <td><code>C{ch}:VDIV {vdiv}</code></td>
 <td><code>:CHANnel{ch}:SCALe {vdiv}</code></td>
+<td><code>CH{ch}:SCAle {vdiv}</code></td>
+<td><code>C{ch}:VDIV {vdiv}</code></td>
 </tr>
 <tr>
 <td>Timebase</td>
 <td><code>TDIV {tdiv}</code></td>
 <td><code>:TIMebase:SCALe {tdiv}</code></td>
+<td><code>HORizontal:SCAle {tdiv}</code></td>
+<td><code>TDIV {tdiv}</code></td>
 </tr>
 <tr>
 <td>Trigger mode</td>
 <td><code>TRIG_MODE {mode}</code></td>
 <td><code>:TRIGger:MODE {mode}</code></td>
+<td><code>TRIGger:A:MODe {mode}</code></td>
+<td><code>TRIG_MODE {mode}</code></td>
 </tr>
 <tr>
 <td>Run</td>
 <td><code>TRIG_MODE AUTO</code></td>
 <td><code>:TRIGger:RUN</code></td>
+<td><code>ACQuire:STATE RUN</code></td>
+<td><code>TRIG_MODE AUTO</code></td>
 </tr>
 <tr>
 <td>Stop</td>
 <td><code>STOP</code></td>
 <td><code>:TRIGger:STOP</code></td>
+<td><code>ACQuire:STATE STOP</code></td>
+<td><code>STOP</code></td>
 </tr>
 <tr>
 <td>Waveform fetch</td>
 <td><code>C{ch}:WF? DAT2</code></td>
 <td><code>C{ch}:WF? DAT2</code> (unchanged for now)</td>
+<td><code>CURVe?</code></td>
+<td><code>C{ch}:WF? ALL</code></td>
 </tr>
 <tr>
 <td>Sample rate</td>
 <td><code>SARA?</code></td>
 <td><code>:ACQuire:SRATe?</code></td>
+<td><code>HORizontal:SAMPLERate?</code></td>
+<td><code>VBS? 'return=app.Acquisition.Horizontal.SamplingRate'</code></td>
 </tr>
 </tbody>
 </table>
@@ -3423,22 +3485,120 @@ properties that wrap them. For anything the API doesn't expose yet, the
 gateway's Terminal tab (or <code>scope.write()</code> / <code>scope.query()</code>) lets you send
 raw commands in whichever dialect the connected scope speaks.</p>
 <h2 id="known-dialect-gaps">Known dialect gaps<a class="headerlink" href="#known-dialect-gaps" title="Permanent link">&para;</a></h2>
-<p>Automated measurements (<code>PAVA?</code>) are <strong>legacy-only</strong> today. On a
-modern-dialect scope, direct <code>scope.measurement.measure(...)</code> calls time out
-and raise <code>SiglentTimeoutError</code> (from <code>scpi_control.exceptions</code>). The web
-gateway catches this internally and shows measurements as unavailable in its UI.</p>
+<p>Not every dialect implements every feature the public API exposes. Where a
+dialect lacks a command, calling the corresponding property or method raises
+<code>FeatureNotSupportedError</code> (or, for the two gaps noted below that involve
+timeouts rather than gating, the appropriate timeout/parse error) —
+<code>scpi_control.exceptions</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Feature</th>
+<th>Supported on</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Measurement statistics (<code>PAST</code>/<code>PASTAT</code>) and cursors (<code>CRST</code>/<code>CRVA?</code>)</td>
+<td>legacy only</td>
+<td>Absent from the modern, Tektronix, and LeCroy command tables.</td>
+</tr>
+<tr>
+<td><code>add_measurement</code> (<code>PACU</code>)</td>
+<td>legacy only</td>
+<td>LeCroy's <code>PACU</code> is slot-first (<code>PACU &lt;slot&gt;,&lt;measurement&gt;,&lt;qualifier&gt;</code>) — a different grammar from Siglent's <code>PACU {mtype},C{ch}</code>, so it isn't wired up rather than being silently wrong.</td>
+</tr>
+<tr>
+<td><code>WINDOW</code> trigger slope</td>
+<td>legacy, modern (Siglent)</td>
+<td>Tektronix edge trigger only has <code>RISe</code>/<code>FALL</code>; LeCroy <code>TRSL</code> only has <code>NEG</code>/<code>POS</code>. Neither has a window-slope equivalent.</td>
+</tr>
+<tr>
+<td>Trigger holdoff</td>
+<td>legacy, tektronix</td>
+<td>On legacy, the wire command (<code>TRIG_DELAY</code>) is really <em>trigger delay</em>, not holdoff — an existing honesty note kept as-is pending a trigger-rework follow-up. Modern has no holdoff command at all. LeCroy holdoff lives in <code>TRIG_SELECT HT/HV</code>, a different shape not yet implemented (follow-up).</td>
+</tr>
+<tr>
+<td><code>GND</code> channel coupling</td>
+<td>legacy, modern, lecroy</td>
+<td>Not supported on Tektronix: neither the TBS1000C (<code>AC</code>|<code>DC</code>) nor the 2 Series MSO (<code>AC</code>|<code>DC</code>|<code>DCREJect</code>) command set has a ground-coupling mode. The MSO2's <code>DCREJect</code> coupling readback is normalized to the public <code>AC</code> token rather than surfaced as a Tek-specific value.</td>
+</tr>
+<tr>
+<td>Channel vertical unit (<code>C{ch}:UNIT</code>)</td>
+<td>legacy only</td>
+<td>No equivalent command in the modern, Tektronix, or LeCroy tables.</td>
+</tr>
+<tr>
+<td><code>measure()</code> automated measurements</td>
+<td>legacy, lecroy, tektronix (TBS1000C family only)</td>
+<td><strong>Modern:</strong> <code>measure()</code> calls still time out and raise <code>SiglentTimeoutError</code> — a longstanding, unchanged gap. <strong>Tektronix 2 Series MSO:</strong> <code>measure()</code> raises <code>FeatureNotSupportedError</code> with a clear message; the MSO2 command set has no <code>MEASUrement:IMMed</code> subsystem (badge-based <code>MEASUrement:MEAS&lt;x&gt;</code> measurements are a follow-up).</td>
+</tr>
+<tr>
+<td>Waveform transfer bit depth</td>
+<td>8-bit only, all dialects</td>
+<td>Tektronix's <code>DATa:WIDth</code> is pinned to <code>1</code> (8-bit) for now; 16-bit transfer is a follow-up.</td>
+</tr>
+<tr>
+<td>LeCroy waveform transfer format</td>
+<td>lecroy</td>
+<td>Uses <code>C{ch}:WF? ALL</code> (descriptor + data in one block), scaled from the <code>WAVEDESC</code> descriptor's vertical gain/offset and horizontal interval/offset fields, with <code>CFMT DEF9,{BYTE\|WORD},BIN</code> and <code>CORD LO</code> (LSB-first) pinning the wire encoding — a different transfer path from the Siglent-style <code>WF? DAT2</code> used by legacy and modern.</td>
+</tr>
+<tr>
+<td>LeCroy bandwidth limit token</td>
+<td>lecroy</td>
+<td>The public <code>ON</code> token maps to the wire value <code>20MHZ</code>; LeCroy's <code>BWL</code> vocabulary (<code>OFF</code>, <code>20MHZ</code>, <code>200MHZ</code>, ...) has no <code>ON</code> token of its own to map onto.</td>
+</tr>
+</tbody>
+</table>
+<p>Automated measurements (<code>PAVA?</code>) on <strong>Siglent modern</strong> scopes remain a
+documented, unchanged gap: <code>scope.measurement.measure(...)</code> calls time out
+and raise <code>SiglentTimeoutError</code>. The web gateway catches this internally and
+shows measurements as unavailable in its UI.</p>
 <h2 id="mock-sessions">Mock sessions<a class="headerlink" href="#mock-sessions" title="Permanent link">&para;</a></h2>
-<p>Mock sessions (<code>mock: true</code> in the web gateway, or <code>MockConnection</code> in
-code) default to a <strong>legacy</strong>-dialect scope. To exercise the modern code
-path against a mock, pass a modern model name:</p>
+<p>Mock sessions (<code>mock: true</code> in the web gateway, or <code>MockConnection</code> in code)
+default to a <strong>legacy</strong>-dialect Siglent scope. Pass a different <code>idn</code> to
+exercise another dialect's code path against a mock:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">scpi_control</span><span class="w"> </span><span class="kn">import</span> <span class="n">Oscilloscope</span>
 </span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">scpi_control.connection.mock</span><span class="w"> </span><span class="kn">import</span> <span class="n">MockConnection</span>
 </span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>
-</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="n">idn</span> <span class="o">=</span> <span class="s2">&quot;Siglent Technologies,SDS824X HD,MOCK0001,1.0.0.0&quot;</span>
-</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="n">scope</span> <span class="o">=</span> <span class="n">Oscilloscope</span><span class="p">(</span><span class="s2">&quot;mock&quot;</span><span class="p">,</span> <span class="n">connection</span><span class="o">=</span><span class="n">MockConnection</span><span class="p">(</span><span class="s2">&quot;mock&quot;</span><span class="p">,</span> <span class="n">idn</span><span class="o">=</span><span class="n">idn</span><span class="p">))</span>
-</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="n">scope</span><span class="o">.</span><span class="n">connect</span><span class="p">()</span>
-</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="nb">print</span><span class="p">(</span><span class="n">scope</span><span class="o">.</span><span class="n">dialect</span><span class="p">)</span>  <span class="c1"># &quot;modern&quot;</span>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="c1"># Siglent modern</span>
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="n">idn</span> <span class="o">=</span> <span class="s2">&quot;Siglent Technologies,SDS824X HD,MOCK0001,1.0.0.0&quot;</span>
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="n">scope</span> <span class="o">=</span> <span class="n">Oscilloscope</span><span class="p">(</span><span class="s2">&quot;mock&quot;</span><span class="p">,</span> <span class="n">connection</span><span class="o">=</span><span class="n">MockConnection</span><span class="p">(</span><span class="s2">&quot;mock&quot;</span><span class="p">,</span> <span class="n">idn</span><span class="o">=</span><span class="n">idn</span><span class="p">))</span>
+</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="n">scope</span><span class="o">.</span><span class="n">connect</span><span class="p">()</span>
+</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="nb">print</span><span class="p">(</span><span class="n">scope</span><span class="o">.</span><span class="n">dialect</span><span class="p">)</span>  <span class="c1"># &quot;modern&quot;</span>
+</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>
+</span><span id="__span-2-10"><a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="c1"># Tektronix (2 Series MSO)</span>
+</span><span id="__span-2-11"><a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a><span class="n">idn</span> <span class="o">=</span> <span class="s2">&quot;TEKTRONIX,MSO24,MOCK0100,CF:91.1CT FV:1.28&quot;</span>
+</span><span id="__span-2-12"><a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a><span class="n">scope</span> <span class="o">=</span> <span class="n">Oscilloscope</span><span class="p">(</span><span class="s2">&quot;mock&quot;</span><span class="p">,</span> <span class="n">connection</span><span class="o">=</span><span class="n">MockConnection</span><span class="p">(</span><span class="s2">&quot;mock&quot;</span><span class="p">,</span> <span class="n">idn</span><span class="o">=</span><span class="n">idn</span><span class="p">))</span>
+</span><span id="__span-2-13"><a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a><span class="n">scope</span><span class="o">.</span><span class="n">connect</span><span class="p">()</span>
+</span><span id="__span-2-14"><a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a><span class="nb">print</span><span class="p">(</span><span class="n">scope</span><span class="o">.</span><span class="n">dialect</span><span class="p">)</span>  <span class="c1"># &quot;tektronix&quot;</span>
+</span><span id="__span-2-15"><a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a>
+</span><span id="__span-2-16"><a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a><span class="c1"># LeCroy (WaveSurfer 3000z)</span>
+</span><span id="__span-2-17"><a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a><span class="n">idn</span> <span class="o">=</span> <span class="s2">&quot;LECROY,WAVESURFER3024Z,MOCK0200,8.5.0&quot;</span>
+</span><span id="__span-2-18"><a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a><span class="n">scope</span> <span class="o">=</span> <span class="n">Oscilloscope</span><span class="p">(</span><span class="s2">&quot;mock&quot;</span><span class="p">,</span> <span class="n">connection</span><span class="o">=</span><span class="n">MockConnection</span><span class="p">(</span><span class="s2">&quot;mock&quot;</span><span class="p">,</span> <span class="n">idn</span><span class="o">=</span><span class="n">idn</span><span class="p">))</span>
+</span><span id="__span-2-19"><a id="__codelineno-2-19" name="__codelineno-2-19" href="#__codelineno-2-19"></a><span class="n">scope</span><span class="o">.</span><span class="n">connect</span><span class="p">()</span>
+</span><span id="__span-2-20"><a id="__codelineno-2-20" name="__codelineno-2-20" href="#__codelineno-2-20"></a><span class="nb">print</span><span class="p">(</span><span class="n">scope</span><span class="o">.</span><span class="n">dialect</span><span class="p">)</span>  <span class="c1"># &quot;lecroy&quot;</span>
 </span></code></pre></div>
+<p>Each mock scope only answers its own dialect's commands. Send it a command
+from a different dialect (e.g. <code>TDIV?</code> against a Tektronix mock, or
+<code>:TIMebase:SCALe?</code> against either vendor mock) and the query still times out
+with <code>SiglentTimeoutError</code>, the same as it would against real hardware
+speaking a different command set. Only queries behave this way — an
+unrecognized write is recorded but silently ignored, matching how real
+scopes handle commands they don't understand.</p>
+<h2 id="manuals">Manuals<a class="headerlink" href="#manuals" title="Permanent link">&para;</a></h2>
+<p>The Tektronix and LeCroy command tables were verified command-by-command
+against the vendor programmer manuals below. The PDFs themselves aren't
+committed to this repo — consult the vendor for the current version:</p>
+<ul>
+<li><em>Tektronix TBS1000C Series Programmer Manual</em> (Tektronix part number
+  077-1691-01) — <a href="https://www.tek.com/">tek.com</a></li>
+<li><em>Tektronix 2 Series MSO Programmer Manual</em> (Tektronix part number
+  077-1776-07) — <a href="https://www.tek.com/">tek.com</a></li>
+<li><em>Teledyne LeCroy MAUI Oscilloscopes Remote Control and Automation Manual</em> —
+  <a href="https://www.teledynelecroy.com/">teledynelecroy.com</a></li>
+</ul>
 
 
 
