@@ -163,3 +163,13 @@ class TestDialectHelpers:
     def test_bare_nr3_dialects(self):
         assert "modern" in BARE_NR3_DIALECTS
         assert "legacy" not in BARE_NR3_DIALECTS
+
+    def test_valid_public_token_unsupported_on_dialect_raises(self):
+        # STOP is the :TRIGger:STOP command on modern, not a trigger-mode token;
+        # the converter contract maps "valid public token, missing from dialect
+        # table" to FeatureNotSupportedError (ValueError stays reserved for
+        # invalid public tokens).
+        from scpi_control import exceptions
+
+        with pytest.raises(exceptions.FeatureNotSupportedError):
+            mode_to_wire("modern", "STOP")
