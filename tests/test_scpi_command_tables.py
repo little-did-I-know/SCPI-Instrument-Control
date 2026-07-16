@@ -206,3 +206,107 @@ class TestMeasurementRouting:
         assert measurement_to_wire("modern", "FREQ") == "FREQ"
         with pytest.raises(ValueError):
             measurement_to_wire("legacy", "BOGUS")
+
+
+from scpi_control.scpi_commands import probe_from_wire, probe_to_wire
+from scpi_control import exceptions as exc
+
+
+class TestTektronixTable:
+    def setup_method(self):
+        self.cmds = SCPICommandSet("tektronix", "tek_tbs")
+
+    def test_channel_and_timebase(self):
+        assert self.cmds.get_command("set_voltage_div", ch=1, vdiv=0.5) == "CH1:SCAle 0.5"
+        assert self.cmds.get_command("set_voltage_offset", ch=2, offset=-1.0) == "CH2:OFFSet -1.0"
+        assert self.cmds.get_command("set_coupling", ch=1, coupling="AC") == "CH1:COUPling AC"
+        assert self.cmds.get_command("set_time_div", tdiv=0.002) == "HORizontal:SCAle 0.002"
+        assert self.cmds.get_command("get_sample_rate") == "HORizontal:SAMPLERate?"
+        assert self.cmds.get_command("set_channel_display", ch=1, state="ON") == "SELect:CH1 ON"
+
+    def test_mso_display_override(self):
+        mso = SCPICommandSet("tektronix", "tek_mso")
+        assert mso.get_command("set_channel_display", ch=1, state="ON") == "DISplay:GLObal:CH1:STATE ON"
+
+    def test_trigger_commands(self):
+        assert self.cmds.get_command("set_trigger_mode", mode="NORMal") == "TRIGger:A:MODe NORMal"
+        assert self.cmds.get_command("set_trigger_source", src="CH2") == "TRIGger:A:EDGE:SOUrce CH2"
+        assert self.cmds.get_command("set_trigger_level", ch=1, level=0.5) == "TRIGger:A:LEVel:CH1 0.5"
+        assert self.cmds.get_command("set_trigger_slope", slope="RISe") == "TRIGger:A:EDGE:SLOpe RISe"
+        assert self.cmds.get_command("run") == "ACQuire:STATE RUN"
+        assert self.cmds.get_command("stop") == "ACQuire:STATE STOP"
+        assert self.cmds.get_command("set_stop_after", mode="SEQuence") == "ACQuire:STOPAfter SEQuence"
+        assert self.cmds.get_command("get_acq_status") == "TRIGger:STATE?"
+        assert self.cmds.get_command("set_trigger_holdoff", t=0.001) == "TRIGger:A:HOLDoff:TIMe 0.001"
+        assert not self.cmds.has_command("arm_trigger")
+
+    def test_waveform_and_measurement_entries(self):
+        assert self.cmds.get_command("set_data_source", ch=1) == "DATa:SOUrce CH1"
+        assert self.cmds.get_command("get_waveform") == "CURVe?"
+        assert self.cmds.get_command("get_wfm_ymult") == "WFMOutpre:YMUlt?"
+        # PK2Pk spelling per TBS1000C PM 077-1691-01 p.119
+        assert self.cmds.get_command("set_meas_immed_type", type="PK2Pk") == "MEASUrement:IMMed:TYPe PK2Pk"
+
+    def test_family_splits(self):
+        # Manual-verified divergences: IMMed measurements and PRObe:GAIN are
+        # TBS-only; WFMOutpre:PT_Off? and PROBEFunc:EXTAtten are MSO-only.
+        mso = SCPICommandSet("tektronix", "tek_mso")
+        assert self.cmds.has_command("set_meas_immed_type")
+        assert not mso.has_command("set_meas_immed_type")
+        assert not mso.has_command("get_meas_immed_value")
+        assert not self.cmds.has_command("get_wfm_pt_off")
+        assert mso.get_command("get_wfm_pt_off") == "WFMOutpre:PT_Off?"
+        assert self.cmds.get_command("set_probe_ratio", ch=1, gain=0.1) == "CH1:PRObe:GAIN 0.1"
+        assert mso.get_command("set_probe_ratio", ch=1, gain=0.1) == "CH1:PROBEFunc:EXTAtten 0.1"
+
+    def test_connect_setup(self):
+        assert CONNECT_SETUP["tektronix"] == ["HEADer OFF"]
+
+
+class TestTektronixConverters:
+    def test_modes(self):
+        assert mode_to_wire("tektronix", "AUTO") == "AUTO"
+        assert mode_to_wire("tektronix", "NORM") == "NORMal"
+        assert mode_from_wire("tektronix", "NORMAL") == "NORM"
+        with pytest.raises(exc.FeatureNotSupportedError):
+            mode_to_wire("tektronix", "SINGLE")  # single-shot is a command sequence, not a mode
+
+    def test_slopes(self):
+        assert slope_to_wire("tektronix", "POS") == "RISe"
+        assert slope_to_wire("tektronix", "NEG") == "FALL"
+        assert slope_from_wire("tektronix", "RISE") == "POS"
+        with pytest.raises(exc.FeatureNotSupportedError):
+            slope_to_wire("tektronix", "WINDOW")
+
+    def test_coupling_identity(self):
+        assert coupling_to_wire("tektronix", "DC") == "DC"
+        assert coupling_to_wire("tektronix", "AC") == "AC"
+        assert coupling_from_wire("tektronix", "AC") == "AC"
+        # Neither Tek family has GND coupling (TBS1000C PM p.53: {AC|DC};
+        # MSO2 PM p.2-184: {AC|DC|DCREJect}) -- valid public token, so it
+        # gates as FeatureNotSupportedError rather than ValueError.
+        with pytest.raises(exc.FeatureNotSupportedError):
+            coupling_to_wire("tektronix", "GND")
+
+    def test_status_map_covers_tek_states(self):
+        assert normalize_status("TRIGGER") == "TRIGD"
+        assert normalize_status("SAVE") == "STOP"
+        assert normalize_status("ARMED") == "ARM"
+
+    def test_probe_gain_inversion(self):
+        assert probe_to_wire("tektronix", 10.0) == "0.1"
+        assert probe_from_wire("tektronix", "0.1") == pytest.approx(10.0)
+        assert probe_to_wire("legacy", 10.0) == "10"
+        assert probe_from_wire("legacy", "10") == pytest.approx(10.0)
+
+    def test_channel_token_tek(self):
+        assert channel_token("tektronix", 2) == "CH2"
+        assert channel_token("tektronix", "C2") == "CH2"
+        assert source_from_wire("tektronix", "CH2") == "C2"
+
+    def test_measurement_map(self):
+        # Wire spellings verbatim from TBS1000C PM 077-1691-01 p.119
+        assert measurement_to_wire("tektronix", "PKPK") == "PK2Pk"
+        assert measurement_to_wire("tektronix", "FREQ") == "FREQuency"
+        assert measurement_to_wire("tektronix", "TOP") == "HIGH"
+        assert measurement_to_wire("tektronix", "DUTY") == "PDUty"

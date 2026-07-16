@@ -1,10 +1,13 @@
-"""SCPI command abstraction layer for different Siglent oscilloscope models.
+"""SCPI command abstraction layer for the supported oscilloscope dialects.
 
-Two wire dialects exist across Siglent scope generations:
+Wire dialects with a command table:
 - "legacy": the LeCroy-derived flat dialect (TRIG_SELECT, TDIV, C1:VDIV) spoken
-  by SDS1000X-E era scopes.
+  by Siglent SDS1000X-E era scopes.
 - "modern": colon-form SCPI (:TRIGger:EDGE:SOURce, :TIMebase:SCALe) documented
   in the SDS Series Programming Guide EN11G for HD/Plus/SDS5000X+ scopes.
+- "tektronix": Tek-style headerless SCPI (CH1:SCAle, HORizontal:SCAle) shared
+  by the TBS1000C and 2 Series MSO families, with family differences captured
+  in VARIANT_OVERRIDES ("tek_tbs" / "tek_mso").
 
 This module holds the per-dialect command tables and the enum conversions
 between the library's public vocabulary and each dialect's wire tokens.
@@ -14,7 +17,7 @@ import re
 from typing import Dict
 
 # Wire dialects with a command table. Grows as vendor tables land.
-SUPPORTED_DIALECTS = ("legacy", "modern")
+SUPPORTED_DIALECTS = ("legacy", "modern", "tektronix")
 
 # IEEE-488.2 mandated common commands, identical on every instrument.
 IEEE488_BASE = {
@@ -27,9 +30,12 @@ IEEE488_BASE = {
 # Commands written once right after connect-time dialect resolution.
 # legacy: response headers off (Siglent legacy echoes headers by default)
 # modern: nothing needed
+# tektronix: HEADer OFF so queries return bare values (no "CH1:SCALE " prefix)
+#            -- TBS1000C PM 077-1691-01 p.96 / 2 Series MSO PM 077-1776-07 p.2-340
 CONNECT_SETUP = {
     "legacy": ["CHDR OFF"],
     "modern": [],
+    "tektronix": ["HEADer OFF"],
 }
 
 
@@ -165,10 +171,87 @@ class SCPICommandSet:
         "hardcopy_print": "HCSU PRINT",
     }
 
-    # Dialect base tables, keyed by dialect name. Tek/LeCroy tables added later.
+    # Tektronix dialect, verified command-by-command against the TBS1000C
+    # Programmer Manual 077-1691-01 (current edition, supersedes 077-1430-xx;
+    # cited below as "TBS p.N") and the 2 Series MSO (MSO22/MSO24) Programmer
+    # Manual 077-1776-07 (cited as "MSO2 p.2-N"); both printed page numbers.
+    # Family differences live in VARIANT_OVERRIDES["tek_tbs"/"tek_mso"]:
+    # channel display, probe attenuation, PT_Off, and immediate measurements
+    # diverge between the families.
+    TEKTRONIX_COMMANDS = {
+        # Acquisition control
+        "set_trigger_mode": "TRIGger:A:MODe {mode}",  # AUTO|NORMal -- TBS p.155 / MSO2 p.2-684
+        "get_trigger_mode": "TRIGger:A:MODe?",  # TBS p.155 / MSO2 p.2-684
+        "force_trigger": "TRIGger FORCe",  # TBS p.149 / MSO2 p.2-626
+        "run": "ACQuire:STATE RUN",  # TBS p.42 / MSO2 p.2-78
+        "stop": "ACQuire:STATE STOP",  # TBS p.42 / MSO2 p.2-78
+        "set_stop_after": "ACQuire:STOPAfter {mode}",  # RUNSTop|SEQuence -- TBS p.43 / MSO2 p.2-80
+        "get_acq_status": "TRIGger:STATE?",  # ARMED|AUTO|READY|SAVE|TRIGGER -- TBS p.162 / MSO2 p.2-686
+        "auto_setup": "AUTOSet EXECute",  # TBS p.47 / MSO2 p.2-113
+        # Channel control
+        "set_channel_display": "SELect:CH{ch} {state}",  # ON|OFF|<NR1> -- TBS p.144 (MSO2: tek_mso override)
+        "get_channel_display": "SELect:CH{ch}?",  # returns 1|0 -- TBS p.144
+        "set_voltage_div": "CH{ch}:SCAle {vdiv}",  # TBS p.58 / MSO2 p.2-184
+        "get_voltage_div": "CH{ch}:SCAle?",  # TBS p.58 / MSO2 p.2-184
+        "set_voltage_offset": "CH{ch}:OFFSet {offset}",  # TBS p.55 / MSO2 p.2-191
+        "get_voltage_offset": "CH{ch}:OFFSet?",  # TBS p.55 / MSO2 p.2-191
+        # Coupling: TBS {AC|DC} only, MSO2 {AC|DC|DCREJect}; neither family
+        # has GND coupling -- TBS p.53 / MSO2 p.2-184
+        "set_coupling": "CH{ch}:COUPling {coupling}",
+        "get_coupling": "CH{ch}:COUPling?",  # TBS p.53 / MSO2 p.2-184
+        # Bandwidth: TBS {TWEnty|FULl|<NR3>} p.53; MSO2 {<NR3>|FULl} p.2-183
+        # (no TWEnty token on MSO2 -- send FULl or a hertz value for portability)
+        "set_bandwidth_limit": "CH{ch}:BANdwidth {limit}",
+        "get_bandwidth_limit": "CH{ch}:BANdwidth?",  # TBS p.53 / MSO2 p.2-183
+        # Timebase
+        "set_time_div": "HORizontal:SCAle {tdiv}",  # TBS p.104 / MSO2 p.2-349
+        "get_time_div": "HORizontal:SCAle?",  # TBS p.104 / MSO2 p.2-349
+        "set_time_offset": "HORizontal:DELay:TIMe {offset}",  # TBS p.103 / MSO2 p.2-343
+        "get_time_offset": "HORizontal:DELay:TIMe?",  # TBS p.103 / MSO2 p.2-343
+        "get_sample_rate": "HORizontal:SAMPLERate?",  # TBS p.104 (query only) / MSO2 p.2-348
+        # Edge trigger
+        "set_trigger_type": "TRIGger:A:TYPe {type}",  # TBS {EDGe|PULSe} p.161 / MSO2 {EDGE|WIDth|...} p.2-682
+        "get_trigger_type": "TRIGger:A:TYPe?",  # TBS p.161 / MSO2 p.2-682
+        "set_trigger_source": "TRIGger:A:EDGE:SOUrce {src}",  # TBS p.152 / MSO2 p.2-662
+        "get_trigger_source": "TRIGger:A:EDGE:SOUrce?",  # TBS p.152 / MSO2 p.2-662
+        "set_trigger_level": "TRIGger:A:LEVel:CH{ch} {level}",  # TBS p.154 / MSO2 p.2-663
+        "get_trigger_level": "TRIGger:A:LEVel:CH{ch}?",  # TBS p.154 / MSO2 p.2-663
+        "set_trigger_slope": "TRIGger:A:EDGE:SLOpe {slope}",  # TBS {RISe|FALL} p.151 / MSO2 adds EITher p.2-662
+        "get_trigger_slope": "TRIGger:A:EDGE:SLOpe?",  # TBS p.151 / MSO2 p.2-662
+        "set_trigger_coupling": "TRIGger:A:EDGE:COUPling {coupling}",  # DC|HFRej|LFRej|NOISErej -- TBS p.151 / MSO2 p.2-661
+        "get_trigger_coupling": "TRIGger:A:EDGE:COUPling?",  # TBS p.151 / MSO2 p.2-661
+        # Holdoff (TBS prints the keyword as HOLDOff, MSO2 as HOLDoff; the
+        # full spelling below is identical on both -- SCPI is case-insensitive)
+        "set_trigger_holdoff": "TRIGger:A:HOLDoff:TIMe {t}",  # TBS p.153 / MSO2 p.2-684
+        "get_trigger_holdoff": "TRIGger:A:HOLDoff:TIMe?",  # TBS p.153 / MSO2 p.2-684
+        # Waveform transfer (CURVe protocol)
+        "set_data_source": "DATa:SOUrce CH{ch}",  # TBS p.71 / MSO2 p.2-208
+        # DATa:ENCdg has no D-section entry in the TBS manual but is used by
+        # its own transfer procedure (p.38) and echoed by DATa? (p.70);
+        # RIBinary = signed int, MSB first on both families -- MSO2 p.2-205
+        "set_data_encoding": "DATa:ENCdg RIBinary",
+        "set_data_width": "DATa:WIDth 1",  # 8-bit for this project (16-bit is a follow-up) -- TBS p.72 / MSO2 p.2-211
+        "set_data_start": "DATa:STARt {start}",  # TBS p.71 / MSO2 p.2-209
+        "set_data_stop": "DATa:STOP {stop}",  # TBS p.72 / MSO2 p.2-210
+        "get_wfm_nr_pt": "WFMOutpre:NR_Pt?",  # TBS p.174 / MSO2 p.2-204
+        "get_wfm_xincr": "WFMOutpre:XINcr?",  # TBS p.175 / MSO2 p.2-706
+        "get_wfm_xzero": "WFMOutpre:XZEro?",  # TBS p.176 / MSO2 p.2-702
+        # NOTE: no WFMOutpre:PT_Off? on TBS1000C (leaf absent from its
+        # WFMOutpre subsystem, pp.172-177) -- MSO2-only, see tek_mso override
+        "get_wfm_ymult": "WFMOutpre:YMUlt?",  # TBS p.176 / MSO2 p.2-707
+        "get_wfm_yzero": "WFMOutpre:YZEro?",  # TBS p.177 / MSO2 p.2-709
+        "get_wfm_yoff": "WFMOutpre:YOFf?",  # TBS p.176 / MSO2 p.2-708
+        "get_waveform": "CURVe?",  # TBS p.68 / MSO2 p.2-77
+        # Immediate measurements (MEASUrement:IMMed) are TBS-only: the MSO2
+        # manual has no IMMed:TYPe/SOUrce1/VALue commands (badge-based
+        # MEASUrement:MEAS<x> instead) -- see tek_tbs override.
+    }
+
+    # Dialect base tables, keyed by dialect name. LeCroy table added later.
     DIALECT_TABLES = {
         "legacy": LEGACY_COMMANDS,
         "modern": MODERN_COMMANDS,
+        "tektronix": TEKTRONIX_COMMANDS,
     }
 
     # Family overrides applied on top of the dialect base table.
@@ -177,6 +260,29 @@ class SCPICommandSet:
         "hd_series": {},
         "x_series": {},  # HCSU? screen-dump override removed: it was a hardcopy SETUP query, not a dump
         "plus_series": {},
+        "tek_tbs": {
+            # Probe attenuation as gain factor: "a common 10x probe has a
+            # gain of 0.1" -- TBS p.56 (no PRObe:GAIN on MSO2)
+            "set_probe_ratio": "CH{ch}:PRObe:GAIN {gain}",
+            "get_probe_ratio": "CH{ch}:PRObe:GAIN?",
+            # Immediate measurements -- TBS pp.117-121 (absent from the MSO2
+            # command set, so MSO models gate with FeatureNotSupportedError)
+            "set_meas_immed_type": "MEASUrement:IMMed:TYPe {type}",  # TBS p.119
+            "set_meas_immed_source": "MEASUrement:IMMed:SOUrce1 CH{ch}",  # TBS p.117
+            "get_meas_immed_value": "MEASUrement:IMMed:VALue?",  # TBS p.121
+        },
+        "tek_mso": {
+            # MSO2 has no SELect subsystem; display is per-channel global
+            # state {<NR1>|OFF|ON} -- MSO2 p.2-225
+            "set_channel_display": "DISplay:GLObal:CH{ch}:STATE {state}",
+            "get_channel_display": "DISplay:GLObal:CH{ch}:STATE?",
+            # External attenuation "as a multiplier" (gain form, e.g.
+            # 167.00E-3) -- MSO2 p.2-192; closest equivalent of TBS PRObe:GAIN
+            "set_probe_ratio": "CH{ch}:PROBEFunc:EXTAtten {gain}",
+            "get_probe_ratio": "CH{ch}:PROBEFunc:EXTAtten?",
+            # Preamble trigger-point offset, MSO2-only -- MSO2 p.2-701
+            "get_wfm_pt_off": "WFMOutpre:PT_Off?",
+        },
     }
 
     def __init__(self, dialect: str = "legacy", scpi_variant: str = "standard"):
@@ -286,7 +392,7 @@ from scpi_control import exceptions
 FLAT_TRIGGER_DIALECTS = frozenset({"legacy"})
 
 # Dialects whose numeric queries return a bare NR3 value with no unit suffix.
-BARE_NR3_DIALECTS = frozenset({"modern"})
+BARE_NR3_DIALECTS = frozenset({"modern", "tektronix"})
 
 
 def is_flat_trigger(dialect: str) -> bool:
@@ -296,26 +402,37 @@ def is_flat_trigger(dialect: str) -> bool:
 _MODE_TO_WIRE = {
     "legacy": {"AUTO": "AUTO", "NORM": "NORM", "SINGLE": "SINGLE", "STOP": "STOP"},
     "modern": {"AUTO": "AUTO", "NORM": "NORMal", "SINGLE": "SINGle"},
+    # AUTO|NORMal (TBS p.155 / MSO2 p.2-684); SINGLE/STOP are command sequences
+    "tektronix": {"AUTO": "AUTO", "NORM": "NORMal"},
 }
 _MODE_FROM_WIRE = {
     "legacy": {"AUTO": "AUTO", "NORM": "NORM", "SINGLE": "SINGLE", "STOP": "STOP"},
     "modern": {"AUTO": "AUTO", "NORMAL": "NORM", "SINGLE": "SINGLE", "FTRIG": "AUTO"},
+    "tektronix": {"AUTO": "AUTO", "NORMAL": "NORM", "NORM": "NORM"},
 }
 _SLOPE_TO_WIRE = {
     "legacy": {"POS": "POS", "NEG": "NEG", "WINDOW": "WINDOW"},
     "modern": {"POS": "RISing", "NEG": "FALLing", "WINDOW": "ALTernate"},
+    # RISe|FALL (TBS p.151 / MSO2 p.2-662); WINDOW has no Tek edge equivalent
+    # (MSO2's third token is EITher, which is absent on TBS)
+    "tektronix": {"POS": "RISe", "NEG": "FALL"},
 }
 _SLOPE_FROM_WIRE = {
     "legacy": {"POS": "POS", "NEG": "NEG", "WINDOW": "WINDOW"},
     "modern": {"RISING": "POS", "FALLING": "NEG", "ALTERNATE": "WINDOW"},
+    "tektronix": {"RISE": "POS", "FALL": "NEG"},
 }
 _COUPLING_TO_WIRE = {
     "legacy": {"DC": "D1M", "AC": "A1M", "GND": "GND"},
     "modern": {"DC": "DC", "AC": "AC", "GND": "GND"},
+    # No GND coupling on either Tek family: TBS is {AC|DC} (p.53), MSO2 is
+    # {AC|DC|DCREJect} (p.2-184) -- GND gates as FeatureNotSupportedError
+    "tektronix": {"DC": "DC", "AC": "AC"},
 }
 _COUPLING_FROM_WIRE = {
     "legacy": {"D1M": "DC", "A1M": "AC", "D50": "DC", "A50": "AC", "GND": "GND"},
     "modern": {"DC": "DC", "AC": "AC", "GND": "GND"},
+    "tektronix": {"DC": "DC", "AC": "AC"},
 }
 
 _PUBLIC_MODES = {"AUTO", "NORM", "SINGLE", "STOP"}
@@ -323,7 +440,9 @@ _PUBLIC_SLOPES = {"POS", "NEG", "WINDOW"}
 _PUBLIC_COUPLINGS = {"DC", "AC", "GND"}
 
 # Acquisition-status vocabulary shared by every dialect's status query.
-_STATUS_MAP = {"ARM": "ARM", "ARMED": "ARM", "READY": "READY", "AUTO": "AUTO", "TRIG'D": "TRIGD", "STOP": "STOP", "ROLL": "ROLL"}
+# TRIGGER/SAVE are the Tek TRIGger:STATE? vocabulary (SAVE == acquisition
+# stopped) -- TBS p.162 / MSO2 p.2-686.
+_STATUS_MAP = {"ARM": "ARM", "ARMED": "ARM", "READY": "READY", "AUTO": "AUTO", "TRIG'D": "TRIGD", "TRIGGER": "TRIGD", "STOP": "STOP", "SAVE": "STOP", "ROLL": "ROLL"}
 
 
 def _last_token(raw: str) -> str:
@@ -354,6 +473,15 @@ _MEASUREMENT_TYPES = {"PKPK", "MAX", "MIN", "AMPL", "TOP", "BASE", "CMEAN", "MEA
 _MEASUREMENT_TO_WIRE = {
     "legacy": {m: m for m in _MEASUREMENT_TYPES},
     "modern": {m: m for m in _MEASUREMENT_TYPES},
+    # Tek MEASUrement:IMMed:TYPe vocabulary, verbatim from TBS p.119 (the
+    # IMMed subsystem is TBS-only; MSO2's MEAS<x> badge vocabulary differs
+    # and is a follow-up when badge measurements land).
+    "tektronix": {
+        "PKPK": "PK2Pk", "MAX": "MAXimum", "MIN": "MINImum", "AMPL": "AMPlitude",
+        "TOP": "HIGH", "BASE": "LOW", "CMEAN": "CMEan", "MEAN": "MEAN",
+        "RMS": "RMS", "CRMS": "CRMs", "FREQ": "FREQuency", "PER": "PERIod",
+        "RISE": "RISe", "FALL": "FALL", "WID": "PWIdth", "NWID": "NWIdth", "DUTY": "PDUty",
+    },
 }
 
 
@@ -420,3 +548,23 @@ def normalize_status(raw: str) -> str:
     if token not in _STATUS_MAP:
         raise ValueError(f"Unrecognized acquisition status response: {raw!r}")
     return _STATUS_MAP[token]
+
+
+def probe_to_wire(dialect: str, ratio: float) -> str:
+    """Convert a probe attenuation ratio to the wire value (Tek speaks gain = 1/ratio).
+
+    TBS PRObe:GAIN: "a common 10x probe has a gain of 0.1" (TBS p.56);
+    MSO2 PROBEFunc:EXTAtten takes the same multiplier form (MSO2 p.2-192).
+    """
+    if dialect == "tektronix":
+        return f"{1.0 / ratio:g}"
+    return f"{ratio:g}"
+
+
+def probe_from_wire(dialect: str, raw: str) -> float:
+    """Convert a probe query response back to an attenuation ratio."""
+    token = _last_token(raw).replace("X", "")
+    value = float(token)
+    if dialect == "tektronix":
+        return 1.0 / value if value else 0.0
+    return value
