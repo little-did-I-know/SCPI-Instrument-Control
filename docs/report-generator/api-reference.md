@@ -72,9 +72,9 @@ ReportMetadata(
 
 ```python
 WaveformData(
-    channel: str,               # e.g., "CH1"
     time: np.ndarray,           # Time values
     voltage: np.ndarray,        # Voltage values
+    channel: str,               # e.g., "CH1"
     sample_rate: float,        # Samples per second
     record_length: int,        # Number of samples
     timebase: Optional[float],  # s/div

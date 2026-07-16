@@ -195,8 +195,10 @@ class WaveformData(CaptureWaveform):
     # `field()` with no default is REQUIRED, and is the only spelling that works.
     # A bare `sample_rate: float` does NOT re-require the field: @dataclass keeps
     # defaults as class attributes, so the annotation inherits the base's None and
-    # the field silently stays optional. The report pipeline divides by sample_rate
-    # and record_length, so both must be present.
+    # the field silently stays optional. Losing that would not raise at runtime --
+    # the base's __post_init__ derives both sample_rate and record_length from the
+    # arrays anyway -- so what field() actually protects is the explicit contract:
+    # callers must state these rather than let them be silently inferred.
     sample_rate: float = field()
     record_length: int = field()
 

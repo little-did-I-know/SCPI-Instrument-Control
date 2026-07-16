@@ -1,7 +1,8 @@
 """The report waveform is the library waveform plus report concerns.
 
 One model owns the physics. This pins the properties that make the subclass real:
-substitutability, the required-field contract, the inherited validation, and the
+substitutability (including through `type(source_waveform)(...)` reconstruction in
+MathOperations), the required-field contract, the inherited validation, and the
 str-coercion the loader used to do by hand.
 """
 
@@ -30,12 +31,17 @@ def test_a_report_waveform_is_a_capture_waveform():
 
 
 def test_sample_rate_and_record_length_are_genuinely_required():
-    """The bare-annotation trap: `sample_rate: float` would silently inherit the
-    base's None default and this contract would weaken with nothing to catch it.
-    Every other test passes sample_rate, so this is the only test that would fail."""
+    """The bare-annotation trap: `sample_rate: float` (or `record_length: int`)
+    would silently inherit the base's None default and that field's contract
+    would weaken with nothing to catch it. Each field is checked with its own
+    construction, omitting exactly that field -- omitting both at once would
+    leave a hole: reverting `record_length` alone stays undetected, because the
+    missing `sample_rate` alone already satisfies `pytest.raises(TypeError)`."""
     t = np.arange(10) / 1e6
     with pytest.raises(TypeError):
-        ReportWaveform(time=t, voltage=np.ones(10), channel="C1")
+        ReportWaveform(time=t, voltage=np.ones(10), channel="C1", record_length=10)
+    with pytest.raises(TypeError):
+        ReportWaveform(time=t, voltage=np.ones(10), channel="C1", sample_rate=1e6)
 
 
 def test_channel_is_coerced_to_str():
@@ -107,3 +113,19 @@ def test_a_report_waveform_can_be_saved_by_the_library(tmp_path):
     p = tmp_path / "cap.npz"
     object.__new__(Waveform)._save_npy(make_report_waveform(), str(p))
     assert p.exists()
+
+
+def test_math_add_preserves_the_report_waveform_type():
+    """MathOperations._create_result_waveform builds the result via
+    `type(source_waveform)(...)`, silently depending on the report subclass's
+    constructor accepting exactly those kwargs. Pre-branch this raised
+    AttributeError on a report waveform -- the old report type had no time/
+    voltage/channel kwargs at all. It works now; pin it so a future required
+    field on ReportWaveform breaks this test instead of breaking silently."""
+    from scpi_control.math_channel import MathOperations
+
+    wf = make_report_waveform()
+    result = MathOperations.add(wf, wf)
+
+    assert isinstance(result, ReportWaveform)
+    np.testing.assert_allclose(result.voltage, wf.voltage * 2)
