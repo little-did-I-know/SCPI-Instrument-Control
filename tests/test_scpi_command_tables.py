@@ -282,9 +282,10 @@ class TestTektronixConverters:
         assert coupling_to_wire("tektronix", "DC") == "DC"
         assert coupling_to_wire("tektronix", "AC") == "AC"
         assert coupling_from_wire("tektronix", "AC") == "AC"
-        # Neither Tek family has GND coupling (TBS1000C PM p.53: {AC|DC};
-        # MSO2 PM p.2-184: {AC|DC|DCREJect}) -- valid public token, so it
-        # gates as FeatureNotSupportedError rather than ValueError.
+        # No Tek family has GND coupling (TBS1000C PM p.53: {AC|DC}; MSO2 PM
+        # p.2-184: {AC|DC|DCREJect}; 4/5/6 PM 077-1305-11 p.2-299:
+        # {AC|DC|DCREJ}) -- valid public token, so it gates as
+        # FeatureNotSupportedError rather than ValueError.
         with pytest.raises(exc.FeatureNotSupportedError):
             coupling_to_wire("tektronix", "GND")
 
@@ -349,3 +350,47 @@ class TestLeCroyTable:
 
     def test_connect_setup(self):
         assert CONNECT_SETUP["lecroy"] == ["CHDR OFF"]
+
+
+# --- Task 3: tektronix base table verified against 4/5/6 PM 077-1305-11 ------
+
+
+def test_tek_mso_variant_serves_all_modern_mso_families():
+    # MSO 2/4/5/6 all resolve to tek_mso and therefore to the same overrides;
+    # verified against MSO2 PM 077-1776-07 and 4/5/6 PM 077-1305-11.
+    from scpi_control.models import MODEL_REGISTRY
+
+    for model in ("MSO24", "MSO44", "MSO46", "MSO54", "MSO56", "MSO58", "MSO58LP", "MSO64"):
+        assert MODEL_REGISTRY[model].scpi_variant == "tek_mso"
+
+    cmds = SCPICommandSet("tektronix", "tek_mso")
+    # DISplay:GLObal:CH<x>:STATE {<NR1>|OFF|ON} -- MSO2 p.2-225 / MSO456 p.2-352
+    assert cmds.get_command("set_channel_display", ch=8, state="ON") == "DISplay:GLObal:CH8:STATE ON"
+    # CH<x>:PROBEFunc:EXTAtten <NR3> -- MSO2 p.2-192 / MSO456 p.2-316
+    assert cmds.get_command("set_probe_ratio", ch=8, gain="0.1") == "CH8:PROBEFunc:EXTAtten 0.1"
+    # WFMOutpre:PT_Off? -- MSO2 p.2-701 / MSO456 p.2-1462
+    assert cmds.get_command("get_wfm_pt_off") == "WFMOutpre:PT_Off?"
+    # MEASUrement:IMMed has no command-reference entry in either MSO manual.
+    assert not cmds.has_command("set_meas_immed_type")
+
+
+def test_tek_line_trigger_source_gate_is_conservative_not_absence():
+    """LINE exists on 2 of the 3 Tek families; the gate is a portability gate.
+
+    Edge-source vocabularies, verbatim from the manuals:
+      TBS1000C  077-1691-01 p.152    {CH1|CH2|LINE|AUX}       -> LINE
+      2 Series  077-1776-07 p.2-663  {CH<x>|DCH<x>_D<x>|INTernal|AUXiliary}
+      4/5/6     077-1305-11 p.2-1406 {CH<x>|CH<x>_D<y>|LINE|AUXiliary} -> LINE
+
+    The LINE divergence falls *inside* the tek_mso variant (MSO2 lacks it, the
+    4/5/6 has it), so the variant cannot express it and LINE stays gated
+    dialect-wide. If tek_mso is ever split, or a per-model capability flag
+    lands, this test is the one to revisit -- see the task-3 report.
+    """
+    from scpi_control.scpi_commands import channel_token
+
+    with pytest.raises(exc.FeatureNotSupportedError):
+        channel_token("tektronix", "LINE")
+
+    # The AUX mapping is family-independent and stays available.
+    assert channel_token("tektronix", "EX") == "AUX"

@@ -283,14 +283,22 @@ def test_tbs_bandwidth_on_uses_twenty_keyword():
 
 
 def test_tek_external_trigger_maps_ex_to_aux():
-    # Both Tek families accept AUX (TBS p.152 / MSO2 p.2-663).
+    # All three Tek families accept AUX / its long form AUXiliary
+    # (TBS p.152 / MSO2 p.2-663 / MSO456 p.2-1406).
     from scpi_control.scpi_commands import channel_token
 
     assert channel_token("tektronix", "EX") == "AUX"
 
 
 def test_tek_external_trigger_gates_ex5_and_line():
-    # EX5 has no Tek token and LINE is TBS-only (absent on MSO2) -- both gate.
+    # EX5 has no token on any Tek family.
+    #
+    # LINE is NOT TBS-only: TBS (077-1691-01 p.152) and the 4/5/6 Series
+    # (077-1305-11 p.2-1406) both list it; the 2 Series (077-1776-07 p.2-663)
+    # does not. Because MSO2 and MSO 4/5/6 share the tek_mso variant, neither
+    # the dialect nor the variant says whether LINE is legal, so it stays gated
+    # dialect-wide rather than being sent to a scope that would reject it.
+    # This test pins the conservative gate, NOT the claim that Tek lacks LINE.
     from scpi_control.scpi_commands import channel_token
 
     for src in ("EX5", "LINE"):

@@ -368,7 +368,12 @@ MODEL_REGISTRY = {
         horiz_divisions=10,
         vert_divisions=10,
     ),
-    # Tektronix 6 Series MSO (datasheet: 8 GHz max BW, 25 GSa/s, 125 Mpts, 10x10 grid)
+    # Tektronix 6 Series MSO (datasheet: 8 GHz max BW, 25 GSa/s, 125 Mpts, 10x10 grid).
+    # bandwidth_mhz is the top BW option: the MSO64 ships as BW-1000/2500/4000/
+    # 6000/8000, and "MSO64 BW-8000 ... DC - 8 GHz" is the maximum -- 6 Series
+    # MSO MSO64 Specifications and Performance Verification 077-1461-00,
+    # "Analog bandwidth 50 ohm DC coupled" table. 25 GS/s matches "8 bits at
+    # 25 GS/s; 8 GHz on all channels" in the same document.
     "MSO64": ModelCapability(
         model_name="MSO64",
         series="MSO6",
