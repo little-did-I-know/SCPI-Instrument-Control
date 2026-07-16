@@ -27,7 +27,10 @@ class ModelCapability:
     has_protocol_decode: bool  # Supports protocol decode
     supported_decode_types: List[str]  # Supported protocol types (I2C, SPI, UART, CAN, etc.)
     scpi_variant: str  # SCPI command variant ("standard", "hd_series", "x_series", "plus_series")
-    dialect: str = "legacy"  # Wire dialect: "legacy" (TRIG_SELECT/TDIV era) or "modern" (colon-form :TRIGger/:TIMebase)
+    dialect: str = "legacy"  # Wire dialect: "legacy", "modern", "tektronix", or "lecroy"
+    vendor: str = "siglent"  # Instrument vendor: "siglent", "tektronix", or "lecroy"
+    horiz_divisions: int = 14  # Screen grid width in divisions (Siglent scopes use 14)
+    vert_divisions: int = 8  # Screen grid height in divisions
 
     def __str__(self) -> str:
         """String representation of model capability."""
@@ -194,11 +197,145 @@ MODEL_REGISTRY = {
         scpi_variant="x_series",
         dialect="modern",
     ),
+    # Tektronix TBS1000C Series (datasheet: 2 ch, 1 GSa/s, 20 kpts, 15x8 grid)
+    "TBS1102C": ModelCapability(
+        model_name="TBS1102C",
+        series="TBS1000C",
+        num_channels=2,
+        max_sample_rate=1.0,
+        memory_depth=20_000,
+        bandwidth_mhz=100,
+        has_math_channels=True,
+        has_fft=True,
+        has_protocol_decode=False,
+        supported_decode_types=[],
+        scpi_variant="tek_tbs",
+        dialect="tektronix",
+        vendor="tektronix",
+        horiz_divisions=15,
+        vert_divisions=8,
+    ),
+    # Tektronix 2 Series MSO (datasheet: 4 ch, 2.5 GSa/s, 10 Mpts, 10x10 grid)
+    "MSO24": ModelCapability(
+        model_name="MSO24",
+        series="MSO2",
+        num_channels=4,
+        max_sample_rate=2.5,
+        memory_depth=10_000_000,
+        bandwidth_mhz=200,
+        has_math_channels=True,
+        has_fft=True,
+        has_protocol_decode=False,
+        supported_decode_types=[],
+        scpi_variant="tek_mso",
+        dialect="tektronix",
+        vendor="tektronix",
+        horiz_divisions=10,
+        vert_divisions=10,
+    ),
+    # LeCroy WaveSurfer 3000z (datasheet: 4 ch, 4 GSa/s, 10 Mpts, 10x8 grid)
+    "WaveSurfer 3024z": ModelCapability(
+        model_name="WaveSurfer 3024z",
+        series="WaveSurfer3000z",
+        num_channels=4,
+        max_sample_rate=4.0,
+        memory_depth=10_000_000,
+        bandwidth_mhz=200,
+        has_math_channels=True,
+        has_fft=True,
+        has_protocol_decode=False,
+        supported_decode_types=[],
+        scpi_variant="lecroy_maui",
+        dialect="lecroy",
+        vendor="lecroy",
+        horiz_divisions=10,
+        vert_divisions=8,
+    ),
+    # LeCroy WaveRunner 8000 (datasheet: 4 ch, 10 GSa/s, 16 Mpts, 10x8 grid)
+    "WaveRunner 8104": ModelCapability(
+        model_name="WaveRunner 8104",
+        series="WaveRunner8000",
+        num_channels=4,
+        max_sample_rate=10.0,
+        memory_depth=16_000_000,
+        bandwidth_mhz=1000,
+        has_math_channels=True,
+        has_fft=True,
+        has_protocol_decode=False,
+        supported_decode_types=[],
+        scpi_variant="lecroy_maui",
+        dialect="lecroy",
+        vendor="lecroy",
+        horiz_divisions=10,
+        vert_divisions=8,
+    ),
 }
+
+
+def _match_registry(model_from_idn: str, vendor: Optional[str] = None) -> Optional[ModelCapability]:
+    """Exact -> fuzzy -> partial registry match, optionally filtered by vendor."""
+    candidates = {name: cap for name, cap in MODEL_REGISTRY.items() if vendor is None or cap.vendor == vendor}
+
+    if model_from_idn in candidates:
+        logger.info(f"Exact match found: {model_from_idn}")
+        return candidates[model_from_idn]
+
+    normalized_model = re.sub(r"[\s\-_]", "", model_from_idn).upper()
+    for registered_model, capability in candidates.items():
+        if re.sub(r"[\s\-_]", "", registered_model).upper() == normalized_model:
+            logger.info(f"Fuzzy match found: {model_from_idn} -> {registered_model}")
+            return capability
+
+    for registered_model, capability in candidates.items():
+        if registered_model.replace(" ", "").upper() in model_from_idn.replace(" ", "").upper():
+            logger.info(f"Partial match found: {model_from_idn} -> {registered_model}")
+            return capability
+
+    return None
+
+
+def _generic_vendor_capability(model_from_idn: str, vendor: str) -> ModelCapability:
+    """Conservative fallback for an unrecognized model of a known vendor."""
+    upper = model_from_idn.upper()
+    if vendor == "tektronix":
+        # TBS1000-pattern models are 2-channel; everything else defaults to 4
+        num_channels = 2 if re.match(r"TBS1\d", upper) else 4
+        scpi_variant = "tek_tbs" if upper.startswith("TBS") else "tek_mso"
+        dialect = "tektronix"
+        horiz, vert = (15, 8) if upper.startswith("TBS1") else (10, 10)
+    else:  # lecroy
+        num_channels = 4
+        scpi_variant = "lecroy_maui"
+        dialect = "lecroy"
+        horiz, vert = 10, 8
+
+    logger.warning(f"Model '{model_from_idn}' not in registry, using generic {vendor} fallback")
+    return ModelCapability(
+        model_name=model_from_idn,
+        series="Unknown",
+        num_channels=num_channels,
+        max_sample_rate=1.0,
+        memory_depth=10_000_000,
+        bandwidth_mhz=100,
+        has_math_channels=True,
+        has_fft=True,
+        has_protocol_decode=False,
+        supported_decode_types=[],
+        scpi_variant=scpi_variant,
+        dialect=dialect,
+        vendor=vendor,
+        horiz_divisions=horiz,
+        vert_divisions=vert,
+    )
 
 
 def detect_model_from_idn(idn_string: str) -> ModelCapability:
     """Detect oscilloscope model and return its capability profile.
+
+    Routes on the manufacturer field: Tektronix and LeCroy IDNs are matched
+    against their vendor-scoped registry entries (falling back to a generic
+    vendor capability), while every other manufacturer takes the historical
+    Siglent detection path unchanged.
 
     Args:
         idn_string: The response from *IDN? command
@@ -211,36 +348,33 @@ def detect_model_from_idn(idn_string: str) -> ModelCapability:
     Raises:
         ValueError: If model cannot be detected from IDN string
     """
-    # Parse the model name from IDN string
+    # Parse the manufacturer and model name from IDN string
     parts = idn_string.split(",")
     if len(parts) < 2:
         raise ValueError(f"Invalid *IDN? response format: {idn_string}")
 
+    manufacturer = parts[0].strip().upper()
     model_from_idn = parts[1].strip()
-    logger.info(f"Detecting model from IDN: {model_from_idn}")
+    logger.info(f"Detecting model from IDN: {manufacturer} / {model_from_idn}")
 
-    # Try exact match first
-    if model_from_idn in MODEL_REGISTRY:
-        logger.info(f"Exact match found: {model_from_idn}")
-        return MODEL_REGISTRY[model_from_idn]
+    if "TEKTRONIX" in manufacturer:
+        return _match_registry(model_from_idn, "tektronix") or _generic_vendor_capability(model_from_idn, "tektronix")
+    if "LECROY" in manufacturer:  # covers both "LECROY" and "TELEDYNE LECROY"
+        return _match_registry(model_from_idn, "lecroy") or _generic_vendor_capability(model_from_idn, "lecroy")
 
-    # Try fuzzy matching - handle variations in model name format
-    # Remove spaces, dashes, underscores for comparison
-    normalized_model = re.sub(r"[\s\-_]", "", model_from_idn).upper()
+    # Everything else takes the historical Siglent path, byte-for-byte
+    matched = _match_registry(model_from_idn)
+    if matched is not None:
+        return matched
+    return _detect_siglent(model_from_idn)
 
-    for registered_model, capability in MODEL_REGISTRY.items():
-        normalized_registered = re.sub(r"[\s\-_]", "", registered_model).upper()
-        if normalized_model == normalized_registered:
-            logger.info(f"Fuzzy match found: {model_from_idn} -> {registered_model}")
-            return capability
 
-    # Try partial matching - check if registry key is contained in model name
-    for registered_model, capability in MODEL_REGISTRY.items():
-        # Remove spaces from both for comparison
-        if registered_model.replace(" ", "").upper() in model_from_idn.replace(" ", "").upper():
-            logger.info(f"Partial match found: {model_from_idn} -> {registered_model}")
-            return capability
+def _detect_siglent(model_from_idn: str) -> ModelCapability:
+    """Generic Siglent fallback when no registry match is found.
 
+    Historical behavior, unchanged: infer series/channel count/dialect from
+    the model name pattern when the model isn't in the registry.
+    """
     # Model not found - create a generic fallback capability
     logger.warning(f"Model '{model_from_idn}' not in registry, using generic fallback")
 
