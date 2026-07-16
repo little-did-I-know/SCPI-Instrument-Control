@@ -1,55 +1,19 @@
-"""Mock connection implementation for deterministic offline SCPI testing."""
+"""Mock connection shell: constructor/state, connect/disconnect, PSU/AWG/DAQ handling,
+and personality dispatch to the vendor-specific scope write/query/waveform modules."""
 
 from __future__ import annotations
 
 import re
-from typing import Dict, Iterable, List, Optional, Tuple, Union
+from typing import Dict, Iterable, List, Optional, Union
 
 from scpi_control import exceptions
 from scpi_control.connection.base import BaseConnection
+from scpi_control.connection.mock.helpers import MOCK_SCREENSHOT_BMP, _build_ieee_block
+from scpi_control.connection.mock import siglent
 from scpi_control.models import detect_model_from_idn
 
-
-def _format_scientific(value: float, unit: str) -> str:
-    """Format a numeric value with a unit using Siglent-style scientific notation."""
-    return f"{value:.2E}{unit}"
-
-
-def _format_nr3(value: float) -> str:
-    """Format a bare NR3 numeric value (no unit) as used by modern-dialect queries."""
-    return f"{value:.2E}"
-
-
-def _build_ieee_block(payload: bytes) -> bytes:
-    """Wrap payload in an IEEE-488.2 definite-length block: #<ndigits><length><payload>."""
-    length_str = str(len(payload)).encode()
-    return b"#" + str(len(length_str)).encode() + length_str + payload
-
-
-# Minimal valid 1x1 24bpp BMP, so a mock SCDP? screenshot decodes as a real image.
-MOCK_SCREENSHOT_BMP = bytes.fromhex("424d3a000000000000003600000028000000010000000100000001001800000000000400000000000000000000000000000000000000ffffff00")
-
-
-# Canonical PAVA? measurement values for the legacy dialect (mirrors real
-# hardware where PAVA? is legacy-only; the modern dialect has no equivalent).
-_MOCK_PAVA_VALUES: Dict[str, Tuple[str, str]] = {
-    "PKPK": ("2.000E+00", "V"),
-    "MAX": ("1.000E+00", "V"),
-    "MIN": ("-1.000E+00", "V"),
-    "AMPL": ("2.000E+00", "V"),
-    "TOP": ("1.000E+00", "V"),
-    "BASE": ("-1.000E+00", "V"),
-    "CMEAN": ("0.000E+00", "V"),
-    "MEAN": ("0.000E+00", "V"),
-    "RMS": ("7.070E-01", "V"),
-    "CRMS": ("7.070E-01", "V"),
-    "FREQ": ("1.000E+03", "HZ"),
-    "PER": ("1.000E-03", "S"),
-    "RISE": ("3.500E-05", "S"),
-    "FALL": ("3.500E-05", "S"),
-    "WID": ("5.000E-04", "S"),
-    "NWID": ("5.000E-04", "S"),
-    "DUTY": ("5.000E+01", "%"),
+_PERSONALITIES = {
+    "siglent": siglent,
 }
 
 
@@ -94,7 +58,9 @@ class MockConnection(BaseConnection):
 
         self.idn = idn
         # Personality: answer only the wire dialect this model actually speaks
-        self.scope_dialect = detect_model_from_idn(idn).dialect
+        capability = detect_model_from_idn(idn)
+        self.scope_dialect = capability.dialect
+        self.scope_vendor = capability.vendor
         self._channel_enabled: Dict[int, bool] = {ch: channel_states.get(ch, True) if channel_states else True for ch in channels}
         self._voltage_scales: Dict[int, float] = {ch: voltage_scales.get(ch, 1.0) if voltage_scales else 1.0 for ch in channels}
         self._voltage_offsets: Dict[int, float] = {ch: voltage_offsets.get(ch, 0.0) if voltage_offsets else 0.0 for ch in channels}
@@ -360,101 +326,17 @@ class MockConnection(BaseConnection):
                     self.awg_channels[ch]["enabled"] = enabled
                 return
 
-        # Oscilloscope commands
-        if self.scope_dialect == "modern":
-            if match := re.match(r":CHANnel(\d+):SWITch\s+(ON|OFF)", command, re.IGNORECASE):
-                self._channel_enabled[int(match.group(1))] = match.group(2).upper() == "ON"
-                return
-            if match := re.match(r":CHANnel(\d+):SCALe\s+(.+)", command, re.IGNORECASE):
-                ch = int(match.group(1))
-                self._voltage_scales[ch] = float(match.group(2))
-                self.scale_updates.setdefault(ch, []).append(float(match.group(2)))
-                return
-            if match := re.match(r":CHANnel(\d+):OFFSet\s+(.+)", command, re.IGNORECASE):
-                self._voltage_offsets[int(match.group(1))] = float(match.group(2))
-                return
-            if match := re.match(r":CHANnel(\d+):COUPling\s+(\w+)", command, re.IGNORECASE):
-                self._channel_coupling[int(match.group(1))] = match.group(2).upper()
-                return
-            if match := re.match(r":TIMebase:SCALe\s+(.+)", command, re.IGNORECASE):
-                self.timebase = float(match.group(1))
-                self.timebase_updates.append(self.timebase)
-                return
-            if match := re.match(r":TRIGger:MODE\s+(\w+)", command, re.IGNORECASE):
-                self.trigger_mode = match.group(1)  # stored as wire token, e.g. "NORMal" (guide p.482)
-                if match.group(1).upper() == "SINGLE" and len(self.trigger_status) <= 1:
-                    # Status vocabulary matches real hardware: Ready while armed, Stop when done (same rule as the legacy ARM handler)
-                    self.trigger_status = ["Ready", "Stop"]
-                return
-            if re.match(r":TRIGger:RUN$", command, re.IGNORECASE):
-                self.trigger_mode = "AUTO"
-                return
-            if re.match(r":TRIGger:STOP$", command, re.IGNORECASE):
-                if len(self.trigger_status) <= 1:
-                    self.trigger_status = ["Stop"]
-                return
-            if match := re.match(r":TRIGger:TYPE\s+(\w+)", command, re.IGNORECASE):
-                self.trigger_type = match.group(1).upper()
-                return
-            if match := re.match(r":TRIGger:EDGE:SOURce\s+(\w+)", command, re.IGNORECASE):
-                self.trigger_source = match.group(1).upper()
-                return
-            if match := re.match(r":TRIGger:EDGE:LEVel\s+(.+)", command, re.IGNORECASE):
-                self.trigger_level[1] = float(match.group(1))
-                return
-            if match := re.match(r":TRIGger:EDGE:SLOPe\s+(\w+)", command, re.IGNORECASE):
-                self.trigger_slope = match.group(1)  # wire token, e.g. "RISing" (guide p.494)
-                return
-            if match := re.match(r":TRIGger:EDGE:COUPling\s+(\w+)", command, re.IGNORECASE):
-                self.trigger_coupling = match.group(1)
-                return
-            # Unknown modern writes fall through and are merely recorded,
-            # mirroring real scopes which silently drop unknown commands
-
-        if command.upper().startswith("TDIV "):
-            value = command.split(" ", 1)[1]
-            try:
-                self.timebase = float(value)
-            except ValueError:
-                self.timebase = self.timebase
-            self.timebase_updates.append(self.timebase)
-        elif match := re.match(r"C(\d+):VDIV\s+(.+)", command, re.IGNORECASE):
-            channel = int(match.group(1))
-            value = float(match.group(2))
-            self._voltage_scales[channel] = value
-            self.scale_updates.setdefault(channel, []).append(value)
-        elif match := re.match(r"C(\d+):OFST\s+(.+)", command, re.IGNORECASE):
-            channel = int(match.group(1))
-            value = float(match.group(2))
-            self._voltage_offsets[channel] = value
-        elif match := re.match(r"C(\d+):TRA\s+(ON|OFF)", command, re.IGNORECASE):
-            channel = int(match.group(1))
-            self._channel_enabled[channel] = match.group(2).upper() == "ON"
-        elif match := re.match(r"C(\d+):CPL\s+(\w+)", command, re.IGNORECASE):
-            self._channel_coupling[int(match.group(1))] = match.group(2).upper()
-        elif command.upper().startswith("TRIG_MODE "):
-            self.trigger_mode = command.split(" ", 1)[1].upper()
-        elif command.upper().startswith("TRIG_SELECT "):
-            _, params = command.split(" ", 1)
-            trig_type, _, source = params.split(",")
-            self.trigger_type = trig_type.strip().upper()
-            self.trigger_source = source.strip().upper()
-        elif match := re.match(r"C(\d+):TRSL\s+(\w+)", command, re.IGNORECASE):
-            self.trigger_slope = match.group(2).upper()
-        elif match := re.match(r"C(\d+):TRCP\s+(\w+)", command, re.IGNORECASE):
-            self.trigger_coupling = match.group(2).upper()
-        elif command.upper() == "ARM":
-            # Simulate an acquisition that will eventually stop when no custom sequence is provided.
-            # Status vocabulary matches real hardware: Ready while armed, Stop when done.
-            if len(self.trigger_status) <= 1:
-                self.trigger_status = ["Ready", "Stop"]
-        elif match := re.match(r"C(\d+):TRLV\s+(.+)", command, re.IGNORECASE):
-            channel = int(match.group(1))
-            self.trigger_level[channel] = float(match.group(2))
-        elif match := re.match(r"C(\d+):WF\?", command, re.IGNORECASE):
+        # Oscilloscope commands: C{n}:WF? channel recording is shared across every
+        # scope dialect/vendor (Tek's CURVe? uses data_source instead - Task 9), so
+        # it is recorded here before personality dispatch rather than inside a
+        # single vendor module's write handler.
+        if match := re.match(r"C(\d+):WF\?", command, re.IGNORECASE):
             channel = int(match.group(1))
             self._last_waveform_channel = channel
             self.waveform_requests.append(channel)
+
+        personality = _PERSONALITIES.get(self.scope_vendor, siglent)
+        personality.handle_write(self, command)
 
     def read(self) -> str:
         """Return an empty response for completeness."""
@@ -693,88 +575,10 @@ class MockConnection(BaseConnection):
                     return "CV"
                 return "CV"
 
-        if self.scope_dialect == "modern":
-            if upper == ":TRIGGER:STATUS?":  # enum Arm|Ready|Auto|Trig'd|Stop|Roll, p.483
-                if len(self.trigger_status) > 1:
-                    return self.trigger_status.pop(0)
-                return self.trigger_status[0]
-            if upper == ":TRIGGER:MODE?":  # mixed-case wire token, e.g. "NORMal", p.482
-                return self.trigger_mode
-            if upper == ":TRIGGER:TYPE?":
-                return self.trigger_type
-            if upper == ":TRIGGER:EDGE:SOURCE?":  # bare token, p.495
-                return self.trigger_source
-            if upper == ":TRIGGER:EDGE:SLOPE?":  # wire token e.g. "RISing", p.494
-                return self.trigger_slope
-            if upper == ":TRIGGER:EDGE:COUPLING?":
-                return self.trigger_coupling
-            if upper == ":TRIGGER:EDGE:LEVEL?":  # bare NR3, p.492
-                return _format_nr3(self.trigger_level.get(1, 0.0))
-            if match := re.match(r":CHANNEL(\d+):SWITCH\?", upper):
-                return "ON" if self._channel_enabled.get(int(match.group(1)), True) else "OFF"
-            if match := re.match(r":CHANNEL(\d+):SCALE\?", upper):  # bare NR3, p.58
-                return _format_nr3(self._voltage_scales.get(int(match.group(1)), 1.0))
-            if match := re.match(r":CHANNEL(\d+):OFFSET\?", upper):  # bare NR3, p.56
-                return _format_nr3(self._voltage_offsets.get(int(match.group(1)), 0.0))
-            if match := re.match(r":CHANNEL(\d+):COUPLING\?", upper):  # DC|AC|GND, p.51
-                return self._channel_coupling.get(int(match.group(1)), "DC")
-            if upper == ":TIMEBASE:SCALE?":  # bare NR3, p.476
-                return _format_nr3(self.timebase)
-            if upper == ":ACQUIRE:SRATE?":  # bare NR3, p.46
-                return _format_nr3(self.sample_rate)
-
-        if self.scope_dialect == "legacy":
-            if match := re.match(r"C(\d+):VDIV\?", command, re.IGNORECASE):
-                channel = int(match.group(1))
-                value = self._voltage_scales.get(channel, 1.0)
-                return _format_scientific(value, "V")
-
-            if match := re.match(r"C(\d+):OFST\?", command, re.IGNORECASE):
-                channel = int(match.group(1))
-                value = self._voltage_offsets.get(channel, 0.0)
-                return _format_scientific(value, "V")
-
-            if match := re.match(r"C(\d+):TRA\?", command, re.IGNORECASE):
-                channel = int(match.group(1))
-                return "ON" if self._channel_enabled.get(channel, True) else "OFF"
-
-            if match := re.match(r"C(\d+):CPL\?", command, re.IGNORECASE):
-                return self._channel_coupling.get(int(match.group(1)), "D1M")
-
-            if match := re.match(r"C(\d+):TRLV\?", command, re.IGNORECASE):
-                channel = int(match.group(1))
-                return _format_scientific(self.trigger_level.get(channel, 0.0), "V")
-
-            if re.match(r"C(\d+):TRSL\?", command, re.IGNORECASE):
-                return self.trigger_slope
-
-            if re.match(r"C(\d+):TRCP\?", command, re.IGNORECASE):
-                return self.trigger_coupling
-
-            if upper == "TDIV?":
-                return _format_scientific(self.timebase, "S")
-
-            if upper == "SARA?":
-                return _format_scientific(self.sample_rate, "Sa/s")
-
-            if upper == "SAST?":
-                if len(self.trigger_status) > 1:
-                    return self.trigger_status.pop(0)
-                return self.trigger_status[0]
-
-            if upper == "TRIG_MODE?":
-                return self.trigger_mode
-
-            if upper == "TRIG_SELECT?":
-                return f"{self.trigger_type},SR,{self.trigger_source}"
-
-            if match := re.match(r"PAVA\?\s*(\w+)\s*,\s*C?(\d+)", command, re.IGNORECASE):
-                mtype = match.group(1).upper()
-                channel = match.group(2)
-                entry = _MOCK_PAVA_VALUES.get(mtype)
-                if entry is not None:
-                    value, unit = entry
-                    return f"PAVA {mtype},C{channel},{value}{unit}"
+        personality = _PERSONALITIES.get(self.scope_vendor, siglent)
+        response = personality.handle_query(self, command)
+        if response is not None:
+            return response
 
         if self.psu_mode or self.awg_mode or self.daq_mode:
             return ""
@@ -787,10 +591,6 @@ class MockConnection(BaseConnection):
         """Convenience helper to query multiple commands sequentially."""
         return [self.query(cmd) for cmd in commands]
 
-    def _build_waveform_block(self, payload: bytes) -> bytes:
-        """Construct a minimal Siglent-style block response."""
-        return b"DESC," + _build_ieee_block(payload)
-
     def read_raw(self, size: Optional[int] = None) -> bytes:
         """Return deterministic raw waveform data (or a mock screenshot BMP after SCDP?)."""
         if not self._connected:
@@ -801,6 +601,5 @@ class MockConnection(BaseConnection):
             # scope's SCDP? reply is parsed in screen_capture.py.
             return _build_ieee_block(MOCK_SCREENSHOT_BMP)
 
-        channel = self._last_waveform_channel or next(iter(self._waveform_payloads.keys()))
-        payload = self._waveform_payloads.get(channel, bytes())
-        return self._build_waveform_block(payload)
+        personality = _PERSONALITIES.get(self.scope_vendor, siglent)
+        return personality.build_waveform_response(self)
