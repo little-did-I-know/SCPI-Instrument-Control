@@ -225,6 +225,21 @@ class TektronixTransfer:
         self._scope = scope
 
     def acquire(self, channel: int, format: str = "BYTE") -> WaveformData:
+        """Acquire waveform data from a channel via the CURVe protocol.
+
+        Args:
+            channel: Channel number (1-4)
+            format: Data format - only 'BYTE' (8-bit, DATa:WIDth 1) is
+                supported today; 'WORD' (16-bit) is a follow-up.
+
+        Returns:
+            WaveformData scaled by the WFMOutpre preamble (ymult/yoff/yzero for
+            volts, xincr/xzero/pt_off for the time axis).
+
+        Raises:
+            FeatureNotSupportedError: If a non-BYTE format is requested.
+            CommandError: If the CURVe block is malformed.
+        """
         if format.upper() != "BYTE":
             raise exceptions.FeatureNotSupportedError("16-bit waveform transfer on tektronix is not supported yet (DATa:WIDth 1 only)")
         scope = self._scope
@@ -286,7 +301,8 @@ def parse_wavedesc(payload: bytes, *, error_context: str = "") -> dict:
     """Parse the WAVEDESC descriptor out of a LeCroy WF? ALL payload (CORD LO)."""
     start = payload.find(b"WAVEDESC")
     if start == -1:
-        raise exceptions.CommandError(f"Invalid LeCroy waveform: no WAVEDESC descriptor found ({error_context})")
+        message = "Invalid LeCroy waveform: no WAVEDESC descriptor found"
+        raise exceptions.CommandError(f"{message} ({error_context})" if error_context else message)
     desc_len = struct.unpack_from("<i", payload, start + _WAVEDESC_DESC_LEN)[0]
     user_text_len = struct.unpack_from("<i", payload, start + _WAVEDESC_USER_TEXT_LEN)[0]
     # Per the WAVEDESC template, DATA_ARRAY_1 follows WAVEDESC + USER_TEXT +

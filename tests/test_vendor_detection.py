@@ -1,7 +1,5 @@
 """Vendor-aware model detection and vendor-axis primitives."""
 
-import pytest
-
 from scpi_control import exceptions
 
 

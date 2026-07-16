@@ -259,9 +259,12 @@ class SCPICommandSet:
         "get_wfm_yzero": "WFMOutpre:YZEro?",  # TBS p.177 / MSO2 p.2-709
         "get_wfm_yoff": "WFMOutpre:YOFf?",  # TBS p.176 / MSO2 p.2-708
         "get_waveform": "CURVe?",  # TBS p.68 / MSO2 p.2-77
-        # Immediate measurements (MEASUrement:IMMed) are TBS-only: the MSO2
-        # manual has no IMMed:TYPe/SOUrce1/VALue commands (badge-based
-        # MEASUrement:MEAS<x> instead) -- see tek_tbs override.
+        # Immediate measurements (MEASUrement:IMMed) are wired for TBS only
+        # (see tek_tbs override); MSO2 gates with FeatureNotSupportedError and
+        # steers callers at its badge-based MEASUrement:MEAS<x> subsystem.
+        # NOTE: the MSO2 PM's programming-examples appendix (p.3-12/3-13) and
+        # factory-defaults table (p.C-11) do show IMMed:TYPe/SOURCE/VALue
+        # working, so this gate is deliberately conservative, not manual-contradicted.
     }
 
     # LeCroy MAUI dialect, per the MAUI Oscilloscopes Remote Control and
@@ -359,7 +362,7 @@ class SCPICommandSet:
     }
 
     # Dialect base tables, keyed by dialect name.
-    DIALECT_TABLES = {
+    DIALECT_TABLES: Dict[str, Dict[str, str]] = {
         "legacy": LEGACY_COMMANDS,
         "modern": MODERN_COMMANDS,
         "tektronix": TEKTRONIX_COMMANDS,
@@ -704,7 +707,21 @@ def source_from_wire(dialect: str, raw: str) -> str:
 
 
 def normalize_status(raw: str) -> str:
-    """Normalize an acquisition-status response to ARM|READY|AUTO|TRIGD|STOP|ROLL."""
+    """Normalize an acquisition-status response to ARM|READY|AUTO|TRIGD|STOP|ROLL.
+
+    Reads the last whitespace-separated token of the response (tolerating a
+    residual header echo such as a leading "SAST") and maps it from whichever
+    dialect produced it:
+
+    - Siglent legacy (SAST?) / modern (:TRIGger:STATus?): ARM, READY, AUTO,
+      TRIG'D, STOP, ROLL.
+    - Tektronix (TRIGger:STATE?): ARMED, AUTO, READY, SAVE, TRIGGER, where SAVE
+      means acquisition stopped and TRIGGER is the triggered state
+      (TBS p.162 / MSO2 p.2-686).
+
+    Raises:
+        ValueError: If the token is not a recognized status in any dialect.
+    """
     token = _last_token(raw)
     if token not in _STATUS_MAP:
         raise ValueError(f"Unrecognized acquisition status response: {raw!r}")

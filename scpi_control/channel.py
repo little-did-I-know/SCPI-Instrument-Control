@@ -31,7 +31,6 @@ class Channel:
         """
         self._scope = oscilloscope
         self._channel = channel_number
-        self._prefix = f"C{channel_number}"
 
         if not 1 <= channel_number <= 4:
             raise exceptions.InvalidParameterError(f"Invalid channel number: {channel_number}. Must be 1-4.")

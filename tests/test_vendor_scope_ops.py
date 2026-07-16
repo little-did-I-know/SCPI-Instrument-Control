@@ -319,3 +319,27 @@ def test_tek_trigger_source_ex5_raises_before_write(tek_scope):
     with pytest.raises(exceptions.FeatureNotSupportedError):
         Trigger(tek_scope).source = "EX5"
     assert not any("EDGE:SOUrce" in c.args[0] for c in tek_scope.write.call_args_list)
+
+
+# --- B8: tektronix trigger-level getter -----------------------------------
+
+
+def test_tek_trigger_level_getter_queries_source_channel(tek_scope):
+    from scpi_control.trigger import Trigger
+
+    trig = Trigger(tek_scope)
+    # source resolves to CH3, so the level getter targets the per-channel path
+    tek_scope.query.side_effect = ["CH3", "0.25"]
+    assert trig.level == pytest.approx(0.25)
+    assert tek_scope.query.call_args_list[-1].args[0] == "TRIGger:A:LEVel:CH3?"
+
+
+def test_tek_trigger_level_getter_non_channel_source_returns_zero(tek_scope):
+    from scpi_control.trigger import Trigger
+
+    trig = Trigger(tek_scope)
+    # A non-channel source (external AUX/LINE) has no per-channel trigger level;
+    # the getter guards and returns 0.0 without issuing a level query.
+    tek_scope.query.return_value = "AUX"
+    assert trig.level == 0.0
+    assert not any("LEVel" in c.args[0] for c in tek_scope.query.call_args_list)
