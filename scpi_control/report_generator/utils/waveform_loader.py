@@ -7,11 +7,18 @@ created by the Siglent oscilloscope library.
 
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Iterable, List, Optional
 
 import numpy as np
 
+from scpi_control import waveform_schema as ws
 from scpi_control.report_generator.models.report_data import WaveformData
+
+
+def _looks_like_ours(keys: Iterable[str]) -> bool:
+    """True when a file carries this library's core schema fields."""
+    keys = set(keys)
+    return ws.TIME in keys and ws.VOLTAGE in keys and ws.CHANNEL in keys
 
 
 class WaveformLoader:
@@ -55,69 +62,81 @@ class WaveformLoader:
 
     @staticmethod
     def _load_npz(filepath: Path) -> List[WaveformData]:
-        """Load waveform data from NPZ file."""
+        """Load an NPZ, reading this library's schema exactly when present."""
         data = np.load(filepath, allow_pickle=True)
-        waveforms = []
 
-        # NPZ files can contain multiple channels
-        # Expected structure: time, voltage, metadata for each channel
+        if _looks_like_ours(data.files):
+            return [WaveformLoader._npz_from_schema(data, filepath)]
+        return WaveformLoader._npz_heuristic(data, filepath)
 
-        # Try to find time and voltage arrays
-        time_key = None
-        voltage_keys = []
+    @staticmethod
+    def _npz_from_schema(data, filepath: Path) -> WaveformData:
+        """Read an NPZ written by scpi_control.waveform's _save_npy."""
+        metadata = {k[len(ws.NPZ_META_PREFIX) :]: data[k] for k in data.files if k.startswith(ws.NPZ_META_PREFIX)}
+        voltage = np.asarray(data[ws.VOLTAGE])
+        return WaveformData(
+            channel_name=str(data[ws.CHANNEL]),
+            time_data=np.asarray(data[ws.TIME]),
+            voltage_data=voltage,
+            sample_rate=float(data[ws.SAMPLE_RATE]),
+            record_length=len(voltage),
+            source_file=filepath,
+        )
 
-        for key in data.files:
-            if "time" in key.lower():
-                time_key = key
-            elif "voltage" in key.lower() or key.startswith("C"):
-                voltage_keys.append(key)
-
-        if time_key is None:
-            # Try using first array as time
-            time_key = data.files[0] if data.files else None
-
-        if not voltage_keys:
-            # Use all arrays except time as voltage data
-            voltage_keys = [k for k in data.files if k != time_key]
-
+    @staticmethod
+    def _npz_heuristic(data, filepath: Path) -> List[WaveformData]:
+        """Best-effort read of a third-party NPZ. Values here are inferred."""
+        time_key = WaveformLoader._pick_time_key(data.files)
+        voltage_keys = [k for k in data.files if k != time_key and np.asarray(data[k]).ndim == 1 and np.issubdtype(np.asarray(data[k]).dtype, np.number)]
         if time_key is None or not voltage_keys:
-            raise ValueError("Could not identify time and voltage data in NPZ file")
+            raise ValueError(f"Could not identify time and voltage data in {filepath}")
 
-        time_data = data[time_key]
-
-        # Load metadata if available
-        metadata = data.get("metadata", {})
-        if isinstance(metadata, np.ndarray):
-            metadata = metadata.item() if metadata.size == 1 else {}
-
+        time_data = np.asarray(data[time_key])
+        waveforms = []
         for voltage_key in voltage_keys:
-            voltage_data = data[voltage_key]
-
-            # Determine channel name from key
-            channel_name = voltage_key
-
-            # Extract metadata for this channel
-            sample_rate = metadata.get("sample_rate", 1e9)
-            if isinstance(sample_rate, np.ndarray):
-                sample_rate = float(sample_rate)
-
-            waveform = WaveformData(
-                channel_name=channel_name,
-                time_data=time_data,
-                voltage_data=voltage_data,
-                sample_rate=sample_rate,
-                record_length=len(voltage_data),
-                timebase=metadata.get("timebase"),
-                voltage_scale=metadata.get(f"{channel_name}_vscale"),
-                voltage_offset=metadata.get(f"{channel_name}_voffset"),
-                probe_ratio=metadata.get(f"{channel_name}_probe"),
-                coupling=metadata.get(f"{channel_name}_coupling"),
-                source_file=filepath,
+            voltage = np.asarray(data[voltage_key])
+            waveforms.append(
+                WaveformData(
+                    channel_name=voltage_key,
+                    time_data=time_data,
+                    voltage_data=voltage,
+                    sample_rate=WaveformLoader._rate_from_time(time_data),
+                    record_length=len(voltage),
+                    source_file=filepath,
+                )
             )
-
-            waveforms.append(waveform)
-
         return waveforms
+
+    @staticmethod
+    def _pick_time_key(keys: Iterable[str]) -> Optional[str]:
+        """Choose a time key without letting 'timestamp' shadow 'time'.
+
+        An exact match always wins; only then do we fall back to a substring
+        guess, and never onto a timestamp-ish key. If nothing looks
+        time-related at all, fall back to the first non-timestamp-ish key
+        (best-effort, for files with no recognizable time key whatsoever) --
+        but a "stamp"-suffixed key is never eligible, even as a last resort.
+        """
+        keys = list(keys)
+        if ws.TIME in keys:
+            return ws.TIME
+        for key in keys:
+            lowered = key.lower()
+            if "time" in lowered and "stamp" not in lowered:
+                return key
+        for key in keys:
+            if "stamp" not in key.lower():
+                return key
+        return None
+
+    @staticmethod
+    def _rate_from_time(time_data: np.ndarray) -> float:
+        """Derive the sample rate from a time axis; 0.0 when it cannot be known."""
+        time_data = np.asarray(time_data)
+        if time_data.ndim != 1 or len(time_data) < 2:
+            return 0.0
+        dt = float(time_data[1] - time_data[0])
+        return 1.0 / dt if dt > 0 else 0.0
 
     @staticmethod
     def _load_csv(filepath: Path) -> List[WaveformData]:
@@ -173,61 +192,48 @@ class WaveformLoader:
 
     @staticmethod
     def _load_mat(filepath: Path) -> List[WaveformData]:
-        """Load waveform data from MATLAB file."""
+        """Load a MAT file, reading this library's schema exactly when present."""
         try:
             from scipy.io import loadmat
         except ImportError:
-            raise ImportError("scipy is required to load MAT files. " "Install with: pip install scipy")
+            raise ImportError("scipy is required to load MAT files. Install with: pip install scipy")
 
         data = loadmat(filepath)
-        waveforms = []
+        keys = [k for k in data.keys() if not k.startswith("__")]
 
-        # Find time and voltage arrays (skip MATLAB metadata keys starting with __)
-        time_key = None
-        voltage_keys = []
+        if _looks_like_ours(keys):
+            voltage = np.asarray(data[ws.VOLTAGE]).flatten()
+            # loadmat returns even scalars as 2-D arrays; .item() unwraps them.
+            return [
+                WaveformData(
+                    channel_name=str(np.asarray(data[ws.CHANNEL]).item()),
+                    time_data=np.asarray(data[ws.TIME]).flatten(),
+                    voltage_data=voltage,
+                    sample_rate=float(np.asarray(data[ws.SAMPLE_RATE]).item()),
+                    record_length=len(voltage),
+                    source_file=filepath,
+                )
+            ]
 
-        for key in data.keys():
-            if key.startswith("__"):
-                continue
-            if "time" in key.lower():
-                time_key = key
-            elif "voltage" in key.lower() or key.startswith("C") or key.startswith("ch"):
-                voltage_keys.append(key)
-
-        if time_key is None:
-            # Use first non-metadata key as time
-            non_meta_keys = [k for k in data.keys() if not k.startswith("__")]
-            time_key = non_meta_keys[0] if non_meta_keys else None
-
-        if not voltage_keys:
-            # Use all non-time, non-metadata keys as voltage
-            voltage_keys = [k for k in data.keys() if not k.startswith("__") and k != time_key]
-
+        time_key = WaveformLoader._pick_time_key(keys)
+        voltage_keys = [k for k in keys if k != time_key and np.issubdtype(np.asarray(data[k]).dtype, np.number)]
         if time_key is None or not voltage_keys:
-            raise ValueError("Could not identify time and voltage data in MAT file")
+            raise ValueError(f"Could not identify time and voltage data in {filepath}")
 
-        time_data = data[time_key].flatten()
-
+        time_data = np.asarray(data[time_key]).flatten()
+        waveforms = []
         for voltage_key in voltage_keys:
-            voltage_data = data[voltage_key].flatten()
-
-            # Calculate sample rate
-            if len(time_data) > 1:
-                dt = time_data[1] - time_data[0]
-                sample_rate = 1.0 / dt if dt > 0 else 1e9
-            else:
-                sample_rate = 1e9
-
-            waveform = WaveformData(
-                channel_name=voltage_key,
-                time_data=time_data,
-                voltage_data=voltage_data,
-                sample_rate=sample_rate,
-                record_length=len(voltage_data),
-                source_file=filepath,
+            voltage = np.asarray(data[voltage_key]).flatten()
+            waveforms.append(
+                WaveformData(
+                    channel_name=voltage_key,
+                    time_data=time_data,
+                    voltage_data=voltage,
+                    sample_rate=WaveformLoader._rate_from_time(time_data),
+                    record_length=len(voltage),
+                    source_file=filepath,
+                )
             )
-            waveforms.append(waveform)
-
         return waveforms
 
     @staticmethod
