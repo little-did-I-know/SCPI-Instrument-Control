@@ -57,7 +57,9 @@ def test_npz_timestamp_never_shadows_time(tmp_path):
     assert not isinstance(got.time_data.dtype.type(), np.str_)
 
 
-def test_npz_user_metadata_is_read(tmp_path):
+def test_npz_meta_keys_do_not_disturb_the_schema_path(tmp_path):
+    """meta_* keys must neither break the schema path nor become phantom
+    waveforms -- nothing reads them, so they must be inert."""
     wf = make_waveform()
     p = tmp_path / "cap.npz"
     saver()._save_npy(wf, str(p), metadata={"dut": "board7"})
@@ -113,3 +115,38 @@ def test_foreign_npz_with_both_time_and_timestamp(tmp_path):
 
     assert got.time_data.ndim == 1
     assert len(got.time_data) == 10
+
+
+def test_foreign_npz_with_our_names_but_no_sample_rate_falls_back(tmp_path):
+    """time/voltage/channel but no sample_rate is NOT our schema -- it must
+    fall back, not die on KeyError."""
+    p = tmp_path / "partial.npz"
+    np.savez(p, time=np.arange(10) / 1e3, voltage=np.ones(10), channel="C1")
+
+    loaded = WaveformLoader.load(p)
+
+    assert len(loaded) == 1
+    assert len(loaded[0].time_data) == 10
+
+
+def test_foreign_npz_with_a_string_first_key_is_rejected_cleanly(tmp_path):
+    """A string array must never become the time axis via the last-resort branch."""
+    p = tmp_path / "stringy.npz"
+    np.savez(p, label=np.array(["a", "b", "c"]), signal=np.ones(3))
+
+    with pytest.raises(ValueError):
+        WaveformLoader.load(p)
+
+
+def test_foreign_mat_scalar_fields_do_not_become_waveforms(tmp_path):
+    """A scalar like sample_rate must not flatten into a 1-sample 'waveform'."""
+    pytest.importorskip("scipy")
+    from scipy.io import savemat
+
+    p = tmp_path / "foreign.mat"
+    savemat(str(p), {"time": np.arange(10) / 1e3, "voltage": np.ones(10), "sample_rate": 1e3})
+
+    loaded = WaveformLoader.load(p)
+
+    assert len(loaded) == 1
+    assert loaded[0].record_length == 10

@@ -16,9 +16,12 @@ from scpi_control.report_generator.models.report_data import WaveformData
 
 
 def _looks_like_ours(keys: Iterable[str]) -> bool:
-    """True when a file carries this library's core schema fields."""
+    """True when a file carries all fields the schema readers unconditionally
+    read: TIME, VOLTAGE, CHANNEL, and SAMPLE_RATE. Anything missing one of
+    these must fall back to the heuristic reader instead of hitting a raw
+    KeyError in the schema path."""
     keys = set(keys)
-    return ws.TIME in keys and ws.VOLTAGE in keys and ws.CHANNEL in keys
+    return ws.TIME in keys and ws.VOLTAGE in keys and ws.CHANNEL in keys and ws.SAMPLE_RATE in keys
 
 
 class WaveformLoader:
@@ -72,7 +75,6 @@ class WaveformLoader:
     @staticmethod
     def _npz_from_schema(data, filepath: Path) -> WaveformData:
         """Read an NPZ written by scpi_control.waveform's _save_npy."""
-        metadata = {k[len(ws.NPZ_META_PREFIX) :]: data[k] for k in data.files if k.startswith(ws.NPZ_META_PREFIX)}
         voltage = np.asarray(data[ws.VOLTAGE])
         return WaveformData(
             channel_name=str(data[ws.CHANNEL]),
@@ -92,6 +94,9 @@ class WaveformLoader:
             raise ValueError(f"Could not identify time and voltage data in {filepath}")
 
         time_data = np.asarray(data[time_key])
+        if not np.issubdtype(time_data.dtype, np.number):
+            raise ValueError(f"Could not identify time and voltage data in {filepath}")
+
         waveforms = []
         for voltage_key in voltage_keys:
             voltage = np.asarray(data[voltage_key])
@@ -216,7 +221,7 @@ class WaveformLoader:
             ]
 
         time_key = WaveformLoader._pick_time_key(keys)
-        voltage_keys = [k for k in keys if k != time_key and np.issubdtype(np.asarray(data[k]).dtype, np.number)]
+        voltage_keys = [k for k in keys if k != time_key and np.issubdtype(np.asarray(data[k]).dtype, np.number) and np.asarray(data[k]).size > 1]
         if time_key is None or not voltage_keys:
             raise ValueError(f"Could not identify time and voltage data in {filepath}")
 
