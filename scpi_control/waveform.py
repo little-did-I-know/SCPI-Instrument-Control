@@ -55,7 +55,13 @@ class WaveformData:
         return len(self.voltage)
 
     def __post_init__(self) -> None:
-        """Validate and populate optional metadata."""
+        """Validate the arrays and derive what they determine.
+
+        Only values the samples actually determine are derived here: record_length
+        is the array's length, and sample_rate is 1/dt off the time axis. Timebase
+        and voltage_scale are NOT derived -- they depend on the scope's display
+        grid, which the samples do not carry. A real acquisition supplies both.
+        """
         if self.time.shape != self.voltage.shape:
             raise ValueError("Time and voltage arrays must have the same shape")
 
@@ -68,21 +74,6 @@ class WaveformData:
             dt = float(np.mean(np.diff(self.time)))
             if dt > 0:
                 self.sample_rate = 1.0 / dt
-
-        # generic fallback; real acquisitions carry explicit timebase --
-        # per-model grids live in ModelCapability
-        if self.timebase is None and self.sample_rate:
-            total_time = self.record_length / self.sample_rate
-            self.timebase = total_time / 14.0
-
-        # Infer a reasonable voltage scale when none is supplied
-        if self.voltage_scale is None:
-            if len(self.voltage) > 0:
-                span = float(np.max(self.voltage) - np.min(self.voltage))
-                # Standard 8 vertical divisions on most scopes
-                self.voltage_scale = span / 8.0 if span > 0 else 1.0
-            else:
-                self.voltage_scale = 1.0
 
 
 class Waveform:

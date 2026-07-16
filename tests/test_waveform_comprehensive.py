@@ -313,17 +313,6 @@ class TestWaveformUtilities:
             descriptor = waveform_handler._get_waveform_descriptor(1)
             assert isinstance(descriptor, dict)
 
-    def test_calculate_timebase(self):
-        """Test calculating timebase from sample rate."""
-        sample_rate = 1e6  # 1 MSa/s
-        record_length = 1000
-
-        duration = record_length / sample_rate
-        time = np.linspace(0, duration, record_length, endpoint=False)
-
-        assert len(time) == record_length
-        assert time[-1] < duration
-
 
 class TestWaveformComparison:
     """Test waveform comparison functions."""
