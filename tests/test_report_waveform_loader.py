@@ -251,6 +251,28 @@ def test_csv_header_with_an_empty_channel_value_falls_back(tmp_path):
     assert got.sample_rate == pytest.approx(1e6)
 
 
+def test_csv_user_metadata_key_named_channel_cannot_override_the_real_one(tmp_path):
+    """The real header always precedes the 'Additional Metadata' block; a user
+    metadata key that happens to be named 'Channel' must not win."""
+    p = tmp_path / "spoofed_channel.csv"
+    p.write_text(
+        "# Channel: C2\n"
+        "# Sample Rate: 1000000.0 Sa/s\n"
+        "#\n"
+        "# Additional Metadata:\n"
+        "# Channel: NOT-THE-REAL-CHANNEL\n"
+        "# Sample Rate: 42.0 Sa/s\n"
+        "Time (s),Voltage (V)\n"
+        "0.0,0.0\n"
+        "1e-06,0.5\n"
+    )
+
+    got = WaveformLoader.load(p)[0]
+
+    assert got.channel_name == "C2"
+    assert got.sample_rate == pytest.approx(1e6)
+
+
 def test_hdf5_round_trip_preserves_everything(tmp_path):
     pytest.importorskip("h5py")
     wf = make_waveform()
@@ -280,6 +302,21 @@ def test_hdf5_with_user_metadata_loads(tmp_path):
     assert len(loaded) == 1
     assert loaded[0].channel_name == "C1"
     np.testing.assert_allclose(loaded[0].voltage_data, wf.voltage)
+
+
+def test_foreign_hdf5_still_loads_heuristically(tmp_path):
+    """A third-party HDF5 has none of our dataset names; best-effort must
+    still work, mirroring test_foreign_npz_still_loads_heuristically."""
+    h5py = pytest.importorskip("h5py")
+    p = tmp_path / "foreign.h5"
+    with h5py.File(p, "w") as f:
+        f.create_dataset("t_axis", data=np.arange(10) / 1e3)
+        f.create_dataset("ch_a", data=np.ones(10))
+
+    loaded = WaveformLoader.load(p)
+
+    assert len(loaded) == 1
+    assert len(loaded[0].time_data) == 10
 
 
 def test_load_multiple_raises_on_a_bad_file(tmp_path):

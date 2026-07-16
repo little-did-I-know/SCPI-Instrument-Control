@@ -1,1 +1,1 @@
-"""Test suite for Siglent Oscilloscope Control application."""
+"""Test suite for SCPI Instrument Control."""
