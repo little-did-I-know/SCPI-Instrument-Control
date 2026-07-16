@@ -244,12 +244,12 @@ class SCPICommandSet:
         # below is the same command (B is the delayed-trigger sibling).
         "set_trigger_type": "TRIGger:A:TYPe {type}",  # TBS {EDGe|PULSe} p.161 / MSO2 {EDGE|WIDth|...} p.2-682 / MSO456 p.2-1426
         "get_trigger_type": "TRIGger:A:TYPe?",  # TBS p.161 / MSO2 p.2-682 / MSO456 p.2-1426
-        "set_trigger_source": "TRIGger:A:EDGE:SOUrce {src}",  # TBS p.152 / MSO2 p.2-662 / MSO456 p.2-1405
-        "get_trigger_source": "TRIGger:A:EDGE:SOUrce?",  # TBS p.152 / MSO2 p.2-662 / MSO456 p.2-1405
+        "set_trigger_source": "TRIGger:A:EDGE:SOUrce {src}",  # TBS p.152 / MSO2 p.2-663 / MSO456 p.2-1405
+        "get_trigger_source": "TRIGger:A:EDGE:SOUrce?",  # TBS p.152 / MSO2 p.2-663 / MSO456 p.2-1405
         "set_trigger_level": "TRIGger:A:LEVel:CH{ch} {level}",  # TBS p.154 / MSO2 p.2-663 / MSO456 p.2-1406
         "get_trigger_level": "TRIGger:A:LEVel:CH{ch}?",  # TBS p.154 / MSO2 p.2-663 / MSO456 p.2-1406
-        "set_trigger_slope": "TRIGger:A:EDGE:SLOpe {slope}",  # TBS {RISe|FALL} p.151 / MSO2 + MSO456 add EITher -- MSO2 p.2-662 / MSO456 p.2-1404
-        "get_trigger_slope": "TRIGger:A:EDGE:SLOpe?",  # TBS p.151 / MSO2 p.2-662 / MSO456 p.2-1404
+        "set_trigger_slope": "TRIGger:A:EDGE:SLOpe {slope}",  # TBS {RISe|FALL} p.151 / MSO2 + MSO456 add EITher -- MSO2 p.2-662 / MSO456 p.2-1405
+        "get_trigger_slope": "TRIGger:A:EDGE:SLOpe?",  # TBS p.151 / MSO2 p.2-662 / MSO456 p.2-1405
         "set_trigger_coupling": "TRIGger:A:EDGE:COUPling {coupling}",  # DC|HFRej|LFRej|NOISErej -- TBS p.151 / MSO2 p.2-661 / MSO456 p.2-1404
         "get_trigger_coupling": "TRIGger:A:EDGE:COUPling?",  # TBS p.151 / MSO2 p.2-661 / MSO456 p.2-1404
         # Holdoff (TBS prints the keyword as HOLDOff, MSO2/MSO456 as HOLDoff; the
@@ -589,7 +589,7 @@ _MODE_FROM_WIRE = {
 _SLOPE_TO_WIRE = {
     "legacy": {"POS": "POS", "NEG": "NEG", "WINDOW": "WINDOW"},
     "modern": {"POS": "RISing", "NEG": "FALLing", "WINDOW": "ALTernate"},
-    # RISe|FALL (TBS p.151 / MSO2 p.2-662 / MSO456 p.2-1404); WINDOW has no Tek
+    # RISe|FALL (TBS p.151 / MSO2 p.2-662 / MSO456 p.2-1405); WINDOW has no Tek
     # edge equivalent (the MSO third token is EITher on both MSO families,
     # which is absent on TBS -- and EITher is "either edge", not a window)
     "tektronix": {"POS": "RISe", "NEG": "FALL"},
