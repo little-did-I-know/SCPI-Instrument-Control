@@ -240,7 +240,7 @@ class LLMClient:
 
             return data["choices"][0]["message"]["content"]
 
-        except (requests.exceptions.RequestException, OSError) as e:
+        except requests.exceptions.RequestException as e:
             print(f"LLM request failed: {e}")
             return None
         except (KeyError, IndexError, json.JSONDecodeError) as e:

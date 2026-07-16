@@ -62,10 +62,12 @@ def test_chat_posts_to_the_openai_compatible_endpoint():
 
 
 def test_chat_returns_none_when_the_transport_fails():
+    import requests
+
     config = LLMConfig(endpoint="http://localhost:1234/v1", model="local-model")
     client = LLMClient(config)
 
-    with patch("requests.Session.post", side_effect=OSError("connection refused")):
+    with patch("requests.Session.post", side_effect=requests.exceptions.ConnectionError("connection refused")):
         assert client.chat([{"role": "user", "content": "hi"}]) is None
 
 
