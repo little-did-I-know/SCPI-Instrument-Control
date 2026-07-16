@@ -433,7 +433,7 @@ Contributions welcome! Areas for improvement:
 For issues and questions:
 
 - GitHub Issues: https://github.com/little-did-I-know/SCPI-Instrument-Control/issues
-- Documentation: See docs/report-generator/ (coming soon)
+- Documentation: See docs/report-generator/
 
 ---
 
