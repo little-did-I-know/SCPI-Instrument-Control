@@ -61,44 +61,46 @@ def _svg_to_drawing(buf, max_width, max_height):
     return drawing
 
 
-class _NumberedCanvas(canvas.Canvas):
-    """Draws running page furniture (header on pages 2+, footer + 'Page X of Y'
-    on every page). Two-pass: it records each page's state on showPage, then draws
-    the furniture with the true total page count on save."""
+if REPORTLAB_AVAILABLE:
 
-    def __init__(self, *args, furniture=None, **kwargs):
-        super().__init__(*args, **kwargs)
-        self._furniture = furniture or {}
-        self._saved_states = []
+    class _NumberedCanvas(canvas.Canvas):
+        """Draws running page furniture (header on pages 2+, footer + 'Page X of Y'
+        on every page). Two-pass: it records each page's state on showPage, then draws
+        the furniture with the true total page count on save."""
 
-    def showPage(self):
-        self._saved_states.append(dict(self.__dict__))
-        self._startPage()
+        def __init__(self, *args, furniture=None, **kwargs):
+            super().__init__(*args, **kwargs)
+            self._furniture = furniture or {}
+            self._saved_states = []
 
-    def save(self):
-        total = len(self._saved_states)
-        for index, state in enumerate(self._saved_states, start=1):
-            self.__dict__.update(state)
-            self._draw_furniture(index, total)
-            super().showPage()
-        super().save()
+        def showPage(self):
+            self._saved_states.append(dict(self.__dict__))
+            self._startPage()
 
-    def _draw_furniture(self, page, total):
-        width, height = self._pagesize
-        self.setFont("Helvetica", 8)
-        self.setFillColor(colors.grey)
-        # Footer on every page: footer_text (left) + "Page X of Y" (right)
-        if self._furniture.get("footer_text"):
-            self.drawString(0.75 * inch, 0.5 * inch, self._furniture["footer_text"])
-        self.drawRightString(width - 0.75 * inch, 0.5 * inch, f"Page {page} of {total}")
-        # Running header on pages 2+ (page 1 already has the big title/logo block)
-        if page > 1:
-            if self._furniture.get("title"):
-                self.drawString(0.75 * inch, height - 0.6 * inch, self._furniture["title"])
-            if self._furniture.get("header_text"):
-                self.drawRightString(width - 0.75 * inch, height - 0.6 * inch, self._furniture["header_text"])
-            self.setStrokeColor(colors.lightgrey)
-            self.line(0.75 * inch, height - 0.7 * inch, width - 0.75 * inch, height - 0.7 * inch)
+        def save(self):
+            total = len(self._saved_states)
+            for index, state in enumerate(self._saved_states, start=1):
+                self.__dict__.update(state)
+                self._draw_furniture(index, total)
+                super().showPage()
+            super().save()
+
+        def _draw_furniture(self, page, total):
+            width, height = self._pagesize
+            self.setFont("Helvetica", 8)
+            self.setFillColor(colors.grey)
+            # Footer on every page: footer_text (left) + "Page X of Y" (right)
+            if self._furniture.get("footer_text"):
+                self.drawString(0.75 * inch, 0.5 * inch, self._furniture["footer_text"])
+            self.drawRightString(width - 0.75 * inch, 0.5 * inch, f"Page {page} of {total}")
+            # Running header on pages 2+ (page 1 already has the big title/logo block)
+            if page > 1:
+                if self._furniture.get("title"):
+                    self.drawString(0.75 * inch, height - 0.6 * inch, self._furniture["title"])
+                if self._furniture.get("header_text"):
+                    self.drawRightString(width - 0.75 * inch, height - 0.6 * inch, self._furniture["header_text"])
+                self.setStrokeColor(colors.lightgrey)
+                self.line(0.75 * inch, height - 0.7 * inch, width - 0.75 * inch, height - 0.7 * inch)
 
 
 class PDFReportGenerator(BaseReportGenerator):
@@ -408,8 +410,8 @@ class PDFReportGenerator(BaseReportGenerator):
                     section_percent = 20 + int((i / num_sections) * section_progress_range)
                     self._report_progress(section_percent, f"Processing section {i+1}/{num_sections}")
 
-                    # Pass waveform progress tracking
                     story.append(CondPageBreak(1.5 * inch))
+                    # Pass waveform progress tracking
                     story.extend(
                         self._generate_section(
                             section,
