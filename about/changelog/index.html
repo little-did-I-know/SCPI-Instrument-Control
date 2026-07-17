@@ -3098,6 +3098,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#breaking-changes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ⚠️ Breaking Changes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#added" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3137,7 +3148,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#breaking-changes" class="md-nav__link">
+  <a href="#breaking-changes_1" class="md-nav__link">
     <span class="md-ellipsis">
       
         ⚠️ Breaking Changes
@@ -3248,7 +3259,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#breaking-changes_1" class="md-nav__link">
+  <a href="#breaking-changes_2" class="md-nav__link">
     <span class="md-ellipsis">
       
         Breaking Changes
@@ -3603,7 +3614,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#breaking-changes_2" class="md-nav__link">
+  <a href="#breaking-changes_3" class="md-nav__link">
     <span class="md-ellipsis">
       
         ⚠️ BREAKING CHANGES
@@ -4151,6 +4162,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#breaking-changes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ⚠️ Breaking Changes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#added" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4190,7 +4212,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#breaking-changes" class="md-nav__link">
+  <a href="#breaking-changes_1" class="md-nav__link">
     <span class="md-ellipsis">
       
         ⚠️ Breaking Changes
@@ -4301,7 +4323,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#breaking-changes_1" class="md-nav__link">
+  <a href="#breaking-changes_2" class="md-nav__link">
     <span class="md-ellipsis">
       
         Breaking Changes
@@ -4656,7 +4678,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#breaking-changes_2" class="md-nav__link">
+  <a href="#breaking-changes_3" class="md-nav__link">
     <span class="md-ellipsis">
       
         ⚠️ BREAKING CHANGES
@@ -5118,6 +5140,33 @@
 <p>The format is based on <a href="https://keepachangelog.com/en/1.0.0/">Keep a Changelog</a>,
 and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semantic Versioning</a>.</p>
 <h2 id="unreleased">[Unreleased]<a class="headerlink" href="#unreleased" title="Permanent link">&para;</a></h2>
+<h3 id="breaking-changes">⚠️ Breaking Changes<a class="headerlink" href="#breaking-changes" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>The report generator's <code>WaveformData</code> fields are renamed, and <code>channel</code>
+  moved from the first constructor argument to the third.</strong> <code>channel_name</code>,
+  <code>time_data</code>, and <code>voltage_data</code> are now <code>channel</code>, <code>time</code>, and <code>voltage</code>,
+  matching the base class's field order (<code>time</code>, <code>voltage</code>, <code>channel</code>, ...).
+  Because the position changed along with the name, positional construction
+  such as <code>WaveformData("CH1", t, v, ...)</code> does <strong>not</strong> fail with a
+  recognizable rename error — it silently assigns <code>"CH1"</code> to <code>time</code> and
+  blows up later with <code>AttributeError: 'str' object has no attribute
+  'shape'</code>. Construct with keywords (<code>channel=</code>, <code>time=</code>, <code>voltage=</code>) to
+  migrate safely. This is a documented public API — see
+  <a href="docs/report-generator/api-reference.md"><code>docs/report-generator/api-reference.md</code></a>.</li>
+<li><strong><code>WaveformData.source</code> and <code>WaveformData.description</code> are removed</strong>, on
+  both the library and report waveform types. <code>WaveformData(..., source="x")</code>
+  now raises <code>TypeError</code> instead of silently accepting the keyword.</li>
+<li><strong><code>WaveformData.timebase</code> and <code>WaveformData.voltage_scale</code> are <code>None</code>
+  unless an instrument actually reported them</strong>, instead of being derived by
+  assuming a 14-division horizontal grid and an 8-division vertical one —
+  Siglent's geometry, previously applied to Tektronix and LeCroy captures too
+  — with a flat trace given a bare 1.0 V/div. Real acquisitions are
+  unaffected: all three vendor backends pass genuine scope values. Code that
+  does arithmetic on <code>timebase</code>/<code>voltage_scale</code> from a <em>synthetic</em> waveform
+  (a math channel, or hand-built test data) — e.g. <code>wf.timebase * 1e6</code> — now
+  raises <code>TypeError</code> on <code>None</code> instead of silently using an invented number.
+  Guard with a <code>None</code> check, or supply real values.</li>
+</ul>
 <h3 id="added">Added<a class="headerlink" href="#added" title="Permanent link">&para;</a></h3>
 <ul>
 <li>Tektronix and LeCroy oscilloscope support (core control, waveform
@@ -5150,9 +5199,17 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   instead of a fixed 1-4 range. Scopes with fewer than four channels now raise
   <code>InvalidParameterError</code> for a channel they do not have, where they
   previously queried it.</li>
+<li>The report generator's <code>WaveformData</code> is now a subclass of
+  <code>scpi_control.waveform.WaveformData</code> (see Breaking Changes above for the
+  field rename and reorder this involved). Report waveforms now inherit the
+  library's array-shape validation, and <code>channel</code> is now guaranteed to be a
+  <code>str</code> by the type itself. The loader's explicit <code>str()</code> calls at each
+  construction site are unchanged and now redundant, not removed — they stay
+  as a defensive measure against <code>np.str_</code>/<code>bytes</code> values handed back at the
+  MAT/HDF5 boundary.</li>
 </ul>
 <h2 id="200-2026-07-15">[2.0.0] - 2026-07-15<a class="headerlink" href="#200-2026-07-15" title="Permanent link">&para;</a></h2>
-<h3 id="breaking-changes">⚠️ Breaking Changes<a class="headerlink" href="#breaking-changes" title="Permanent link">&para;</a></h3>
+<h3 id="breaking-changes_1">⚠️ Breaking Changes<a class="headerlink" href="#breaking-changes_1" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>Removed the <code>siglent</code> compatibility shim.</strong> <code>import siglent</code> now raises
   <code>ModuleNotFoundError</code>; use <code>import scpi_control</code> (identical API). The shim
@@ -5217,7 +5274,7 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 <h2 id="100-2026-01-06">[1.0.0] - 2026-01-06<a class="headerlink" href="#100-2026-01-06" title="Permanent link">&para;</a></h2>
 <h3 id="major-release-package-renamed">⚠️ MAJOR RELEASE - Package Renamed<a class="headerlink" href="#major-release-package-renamed" title="Permanent link">&para;</a></h3>
 <p><strong>This is a major release with a package rename.</strong> The project has been renamed from <code>Siglent-Oscilloscope</code> to <code>SCPI-Instrument-Control</code> to better reflect its expanded capabilities beyond just Siglent oscilloscopes.</p>
-<h3 id="breaking-changes_1">Breaking Changes<a class="headerlink" href="#breaking-changes_1" title="Permanent link">&para;</a></h3>
+<h3 id="breaking-changes_2">Breaking Changes<a class="headerlink" href="#breaking-changes_2" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>PyPI Package Name</strong>: <code>siglent</code> → <code>SCPI-Instrument-Control</code></li>
 <li><strong>Python Import Name</strong>: <code>import siglent</code> → <code>import scpi_control</code> (recommended)</li>
@@ -5832,7 +5889,7 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 <li>Resolved workflow exit code 1 error during archive creation</li>
 </ul>
 <h2 id="030-unreleased">[0.3.0] - Unreleased<a class="headerlink" href="#030-unreleased" title="Permanent link">&para;</a></h2>
-<h3 id="breaking-changes_2">⚠️ BREAKING CHANGES<a class="headerlink" href="#breaking-changes_2" title="Permanent link">&para;</a></h3>
+<h3 id="breaking-changes_3">⚠️ BREAKING CHANGES<a class="headerlink" href="#breaking-changes_3" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>Exception Class Renaming</strong> (Issue #3 from Code Review)</li>
 <li><code>ConnectionError</code> renamed to <code>SiglentConnectionError</code> to avoid shadowing Python's built-in <code>ConnectionError</code></li>
