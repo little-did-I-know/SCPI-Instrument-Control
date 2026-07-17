@@ -7,6 +7,7 @@ company branding, and AI-generated insights.
 
 from __future__ import annotations
 
+import functools
 import io
 import logging
 import re
@@ -20,6 +21,7 @@ try:
     from reportlab.lib.pagesizes import A4, letter
     from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
     from reportlab.lib.units import inch
+    from reportlab.pdfgen import canvas
     from reportlab.platypus import Image as RLImage
     from reportlab.platypus import KeepTogether, PageBreak, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
     from reportlab.graphics.shapes import Drawing
@@ -57,6 +59,46 @@ def _svg_to_drawing(buf, max_width, max_height):
     drawing.width *= scale
     drawing.height *= scale
     return drawing
+
+
+class _NumberedCanvas(canvas.Canvas):
+    """Draws running page furniture (header on pages 2+, footer + 'Page X of Y'
+    on every page). Two-pass: it records each page's state on showPage, then draws
+    the furniture with the true total page count on save."""
+
+    def __init__(self, *args, furniture=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._furniture = furniture or {}
+        self._saved_states = []
+
+    def showPage(self):
+        self._saved_states.append(dict(self.__dict__))
+        self._startPage()
+
+    def save(self):
+        total = len(self._saved_states)
+        for index, state in enumerate(self._saved_states, start=1):
+            self.__dict__.update(state)
+            self._draw_furniture(index, total)
+            super().showPage()
+        super().save()
+
+    def _draw_furniture(self, page, total):
+        width, height = self._pagesize
+        self.setFont("Helvetica", 8)
+        self.setFillColor(colors.grey)
+        # Footer on every page: footer_text (left) + "Page X of Y" (right)
+        if self._furniture.get("footer_text"):
+            self.drawString(0.75 * inch, 0.5 * inch, self._furniture["footer_text"])
+        self.drawRightString(width - 0.75 * inch, 0.5 * inch, f"Page {page} of {total}")
+        # Running header on pages 2+ (page 1 already has the big title/logo block)
+        if page > 1:
+            if self._furniture.get("title"):
+                self.drawString(0.75 * inch, height - 0.6 * inch, self._furniture["title"])
+            if self._furniture.get("header_text"):
+                self.drawRightString(width - 0.75 * inch, height - 0.6 * inch, self._furniture["header_text"])
+            self.setStrokeColor(colors.lightgrey)
+            self.line(0.75 * inch, height - 0.7 * inch, width - 0.75 * inch, height - 0.7 * inch)
 
 
 class PDFReportGenerator(BaseReportGenerator):
@@ -392,7 +434,12 @@ class PDFReportGenerator(BaseReportGenerator):
             self._report_progress(88, "Building PDF document")
 
             # Build PDF
-            doc.build(story)
+            furniture = {
+                "title": report.metadata.title,
+                "header_text": report.metadata.header_text,
+                "footer_text": report.metadata.footer_text,
+            }
+            doc.build(story, canvasmaker=functools.partial(_NumberedCanvas, furniture=furniture))
 
             self._report_progress(100, "PDF generation complete")
 
