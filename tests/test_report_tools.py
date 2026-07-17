@@ -17,9 +17,7 @@ from scpi_control.report_generator.models.report_data import (
     TestReport,
     TestSection,
     WaveformData,
-    WaveformRegion,
 )
-from scpi_control.report_generator.utils.waveform_analyzer import WaveformAnalyzer
 
 
 def make_waveform(channel="C1", n=2000, rate=1e6, freq=10_000, label=None):
@@ -32,6 +30,16 @@ def make_waveform(channel="C1", n=2000, rate=1e6, freq=10_000, label=None):
         record_length=n,
         label=label,
     )
+
+
+def make_bursty_waveform(channel="C1", n=4000, rate=1e6, freq=10_000, bursts=20, width=6):
+    """A sine carrying `bursts` multi-sample spikes -- enough real transients to
+    exceed MAX_TRANSIENTS."""
+    t = np.arange(n) / rate
+    v = np.sin(2 * np.pi * freq * t)
+    for start in np.linspace(50, n - 100, bursts).astype(int):
+        v[start : start + width] += 8.0
+    return WaveformData(channel=channel, time=t, voltage=v, sample_rate=rate, record_length=n)
 
 
 def make_report(waveforms=None, measurements=None):
@@ -97,21 +105,15 @@ def test_detect_transients_reports_none_on_a_clean_sine():
     assert "none" in out.lower()
 
 
-def test_detect_transients_caps_its_output_and_says_so(monkeypatch):
+def test_detect_transients_caps_its_output_and_says_so():
     """A noisy capture can produce hundreds of transients and blow the context.
     Truncation must be stated: silently returning 10 of 400 teaches the model the
     signal is cleaner than it is.
 
-    WaveformAnalyzer.detect_transients hard-truncates its own return to 10
-    (waveform_analyzer.py:1003) as an internal implementation detail, so no real
-    capture -- however noisy -- can ever hand ReportTools more than that. The
-    collaborator is stubbed here so this test exercises ReportTools' OWN
-    truncation and "showing first" message in isolation, which is the behaviour
-    this tool layer is actually responsible for."""
-    fake_regions = [WaveformRegion(start_time=i * 1e-6, end_time=(i + 1) * 1e-6, label=f"Transient {i}") for i in range(15)]
-    monkeypatch.setattr(WaveformAnalyzer, "detect_transients", lambda waveform, sensitivity=3.0: fake_regions)
-
-    out = ReportTools(make_report()).detect_transients("C1")
+    Drives the real analyzer: the spikes are multi-sample bursts because the
+    analyzer discards any region shorter than 0.1% of the capture, which single
+    -sample spikes never clear."""
+    out = ReportTools(make_report(waveforms=[make_bursty_waveform()])).detect_transients("C1")
 
     assert "showing first" in out
     assert out.count("µs") <= MAX_TRANSIENTS

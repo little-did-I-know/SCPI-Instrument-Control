@@ -26,11 +26,12 @@ from scpi_control.report_generator.utils.waveform_analyzer import WaveformAnalyz
 
 logger = logging.getLogger(__name__)
 
-# WaveformAnalyzer.detect_transients already truncates its own return to 10
-# (waveform_analyzer.py:1003), but that is an internal implementation detail,
-# not part of its documented contract -- unlike detect_edges(max_edges=4), which
-# advertises its bound in its signature. MAX_TRANSIENTS makes the bound part of
-# this tool's own explicit contract rather than an accident of the collaborator.
+# detect_transients is unbounded by default in WaveformAnalyzer, so a noisy
+# capture really can yield hundreds and blow the context. This is the real
+# backstop: the analyzer is called with no limit so the TRUE total is known, and
+# the truncation to MAX_TRANSIENTS is reported rather than hidden -- "400 found,
+# showing first 10" instead of a bare "10 found", which would teach the model the
+# signal is cleaner than it is.
 MAX_TRANSIENTS = 10
 
 _SENSITIVITY_DEFAULT = 3.0
