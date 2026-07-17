@@ -880,64 +880,39 @@ class PDFReportGenerator(BaseReportGenerator):
 
         return story
 
-    def _generate_region_plot(self, waveform: WaveformData, region: "WaveformRegion") -> Optional[RLImage]:
-        """
-        Generate a zoomed plot for a specific region.
+    def _generate_region_plot(self, waveform: WaveformData, region: "WaveformRegion") -> Optional[Drawing]:
+        """Generate a zoomed region plot as a scaled vector Drawing.
 
         Args:
             waveform: Parent waveform
             region: Region to plot
 
         Returns:
-            ReportLab Image object, or None if generation fails
+            A scaled reportlab Drawing, or None if generation fails.
         """
         try:
-            from io import BytesIO
-
-            import matplotlib.pyplot as plt
-
-            # Extract region data
             t, v = waveform.get_region_data(region)
-
             if len(t) == 0:
                 return None
 
-            # Apply plot style
-            if self.plot_style.matplotlib_style != "default":
-                plt.style.use(self.plot_style.matplotlib_style)
-
-            fig, ax = plt.subplots(figsize=(6, 3))
-
-            # Plot the region
-            ax.plot(t * 1e3, v, color=region.highlight_color or self.plot_style.waveform_color, linewidth=self.plot_style.waveform_linewidth)
-
-            # Add reference line for ideal value
-            if region.ideal_value is not None:
-                ax.axhline(y=region.ideal_value, color="red", linestyle="--", linewidth=1, label=f"Ideal: {region.ideal_value:.4f}V", alpha=0.6)
-                ax.legend(fontsize=8)
-
-            # Apply style to axes
-            self.plot_style.apply_to_axes(ax)
-
-            # Labels
-            ax.set_xlabel("Time (ms)", fontsize=self.plot_style.label_fontsize)
-            ax.set_ylabel("Voltage (V)", fontsize=self.plot_style.label_fontsize)
-            ax.set_title(f"{region.label} - Zoomed View", fontsize=self.plot_style.title_fontsize)
-
-            ax.grid(True, alpha=0.3)
-
-            plt.tight_layout()
-
-            # Convert to image
-            buf = BytesIO()
-            plt.savefig(buf, format="png", dpi=150, bbox_inches="tight")
+            style = self.plot_style.matplotlib_style or "default"
+            buf = io.BytesIO()
+            with plt.style.context(style):
+                fig, ax = plt.subplots(figsize=(self.plot_width / inch, self.plot_height / inch))
+                ax.plot(t * 1e3, v, color=region.highlight_color or self.plot_style.waveform_color, linewidth=self.plot_style.waveform_linewidth)
+                if region.ideal_value is not None:
+                    ax.axhline(y=region.ideal_value, color="red", linestyle="--", linewidth=1, label=f"Ideal: {region.ideal_value:.4f}V", alpha=0.6)
+                    ax.legend(fontsize=8)
+                self.plot_style.apply_to_axes(ax)
+                ax.set_xlabel("Time (ms)", fontsize=self.plot_style.label_fontsize)
+                ax.set_ylabel("Voltage (V)", fontsize=self.plot_style.label_fontsize)
+                ax.set_title(f"{region.label} - Zoomed View", fontsize=self.plot_style.title_fontsize)
+                ax.grid(True, alpha=0.3)
+                fig.tight_layout()
+                fig.savefig(buf, format="svg")
+                plt.close(fig)
             buf.seek(0)
-            plt.close(fig)
-
-            # Create ReportLab image
-            img = RLImage(buf, width=5 * inch, height=2.5 * inch)
-            return img
-
+            return _svg_to_drawing(buf, self.plot_width, self.plot_height)
         except Exception as e:
             logger.exception(f"Error generating region plot: {e}")
             return None
