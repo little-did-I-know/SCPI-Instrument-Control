@@ -10,7 +10,7 @@ from datetime import datetime
 import numpy as np
 import pytest
 
-from scpi_control.report_generator.llm.tools import MAX_TRANSIENTS, ReportTools
+from scpi_control.report_generator.llm.tools import MAX_PLATEAUS, MAX_TRANSIENTS, ReportTools
 from scpi_control.report_generator.models.report_data import (
     MeasurementResult,
     ReportMetadata,
@@ -190,6 +190,74 @@ def test_every_tool_has_a_description_and_described_parameters():
         assert tool.function.description, f"{fn.__name__} has no description"
         for pname, prop in (tool.function.parameters.properties or {}).items():
             assert prop.description, f"{fn.__name__}.{pname} has no description"
+
+
+def make_square(channel="C1", n=4000, rate=1e6, freq=500.1):
+    """A clean square wave, ~2 cycles over 4000 samples -> a few long plateaus
+    (well under MAX_PLATEAUS, so nothing truncates and both plateau_high and
+    plateau_low show). Raise freq to force many plateaus.
+
+    Note: detect_plateaus thresholds at median(v) +/- 0.3*std(v). A perfect +-1
+    square wave is bimodal, so that threshold only splits both polarities apart
+    when the high/low sample counts are exactly equal (median lands on 0);
+    otherwise the median snaps entirely to whichever side has one more sample
+    and the other polarity is never detected. At an exact divisor like 500 Hz
+    every zero-crossing lands on an integer sample index and ties into the high
+    side (`>= 0`), which is why 500.1 Hz -- not 500 Hz -- is the default: it
+    avoids that exact tie so both plateau_high and plateau_low actually appear.
+
+    Also note: detect_plateaus requires each plateau to last >= 1% of the record,
+    so a high-frequency square whose half-periods fall below that yields NO
+    plateaus -- keep freq low enough that half_period_samples =
+    rate/(2*freq) >> n*0.01."""
+    t = np.arange(n) / rate
+    v = np.where(np.sin(2 * np.pi * freq * t) >= 0, 1.0, -1.0)
+    return WaveformData(channel=channel, time=t, voltage=v, sample_rate=rate, record_length=n)
+
+
+def make_flatless(channel="C1", n=2000, rate=1e6, freq=50_000):
+    """A fast sine: its arcs above threshold are too brief to register as plateaus
+    (detect_plateaus -> none), and a pure sine's slope never crosses detect_edges'
+    2-sigma derivative threshold (detect_edges -> none). One deterministic 'empty'
+    fixture for both the no-plateaus and no-edges cases."""
+    t = np.arange(n) / rate
+    return WaveformData(channel=channel, time=t, voltage=np.sin(2 * np.pi * freq * t), sample_rate=rate, record_length=n)
+
+
+def report_of(waveform):
+    return make_report(waveforms=[waveform])
+
+
+def test_analyze_plateaus_reports_slope_per_plateau():
+    out = ReportTools(report_of(make_square())).analyze_plateaus("C1")
+    assert "plateau_high" in out and "plateau_low" in out
+    assert "slope=" in out and "V/s" in out
+    assert "channel=C1" in out and "[Captures]" in out
+
+
+def test_analyze_plateaus_on_a_signal_with_no_plateaus():
+    out = ReportTools(report_of(make_flatless())).analyze_plateaus("C1")
+    assert "no flat plateaus" in out.lower()
+
+
+def test_analyze_plateaus_caps_its_output_and_states_the_true_total():
+    """A many-cycle square wave yields far more than MAX_PLATEAUS regions. The
+    reported total must be true and the truncation stated -- the detect_transients
+    lesson: a silent slice teaches the model the signal is simpler than it is."""
+    many = make_square(freq=5_000)  # 20 cycles over 4000 samples -> 19 plateaus, well over MAX_PLATEAUS
+    out = ReportTools(report_of(many)).analyze_plateaus("C1")
+    assert "showing first" in out
+    # one plateau line per shown region; count the leading "  plateau_" bullets
+    assert out.count("  plateau_") == MAX_PLATEAUS
+
+
+def test_analyze_plateaus_does_not_mutate_the_report():
+    """Read-only: the tool must never append to waveform.regions."""
+    report = report_of(make_square())
+    waveform = report.sections[0].waveforms[0]
+    before = len(waveform.regions)
+    ReportTools(report).analyze_plateaus("C1")
+    assert len(waveform.regions) == before
 
 
 def test_optional_parameters_are_not_marked_required():

@@ -35,6 +35,16 @@ _SENSITIVITY_DEFAULT = 3.0
 _SENSITIVITY_MIN = 1.0
 _SENSITIVITY_MAX = 10.0
 
+MAX_PLATEAUS = 8
+
+
+def _format_volts(value: Optional[float]) -> str:
+    return "n/a" if value is None else f"{value:.4g} V"
+
+
+def _format_slope(value: Optional[float]) -> str:
+    return "n/a" if value is None else f"{value:.4g} V/s"
+
 
 class ReportTools:
     """Read-only tools over one loaded report."""
@@ -98,6 +108,40 @@ class ReportTools:
         stats = WaveformAnalyzer.analyze(waveform)
         lines = [f"analyze_waveform(channel={channel}) [{section_title}]:"]
         lines.extend(f"  {name}: {WaveformAnalyzer.format_stat_value(name, value)}" for name, value in stats.items())
+        return "\n".join(lines)
+
+    def analyze_plateaus(self, channel: str) -> str:
+        """Measure the flat plateau regions of a captured waveform.
+
+        Reports each plateau's level, slope, flatness, drift and noise -- the raw
+        facts for judging probe compensation and settling. A plateau that slopes
+        instead of staying flat suggests probe miscompensation; interpret the
+        slope yourself rather than expecting a verdict.
+
+        Args:
+            channel: Channel to inspect, e.g. "C1". Must be one listed by list_waveforms.
+        """
+        waveform, section_title = self._find(channel)
+        regions = WaveformAnalyzer.detect_plateaus(waveform)
+        head = f"analyze_plateaus(channel={channel}) [{section_title}]:"
+        if not regions:
+            return f"{head} no flat plateaus found."
+
+        for region in regions:
+            WaveformAnalyzer.analyze_region(waveform, region, calculate_calibration=False)
+
+        shown = regions[:MAX_PLATEAUS]
+        summary = f"{head} {len(regions)} found"
+        if len(regions) > len(shown):
+            summary += f", showing first {len(shown)}"
+        lines = [summary]
+        for region in shown:
+            lines.append(
+                f"  {region.region_type} {region.start_time * 1e6:.2f}-{region.end_time * 1e6:.2f} µs: "
+                f"level={_format_volts(region.ideal_value)}, slope={_format_slope(region.slope)}, "
+                f"flatness={_format_volts(region.flatness)}, drift={_format_volts(region.drift)}, "
+                f"noise={_format_volts(region.noise_level)}"
+            )
         return "\n".join(lines)
 
     def detect_transients(self, channel: str, sensitivity: Optional[float] = None) -> str:
