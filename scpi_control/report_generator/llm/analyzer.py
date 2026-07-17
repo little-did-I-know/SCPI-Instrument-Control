@@ -4,12 +4,16 @@ High-level analyzer that uses LLM to generate insights and summaries.
 Provides convenient methods for common analysis tasks.
 """
 
+import logging
 from typing import List, Optional
 
 from scpi_control.report_generator.llm.client import LLMClient
 from scpi_control.report_generator.llm.context_builder import ContextBuilder
 from scpi_control.report_generator.llm.prompts import get_system_prompt
+from scpi_control.report_generator.llm.tools import ReportTools
 from scpi_control.report_generator.models.report_data import MeasurementResult, TestReport
+
+logger = logging.getLogger(__name__)
 
 
 class ReportAnalyzer:
@@ -91,6 +95,10 @@ class ReportAnalyzer:
         """
         Answer a user question about the test report.
 
+        Uses tool calling when the model supports it, so the model can reach the
+        real analyses. Otherwise falls back to the summarized context, which is
+        eight scalars per waveform.
+
         Args:
             report: Test report context
             question: User's question
@@ -98,16 +106,20 @@ class ReportAnalyzer:
         Returns:
             Answer text, or None if generation failed
         """
-        system_prompt = get_system_prompt("chat")
-        user_prompt = ContextBuilder.build_chat_context(report, question)
+        if self.client.supports_tools():
+            logger.info("Answering with tool calling")
+            messages = [
+                {"role": "system", "content": get_system_prompt("chat_tools")},
+                {"role": "user", "content": question},
+            ]
+            return self.client.chat_with_tools(messages, ReportTools(report).functions())
 
-        answer = self.client.complete(
-            prompt=user_prompt,
-            system_prompt=system_prompt,
+        logger.info("Model cannot call tools; answering from the summarized context")
+        return self.client.complete(
+            prompt=ContextBuilder.build_chat_context(report, question),
+            system_prompt=get_system_prompt("chat"),
             temperature=0.7,
         )
-
-        return answer
 
     def explain_measurement(
         self,

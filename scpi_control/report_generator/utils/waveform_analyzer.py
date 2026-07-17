@@ -774,7 +774,10 @@ class WaveformAnalyzer:
 
         # Detect transients if requested
         if auto_detect_transients:
-            transients = WaveformAnalyzer.detect_transients(waveform)
+            # limit=10 preserves this path's long-standing behavior: detect_transients
+            # used to truncate to 10 internally, and region lists feed plots and PDFs
+            # where an unbounded append would change what gets rendered.
+            transients = WaveformAnalyzer.detect_transients(waveform, limit=10)
             for transient in transients:
                 waveform.regions.append(transient)
 
@@ -943,7 +946,7 @@ class WaveformAnalyzer:
         return edges
 
     @staticmethod
-    def detect_transients(waveform: "WaveformData", sensitivity: float = 3.0) -> list:
+    def detect_transients(waveform: "WaveformData", sensitivity: float = 3.0, limit: Optional[int] = None) -> list:
         """
         Detect transient responses in a waveform.
 
@@ -953,6 +956,11 @@ class WaveformAnalyzer:
         Args:
             waveform: WaveformData object
             sensitivity: Detection sensitivity (sigma multiplier)
+            limit: Maximum number of transients to return. None (the default)
+                means no limit: every detected transient is returned. Callers
+                that truncate must report the true total, so the count is the
+                caller's to keep -- returning a silently shortened list would
+                make a noisy capture look clean.
 
         Returns:
             List of WaveformRegion objects for detected transients
@@ -1000,7 +1008,7 @@ class WaveformAnalyzer:
                     )
                     transients.append(transient)
 
-        return transients[:10]  # Limit to 10 transients
+        return transients if limit is None else transients[:limit]
 
     @staticmethod
     def analyze_region(waveform: "WaveformData", region: "WaveformRegion", calculate_calibration: bool = True) -> None:

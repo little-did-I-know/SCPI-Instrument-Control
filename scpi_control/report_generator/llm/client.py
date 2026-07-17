@@ -9,7 +9,7 @@ import json
 import logging
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 import requests
 
@@ -124,11 +124,14 @@ class LLMClient:
 
         # Initialize Ollama Python client if available and using Ollama
         self._ollama_client = None
+        self._supports_tools: Optional[bool] = None
         if self._is_ollama_native and OLLAMA_CLIENT_AVAILABLE:
             try:
                 # Extract host from endpoint (e.g., "http://192.168.1.4:11434/api" -> "http://192.168.1.4:11434")
                 host = config.endpoint.rsplit("/api", 1)[0] if "/api" in config.endpoint else config.endpoint
-                self._ollama_client = ollama.Client(host=host)
+                # config.timeout was dead on this path until now: ollama.Client
+                # forwards kwargs to httpx.Client, so a stalled server hung forever.
+                self._ollama_client = ollama.Client(host=host, timeout=config.timeout)
                 logger.debug(f"Using Ollama Python SDK (host: {host})")
 
                 # Verify connection by listing models
@@ -142,6 +145,111 @@ class LLMClient:
                 logger.exception(f"Failed to initialize Ollama client: {e}")
                 logger.warning("Falling back to HTTP requests")
                 self._ollama_client = None
+
+    def supports_tools(self) -> bool:
+        """Whether the configured model can call tools.
+
+        False whenever tool support isn't positively confirmed -- no SDK client,
+        an unreachable server, an unknown model. Never guesses, never raises.
+        Call it from a worker thread, never the GUI thread.
+
+        Caches a *decided* answer (tools present or absent, or no SDK client at
+        all) after one network round trip, so the healthy path probes once. But
+        a probe that could not decide -- the server was briefly unreachable, or
+        the model was not pulled yet -- is deliberately not cached: this client
+        is long-lived (main_window keeps it until the settings dialog rebuilds
+        it), so a transient outage must not silently disable tools for the whole
+        session. The retry cost falls only on the already-broken path.
+        """
+        if self._supports_tools is None:
+            self._supports_tools = self._probe_tool_support()
+        return self._supports_tools is True
+
+    def _probe_tool_support(self) -> Optional[bool]:
+        """Decided True/False, or None when the probe could not decide.
+
+        None means "unknown, retry on the next call" and is not cached. A
+        missing SDK client is a decided False -- a /v1 endpoint or a missing SDK
+        never changes for this client instance, so there is nothing to retry.
+        """
+        if self._ollama_client is None:
+            logger.debug("Tool calling unavailable: no Ollama SDK client for this endpoint")
+            return False
+        try:
+            capabilities = self._ollama_client.show(self.config.model).capabilities or []
+        except Exception:
+            logger.warning(f"Could not read capabilities for model {self.config.model!r}; leaving tool support undecided, will retry", exc_info=True)
+            return None
+        supported = "tools" in capabilities
+        logger.info(f"Model {self.config.model!r} tool support: {supported}")
+        return supported
+
+    def chat_with_tools(self, messages: List[Dict[str, str]], tools: List[Callable], max_rounds: int = 5) -> Optional[str]:
+        """Run a tool-calling conversation until the model answers.
+
+        Takes plain callables: ollama builds each schema from the signature and
+        docstring, and this method dispatches by __name__. It therefore needs no
+        protocol and knows nothing about what the tools do.
+
+        Only works on the Ollama SDK path -- returns None otherwise. Gate calls
+        with supports_tools().
+
+        Args:
+            messages: Conversation so far, e.g. a system and a user message.
+            tools: Bound callables the model may invoke.
+            max_rounds: Maximum model turns before giving up.
+
+        Returns:
+            The model's answer, or None if it failed or never produced one.
+        """
+        if self._ollama_client is None:
+            logger.warning("chat_with_tools called with no Ollama SDK client; cannot send tools")
+            return None
+
+        by_name = {fn.__name__: fn for fn in tools}
+        conversation = list(messages)
+
+        for round_number in range(1, max_rounds + 1):
+            try:
+                response = self._ollama_client.chat(model=self.config.model, messages=conversation, tools=tools, options={"temperature": self.config.temperature})
+            except Exception:
+                logger.exception("Tool-calling chat failed")
+                return None
+
+            message = response.message
+            if not message.tool_calls:
+                return message.content
+
+            logger.debug(f"Round {round_number}: model called {len(message.tool_calls)} tool(s)")
+            conversation.append(message)
+            for call in message.tool_calls:
+                conversation.append(
+                    {
+                        "role": "tool",
+                        "content": self._run_tool(by_name, call.function.name, call.function.arguments),
+                        "tool_name": call.function.name,
+                    }
+                )
+
+        logger.warning(f"Tool loop hit max_rounds={max_rounds} without an answer; giving up")
+        return None
+
+    @staticmethod
+    def _run_tool(by_name: Dict[str, Callable], name: str, arguments: Dict[str, Any]) -> str:
+        """Run one tool call, converting failure into a result the model can read.
+
+        Errors are data, not exceptions: told "no waveform for 'C9'. Available:
+        C1, C2", the model retries by itself. Raising here would waste the turn.
+        """
+        function = by_name.get(name)
+        if function is None:
+            logger.warning(f"Model called unknown tool {name!r}")
+            return f"Error: no tool named {name!r}. Available tools: {', '.join(sorted(by_name))}"
+        try:
+            return function(**arguments)
+        except Exception as exc:
+            logger.info(f"Tool {name!r} failed: {exc}")
+            return f"Error from {name}: {exc}"
 
     def test_connection(self) -> bool:
         """
