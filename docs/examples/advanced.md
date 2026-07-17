@@ -966,7 +966,7 @@ def create_report_with_ai(report: TestReport) -> TestReport:
 
         print("Generating AI-powered executive summary...")
         report.executive_summary = analyzer.generate_executive_summary(report)
-        report.ai_generated_summary = True
+        report.summary_source = "ai"  # attributes the summary as AI-generated
 
         print("Generating AI key findings...")
         report.key_findings = analyzer.generate_key_findings(report, max_findings=3) or []

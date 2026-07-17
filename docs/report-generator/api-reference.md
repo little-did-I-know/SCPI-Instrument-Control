@@ -141,7 +141,7 @@ TestReport(
     metadata: ReportMetadata,
     sections: List[TestSection] = [],
     executive_summary: Optional[str] = None,
-    ai_generated_summary: bool = False,
+    summary_source: str = "manual",  # "manual", "ai", or "computed"
     key_findings: List[str] = [],
     recommendations: List[str] = [],
     overall_result: Optional[str] = None,  # "PASS", "FAIL", "INCONCLUSIVE"
@@ -448,7 +448,7 @@ def generate_automated_report(waveform_files, output_path):
 
             # Generate summary
             report.executive_summary = analyzer.generate_executive_summary(report)
-            report.ai_generated_summary = True
+            report.summary_source = "ai"  # attributes the summary as AI-generated
 
             # Add insights to section
             section.ai_insights = analyzer.analyze_waveforms(report)

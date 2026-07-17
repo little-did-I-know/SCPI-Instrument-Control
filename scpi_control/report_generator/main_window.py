@@ -35,10 +35,11 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from scpi_control.report_generator.analysis.computed_analyzer import ComputedAnalyzer
 from scpi_control.report_generator.generators.markdown_generator import MarkdownReportGenerator
 from scpi_control.report_generator.models.app_settings import AppSettings
 from scpi_control.report_generator.models.plot_style import PlotStyle
-from scpi_control.report_generator.models.report_data import TestReport, TestSection, WaveformData
+from scpi_control.report_generator.models.report_data import SUMMARY_SOURCE_AI, TestReport, TestSection, WaveformData
 from scpi_control.report_generator.models.report_options import ReportOptions
 from scpi_control.report_generator.models.template import ReportTemplate
 from scpi_control.report_generator.utils.waveform_loader import WaveformLoader
@@ -612,13 +613,17 @@ class MainWindow(QMainWindow):
 
             if ai_content.get("executive_summary"):
                 report.executive_summary = ai_content["executive_summary"]
-                report.ai_generated_summary = True
+                report.summary_source = SUMMARY_SOURCE_AI
 
             if ai_content.get("key_findings"):
                 report.key_findings = ai_content["key_findings"]
 
             if ai_content.get("recommendations"):
                 report.recommendations = ai_content["recommendations"]
+
+        # Deterministic analysis: always enrich per-waveform data; fill the
+        # report-level summary/findings/recommendations only if the LLM did not.
+        ComputedAnalyzer().analyze_report(report)
 
         # Update chat sidebar and AI panel with report
         self.current_report = report

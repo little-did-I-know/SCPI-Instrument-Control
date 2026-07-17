@@ -19,7 +19,7 @@ import numpy as np
 
 from scpi_control.report_generator.generators.markdown_generator import MarkdownReportGenerator
 from scpi_control.report_generator.models.criteria import ComparisonType, CriteriaSet, MeasurementCriteria
-from scpi_control.report_generator.models.report_data import MeasurementResult, ReportMetadata, TestReport, TestSection, WaveformData
+from scpi_control.report_generator.models.report_data import SUMMARY_SOURCE_AI, MeasurementResult, ReportMetadata, TestReport, TestSection, WaveformData
 
 # Import PDF generator if available
 try:
@@ -177,7 +177,7 @@ def create_report_with_ai(report: TestReport) -> TestReport:
 
         print("Generating AI-powered executive summary...")
         report.executive_summary = analyzer.generate_executive_summary(report)
-        report.ai_generated_summary = True
+        report.summary_source = SUMMARY_SOURCE_AI
 
         print("Generating AI key findings...")
         report.key_findings = analyzer.generate_key_findings(report, max_findings=3) or []
