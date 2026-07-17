@@ -32,16 +32,6 @@ def make_waveform(channel="C1", n=2000, rate=1e6, freq=10_000, label=None):
     )
 
 
-def make_bursty_waveform(channel="C1", n=4000, rate=1e6, freq=10_000, bursts=20, width=6):
-    """A sine carrying `bursts` multi-sample spikes -- enough real transients to
-    exceed MAX_TRANSIENTS."""
-    t = np.arange(n) / rate
-    v = np.sin(2 * np.pi * freq * t)
-    for start in np.linspace(50, n - 100, bursts).astype(int):
-        v[start : start + width] += 8.0
-    return WaveformData(channel=channel, time=t, voltage=v, sample_rate=rate, record_length=n)
-
-
 def make_report(waveforms=None, measurements=None):
     section = TestSection(
         title="Captures",
@@ -68,6 +58,42 @@ def test_list_waveforms_names_every_channel():
 
 def test_list_waveforms_on_a_report_with_none():
     assert "no waveforms" in ReportTools(make_report(waveforms=[])).list_waveforms().lower()
+
+
+def make_two_section_report():
+    """The normal shape of a real report: several sections each capturing C1."""
+    return TestReport(
+        metadata=ReportMetadata(title="Bench Check", technician="robin", test_date=datetime(2026, 7, 16)),
+        sections=[
+            TestSection(title="Rise Time Test", waveforms=[make_waveform("C1")]),
+            TestSection(title="Overshoot Test", waveforms=[make_waveform("C1")]),
+        ],
+    )
+
+
+def test_list_waveforms_distinguishes_the_same_channel_in_two_sections():
+    """Two bare "C1:" rows would read as a duplicate or a bug. The section is
+    what tells them apart."""
+    out = ReportTools(make_two_section_report()).list_waveforms()
+
+    assert "Rise Time Test" in out and "Overshoot Test" in out
+
+
+def test_analyze_waveform_names_the_section_it_actually_used():
+    """Only the first C1 is reachable, so the result must say which capture it
+    is. Silently analyzing Rise Time while the model believes it asked about
+    Overshoot is the failure this prevents."""
+    out = ReportTools(make_two_section_report()).analyze_waveform("C1")
+
+    assert "Rise Time Test" in out
+    assert "Overshoot Test" not in out
+
+
+def test_detect_transients_names_the_section_it_actually_used():
+    out = ReportTools(make_two_section_report()).detect_transients("C1")
+
+    assert "Rise Time Test" in out
+    assert "Overshoot Test" not in out
 
 
 def test_analyze_waveform_identifies_a_sine():
@@ -105,18 +131,20 @@ def test_detect_transients_reports_none_on_a_clean_sine():
     assert "none" in out.lower()
 
 
-def test_detect_transients_caps_its_output_and_says_so():
+def test_detect_transients_caps_its_output_and_says_so(bursty_waveform):
     """A noisy capture can produce hundreds of transients and blow the context.
     Truncation must be stated: silently returning 10 of 400 teaches the model the
     signal is cleaner than it is.
 
-    Drives the real analyzer: the spikes are multi-sample bursts because the
-    analyzer discards any region shorter than 0.1% of the capture, which single
-    -sample spikes never clear."""
-    out = ReportTools(make_report(waveforms=[make_bursty_waveform()])).detect_transients("C1")
+    The TOTAL is the load-bearing half. Reporting "10 found, showing first 10"
+    on a 20-transient capture would announce truncation while still lying about
+    the size of what was dropped, so the count is pinned exactly, not just its
+    presence. Deterministic: the fixture's spikes are placed by linspace, not RNG.
+    """
+    out = ReportTools(make_report(waveforms=[bursty_waveform])).detect_transients("C1")
 
-    assert "showing first" in out
-    assert out.count("µs") <= MAX_TRANSIENTS
+    assert "20 found, showing first 10" in out
+    assert out.count("µs") == MAX_TRANSIENTS
 
 
 def test_detect_transients_rejects_an_out_of_range_sensitivity():
