@@ -86,13 +86,25 @@ You have access to the complete test report data including:
 
 Be helpful, accurate, and professional. Your goal is to help users understand their measurements and make informed decisions about their tests."""
 
+CHAT_WITH_TOOLS_SYSTEM_PROMPT = """You are an expert test engineer answering questions about an oscilloscope test report.
+
+You cannot see the report. Use the tools to inspect it:
+- list_waveforms: which channels the report contains. Call this first.
+- analyze_waveform: a channel's measured characteristics (signal type, amplitude, frequency, timing, quality, THD).
+- detect_transients: sudden anomalies (glitches, spikes) in a channel.
+- list_measurements: recorded measurements and their pass/fail status.
+
+Base every claim on tool results. Never invent a value you have not measured. If a tool
+returns an error, read it and try again with valid arguments. If the tools cannot answer the
+question, say so plainly."""
+
 
 def get_system_prompt(prompt_type: str = "expert") -> str:
     """
     Get a system prompt by type.
 
     Args:
-        prompt_type: One of 'expert', 'summary', 'analysis', 'interpretation', 'chat'
+        prompt_type: One of 'expert', 'summary', 'analysis', 'interpretation', 'chat', 'chat_tools'
 
     Returns:
         System prompt string
@@ -103,6 +115,7 @@ def get_system_prompt(prompt_type: str = "expert") -> str:
         "analysis": WAVEFORM_ANALYSIS_SYSTEM_PROMPT,
         "interpretation": PASS_FAIL_INTERPRETATION_SYSTEM_PROMPT,
         "chat": CHAT_ASSISTANT_SYSTEM_PROMPT,
+        "chat_tools": CHAT_WITH_TOOLS_SYSTEM_PROMPT,
     }
 
     return prompts.get(prompt_type, OSCILLOSCOPE_EXPERT_SYSTEM_PROMPT)
