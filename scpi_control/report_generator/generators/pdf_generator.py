@@ -190,19 +190,10 @@ class PDFReportGenerator(BaseReportGenerator):
             )
         )
 
-        # Waveform heading (for individual waveforms)
-        # Only add if it doesn't exist
-        if "Heading4" not in self.styles:
-            self.styles.add(
-                ParagraphStyle(
-                    name="Heading4",
-                    parent=self.styles["Heading3"],
-                    fontSize=12,
-                    textColor=colors.HexColor(self.branding.secondary_color),
-                    spaceAfter=6,
-                    spaceBefore=10,
-                )
-            )
+        # Waveform heading (for individual waveforms). reportlab's sample stylesheet
+        # already ships a "Heading4", so recolor it with the brand's secondary color
+        # rather than adding a duplicate that the stylesheet would ignore.
+        self.styles["Heading4"].textColor = colors.HexColor(self.branding.secondary_color)
 
         # Result PASS style
         self.styles.add(
