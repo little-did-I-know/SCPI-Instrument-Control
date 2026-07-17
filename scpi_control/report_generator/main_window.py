@@ -35,6 +35,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from scpi_control.report_generator.analysis.computed_analyzer import ComputedAnalyzer
 from scpi_control.report_generator.generators.markdown_generator import MarkdownReportGenerator
 from scpi_control.report_generator.models.app_settings import AppSettings
 from scpi_control.report_generator.models.plot_style import PlotStyle
@@ -619,6 +620,10 @@ class MainWindow(QMainWindow):
 
             if ai_content.get("recommendations"):
                 report.recommendations = ai_content["recommendations"]
+
+        # Deterministic analysis: always enrich per-waveform data; fill the
+        # report-level summary/findings/recommendations only if the LLM did not.
+        ComputedAnalyzer().analyze_report(report)
 
         # Update chat sidebar and AI panel with report
         self.current_report = report
