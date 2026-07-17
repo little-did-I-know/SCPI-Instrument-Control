@@ -118,6 +118,18 @@ def test_analyze_waveform_unknown_channel_lists_the_valid_ones():
     assert "C9" in str(exc.value) and "C1" in str(exc.value)
 
 
+def test_analyze_waveform_unknown_channel_tags_each_option_with_its_section():
+    """A two-section report answering an unknown channel with a bare "C1, C1"
+    would invite the exact "two separately addressable C1s" misconception the
+    section-naming fix exists to prevent. Each available channel must be tagged
+    with the section it came from."""
+    with pytest.raises(ValueError) as exc:
+        ReportTools(make_two_section_report()).analyze_waveform("C9")
+    message = str(exc.value)
+    assert "Rise Time Test" in message
+    assert "Overshoot Test" in message
+
+
 def test_tool_results_echo_their_arguments():
     """Ollama tags tool results by tool_name only -- there is no tool_call_id --
     so two parallel calls to one tool are indistinguishable at the protocol

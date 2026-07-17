@@ -66,7 +66,7 @@ class ReportTools:
         for waveform, section_title in self._waveforms():
             if waveform.channel == channel or waveform.label == channel:
                 return waveform, section_title
-        available = ", ".join(wf.channel for wf, _ in self._waveforms()) or "none"
+        available = ", ".join(f"{wf.channel} [{title}]" for wf, title in self._waveforms()) or "none"
         raise ValueError(f"no waveform for channel {channel!r}. Available: {available}")
 
     # -- tools --
@@ -89,7 +89,7 @@ class ReportTools:
         signals.
 
         If two sections captured the same channel, this analyzes the first and
-        names the section it used, so check that section is the one you meant.
+        names the section it used; report that section alongside your answer.
 
         Args:
             channel: Channel to analyze, e.g. "C1". Must be one listed by list_waveforms.
@@ -107,7 +107,7 @@ class ReportTools:
         starts and ends, in microseconds.
 
         If two sections captured the same channel, this inspects the first and
-        names the section it used, so check that section is the one you meant.
+        names the section it used; report that section alongside your answer.
 
         Args:
             channel: Channel to inspect, e.g. "C1". Must be one listed by list_waveforms.

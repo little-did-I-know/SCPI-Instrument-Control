@@ -149,9 +149,9 @@ class LLMClient:
     def supports_tools(self) -> bool:
         """Whether the configured model can call tools.
 
-        False on any doubt -- no SDK client, an unreachable server, an unknown
-        model. Never guesses, never raises. Call it from a worker thread, never
-        the GUI thread.
+        False whenever tool support isn't positively confirmed -- no SDK client,
+        an unreachable server, an unknown model. Never guesses, never raises.
+        Call it from a worker thread, never the GUI thread.
 
         Caches a *decided* answer (tools present or absent, or no SDK client at
         all) after one network round trip, so the healthy path probes once. But
@@ -211,7 +211,7 @@ class LLMClient:
 
         for round_number in range(1, max_rounds + 1):
             try:
-                response = self._ollama_client.chat(model=self.config.model, messages=conversation, tools=tools)
+                response = self._ollama_client.chat(model=self.config.model, messages=conversation, tools=tools, options={"temperature": self.config.temperature})
             except Exception:
                 logger.exception("Tool-calling chat failed")
                 return None

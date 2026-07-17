@@ -143,3 +143,26 @@ def test_without_an_sdk_client_it_returns_none():
     c = LLMClient(LLMConfig(endpoint="http://localhost:11434/v1", model="llama3.2"))
     assert c._ollama_client is None
     assert c.chat_with_tools([{"role": "user", "content": "hi"}], [greet]) is None
+
+
+def test_a_transport_exception_from_the_sdk_returns_none():
+    """.chat() itself can raise -- a dropped connection, a server restart mid-
+    request -- and that must not propagate out of the loop, the same as any
+    other failure mode here."""
+    with ollama_sdk() as (fake, _):
+        fake.chat.side_effect = RuntimeError("boom")
+        answer = client().chat_with_tools([{"role": "user", "content": "hi"}], [greet])
+
+    assert answer is None
+
+
+def test_the_tool_loop_uses_the_configured_temperature():
+    """The tool path must run at the configured temperature, not Ollama's
+    model-default (~0.8), matching the summarized-context path (analyzer.py's
+    complete(..., temperature=0.7))."""
+    with ollama_sdk() as (fake, _):
+        fake.chat.side_effect = [reply(content="ok")]
+        c = client()
+        c.chat_with_tools([{"role": "user", "content": "hi"}], [greet])
+
+    assert fake.chat.call_args.kwargs["options"]["temperature"] == c.config.temperature
