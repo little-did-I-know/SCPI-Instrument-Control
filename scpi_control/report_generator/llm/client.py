@@ -9,7 +9,7 @@ import json
 import logging
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 import requests
 
@@ -183,6 +183,73 @@ class LLMClient:
         supported = "tools" in capabilities
         logger.info(f"Model {self.config.model!r} tool support: {supported}")
         return supported
+
+    def chat_with_tools(self, messages: List[Dict[str, str]], tools: List[Callable], max_rounds: int = 5) -> Optional[str]:
+        """Run a tool-calling conversation until the model answers.
+
+        Takes plain callables: ollama builds each schema from the signature and
+        docstring, and this method dispatches by __name__. It therefore needs no
+        protocol and knows nothing about what the tools do.
+
+        Only works on the Ollama SDK path -- returns None otherwise. Gate calls
+        with supports_tools().
+
+        Args:
+            messages: Conversation so far, e.g. a system and a user message.
+            tools: Bound callables the model may invoke.
+            max_rounds: Maximum model turns before giving up.
+
+        Returns:
+            The model's answer, or None if it failed or never produced one.
+        """
+        if self._ollama_client is None:
+            logger.warning("chat_with_tools called with no Ollama SDK client; cannot send tools")
+            return None
+
+        by_name = {fn.__name__: fn for fn in tools}
+        conversation = list(messages)
+
+        for round_number in range(1, max_rounds + 1):
+            try:
+                response = self._ollama_client.chat(model=self.config.model, messages=conversation, tools=tools)
+            except Exception:
+                logger.exception("Tool-calling chat failed")
+                return None
+
+            message = response.message
+            if not message.tool_calls:
+                return message.content
+
+            logger.debug(f"Round {round_number}: model called {len(message.tool_calls)} tool(s)")
+            conversation.append(message)
+            for call in message.tool_calls:
+                conversation.append(
+                    {
+                        "role": "tool",
+                        "content": self._run_tool(by_name, call.function.name, call.function.arguments),
+                        "tool_name": call.function.name,
+                    }
+                )
+
+        logger.warning(f"Tool loop hit max_rounds={max_rounds} without an answer; giving up")
+        return None
+
+    @staticmethod
+    def _run_tool(by_name: Dict[str, Callable], name: str, arguments: Dict[str, Any]) -> str:
+        """Run one tool call, converting failure into a result the model can read.
+
+        Errors are data, not exceptions: told "no waveform for 'C9'. Available:
+        C1, C2", the model retries by itself. Raising here would waste the turn.
+        """
+        function = by_name.get(name)
+        if function is None:
+            logger.warning(f"Model called unknown tool {name!r}")
+            return f"Error: no tool named {name!r}. Available tools: {', '.join(sorted(by_name))}"
+        try:
+            return function(**arguments)
+        except Exception as exc:
+            logger.info(f"Tool {name!r} failed: {exc}")
+            return f"Error from {name}: {exc}"
 
     def test_connection(self) -> bool:
         """
