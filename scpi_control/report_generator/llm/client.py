@@ -124,11 +124,14 @@ class LLMClient:
 
         # Initialize Ollama Python client if available and using Ollama
         self._ollama_client = None
+        self._supports_tools: Optional[bool] = None
         if self._is_ollama_native and OLLAMA_CLIENT_AVAILABLE:
             try:
                 # Extract host from endpoint (e.g., "http://192.168.1.4:11434/api" -> "http://192.168.1.4:11434")
                 host = config.endpoint.rsplit("/api", 1)[0] if "/api" in config.endpoint else config.endpoint
-                self._ollama_client = ollama.Client(host=host)
+                # config.timeout was dead on this path until now: ollama.Client
+                # forwards kwargs to httpx.Client, so a stalled server hung forever.
+                self._ollama_client = ollama.Client(host=host, timeout=config.timeout)
                 logger.debug(f"Using Ollama Python SDK (host: {host})")
 
                 # Verify connection by listing models
@@ -142,6 +145,31 @@ class LLMClient:
                 logger.exception(f"Failed to initialize Ollama client: {e}")
                 logger.warning("Falling back to HTTP requests")
                 self._ollama_client = None
+
+    def supports_tools(self) -> bool:
+        """Whether the configured model can call tools.
+
+        False on any doubt -- no SDK client, an unreachable server, an unknown
+        model. Never guesses, never raises. Performs one network round trip on
+        first call and caches, so call it from a worker thread, never the GUI
+        thread.
+        """
+        if self._supports_tools is None:
+            self._supports_tools = self._probe_tool_support()
+        return self._supports_tools
+
+    def _probe_tool_support(self) -> bool:
+        if self._ollama_client is None:
+            logger.debug("Tool calling unavailable: no Ollama SDK client for this endpoint")
+            return False
+        try:
+            capabilities = self._ollama_client.show(self.config.model).capabilities or []
+        except Exception:
+            logger.warning(f"Could not read capabilities for model {self.config.model!r}; assuming no tool support", exc_info=True)
+            return False
+        supported = "tools" in capabilities
+        logger.info(f"Model {self.config.model!r} tool support: {supported}")
+        return supported
 
     def test_connection(self) -> bool:
         """

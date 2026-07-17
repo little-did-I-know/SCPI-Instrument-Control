@@ -1,9 +1,33 @@
 """Fixtures shared across the test suite."""
 
+from contextlib import contextmanager
+from unittest.mock import MagicMock, patch
+
 import numpy as np
 import pytest
 
 from scpi_control.report_generator.models.report_data import WaveformData
+
+
+@contextmanager
+def ollama_sdk(capabilities=("completion", "tools")):
+    """Patch the ollama SDK class so nothing reaches the network.
+
+    LLMClient.__init__ calls .list() against a real server (client.py:136), and a
+    live Ollama runs on this machine. The existing dodges in
+    test_report_llm_client.py -- patching OLLAMA_CLIENT_AVAILABLE=False, or using
+    a /v1 endpoint -- both work by AVOIDING the SDK path, which is exactly where
+    tool calling lives. So tool tests must patch the class itself.
+
+    Get this wrong and the test does not fail: it does a real round-trip and
+    passes for the wrong reason, and .list()'s failure is caught and merely
+    warned (client.py:138-140), so a half-mock stays silent.
+    """
+    fake = MagicMock()
+    fake.list.return_value = MagicMock(models=[])
+    fake.show.return_value = MagicMock(capabilities=list(capabilities))
+    with patch("scpi_control.report_generator.llm.client.ollama.Client", return_value=fake) as cls:
+        yield fake, cls
 
 
 @pytest.fixture
