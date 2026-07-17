@@ -330,6 +330,7 @@ def test_analyze_spectrum_names_the_dominant_frequency():
 def test_analyze_spectrum_shows_harmonic_content_for_a_periodic_signal():
     out = ReportTools(report_of(make_square())).analyze_spectrum("C1")
     assert "harmonic" in out.lower()
+    assert "fundamental" in out
 
 
 def test_analyze_spectrum_on_a_degenerate_signal():

@@ -165,6 +165,9 @@ class WaveformAnalyzer:
         """
         empty = {"dominant_peaks": [], "fundamental_hz": None, "harmonic_ratios": None}
 
+        if num_peaks < 1:
+            return empty
+
         v = waveform.voltage
         sample_rate = waveform.sample_rate
         n = len(v)

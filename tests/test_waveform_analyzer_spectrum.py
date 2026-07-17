@@ -55,3 +55,13 @@ def test_degenerate_signal_returns_empty_rather_than_raising():
     assert spec["dominant_peaks"] == []
     assert spec["fundamental_hz"] is None
     assert spec["harmonic_ratios"] is None
+
+
+def test_non_positive_num_peaks_returns_empty_rather_than_raising():
+    """num_peaks<=0 slices the peak list to empty; without a guard the [0] index
+    raises. The docstring promises never to raise on degenerate input."""
+    v = np.sin(2 * np.pi * 1000 * np.arange(2000) / 1e6)
+    for bad in (0, -1):
+        spec = WaveformAnalyzer.calculate_spectrum(make_waveform(v), num_peaks=bad)
+        assert spec["dominant_peaks"] == []
+        assert spec["fundamental_hz"] is None
