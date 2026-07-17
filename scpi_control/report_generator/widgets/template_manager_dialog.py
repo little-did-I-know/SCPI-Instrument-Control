@@ -62,6 +62,13 @@ class TemplateManagerDialog(QDialog):
         export_btn.clicked.connect(self._export_template)
         action_layout.addWidget(export_btn)
 
+        create_default_btn = QPushButton("Create Default Template")
+        create_default_btn.setToolTip(
+            "Adds a starter template with standard defaults, report options, and branding colors. " "Its sections are carried for future use but are not yet applied when the template is loaded."
+        )
+        create_default_btn.clicked.connect(self._create_default_template)
+        action_layout.addWidget(create_default_btn)
+
         left_layout.addLayout(action_layout)
 
         layout.addLayout(left_layout, 60)
@@ -352,6 +359,28 @@ class TemplateManagerDialog(QDialog):
                 self,
                 "Error Importing Template",
                 f"Failed to import template:\n{str(e)}",
+            )
+
+    def _create_default_template(self):
+        """Create and save the built-in default template to the library."""
+        try:
+            template = ReportTemplate.create_default_template()
+
+            template.save_to_library()
+
+            QMessageBox.information(
+                self,
+                "Default Template Created",
+                f"Template '{template.name}' created successfully.\n" "Its sections are not yet applied when the template is loaded.",
+            )
+
+            self._refresh_template_list()
+
+        except Exception as e:
+            QMessageBox.critical(
+                self,
+                "Error Creating Default Template",
+                f"Failed to create default template:\n{str(e)}",
             )
 
     def _export_template(self):
