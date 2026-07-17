@@ -24,14 +24,32 @@ def test_supports_tools_reads_the_model_capabilities():
 def test_supports_tools_is_false_when_the_model_lacks_them():
     """deepseek-coder-v2 is a real example: ['completion', 'insert'], no tools.
     Passing tools to it would advertise a capability we cannot deliver."""
-    with ollama_sdk(capabilities=("completion", "insert")):
+    with ollama_sdk(capabilities=("completion", "insert")) as (fake, _):
         assert LLMClient(ollama_config(model="deepseek-coder-v2")).supports_tools() is False
+        # Prove the capability parse ran, not a no-SDK-client short-circuit.
+        assert fake.show.called
 
 
 def test_supports_tools_is_false_when_the_probe_raises():
     with ollama_sdk() as (fake, _):
         fake.show.side_effect = RuntimeError("server gone")
         assert LLMClient(ollama_config()).supports_tools() is False
+        # Prove the exception path ran, not a no-SDK-client short-circuit.
+        assert fake.show.called
+
+
+def test_supports_tools_retries_after_a_probe_that_raised():
+    """A raised probe is undecided, not a decided False -- the client is
+    long-lived, so a transient outage must not disable tools for the whole
+    session. The failure is not cached: a later call retries and can succeed."""
+    with ollama_sdk() as (fake, _):
+        fake.show.side_effect = RuntimeError("server briefly gone")
+        client = LLMClient(ollama_config())
+        assert client.supports_tools() is False  # could not decide
+        assert client._supports_tools is None  # deliberately not cached
+        fake.show.side_effect = None  # server recovers, falls back to return_value
+        assert client.supports_tools() is True  # retried, now decided
+    assert fake.show.call_count == 2
 
 
 def test_supports_tools_is_false_without_an_sdk_client():
@@ -39,6 +57,14 @@ def test_supports_tools_is_false_without_an_sdk_client():
     client = LLMClient(LLMConfig(endpoint="http://localhost:11434/v1", model="llama3.2"))
     assert client._ollama_client is None
     assert client.supports_tools() is False
+
+
+def test_supports_tools_caches_the_no_sdk_client_false():
+    """No SDK client is a DECIDED False -- a /v1 endpoint never grows one, so
+    there is nothing to retry. It must be cached, not re-evaluated every call."""
+    client = LLMClient(LLMConfig(endpoint="http://localhost:11434/v1", model="llama3.2"))
+    assert client.supports_tools() is False
+    assert client._supports_tools is False  # decided and cached, not left None
 
 
 def test_supports_tools_is_cached():

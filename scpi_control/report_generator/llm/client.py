@@ -150,23 +150,36 @@ class LLMClient:
         """Whether the configured model can call tools.
 
         False on any doubt -- no SDK client, an unreachable server, an unknown
-        model. Never guesses, never raises. Performs one network round trip on
-        first call and caches, so call it from a worker thread, never the GUI
-        thread.
+        model. Never guesses, never raises. Call it from a worker thread, never
+        the GUI thread.
+
+        Caches a *decided* answer (tools present or absent, or no SDK client at
+        all) after one network round trip, so the healthy path probes once. But
+        a probe that could not decide -- the server was briefly unreachable, or
+        the model was not pulled yet -- is deliberately not cached: this client
+        is long-lived (main_window keeps it until the settings dialog rebuilds
+        it), so a transient outage must not silently disable tools for the whole
+        session. The retry cost falls only on the already-broken path.
         """
         if self._supports_tools is None:
             self._supports_tools = self._probe_tool_support()
-        return self._supports_tools
+        return self._supports_tools is True
 
-    def _probe_tool_support(self) -> bool:
+    def _probe_tool_support(self) -> Optional[bool]:
+        """Decided True/False, or None when the probe could not decide.
+
+        None means "unknown, retry on the next call" and is not cached. A
+        missing SDK client is a decided False -- a /v1 endpoint or a missing SDK
+        never changes for this client instance, so there is nothing to retry.
+        """
         if self._ollama_client is None:
             logger.debug("Tool calling unavailable: no Ollama SDK client for this endpoint")
             return False
         try:
             capabilities = self._ollama_client.show(self.config.model).capabilities or []
         except Exception:
-            logger.warning(f"Could not read capabilities for model {self.config.model!r}; assuming no tool support", exc_info=True)
-            return False
+            logger.warning(f"Could not read capabilities for model {self.config.model!r}; leaving tool support undecided, will retry", exc_info=True)
+            return None
         supported = "tools" in capabilities
         logger.info(f"Model {self.config.model!r} tool support: {supported}")
         return supported
