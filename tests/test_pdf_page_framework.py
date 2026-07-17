@@ -73,3 +73,26 @@ def test_report_without_header_footer_text_still_builds_with_page_numbers(tmp_pa
         assert "Page 1 of" in doc[0].get_text()  # page number always renders
     finally:
         doc.close()
+
+
+def test_a_multi_section_report_builds_to_a_valid_multipage_pdf(tmp_path):
+    """Integration: sections with CondPageBreaks between them still compile to a
+    valid multi-page PDF. (The anti-stranding EFFECT is layout-dependent and is
+    verified manually; this pins that the CondPageBreaks don't break the build.)"""
+    t = np.arange(200) / 1e6
+    sections = [
+        TestSection(title=f"Section {i}", content=f"Body {i}.", waveforms=[WaveformData(channel="C1", time=t, voltage=np.sin(2 * np.pi * 10_000 * t), sample_rate=1e6, record_length=200, label="C1")])
+        for i in range(6)
+    ]
+    report = TestReport(metadata=ReportMetadata(title="Bench", technician="robin", test_date=datetime(2026, 7, 17)), sections=sections)
+    out = tmp_path / "multi.pdf"
+    assert PDFReportGenerator().generate(report, str(out)) is True
+    doc = fitz.open(out)
+    try:
+        assert doc.page_count >= 2
+        # each section heading appears in the rendered text
+        text = "".join(doc[i].get_text() for i in range(doc.page_count))
+        for i in range(6):
+            assert f"Section {i}" in text
+    finally:
+        doc.close()

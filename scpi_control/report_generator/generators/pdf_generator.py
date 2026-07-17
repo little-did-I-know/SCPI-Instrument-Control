@@ -23,7 +23,7 @@ try:
     from reportlab.lib.units import inch
     from reportlab.pdfgen import canvas
     from reportlab.platypus import Image as RLImage
-    from reportlab.platypus import KeepTogether, PageBreak, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+    from reportlab.platypus import CondPageBreak, KeepTogether, PageBreak, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
     from reportlab.graphics.shapes import Drawing
     from svglib.svglib import svg2rlg
 
@@ -409,6 +409,7 @@ class PDFReportGenerator(BaseReportGenerator):
                     self._report_progress(section_percent, f"Processing section {i+1}/{num_sections}")
 
                     # Pass waveform progress tracking
+                    story.append(CondPageBreak(1.5 * inch))
                     story.extend(
                         self._generate_section(
                             section,
