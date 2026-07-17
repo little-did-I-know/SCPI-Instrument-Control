@@ -45,9 +45,17 @@ def make_report(waveforms=None, measurements=None):
     )
 
 
-def test_functions_returns_exactly_the_four_tools():
+def test_functions_returns_the_seven_tools_in_order():
     names = [fn.__name__ for fn in ReportTools(make_report()).functions()]
-    assert names == ["list_waveforms", "analyze_waveform", "detect_transients", "list_measurements"]
+    assert names == [
+        "list_waveforms",
+        "analyze_waveform",
+        "analyze_plateaus",
+        "list_edges",
+        "analyze_spectrum",
+        "detect_transients",
+        "list_measurements",
+    ]
 
 
 def test_list_waveforms_names_every_channel():

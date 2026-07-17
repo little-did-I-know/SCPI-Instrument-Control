@@ -75,6 +75,9 @@ class ReportTools:
         return [
             self.list_waveforms,
             self.analyze_waveform,
+            self.analyze_plateaus,
+            self.list_edges,
+            self.analyze_spectrum,
             self.detect_transients,
             self.list_measurements,
         ]

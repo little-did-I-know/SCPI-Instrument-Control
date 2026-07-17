@@ -91,6 +91,9 @@ CHAT_WITH_TOOLS_SYSTEM_PROMPT = """You are an expert test engineer answering que
 You cannot see the report. Use the tools to inspect it:
 - list_waveforms: which channels the report contains. Call this first.
 - analyze_waveform: a channel's measured characteristics (signal type, amplitude, frequency, timing, quality, THD).
+- analyze_plateaus: per-plateau level, slope, flatness, drift and noise (for probe-compensation and settling questions).
+- list_edges: where the rising and falling edges are and how many.
+- analyze_spectrum: the dominant frequency peaks and per-harmonic content.
 - detect_transients: sudden anomalies (glitches, spikes) in a channel.
 - list_measurements: recorded measurements and their pass/fail status.
 
