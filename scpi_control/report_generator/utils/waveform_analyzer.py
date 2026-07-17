@@ -142,6 +142,63 @@ class WaveformAnalyzer:
             }
 
     @staticmethod
+    def calculate_spectrum(waveform: "WaveformData", num_peaks: int = 5) -> dict:
+        """
+        Find the dominant frequency components of a waveform.
+
+        Returns the strongest spectral peaks and, when a clear fundamental
+        exists, the per-harmonic amplitude ratios. Pure CPU; never raises on
+        degenerate input.
+
+        Args:
+            waveform: WaveformData object
+            num_peaks: Maximum number of dominant peaks to return
+
+        Returns:
+            Dict with:
+              - 'dominant_peaks': list of (frequency_hz, relative_magnitude)
+                tuples, strongest first; relative_magnitude is vs the strongest
+                peak (so the first is always 1.0). Empty if none found.
+              - 'fundamental_hz': frequency of the strongest peak, or None.
+              - 'harmonic_ratios': list of harmonic amplitudes relative to the
+                fundamental (index 0 = fundamental = 1.0), or None.
+        """
+        empty = {"dominant_peaks": [], "fundamental_hz": None, "harmonic_ratios": None}
+
+        v = waveform.voltage
+        sample_rate = waveform.sample_rate
+        n = len(v)
+        if n < 4 or sample_rate <= 0:
+            return empty
+
+        yf = np.abs(fft(v - np.mean(v)))  # remove DC
+        xf = fftfreq(n, 1 / sample_rate)
+        pos = xf > 0
+        xf_pos = xf[pos]
+        yf_pos = yf[pos]
+        if len(yf_pos) < 2 or np.max(yf_pos) == 0:
+            return empty
+
+        peak_indices, _ = scipy_signal.find_peaks(yf_pos)
+        if len(peak_indices) == 0:
+            peak_indices = np.array([int(np.argmax(yf_pos))])
+
+        # Strongest first, keep the top num_peaks
+        order = np.argsort(yf_pos[peak_indices])[::-1][:num_peaks]
+        peak_indices = peak_indices[order]
+        strongest = yf_pos[peak_indices[0]]
+        dominant_peaks = [(float(xf_pos[i]), float(yf_pos[i] / strongest)) for i in peak_indices]
+
+        ratios = WaveformAnalyzer._get_harmonic_ratios(waveform)
+        harmonic_ratios = None if ratios is None else [float(x) for x in ratios]
+
+        return {
+            "dominant_peaks": dominant_peaks,
+            "fundamental_hz": float(xf_pos[peak_indices[0]]),
+            "harmonic_ratios": harmonic_ratios,
+        }
+
+    @staticmethod
     def calculate_timing_stats(waveform: WaveformData) -> Dict[str, Optional[float]]:
         """Calculate timing measurements (rise time, fall time, pulse width, duty cycle)."""
         try:
