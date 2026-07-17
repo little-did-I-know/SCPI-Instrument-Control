@@ -246,6 +246,10 @@ def test_analyze_plateaus_caps_its_output_and_states_the_true_total():
     lesson: a silent slice teaches the model the signal is simpler than it is."""
     many = make_square(freq=5_000)  # 20 cycles over 4000 samples -> 19 plateaus, well over MAX_PLATEAUS
     out = ReportTools(report_of(many)).analyze_plateaus("C1")
+    # Pin the TRUE total, not just the truncation marker: printing "8 found,
+    # showing first 8" would still satisfy "showing first" and the bullet count
+    # (that is the exact silent-slice regression), so assert the real number.
+    assert "19 found, showing first 8" in out
     assert "showing first" in out
     # one plateau line per shown region; count the leading "  plateau_" bullets
     assert out.count("  plateau_") == MAX_PLATEAUS
