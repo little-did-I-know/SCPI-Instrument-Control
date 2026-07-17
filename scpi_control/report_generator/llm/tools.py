@@ -37,6 +37,9 @@ _SENSITIVITY_MAX = 10.0
 
 MAX_PLATEAUS = 8
 
+_EDGES_DEFAULT = 4
+_EDGES_MAX = 20
+
 
 def _format_volts(value: Optional[float]) -> str:
     return "n/a" if value is None else f"{value:.4g} V"
@@ -142,6 +145,36 @@ class ReportTools:
                 f"flatness={_format_volts(region.flatness)}, drift={_format_volts(region.drift)}, "
                 f"noise={_format_volts(region.noise_level)}"
             )
+        return "\n".join(lines)
+
+    def list_edges(self, channel: str, max_edges: Optional[int] = None) -> str:
+        """List the rising and falling edges in a captured waveform, with their times.
+
+        Reports where each edge occurs and how many there are. This is edge
+        LOCATION, not transition speed: for a channel's representative rise/fall
+        time use analyze_waveform instead.
+
+        Args:
+            channel: Channel to inspect, e.g. "C1". Must be one listed by list_waveforms.
+            max_edges: Maximum edges to report, between 2 and 20. Defaults to 4. If
+                the result reports exactly this many, there may be more -- raise it.
+        """
+        if max_edges is None:
+            max_edges = _EDGES_DEFAULT
+        if not 2 <= max_edges <= _EDGES_MAX:
+            raise ValueError(f"max_edges must be between 2 and {_EDGES_MAX}, got {max_edges}")
+
+        waveform, section_title = self._find(channel)
+        edges = WaveformAnalyzer.detect_edges(waveform, max_edges=max_edges)
+        head = f"list_edges(channel={channel}) [{section_title}]:"
+        if not edges:
+            return f"{head} no edges found."
+
+        lines = [f"{head} {len(edges)} found (max_edges={max_edges})"]
+        for edge in edges:
+            kind = "rising" if edge.region_type == "edge_rising" else "falling"
+            midpoint = (edge.start_time + edge.end_time) / 2
+            lines.append(f"  {kind} edge @ {midpoint * 1e6:.2f} µs")
         return "\n".join(lines)
 
     def detect_transients(self, channel: str, sensitivity: Optional[float] = None) -> str:

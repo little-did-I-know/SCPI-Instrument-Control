@@ -264,6 +264,32 @@ def test_analyze_plateaus_does_not_mutate_the_report():
     assert len(waveform.regions) == before
 
 
+def test_list_edges_reports_rising_and_falling_edges():
+    out = ReportTools(report_of(make_square())).list_edges("C1")
+    assert "rising" in out and "falling" in out
+    assert "µs" in out
+    assert "channel=C1" in out and "[Captures]" in out
+
+
+def test_list_edges_names_the_cap_so_the_model_can_raise_it():
+    """detect_edges gives no true total, so the honest signal is the cap itself:
+    if the model sees as many edges as it asked for, it can ask for more."""
+    out = ReportTools(report_of(make_square())).list_edges("C1", max_edges=2)
+    assert "max_edges=2" in out
+
+
+def test_list_edges_on_a_flat_signal():
+    out = ReportTools(report_of(make_flatless())).list_edges("C1")
+    assert "no edges" in out.lower()
+
+
+def test_list_edges_rejects_an_out_of_range_max_edges():
+    """ollama strips numeric bounds from the schema, so the dispatcher is the only
+    real guard."""
+    with pytest.raises(ValueError):
+        ReportTools(report_of(make_square())).list_edges("C1", max_edges=99)
+
+
 def test_optional_parameters_are_not_marked_required():
     """THE discipline test. ollama marks `x: float = 3.0` REQUIRED despite the
     default; only `Optional[X] = None` escapes, and an unhinted parameter is
