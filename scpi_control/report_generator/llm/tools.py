@@ -18,6 +18,7 @@ Everything in this module is pure CPU over in-memory arrays: no I/O, no
 instrument, and no knowledge of the LLM.
 """
 
+import math
 from typing import Callable, List, Optional, Tuple
 
 from scpi_control.report_generator.models.report_data import TestReport, WaveformData
@@ -47,6 +48,20 @@ def _format_volts(value: Optional[float]) -> str:
 
 def _format_slope(value: Optional[float]) -> str:
     return "n/a" if value is None else f"{value:.4g} V/s"
+
+
+def _format_hz(freq: float) -> str:
+    if freq >= 1e6:
+        return f"{freq / 1e6:.3f} MHz"
+    if freq >= 1e3:
+        return f"{freq / 1e3:.3f} kHz"
+    return f"{freq:.1f} Hz"
+
+
+def _format_db(ratio: float) -> str:
+    if ratio <= 0:
+        return "-inf dB"
+    return f"{20 * math.log10(ratio):.1f} dB"
 
 
 class ReportTools:
@@ -175,6 +190,36 @@ class ReportTools:
             kind = "rising" if edge.region_type == "edge_rising" else "falling"
             midpoint = (edge.start_time + edge.end_time) / 2
             lines.append(f"  {kind} edge @ {midpoint * 1e6:.2f} µs")
+        return "\n".join(lines)
+
+    def analyze_spectrum(self, channel: str) -> str:
+        """Report the dominant frequency components of a captured waveform.
+
+        Lists the strongest frequency peaks and, for a periodic signal, the
+        per-harmonic content -- more detail than analyze_waveform's single THD
+        value.
+
+        Args:
+            channel: Channel to inspect, e.g. "C1". Must be one listed by list_waveforms.
+        """
+        waveform, section_title = self._find(channel)
+        spectrum = WaveformAnalyzer.calculate_spectrum(waveform)
+        head = f"analyze_spectrum(channel={channel}) [{section_title}]:"
+
+        peaks = spectrum["dominant_peaks"]
+        if not peaks:
+            return f"{head} no significant frequency content."
+
+        lines = [head, "  dominant peaks:"]
+        for freq, rel in peaks:
+            lines.append(f"    {_format_hz(freq)}: {_format_db(rel)}")
+
+        ratios = spectrum["harmonic_ratios"]
+        if ratios:
+            lines.append("  harmonic content (relative to fundamental):")
+            for index, ratio in enumerate(ratios, start=1):
+                label = "fundamental" if index == 1 else f"harmonic {index}"
+                lines.append(f"    {label}: {_format_db(ratio)}")
         return "\n".join(lines)
 
     def detect_transients(self, channel: str, sensitivity: Optional[float] = None) -> str:

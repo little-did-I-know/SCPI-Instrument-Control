@@ -224,6 +224,12 @@ def make_flatless(channel="C1", n=2000, rate=1e6, freq=50_000):
     return WaveformData(channel=channel, time=t, voltage=np.sin(2 * np.pi * freq * t), sample_rate=rate, record_length=n)
 
 
+def make_two_tone(channel="C1", n=2000, rate=1e6):
+    t = np.arange(n) / rate
+    v = 1.0 * np.sin(2 * np.pi * 10_000 * t) + 0.5 * np.sin(2 * np.pi * 30_000 * t)
+    return WaveformData(channel=channel, time=t, voltage=v, sample_rate=rate, record_length=n)
+
+
 def report_of(waveform):
     return make_report(waveforms=[waveform])
 
@@ -304,3 +310,21 @@ def test_optional_parameters_are_not_marked_required():
     assert params.required == ["channel"], "sensitivity has a default and must not be required"
     assert params.properties["channel"].type == "string"
     assert params.properties["sensitivity"].type == "number"
+
+
+def test_analyze_spectrum_names_the_dominant_frequency():
+    out = ReportTools(report_of(make_two_tone())).analyze_spectrum("C1")
+    assert "kHz" in out
+    assert "10.0" in out  # the 10 kHz fundamental appears
+    assert "channel=C1" in out and "[Captures]" in out
+
+
+def test_analyze_spectrum_shows_harmonic_content_for_a_periodic_signal():
+    out = ReportTools(report_of(make_square())).analyze_spectrum("C1")
+    assert "harmonic" in out.lower()
+
+
+def test_analyze_spectrum_on_a_degenerate_signal():
+    flat = WaveformData(channel="C1", time=np.arange(3) / 1e6, voltage=np.zeros(3), sample_rate=1e6, record_length=3)
+    out = ReportTools(report_of(flat)).analyze_spectrum("C1")
+    assert "no significant frequency content" in out.lower()
