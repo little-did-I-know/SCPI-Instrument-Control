@@ -90,6 +90,32 @@ class BrandingTemplate:
             data["company_logo_path"] = Path(data["company_logo_path"])
         return cls(**data)
 
+    def apply_to_metadata(self, metadata) -> None:
+        """Copy this branding's logo/company/header/footer into a ReportMetadata,
+        only where set -- an empty branding field never overwrites the metadata."""
+        if self.company_name:
+            metadata.company_name = self.company_name
+        if self.company_logo_path:
+            metadata.company_logo_path = self.company_logo_path
+        if self.header_text:
+            metadata.header_text = self.header_text
+        if self.footer_text:
+            metadata.footer_text = self.footer_text
+
+    @classmethod
+    def from_metadata(cls, metadata, colors=None) -> "BrandingTemplate":
+        """Capture a report's logo/company/header/footer (and optional color
+        overrides) into a new BrandingTemplate. `colors` is a dict of any of
+        primary_color/secondary_color/success_color/failure_color; unspecified
+        colors keep the class defaults."""
+        return cls(
+            company_name=metadata.company_name,
+            company_logo_path=metadata.company_logo_path,
+            header_text=metadata.header_text,
+            footer_text=metadata.footer_text,
+            **(colors or {}),
+        )
+
 
 @dataclass
 class ReportTemplate:
