@@ -9,10 +9,27 @@ from datetime import datetime
 from pathlib import Path
 
 from PyQt6.QtCore import QDateTime, Qt, pyqtSignal
-from PyQt6.QtWidgets import QComboBox, QDateTimeEdit, QFileDialog, QFormLayout, QGroupBox, QLineEdit, QPushButton, QTextEdit, QVBoxLayout, QWidget
+from PyQt6.QtGui import QColor
+from PyQt6.QtWidgets import QColorDialog, QComboBox, QDateTimeEdit, QFileDialog, QFormLayout, QGroupBox, QLineEdit, QPushButton, QTextEdit, QVBoxLayout, QWidget
 
 from scpi_control.report_generator.models.report_data import ReportMetadata
 from scpi_control.report_generator.models.test_types import get_test_type_names
+
+#: Default brand colors, matching `BrandingTemplate`'s field defaults.
+DEFAULT_BRAND_COLORS = {
+    "primary_color": "#1f77b4",
+    "secondary_color": "#ff7f0e",
+    "success_color": "#2ca02c",
+    "failure_color": "#d62728",
+}
+
+#: Human-readable labels for each brand color key, used for button/dialog titles.
+BRAND_COLOR_LABELS = {
+    "primary_color": "Title",
+    "secondary_color": "Heading",
+    "success_color": "Pass",
+    "failure_color": "Fail",
+}
 
 
 class MetadataPanel(QWidget):
@@ -30,6 +47,7 @@ class MetadataPanel(QWidget):
         super().__init__(parent)
 
         self.company_logo_path = None
+        self._brand_colors = dict(DEFAULT_BRAND_COLORS)
 
         self._setup_ui()
 
@@ -147,6 +165,30 @@ class MetadataPanel(QWidget):
 
         branding_layout.addRow("Logo:", logo_layout)
 
+        self.title_color_btn = QPushButton()
+        self.title_color_btn.clicked.connect(lambda: self._pick_color("primary_color"))
+        branding_layout.addRow("Title Color:", self.title_color_btn)
+
+        self.heading_color_btn = QPushButton()
+        self.heading_color_btn.clicked.connect(lambda: self._pick_color("secondary_color"))
+        branding_layout.addRow("Heading Color:", self.heading_color_btn)
+
+        self.pass_color_btn = QPushButton()
+        self.pass_color_btn.clicked.connect(lambda: self._pick_color("success_color"))
+        branding_layout.addRow("Pass Color:", self.pass_color_btn)
+
+        self.fail_color_btn = QPushButton()
+        self.fail_color_btn.clicked.connect(lambda: self._pick_color("failure_color"))
+        branding_layout.addRow("Fail Color:", self.fail_color_btn)
+
+        self._color_buttons = {
+            "primary_color": self.title_color_btn,
+            "secondary_color": self.heading_color_btn,
+            "success_color": self.pass_color_btn,
+            "failure_color": self.fail_color_btn,
+        }
+        self._refresh_color_swatches()
+
         self.header_edit = QLineEdit()
         self.header_edit.setPlaceholderText("e.g., CONFIDENTIAL")
         self.header_edit.textChanged.connect(self.metadata_changed.emit)
@@ -190,6 +232,48 @@ class MetadataPanel(QWidget):
             self.company_logo_path = Path(file_path)
             self.logo_path_label.setText(str(self.company_logo_path))
             self.metadata_changed.emit()
+
+    def _pick_color(self, key: str):
+        """
+        Open a color picker dialog for one brand color.
+
+        Args:
+            key: One of "primary_color", "secondary_color", "success_color", "failure_color".
+        """
+        label = BRAND_COLOR_LABELS.get(key, key)
+        current_color = QColor(self._brand_colors[key])
+        color = QColorDialog.getColor(current_color, self, f"Select {label} Color")
+
+        if color.isValid():
+            self._brand_colors[key] = color.name()
+            self._refresh_color_swatches()
+            self.metadata_changed.emit()
+
+    def _refresh_color_swatches(self):
+        """Re-paint the four brand color buttons to match `self._brand_colors`."""
+        for key, button in self._color_buttons.items():
+            button.setStyleSheet(f"background-color: {self._brand_colors[key]}")
+
+    def get_branding_colors(self) -> dict:
+        """
+        Get the current brand colors.
+
+        Returns:
+            Dict with keys "primary_color", "secondary_color", "success_color", "failure_color".
+        """
+        return dict(self._brand_colors)
+
+    def set_branding_colors(self, colors: dict) -> None:
+        """
+        Load brand colors into the form, updating only the keys present in `colors`.
+
+        Args:
+            colors: Dict of brand color hex strings, keyed as in get_branding_colors().
+        """
+        for key in self._brand_colors:
+            if colors.get(key):
+                self._brand_colors[key] = colors[key]
+        self._refresh_color_swatches()
 
     def get_metadata(self) -> ReportMetadata:
         """
@@ -295,5 +379,7 @@ class MetadataPanel(QWidget):
         self.company_name_edit.clear()
         self.company_logo_path = None
         self.logo_path_label.clear()
+        self._brand_colors = dict(DEFAULT_BRAND_COLORS)
+        self._refresh_color_swatches()
         self.header_edit.clear()
         self.footer_edit.clear()
