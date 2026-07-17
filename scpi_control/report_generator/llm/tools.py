@@ -18,6 +18,7 @@ Everything in this module is pure CPU over in-memory arrays: no I/O, no
 instrument, and no knowledge of the LLM.
 """
 
+import math
 from typing import Callable, List, Optional, Tuple
 
 from scpi_control.report_generator.models.report_data import TestReport, WaveformData
@@ -35,6 +36,33 @@ _SENSITIVITY_DEFAULT = 3.0
 _SENSITIVITY_MIN = 1.0
 _SENSITIVITY_MAX = 10.0
 
+MAX_PLATEAUS = 8
+
+_EDGES_DEFAULT = 4
+_EDGES_MAX = 20
+
+
+def _format_volts(value: Optional[float]) -> str:
+    return "n/a" if value is None else f"{value:.4g} V"
+
+
+def _format_slope(value: Optional[float]) -> str:
+    return "n/a" if value is None else f"{value:.4g} V/s"
+
+
+def _format_hz(freq: float) -> str:
+    if freq >= 1e6:
+        return f"{freq / 1e6:.3f} MHz"
+    if freq >= 1e3:
+        return f"{freq / 1e3:.3f} kHz"
+    return f"{freq:.1f} Hz"
+
+
+def _format_db(ratio: float) -> str:
+    if ratio <= 0:
+        return "-inf dB"
+    return f"{20 * math.log10(ratio):.1f} dB"
+
 
 class ReportTools:
     """Read-only tools over one loaded report."""
@@ -47,6 +75,9 @@ class ReportTools:
         return [
             self.list_waveforms,
             self.analyze_waveform,
+            self.analyze_plateaus,
+            self.list_edges,
+            self.analyze_spectrum,
             self.detect_transients,
             self.list_measurements,
         ]
@@ -98,6 +129,100 @@ class ReportTools:
         stats = WaveformAnalyzer.analyze(waveform)
         lines = [f"analyze_waveform(channel={channel}) [{section_title}]:"]
         lines.extend(f"  {name}: {WaveformAnalyzer.format_stat_value(name, value)}" for name, value in stats.items())
+        return "\n".join(lines)
+
+    def analyze_plateaus(self, channel: str) -> str:
+        """Measure the flat plateau regions of a captured waveform.
+
+        Reports each plateau's level, slope, flatness, drift and noise -- the raw
+        facts for judging probe compensation and settling. A plateau that slopes
+        instead of staying flat suggests probe miscompensation; interpret the
+        slope yourself rather than expecting a verdict.
+
+        Args:
+            channel: Channel to inspect, e.g. "C1". Must be one listed by list_waveforms.
+        """
+        waveform, section_title = self._find(channel)
+        regions = WaveformAnalyzer.detect_plateaus(waveform)
+        head = f"analyze_plateaus(channel={channel}) [{section_title}]:"
+        if not regions:
+            return f"{head} no flat plateaus found."
+
+        for region in regions:
+            WaveformAnalyzer.analyze_region(waveform, region, calculate_calibration=False)
+
+        shown = regions[:MAX_PLATEAUS]
+        summary = f"{head} {len(regions)} found"
+        if len(regions) > len(shown):
+            summary += f", showing first {len(shown)}"
+        lines = [summary]
+        for region in shown:
+            lines.append(
+                f"  {region.region_type} {region.start_time * 1e6:.2f}-{region.end_time * 1e6:.2f} µs: "
+                f"level={_format_volts(region.ideal_value)}, slope={_format_slope(region.slope)}, "
+                f"flatness={_format_volts(region.flatness)}, drift={_format_volts(region.drift)}, "
+                f"noise={_format_volts(region.noise_level)}"
+            )
+        return "\n".join(lines)
+
+    def list_edges(self, channel: str, max_edges: Optional[int] = None) -> str:
+        """List the rising and falling edges in a captured waveform, with their times.
+
+        Reports where each edge occurs and how many there are. This is edge
+        LOCATION, not transition speed: for a channel's representative rise/fall
+        time use analyze_waveform instead.
+
+        Args:
+            channel: Channel to inspect, e.g. "C1". Must be one listed by list_waveforms.
+            max_edges: Maximum edges to report, between 2 and 20. Defaults to 4. If
+                the result reports exactly this many, there may be more -- raise it.
+        """
+        if max_edges is None:
+            max_edges = _EDGES_DEFAULT
+        if not 2 <= max_edges <= _EDGES_MAX:
+            raise ValueError(f"max_edges must be between 2 and {_EDGES_MAX}, got {max_edges}")
+
+        waveform, section_title = self._find(channel)
+        edges = WaveformAnalyzer.detect_edges(waveform, max_edges=max_edges)
+        head = f"list_edges(channel={channel}) [{section_title}]:"
+        if not edges:
+            return f"{head} no edges found."
+
+        lines = [f"{head} {len(edges)} found (max_edges={max_edges})"]
+        for edge in edges:
+            kind = "rising" if edge.region_type == "edge_rising" else "falling"
+            midpoint = (edge.start_time + edge.end_time) / 2
+            lines.append(f"  {kind} edge @ {midpoint * 1e6:.2f} µs")
+        return "\n".join(lines)
+
+    def analyze_spectrum(self, channel: str) -> str:
+        """Report the dominant frequency components of a captured waveform.
+
+        Lists the strongest frequency peaks and, for a periodic signal, the
+        per-harmonic content -- more detail than analyze_waveform's single THD
+        value.
+
+        Args:
+            channel: Channel to inspect, e.g. "C1". Must be one listed by list_waveforms.
+        """
+        waveform, section_title = self._find(channel)
+        spectrum = WaveformAnalyzer.calculate_spectrum(waveform)
+        head = f"analyze_spectrum(channel={channel}) [{section_title}]:"
+
+        peaks = spectrum["dominant_peaks"]
+        if not peaks:
+            return f"{head} no significant frequency content."
+
+        lines = [head, "  dominant peaks:"]
+        for freq, rel in peaks:
+            lines.append(f"    {_format_hz(freq)}: {_format_db(rel)}")
+
+        ratios = spectrum["harmonic_ratios"]
+        if ratios:
+            lines.append("  harmonic content (relative to fundamental):")
+            for index, ratio in enumerate(ratios, start=1):
+                label = "fundamental" if index == 1 else f"harmonic {index}"
+                lines.append(f"    {label}: {_format_db(ratio)}")
         return "\n".join(lines)
 
     def detect_transients(self, channel: str, sensitivity: Optional[float] = None) -> str:

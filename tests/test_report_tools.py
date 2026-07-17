@@ -10,7 +10,7 @@ from datetime import datetime
 import numpy as np
 import pytest
 
-from scpi_control.report_generator.llm.tools import MAX_TRANSIENTS, ReportTools
+from scpi_control.report_generator.llm.tools import MAX_PLATEAUS, MAX_TRANSIENTS, ReportTools
 from scpi_control.report_generator.models.report_data import (
     MeasurementResult,
     ReportMetadata,
@@ -45,9 +45,17 @@ def make_report(waveforms=None, measurements=None):
     )
 
 
-def test_functions_returns_exactly_the_four_tools():
+def test_functions_returns_the_seven_tools_in_order():
     names = [fn.__name__ for fn in ReportTools(make_report()).functions()]
-    assert names == ["list_waveforms", "analyze_waveform", "detect_transients", "list_measurements"]
+    assert names == [
+        "list_waveforms",
+        "analyze_waveform",
+        "analyze_plateaus",
+        "list_edges",
+        "analyze_spectrum",
+        "detect_transients",
+        "list_measurements",
+    ]
 
 
 def test_list_waveforms_names_every_channel():
@@ -192,6 +200,110 @@ def test_every_tool_has_a_description_and_described_parameters():
             assert prop.description, f"{fn.__name__}.{pname} has no description"
 
 
+def make_square(channel="C1", n=4000, rate=1e6, freq=500.1):
+    """A clean square wave, ~2 cycles over 4000 samples -> a few long plateaus
+    (well under MAX_PLATEAUS, so nothing truncates and both plateau_high and
+    plateau_low show). Raise freq to force many plateaus.
+
+    Note: detect_plateaus thresholds at median(v) +/- 0.3*std(v). A perfect +-1
+    square wave is bimodal, so that threshold only splits both polarities apart
+    when the high/low sample counts are exactly equal (median lands on 0);
+    otherwise the median snaps entirely to whichever side has one more sample
+    and the other polarity is never detected. At an exact divisor like 500 Hz
+    every zero-crossing lands on an integer sample index and ties into the high
+    side (`>= 0`), which is why 500.1 Hz -- not 500 Hz -- is the default: it
+    avoids that exact tie so both plateau_high and plateau_low actually appear.
+
+    Also note: detect_plateaus requires each plateau to last >= 1% of the record,
+    so a high-frequency square whose half-periods fall below that yields NO
+    plateaus -- keep freq low enough that half_period_samples =
+    rate/(2*freq) >> n*0.01."""
+    t = np.arange(n) / rate
+    v = np.where(np.sin(2 * np.pi * freq * t) >= 0, 1.0, -1.0)
+    return WaveformData(channel=channel, time=t, voltage=v, sample_rate=rate, record_length=n)
+
+
+def make_flatless(channel="C1", n=2000, rate=1e6, freq=50_000):
+    """A fast sine: its arcs above threshold are too brief to register as plateaus
+    (detect_plateaus -> none), and a pure sine's slope never crosses detect_edges'
+    2-sigma derivative threshold (detect_edges -> none). One deterministic 'empty'
+    fixture for both the no-plateaus and no-edges cases."""
+    t = np.arange(n) / rate
+    return WaveformData(channel=channel, time=t, voltage=np.sin(2 * np.pi * freq * t), sample_rate=rate, record_length=n)
+
+
+def make_two_tone(channel="C1", n=2000, rate=1e6):
+    t = np.arange(n) / rate
+    v = 1.0 * np.sin(2 * np.pi * 10_000 * t) + 0.5 * np.sin(2 * np.pi * 30_000 * t)
+    return WaveformData(channel=channel, time=t, voltage=v, sample_rate=rate, record_length=n)
+
+
+def report_of(waveform):
+    return make_report(waveforms=[waveform])
+
+
+def test_analyze_plateaus_reports_slope_per_plateau():
+    out = ReportTools(report_of(make_square())).analyze_plateaus("C1")
+    assert "plateau_high" in out and "plateau_low" in out
+    assert "slope=" in out and "V/s" in out
+    assert "channel=C1" in out and "[Captures]" in out
+
+
+def test_analyze_plateaus_on_a_signal_with_no_plateaus():
+    out = ReportTools(report_of(make_flatless())).analyze_plateaus("C1")
+    assert "no flat plateaus" in out.lower()
+
+
+def test_analyze_plateaus_caps_its_output_and_states_the_true_total():
+    """A many-cycle square wave yields far more than MAX_PLATEAUS regions. The
+    reported total must be true and the truncation stated -- the detect_transients
+    lesson: a silent slice teaches the model the signal is simpler than it is."""
+    many = make_square(freq=5_000)  # 20 cycles over 4000 samples -> 19 plateaus, well over MAX_PLATEAUS
+    out = ReportTools(report_of(many)).analyze_plateaus("C1")
+    # Pin the TRUE total, not just the truncation marker: printing "8 found,
+    # showing first 8" would still satisfy "showing first" and the bullet count
+    # (that is the exact silent-slice regression), so assert the real number.
+    assert "19 found, showing first 8" in out
+    assert "showing first" in out
+    # one plateau line per shown region; count the leading "  plateau_" bullets
+    assert out.count("  plateau_") == MAX_PLATEAUS
+
+
+def test_analyze_plateaus_does_not_mutate_the_report():
+    """Read-only: the tool must never append to waveform.regions."""
+    report = report_of(make_square())
+    waveform = report.sections[0].waveforms[0]
+    before = len(waveform.regions)
+    ReportTools(report).analyze_plateaus("C1")
+    assert len(waveform.regions) == before
+
+
+def test_list_edges_reports_rising_and_falling_edges():
+    out = ReportTools(report_of(make_square())).list_edges("C1")
+    assert "rising" in out and "falling" in out
+    assert "µs" in out
+    assert "channel=C1" in out and "[Captures]" in out
+
+
+def test_list_edges_names_the_cap_so_the_model_can_raise_it():
+    """detect_edges gives no true total, so the honest signal is the cap itself:
+    if the model sees as many edges as it asked for, it can ask for more."""
+    out = ReportTools(report_of(make_square())).list_edges("C1", max_edges=2)
+    assert "max_edges=2" in out
+
+
+def test_list_edges_on_a_flat_signal():
+    out = ReportTools(report_of(make_flatless())).list_edges("C1")
+    assert "no edges" in out.lower()
+
+
+def test_list_edges_rejects_an_out_of_range_max_edges():
+    """ollama strips numeric bounds from the schema, so the dispatcher is the only
+    real guard."""
+    with pytest.raises(ValueError):
+        ReportTools(report_of(make_square())).list_edges("C1", max_edges=99)
+
+
 def test_optional_parameters_are_not_marked_required():
     """THE discipline test. ollama marks `x: float = 3.0` REQUIRED despite the
     default; only `Optional[X] = None` escapes, and an unhinted parameter is
@@ -206,3 +318,22 @@ def test_optional_parameters_are_not_marked_required():
     assert params.required == ["channel"], "sensitivity has a default and must not be required"
     assert params.properties["channel"].type == "string"
     assert params.properties["sensitivity"].type == "number"
+
+
+def test_analyze_spectrum_names_the_dominant_frequency():
+    out = ReportTools(report_of(make_two_tone())).analyze_spectrum("C1")
+    assert "kHz" in out
+    assert "10.0" in out  # the 10 kHz fundamental appears
+    assert "channel=C1" in out and "[Captures]" in out
+
+
+def test_analyze_spectrum_shows_harmonic_content_for_a_periodic_signal():
+    out = ReportTools(report_of(make_square())).analyze_spectrum("C1")
+    assert "harmonic" in out.lower()
+    assert "fundamental" in out
+
+
+def test_analyze_spectrum_on_a_degenerate_signal():
+    flat = WaveformData(channel="C1", time=np.arange(3) / 1e6, voltage=np.zeros(3), sample_rate=1e6, record_length=3)
+    out = ReportTools(report_of(flat)).analyze_spectrum("C1")
+    assert "no significant frequency content" in out.lower()

@@ -35,7 +35,15 @@ def test_answer_question_uses_tools_when_the_model_supports_them():
     assert answer == "C1 is a sine."
     client.complete.assert_not_called()
     tools = client.chat_with_tools.call_args.args[1]
-    assert [fn.__name__ for fn in tools] == ["list_waveforms", "analyze_waveform", "detect_transients", "list_measurements"]
+    assert [fn.__name__ for fn in tools] == [
+        "list_waveforms",
+        "analyze_waveform",
+        "analyze_plateaus",
+        "list_edges",
+        "analyze_spectrum",
+        "detect_transients",
+        "list_measurements",
+    ]
 
 
 def test_the_tool_path_sends_the_question_and_a_tool_aware_system_prompt():
@@ -68,4 +76,7 @@ def test_answer_question_falls_back_when_the_model_cannot_call_tools():
 def test_the_tool_aware_prompt_is_registered():
     prompt = get_system_prompt("chat_tools")
     assert "list_waveforms" in prompt
+    assert "analyze_plateaus" in prompt
+    assert "list_edges" in prompt
+    assert "analyze_spectrum" in prompt
     assert prompt != get_system_prompt("chat")
