@@ -12,6 +12,8 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 
+from scpi_control.waveform import WaveformData as CaptureWaveform
+
 
 @dataclass
 class ReportMetadata:
@@ -182,19 +184,25 @@ class WaveformRegion:
 
 
 @dataclass
-class WaveformData:
-    """Waveform data for inclusion in reports."""
+class WaveformData(CaptureWaveform):
+    """A captured waveform plus everything a report needs to present it.
 
-    channel_name: str
-    time_data: np.ndarray
-    voltage_data: np.ndarray
-    sample_rate: float
-    record_length: int
+    Subclasses the library's WaveformData so the physics -- time, voltage, channel,
+    sample_rate, record_length and the instrument's timebase/voltage_scale -- is
+    defined once, in scpi_control.waveform. Only report concerns live here.
+    """
 
-    # Optional metadata
-    timebase: Optional[float] = None
-    voltage_scale: Optional[float] = None
-    voltage_offset: Optional[float] = None
+    # `field()` with no default is REQUIRED, and is the only spelling that works.
+    # A bare `sample_rate: float` does NOT re-require the field: @dataclass keeps
+    # defaults as class attributes, so the annotation inherits the base's None and
+    # the field silently stays optional. Losing that would not raise at runtime --
+    # the base's __post_init__ derives both sample_rate and record_length from the
+    # arrays anyway -- so what field() actually protects is the explicit contract:
+    # callers must state these rather than let them be silently inferred.
+    sample_rate: float = field()
+    record_length: int = field()
+
+    # Instrument metadata the library does not carry
     probe_ratio: Optional[float] = None
     coupling: Optional[str] = None
 
@@ -215,9 +223,11 @@ class WaveformData:
     regions: List[WaveformRegion] = field(default_factory=list)
 
     def __post_init__(self):
-        """Set default label if not provided."""
+        """Validate via the library's rules, then apply report defaults."""
+        super().__post_init__()
+        self.channel = str(self.channel)
         if self.label is None:
-            self.label = self.channel_name
+            self.label = self.channel
 
     def analyze(self) -> None:
         """
@@ -291,11 +301,11 @@ class WaveformData:
             region: WaveformRegion to extract
 
         Returns:
-            Tuple of (time_data, voltage_data) for the region
+            Tuple of (time, voltage) for the region
         """
         # Find indices for this time range
-        mask = (self.time_data >= region.start_time) & (self.time_data <= region.end_time)
-        return self.time_data[mask], self.voltage_data[mask]
+        mask = (self.time >= region.start_time) & (self.time <= region.end_time)
+        return self.time[mask], self.voltage[mask]
 
     def remove_region(self, region: WaveformRegion) -> bool:
         """
@@ -332,7 +342,7 @@ class WaveformData:
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary (excludes numpy arrays for JSON serialization)."""
         data = {
-            "channel_name": self.channel_name,
+            "channel_name": self.channel,
             "sample_rate": self.sample_rate,
             "record_length": self.record_length,
             "color": self.color,

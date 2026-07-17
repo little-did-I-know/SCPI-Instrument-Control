@@ -39,7 +39,7 @@ def generate_test_square_wave(slope: float = 0, noise: float = 0.01):
         noise: Noise level to add (RMS voltage)
 
     Returns:
-        Tuple of (time_data, voltage_data)
+        Tuple of (time, voltage)
     """
     # 1kHz square wave, 10ms duration, 100kS/s
     sample_rate = 100000
@@ -116,7 +116,7 @@ trimmer capacitor requires adjustment.
     # Generate test waveform (flat plateaus, minimal slope)
     t1, v1 = generate_test_square_wave(slope=0, noise=0.005)
 
-    waveform1 = WaveformData(channel_name="CH1", time_data=t1, voltage_data=v1, sample_rate=100000, record_length=len(t1), label="Properly Compensated Probe", probe_ratio=10)
+    waveform1 = WaveformData(channel="CH1", time=t1, voltage=v1, sample_rate=100000, record_length=len(t1), label="Properly Compensated Probe", probe_ratio=10)
 
     # Analyze the waveform (detects signal type)
     print("   - Analyzing waveform...")
@@ -152,7 +152,7 @@ trimmer capacitor requires adjustment.
     # Generate test waveform (positive slope = undercompensated)
     t2, v2 = generate_test_square_wave(slope=15000, noise=0.008)
 
-    waveform2 = WaveformData(channel_name="CH2", time_data=t2, voltage_data=v2, sample_rate=100000, record_length=len(t2), label="Undercompensated Probe", probe_ratio=10)
+    waveform2 = WaveformData(channel="CH2", time=t2, voltage=v2, sample_rate=100000, record_length=len(t2), label="Undercompensated Probe", probe_ratio=10)
 
     waveform2.analyze()
     WaveformAnalyzer.detect_regions(waveform2, auto_detect_plateaus=True, auto_detect_edges=False)
@@ -176,7 +176,7 @@ trimmer capacitor requires adjustment.
     # Generate test waveform (negative slope = overcompensated)
     t3, v3 = generate_test_square_wave(slope=-18000, noise=0.006)
 
-    waveform3 = WaveformData(channel_name="CH3", time_data=t3, voltage_data=v3, sample_rate=100000, record_length=len(t3), label="Overcompensated Probe", probe_ratio=10)
+    waveform3 = WaveformData(channel="CH3", time=t3, voltage=v3, sample_rate=100000, record_length=len(t3), label="Overcompensated Probe", probe_ratio=10)
 
     waveform3.analyze()
     WaveformAnalyzer.detect_regions(waveform3, auto_detect_plateaus=True, auto_detect_edges=False)
@@ -200,7 +200,7 @@ trimmer capacitor requires adjustment.
     # Generate another test waveform
     t4, v4 = generate_test_square_wave(slope=5000, noise=0.01)
 
-    waveform4 = WaveformData(channel_name="CH4", time_data=t4, voltage_data=v4, sample_rate=100000, record_length=len(t4), label="Manual Region Example")
+    waveform4 = WaveformData(channel="CH4", time=t4, voltage=v4, sample_rate=100000, record_length=len(t4), label="Manual Region Example")
 
     waveform4.analyze()
 

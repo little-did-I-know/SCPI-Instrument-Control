@@ -94,9 +94,9 @@ class WaveformLoader:
         """Read an NPZ written by scpi_control.waveform's _save_npy."""
         voltage = np.asarray(data[ws.VOLTAGE])
         return WaveformData(
-            channel_name=str(data[ws.CHANNEL]),
-            time_data=np.asarray(data[ws.TIME]),
-            voltage_data=voltage,
+            channel=str(data[ws.CHANNEL]),
+            time=np.asarray(data[ws.TIME]),
+            voltage=voltage,
             sample_rate=float(data[ws.SAMPLE_RATE]),
             record_length=len(voltage),
             source_file=filepath,
@@ -117,9 +117,9 @@ class WaveformLoader:
             voltage = np.asarray(data[voltage_key])
             waveforms.append(
                 WaveformData(
-                    channel_name=voltage_key,
-                    time_data=time_data,
-                    voltage_data=voltage,
+                    channel=voltage_key,
+                    time=time_data,
+                    voltage=voltage,
                     sample_rate=WaveformLoader._rate_from_time(time_data),
                     record_length=len(voltage),
                     source_file=filepath,
@@ -187,9 +187,9 @@ class WaveformLoader:
                 channel_name = f"CH{i}"
             waveforms.append(
                 WaveformData(
-                    channel_name=channel_name,
-                    time_data=time_data,
-                    voltage_data=voltage,
+                    channel=channel_name,
+                    time=time_data,
+                    voltage=voltage,
                     sample_rate=WaveformLoader._rate_from_header(header, derived_rate),
                     record_length=len(voltage),
                     source_file=filepath,
@@ -266,9 +266,9 @@ class WaveformLoader:
             # loadmat returns even scalars as 2-D arrays; .item() unwraps them.
             return [
                 WaveformData(
-                    channel_name=str(np.asarray(data[ws.CHANNEL]).item()),
-                    time_data=np.asarray(data[ws.TIME]).flatten(),
-                    voltage_data=voltage,
+                    channel=str(np.asarray(data[ws.CHANNEL]).item()),
+                    time=np.asarray(data[ws.TIME]).flatten(),
+                    voltage=voltage,
                     sample_rate=float(np.asarray(data[ws.SAMPLE_RATE]).item()),
                     record_length=len(voltage),
                     source_file=filepath,
@@ -286,9 +286,9 @@ class WaveformLoader:
             voltage = np.asarray(data[voltage_key]).flatten()
             waveforms.append(
                 WaveformData(
-                    channel_name=voltage_key,
-                    time_data=time_data,
-                    voltage_data=voltage,
+                    channel=voltage_key,
+                    time=time_data,
+                    voltage=voltage,
                     sample_rate=WaveformLoader._rate_from_time(time_data),
                     record_length=len(voltage),
                     source_file=filepath,
@@ -321,9 +321,9 @@ class WaveformLoader:
                     channel = channel.decode()
                 return [
                     WaveformData(
-                        channel_name=str(channel),
-                        time_data=time_data,
-                        voltage_data=voltage,
+                        channel=str(channel),
+                        time=time_data,
+                        voltage=voltage,
                         # Foreign files can name datasets 'time'/'voltage' without
                         # carrying our sample_rate attr; derive it from the
                         # numeric time axis instead of silently reporting 0.0,
@@ -347,9 +347,9 @@ class WaveformLoader:
                 attrs = dict(f[key].attrs)
                 waveforms.append(
                     WaveformData(
-                        channel_name=key,
-                        time_data=time_data,
-                        voltage_data=voltage,
+                        channel=key,
+                        time=time_data,
+                        voltage=voltage,
                         sample_rate=float(attrs.get(ws.SAMPLE_RATE, WaveformLoader._rate_from_time(time_data))),
                         record_length=len(voltage),
                         source_file=filepath,

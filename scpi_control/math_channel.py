@@ -24,27 +24,18 @@ class MathOperations:
         Returns:
             New WaveformData with calculated voltage and source metadata
         """
-        # Safely propagate optional metadata and estimate missing values
-        sample_rate = getattr(source_waveform, "sample_rate", None)
-        if sample_rate is None and len(source_waveform.time) > 1:
-            dt = float(np.mean(np.diff(source_waveform.time)))
-            if dt > 0:
-                sample_rate = 1.0 / dt
-
+        # Propagate what the source actually carries. Nothing is invented here:
+        # sample_rate is left to WaveformData.__post_init__, which derives it from
+        # the same time axis; timebase and voltage_scale stay None unless the
+        # source has real ones, because a math result cannot know the scope's grid.
         voltage_scale = getattr(source_waveform, "voltage_scale", None)
-        if voltage_scale is None:
-            span = float(np.max(voltage) - np.min(voltage)) if len(voltage) > 0 else 0.0
-            voltage_scale = span / 8.0 if span > 0 else 1.0
-
         timebase = getattr(source_waveform, "timebase", None)
-        if timebase is None and sample_rate:
-            timebase = len(voltage) / sample_rate / 14.0
 
         return type(source_waveform)(
             time=source_waveform.time,
             voltage=voltage,
             channel=channel,
-            sample_rate=sample_rate,
+            sample_rate=getattr(source_waveform, "sample_rate", None),
             record_length=len(voltage),
             timebase=timebase,
             voltage_scale=voltage_scale,

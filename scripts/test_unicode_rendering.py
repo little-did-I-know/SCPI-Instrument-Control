@@ -97,9 +97,9 @@ Note: These results are within \u00b15% of theoretical predictions.
     # Add a test waveform
     t, v = generate_test_waveform()
     waveform = WaveformData(
-        channel_name="CH1",
-        time_data=t,
-        voltage_data=v,
+        channel="CH1",
+        time=t,
+        voltage=v,
         sample_rate=100000,
         record_length=len(t),
         label="Test Sine Wave"

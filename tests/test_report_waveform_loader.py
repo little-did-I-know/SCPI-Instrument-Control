@@ -37,10 +37,10 @@ def test_npz_round_trip_preserves_everything(tmp_path):
 
     assert len(loaded) == 1
     got = loaded[0]
-    assert got.channel_name == "C1"  # was 'voltage'
+    assert got.channel == "C1"  # was 'voltage'
     assert got.sample_rate == pytest.approx(SAMPLE_RATE)  # was a fabricated 1e9
-    np.testing.assert_allclose(got.time_data, wf.time)  # was a 0-dim timestamp STRING
-    np.testing.assert_allclose(got.voltage_data, wf.voltage)
+    np.testing.assert_allclose(got.time, wf.time)  # was a 0-dim timestamp STRING
+    np.testing.assert_allclose(got.voltage, wf.voltage)
     assert got.record_length == 100
 
 
@@ -52,9 +52,9 @@ def test_npz_timestamp_never_shadows_time(tmp_path):
 
     got = WaveformLoader.load(p)[0]
 
-    assert got.time_data.ndim == 1
-    assert len(got.time_data) == 100
-    assert not isinstance(got.time_data.dtype.type(), np.str_)
+    assert got.time.ndim == 1
+    assert len(got.time) == 100
+    assert not isinstance(got.time.dtype.type(), np.str_)
 
 
 def test_npz_meta_keys_do_not_disturb_the_schema_path(tmp_path):
@@ -65,8 +65,8 @@ def test_npz_meta_keys_do_not_disturb_the_schema_path(tmp_path):
     saver()._save_npy(wf, str(p), metadata={"dut": "board7"})
 
     got = WaveformLoader.load(p)[0]
-    assert got.channel_name == "C1"
-    np.testing.assert_allclose(got.time_data, wf.time)
+    assert got.channel == "C1"
+    np.testing.assert_allclose(got.time, wf.time)
 
 
 def test_mat_round_trip_preserves_everything(tmp_path):
@@ -79,10 +79,10 @@ def test_mat_round_trip_preserves_everything(tmp_path):
 
     assert len(loaded) == 1, "the channel name must not become a phantom waveform"
     got = loaded[0]
-    assert got.channel_name == "C1"
+    assert got.channel == "C1"
     assert got.sample_rate == pytest.approx(SAMPLE_RATE)
-    np.testing.assert_allclose(got.time_data, wf.time)
-    np.testing.assert_allclose(got.voltage_data, wf.voltage)
+    np.testing.assert_allclose(got.time, wf.time)
+    np.testing.assert_allclose(got.voltage, wf.voltage)
 
 
 def test_mat_does_not_invent_a_channel_waveform(tmp_path):
@@ -92,7 +92,7 @@ def test_mat_does_not_invent_a_channel_waveform(tmp_path):
     saver()._save_mat(make_waveform(), str(p))
 
     for got in WaveformLoader.load(p):
-        assert np.issubdtype(got.voltage_data.dtype, np.number)
+        assert np.issubdtype(got.voltage.dtype, np.number)
 
 
 def test_foreign_npz_still_loads_heuristically(tmp_path):
@@ -103,7 +103,7 @@ def test_foreign_npz_still_loads_heuristically(tmp_path):
     loaded = WaveformLoader.load(p)
 
     assert len(loaded) == 1
-    assert len(loaded[0].time_data) == 10
+    assert len(loaded[0].time) == 10
 
 
 def test_foreign_npz_with_both_time_and_timestamp(tmp_path):
@@ -113,8 +113,8 @@ def test_foreign_npz_with_both_time_and_timestamp(tmp_path):
 
     got = WaveformLoader.load(p)[0]
 
-    assert got.time_data.ndim == 1
-    assert len(got.time_data) == 10
+    assert got.time.ndim == 1
+    assert len(got.time) == 10
 
 
 def test_foreign_npz_with_our_names_but_no_sample_rate_falls_back(tmp_path):
@@ -126,7 +126,7 @@ def test_foreign_npz_with_our_names_but_no_sample_rate_falls_back(tmp_path):
     loaded = WaveformLoader.load(p)
 
     assert len(loaded) == 1
-    assert len(loaded[0].time_data) == 10
+    assert len(loaded[0].time) == 10
 
 
 def test_foreign_npz_with_a_string_first_key_is_rejected_cleanly(tmp_path):
@@ -175,10 +175,10 @@ def test_plain_csv_round_trip(tmp_path):
 
     assert len(loaded) == 1
     got = loaded[0]
-    assert got.channel_name == "CH1"  # synthesized: the format cannot carry 'C1'
+    assert got.channel == "CH1"  # synthesized: the format cannot carry 'C1'
     assert got.sample_rate == pytest.approx(SAMPLE_RATE, rel=1e-6)  # derived from the time axis
-    np.testing.assert_allclose(got.time_data, wf.time)
-    np.testing.assert_allclose(got.voltage_data, wf.voltage)
+    np.testing.assert_allclose(got.time, wf.time)
+    np.testing.assert_allclose(got.voltage, wf.voltage)
 
 
 def test_csv_enhanced_loads_at_all(tmp_path):
@@ -191,8 +191,8 @@ def test_csv_enhanced_loads_at_all(tmp_path):
     loaded = WaveformLoader.load(p)
 
     assert len(loaded) == 1
-    np.testing.assert_allclose(loaded[0].time_data, wf.time)
-    np.testing.assert_allclose(loaded[0].voltage_data, wf.voltage)
+    np.testing.assert_allclose(loaded[0].time, wf.time)
+    np.testing.assert_allclose(loaded[0].voltage, wf.voltage)
 
 
 def test_csv_enhanced_reads_channel_and_rate_from_its_header(tmp_path):
@@ -203,7 +203,7 @@ def test_csv_enhanced_reads_channel_and_rate_from_its_header(tmp_path):
 
     got = WaveformLoader.load(p)[0]
 
-    assert got.channel_name == "C3"
+    assert got.channel == "C3"
     assert got.sample_rate == pytest.approx(SAMPLE_RATE)
 
 
@@ -226,9 +226,9 @@ def test_csv_with_legacy_siglent_header_still_loads(tmp_path):
 
     got = WaveformLoader.load(p)[0]
 
-    assert got.channel_name == "C2"
+    assert got.channel == "C2"
     assert got.sample_rate == pytest.approx(1e6)
-    assert len(got.time_data) == 3
+    assert len(got.time) == 3
 
 
 def test_single_column_csv_raises_rather_than_returning_nothing(tmp_path):
@@ -247,7 +247,7 @@ def test_csv_header_with_an_empty_channel_value_falls_back(tmp_path):
 
     got = WaveformLoader.load(p)[0]
 
-    assert got.channel_name == "CH1"
+    assert got.channel == "CH1"
     assert got.sample_rate == pytest.approx(1e6)
 
 
@@ -269,7 +269,7 @@ def test_csv_user_metadata_key_named_channel_cannot_override_the_real_one(tmp_pa
 
     got = WaveformLoader.load(p)[0]
 
-    assert got.channel_name == "C2"
+    assert got.channel == "C2"
     assert got.sample_rate == pytest.approx(1e6)
 
 
@@ -283,10 +283,10 @@ def test_hdf5_round_trip_preserves_everything(tmp_path):
 
     assert len(loaded) == 1
     got = loaded[0]
-    assert got.channel_name == "C1"  # was 'voltage'
+    assert got.channel == "C1"  # was 'voltage'
     assert got.sample_rate == pytest.approx(SAMPLE_RATE)  # was 1e9: read from the wrong attrs
-    np.testing.assert_allclose(got.time_data, wf.time)
-    np.testing.assert_allclose(got.voltage_data, wf.voltage)
+    np.testing.assert_allclose(got.time, wf.time)
+    np.testing.assert_allclose(got.voltage, wf.voltage)
 
 
 def test_hdf5_with_user_metadata_loads(tmp_path):
@@ -300,8 +300,8 @@ def test_hdf5_with_user_metadata_loads(tmp_path):
     loaded = WaveformLoader.load(p)
 
     assert len(loaded) == 1
-    assert loaded[0].channel_name == "C1"
-    np.testing.assert_allclose(loaded[0].voltage_data, wf.voltage)
+    assert loaded[0].channel == "C1"
+    np.testing.assert_allclose(loaded[0].voltage, wf.voltage)
 
 
 def test_foreign_hdf5_still_loads_heuristically(tmp_path):
@@ -316,7 +316,7 @@ def test_foreign_hdf5_still_loads_heuristically(tmp_path):
     loaded = WaveformLoader.load(p)
 
     assert len(loaded) == 1
-    assert len(loaded[0].time_data) == 10
+    assert len(loaded[0].time) == 10
 
 
 def test_foreign_hdf5_with_a_string_time_dataset_is_rejected_cleanly(tmp_path):
@@ -368,4 +368,4 @@ def test_load_multiple_happy_path(tmp_path):
 
     loaded = WaveformLoader.load_multiple([a, b])
 
-    assert [w.channel_name for w in loaded] == ["C1", "C2"]
+    assert [w.channel for w in loaded] == ["C1", "C2"]

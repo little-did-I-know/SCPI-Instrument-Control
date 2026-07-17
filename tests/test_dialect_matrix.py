@@ -115,6 +115,11 @@ def test_get_waveform_wire_and_value(rig):
     scope.channel1.voltage_scale = 0.5
     waveform = scope.get_waveform(1)
     assert waveform.voltage_scale == pytest.approx(0.5)
+    # The instrument's own timebase, not a derived one: every vendor backend must
+    # read it from the scope now that __post_init__ no longer invents a fallback.
+    # Asserting the exact mock value is what distinguishes "the backend reported
+    # it" from "something computed it" -- a fabricated value would not be 1e-3.
+    assert waveform.timebase == pytest.approx(1e-3)
     assert len(waveform.voltage) > 0
 
 

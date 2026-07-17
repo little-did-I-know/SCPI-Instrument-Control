@@ -287,8 +287,8 @@ class MarkdownReportGenerator(BaseReportGenerator):
 
         else:
             # Fallback to basic statistics if not analyzed
-            v_min = np.min(waveform.voltage_data)
-            v_max = np.max(waveform.voltage_data)
+            v_min = np.min(waveform.voltage)
+            v_max = np.max(waveform.voltage)
             v_pp = v_max - v_min
             lines.append(f"| Peak-to-Peak | {v_pp:.4f} V |")
             lines.append(f"| Min | {v_min:.4f} V |")
@@ -501,7 +501,7 @@ class MarkdownReportGenerator(BaseReportGenerator):
         fig, ax = plt.subplots(figsize=(10, 4))
 
         # Use plot style colors and settings
-        ax.plot(waveform.time_data * 1e6, waveform.voltage_data, color=waveform.color or self.plot_style.waveform_color, linewidth=self.plot_style.waveform_linewidth)
+        ax.plot(waveform.time * 1e6, waveform.voltage, color=waveform.color or self.plot_style.waveform_color, linewidth=self.plot_style.waveform_linewidth)
 
         # Apply style to axes
         self.plot_style.apply_to_axes(ax)

@@ -56,9 +56,9 @@ def create_test_report():
     for i in range(3):
         t, v = generate_test_waveform(freq=1000 * (i + 1))
         waveform = WaveformData(
-            channel_name=f"CH{i+1}",
-            time_data=t,
-            voltage_data=v,
+            channel=f"CH{i+1}",
+            time=t,
+            voltage=v,
             sample_rate=100000,
             record_length=len(t),
             label=f"Sine Wave {i+1}"
@@ -79,9 +79,9 @@ def create_test_report():
     # Clean square wave
     t, v = generate_square_wave(freq=1000, amplitude=2.0, noise_level=0.0)
     waveform = WaveformData(
-        channel_name="CH4",
-        time_data=t,
-        voltage_data=v,
+        channel="CH4",
+        time=t,
+        voltage=v,
         sample_rate=100000,
         record_length=len(t),
         label="Clean Square Wave"
@@ -92,9 +92,9 @@ def create_test_report():
     # Noisy square wave (low noise)
     t, v = generate_square_wave(freq=1000, amplitude=2.0, noise_level=0.05)
     waveform = WaveformData(
-        channel_name="CH5",
-        time_data=t,
-        voltage_data=v,
+        channel="CH5",
+        time=t,
+        voltage=v,
         sample_rate=100000,
         record_length=len(t),
         label="Square Wave (Low Noise)"
@@ -105,9 +105,9 @@ def create_test_report():
     # Noisy square wave (high noise)
     t, v = generate_square_wave(freq=1000, amplitude=2.0, noise_level=0.1)
     waveform = WaveformData(
-        channel_name="CH6",
-        time_data=t,
-        voltage_data=v,
+        channel="CH6",
+        time=t,
+        voltage=v,
         sample_rate=100000,
         record_length=len(t),
         label="Square Wave (High Noise)"

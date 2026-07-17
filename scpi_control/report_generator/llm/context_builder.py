@@ -30,7 +30,7 @@ class ContextBuilder:
         Returns:
             Formatted context string
         """
-        lines = [f"Waveform: {waveform.label or waveform.channel_name}"]
+        lines = [f"Waveform: {waveform.label or waveform.channel}"]
 
         # Basic stats
         lines.append(f"  Sample Rate: {waveform.sample_rate / 1e6:.2f} MS/s")
@@ -40,10 +40,10 @@ class ContextBuilder:
             lines.append(f"  Timebase: {waveform.timebase * 1e6:.2f} µs/div")
 
         # Voltage statistics
-        v_min = np.min(waveform.voltage_data)
-        v_max = np.max(waveform.voltage_data)
-        v_mean = np.mean(waveform.voltage_data)
-        v_std = np.std(waveform.voltage_data)
+        v_min = np.min(waveform.voltage)
+        v_max = np.max(waveform.voltage)
+        v_mean = np.mean(waveform.voltage)
+        v_std = np.std(waveform.voltage)
         v_pp = v_max - v_min
 
         lines.append(f"  Voltage Range: {v_min:.4f} V to {v_max:.4f} V")
@@ -52,7 +52,7 @@ class ContextBuilder:
         lines.append(f"  Std Dev: {v_std:.4f} V")
 
         # Time statistics
-        time_span = waveform.time_data[-1] - waveform.time_data[0]
+        time_span = waveform.time[-1] - waveform.time[0]
         lines.append(f"  Time Span: {time_span * 1e6:.2f} µs")
 
         return "\n".join(lines)

@@ -63,7 +63,7 @@ class TestWindow(QMainWindow):
         v = np.sin(2 * np.pi * 1000 * t)  # 1kHz sine wave
 
         # Create waveform data
-        waveform = WaveformData(time=t, voltage=v, channel=1, source="Test", description="1kHz Sine Wave")
+        waveform = WaveformData(time=t, voltage=v, channel=1)
 
         # Plot it
         self.display.plot_waveform(waveform, clear_others=True)
@@ -78,7 +78,7 @@ class TestWindow(QMainWindow):
         v = np.sign(np.sin(2 * np.pi * 1000 * t))  # 1kHz square wave
 
         # Create waveform data
-        waveform = WaveformData(time=t, voltage=v, channel=2, source="Test", description="1kHz Square Wave")
+        waveform = WaveformData(time=t, voltage=v, channel=2)
 
         # Plot it
         self.display.plot_waveform(waveform, clear_others=True)
@@ -95,8 +95,6 @@ class TestWindow(QMainWindow):
             time=t,
             voltage=np.sin(2 * np.pi * 1000 * t),
             channel=1,
-            source="Test",
-            description="CH1: 1kHz Sine",
         )
 
         # Square wave on CH2
@@ -104,8 +102,6 @@ class TestWindow(QMainWindow):
             time=t,
             voltage=0.5 * np.sign(np.sin(2 * np.pi * 500 * t)),
             channel=2,
-            source="Test",
-            description="CH2: 500Hz Square",
         )
 
         # Sawtooth on CH3
@@ -113,8 +109,6 @@ class TestWindow(QMainWindow):
             time=t,
             voltage=0.8 * (2 * (t * 2000 % 1) - 1),
             channel=3,
-            source="Test",
-            description="CH3: 2kHz Sawtooth",
         )
 
         # Plot all
