@@ -58,12 +58,13 @@ def test_layer1_is_idempotent():
 
 
 def test_layer1_is_non_fatal_on_one_bad_waveform(monkeypatch):
-    """A waveform whose analysis raises is skipped, not fatal -- the others still
-    get populated."""
+    """A waveform whose analysis raises is skipped, not fatal -- and a LATER
+    waveform still gets populated, proving the loop CONTINUES past the failure
+    (not merely that analyze_report didn't raise)."""
     from scpi_control.report_generator.models import report_data
 
-    good = make_square("C1")
     bad = make_square("C2")
+    good = make_square("C1")
 
     real_analyze = report_data.WaveformData.analyze
 
@@ -74,10 +75,12 @@ def test_layer1_is_non_fatal_on_one_bad_waveform(monkeypatch):
 
     monkeypatch.setattr(report_data.WaveformData, "analyze", maybe_raise)
 
-    report = make_report(waveforms=[good, bad])
+    report = make_report(waveforms=[bad, good])  # the bad one is processed FIRST
     ComputedAnalyzer().analyze_report(report)  # must not raise
 
-    assert report.get_all_waveforms()[0].statistics is not None  # C1 populated
+    waveforms = report.get_all_waveforms()
+    assert waveforms[0].statistics is None  # C2 raised -> skipped, left unpopulated
+    assert waveforms[1].statistics is not None  # C1, processed AFTER, still populated
 
 
 def measurement(name, value, unit, passed=None, lo=None, hi=None, channel="C1"):
