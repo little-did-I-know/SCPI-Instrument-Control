@@ -10,7 +10,7 @@ from pathlib import Path
 from datetime import datetime
 
 from scpi_control.report_generator.models.report_data import (
-    TestReport, ReportMetadata, TestSection, WaveformData
+    SUMMARY_SOURCE_AI, TestReport, ReportMetadata, TestSection, WaveformData
 )
 from scpi_control.report_generator.generators.pdf_generator import PDFReportGenerator
 
@@ -49,7 +49,7 @@ This test verifies Unicode character rendering in PDF reports:
 - Degrees: 25\u00b0C or 77\u00b0F
 - Non-breaking spaces and special formatting
 """
-    report.ai_generated_summary = True
+    report.summary_source = SUMMARY_SOURCE_AI
 
     # Key findings with Unicode
     report.key_findings = [
