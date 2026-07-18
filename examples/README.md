@@ -7,6 +7,12 @@ to real hardware over LAN by default (update the IP/host constant near the
 top of each file); a few run entirely against mock connections and need no
 instrument at all — those are called out below.
 
+Here is a genuine capture from a **Siglent SDS824X HD** on the bench — its 1&nbsp;kHz
+calibration square wave, acquired over LAN and plotted by the same automation API that
+`waveform_capture.py` uses:
+
+![Real 1 kHz calibration square wave captured from a Siglent SDS824X HD](../docs/images/cal-square-waveform.png)
+
 Install the core library, then add the extras a given example needs:
 
 ```bash

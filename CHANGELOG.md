@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Examples: four new runnable, no-hardware examples — `report_ai_qa.py` (local-LLM tool-calling Q&A over a report), `network_discovery.py` (scan the network for SCPI instruments), `report_branding.py` (apply company branding/colours to a report), and `report_computed_analysis.py` (deterministic, LLM-free report analysis).
 - Examples: a `tests/test_examples_smoke.py` guard that executes the no-hardware examples, compile-checks the rest, and blocks known-stale tokens from reappearing.
+- Docs: a real screen capture and a real 1&nbsp;kHz calibration-square-wave plot from a Siglent SDS824X HD (in `docs/images/`), plus the raw capture committed as a test fixture (`tests/fixtures/cal_square_sds824x.npz`) that exercises the analyzer against genuine hardware data.
 
 ### Changed
 
@@ -22,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Report generator analysis: `WaveformAnalyzer`'s noise check no longer computes an O(n²) full autocorrelation — it now reads only the two autocorrelation lags it uses, so analysing large captures (e.g. 1,000,000-sample records) completes in milliseconds instead of hanging. Also removes a divide-by-zero `RuntimeWarning` on constant signals.
 - Examples: repaired broken examples — `simple_capture.py` and `advanced_analysis.py` referenced a non-existent `waveform.time_interval` (now the sample period `1.0 / sample_rate`), and the interactive tutorial saved with an invalid `format="NPZ"` (now `"NPY"`). The report-generation and branding examples now degrade cleanly when reportlab is absent instead of crashing.
 - Examples: updated the stale `Siglent-Oscilloscope` package name (and dead repo links) to `SCPI-Instrument-Control`, and corrected the README's hardware/no-hardware annotations.
+- Screen capture on modern-dialect scopes (SDS800X HD): `ScreenCapture` now selects the correct SCDP command per dialect and reads the raw BMP sized by its own header, instead of over-reading a fixed 10&nbsp;MB — which timed out and dropped the connection. `scope.screen_capture.get_screenshot_pil()` now works on the modern scopes.
 
 ## [3.0.0] - 2026-07-17
 

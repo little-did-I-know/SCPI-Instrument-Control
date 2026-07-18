@@ -16,6 +16,12 @@
 
 A universal Python library for controlling SCPI-compatible test equipment via Ethernet/LAN. Supports oscilloscopes, function generators (AWGs), and power supplies with a comprehensive programmatic API and high-performance PyQt6-based GUI application.
 
+<p align="center">
+  <img src="docs/images/sds824x-hd-cal-square.png" alt="Live screen capture from a Siglent SDS824X HD oscilloscope" width="720">
+  <br>
+  <em>A live screen capture pulled over LAN from a Siglent SDS824X&nbsp;HD (its 1&nbsp;kHz calibration square wave), via <code>scope.screen_capture.get_screenshot_pil()</code>.</em>
+</p>
+
 ## Features
 
 ### Core Features
