@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Report generator AI: every oscilloscope system prompt now carries one shared grounding rule (claim only what the report data or a tool actually returned; say so plainly when a value is missing rather than inventing it).
 - Report generator AI: key-findings and recommendations are parsed more tolerantly — multi-digit numbering, markdown-bold list markers, and a leading preamble line no longer corrupt the extracted list.
 
+### Fixed
+
+- Report generator analysis: `WaveformAnalyzer`'s noise check no longer computes an O(n²) full autocorrelation — it now reads only the two autocorrelation lags it uses, so analysing large captures (e.g. 1,000,000-sample records) completes in milliseconds instead of hanging. Also removes a divide-by-zero `RuntimeWarning` on constant signals.
+
 ## [3.0.0] - 2026-07-17
 
 ### ⚠️ Breaking Changes
