@@ -5,18 +5,7 @@ Contains expert knowledge about oscilloscopes, signal analysis,
 and test procedures to guide LLM responses.
 """
 
-# One grounding rule, interpolated into every system prompt below so it cannot
-# drift across six hand-edited copies. Worded to cover both data sources: the
-# static report context (five prompts) and tool results (chat_tools).
-# NOTE: the prompts that embed this are f-strings — keep literal braces out of
-# their bodies, or double them ({{ }}).
-_GROUNDING = (
-    "Ground every statement in the data available to you — the values in the "
-    "report context you were given, or the results a tool returned. Cite specific "
-    "values rather than describing them vaguely. Never invent or estimate a value: "
-    "if a specific number or detail isn't in the data you have, say so plainly "
-    "instead of guessing."
-)
+from scpi_control.report_generator.llm._prompt_helpers import _GROUNDING, lookup_prompt
 
 OSCILLOSCOPE_EXPERT_SYSTEM_PROMPT = f"""You are an expert oscilloscope technician and test engineer with deep knowledge of:
 
@@ -146,4 +135,4 @@ def get_system_prompt(prompt_type: str = "expert") -> str:
         "chat_tools": CHAT_WITH_TOOLS_SYSTEM_PROMPT,
     }
 
-    return prompts.get(prompt_type, OSCILLOSCOPE_EXPERT_SYSTEM_PROMPT)
+    return lookup_prompt(prompts, prompt_type, OSCILLOSCOPE_EXPERT_SYSTEM_PROMPT)

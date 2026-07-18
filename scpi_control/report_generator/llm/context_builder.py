@@ -10,6 +10,7 @@ from typing import Any, Dict, List, Optional
 
 import numpy as np
 
+from scpi_control.report_generator.llm._prompt_helpers import build_chat_prompt
 from scpi_control.report_generator.models.report_data import MeasurementResult, TestReport, TestSection, WaveformData
 from scpi_control.report_generator.models.test_types import get_test_type
 
@@ -266,24 +267,15 @@ class ContextBuilder:
             Full prompt with context and question
         """
         context = ContextBuilder.build_report_context(report, include_sections=True)
-
-        prompt = (
+        preamble = (
             "You are an expert oscilloscope technician and test engineer. "
             "Answer the following question about this test report data. "
             "Be specific, technical, and refer to actual measurements when relevant.\n\n"
         )
-
-        # Add test type context if available
         if report.metadata.test_type:
             test_type_def = get_test_type(report.metadata.test_type)
             if test_type_def and test_type_def.id != "general":
-                prompt += "=== TEST TYPE CONTEXT ===\n\n"
-                prompt += test_type_def.get_ai_context()
-                prompt += "\n\nWhen answering, consider the expected signal characteristics for this test type.\n\n"
-
-        prompt += "=== TEST REPORT DATA ===\n\n"
-        prompt += context
-        prompt += "\n\n=== USER QUESTION ===\n\n"
-        prompt += user_question
-
-        return prompt
+                preamble += "=== TEST TYPE CONTEXT ===\n\n"
+                preamble += test_type_def.get_ai_context()
+                preamble += "\n\nWhen answering, consider the expected signal characteristics for this test type.\n\n"
+        return build_chat_prompt(preamble, "TEST REPORT DATA", context, user_question)
