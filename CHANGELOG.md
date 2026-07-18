@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Report generator AI: every oscilloscope system prompt now carries one shared grounding rule (claim only what the report data or a tool actually returned; say so plainly when a value is missing rather than inventing it).
+- Report generator AI: key-findings and recommendations are parsed more tolerantly — multi-digit numbering, markdown-bold list markers, and a leading preamble line no longer corrupt the extracted list.
+
 ## [3.0.0] - 2026-07-17
 
 ### ⚠️ Breaking Changes
