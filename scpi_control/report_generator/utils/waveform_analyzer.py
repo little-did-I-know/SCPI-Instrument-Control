@@ -10,11 +10,17 @@ from typing import Dict, Optional, Tuple
 
 import numpy as np
 from scipy import signal as scipy_signal
-from scipy.fft import fft, fftfreq
+from scipy.fft import fft, fftfreq, rfft
 
 from scpi_control.report_generator.models.report_data import WaveformData, WaveformRegion
 
 logger = logging.getLogger(__name__)
+
+# A periodic signal concentrates its spectral energy in a dominant peak; noise
+# spreads it out. _is_noise flags a signal as noise when its strongest FFT bin
+# is less than this multiple of the median bin. Empirically, real periodic
+# signals sit >=~280x while white noise sits ~4x, so this is not sensitive.
+_NOISE_PEAK_TO_MEDIAN = 15.0
 
 
 class SignalType:
@@ -491,22 +497,24 @@ class WaveformAnalyzer:
 
     @staticmethod
     def _is_noise(v: np.ndarray) -> bool:
-        """Check whether the signal is primarily noise.
+        """Return True if the signal is primarily noise.
 
-        Noise decorrelates quickly, so its autocorrelation at a lag of 10% of the
-        record is small relative to lag 0. Only those two autocorrelation values
-        are needed, so compute them directly as O(n) dot products rather than
-        forming the full O(n^2) autocorrelation.
+        Noise spreads its energy across the spectrum, so no frequency bin stands
+        out; a periodic signal concentrates energy in a dominant peak (and its
+        harmonics). Compare the strongest magnitude bin to the median bin: a small
+        ratio means nothing dominates -> noise.
         """
-        x = v - np.mean(v)
-        r0 = float(np.dot(x, x))  # autocorrelation at lag 0
-        if r0 == 0.0:
-            return False  # constant/flat signal: not noise (and avoids divide-by-zero)
-        lag = max(1, len(x) // 10)
-        if lag >= len(x):
+        n = v.size
+        if n < 4:
             return False
-        rk = float(np.dot(x[:-lag], x[lag:]))  # autocorrelation at `lag`
-        return bool((rk / r0) < 0.3)
+        x = v - np.mean(v)
+        mag = np.abs(rfft(x))[1:]  # positive-frequency magnitudes, DC bin dropped
+        if mag.size == 0:
+            return False
+        median = float(np.median(mag))
+        if median == 0.0:
+            return False  # isolated tones on a zero floor: not noise
+        return bool((float(np.max(mag)) / median) < _NOISE_PEAK_TO_MEDIAN)
 
     @staticmethod
     def _get_harmonic_ratios(waveform: WaveformData, num_harmonics: int = 5) -> Optional[np.ndarray]:
