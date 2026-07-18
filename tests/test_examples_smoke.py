@@ -39,6 +39,7 @@ EXECUTE = [
     ("report_computed_analysis.py", None),
     ("report_branding.py", None),
     ("network_discovery.py", None),
+    ("report_ai_qa.py", None),
 ]
 
 _TIMEOUTS = {"report_ai_qa.py": 240}
