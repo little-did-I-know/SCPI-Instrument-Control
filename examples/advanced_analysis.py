@@ -16,7 +16,7 @@ SCOPE_IP = "192.168.1.100"
 
 def plot_waveform(waveform, channel_num, title="Waveform"):
     """Plot time-domain waveform."""
-    time = np.arange(len(waveform.voltage)) * waveform.time_interval
+    time = np.arange(len(waveform.voltage)) * (1.0 / waveform.sample_rate)
     time_ms = time * 1000  # Convert to milliseconds
 
     plt.figure(figsize=(12, 4))
@@ -32,7 +32,7 @@ def plot_fft(waveform, channel_num):
     """Plot frequency spectrum using FFT."""
     # Perform FFT
     fft_result = np.fft.fft(waveform.voltage)
-    fft_freq = np.fft.fftfreq(len(waveform.voltage), waveform.time_interval)
+    fft_freq = np.fft.fftfreq(len(waveform.voltage), 1.0 / waveform.sample_rate)
 
     # Take only positive frequencies
     positive_freq_idx = fft_freq > 0

@@ -26,7 +26,7 @@ pip install "SCPI-Instrument-Control"
 | `continuous_capture.py` | Collecting waveforms continuously over a period of time, for monitoring, statistics, or time-varying phenomena. | Oscilloscope on the network |
 | `trigger_based_capture.py` | Waiting for specific trigger conditions and capturing waveforms when they occur, for sporadic events. | Oscilloscope on the network |
 | `advanced_analysis.py` | Advanced waveform analysis and visualization: FFT analysis, statistical analysis, and matplotlib plots. | Oscilloscope on the network, matplotlib |
-| `probe_calibration_analysis.py` | Waveform region extraction for probe compensation analysis: plateau detection, slope analysis, calibration guidance, and zoomed PDF report plots. | Oscilloscope on the network, `SCPI-Instrument-Control[report-generator]` |
+| `probe_calibration_analysis.py` | Waveform region extraction for probe compensation analysis: plateau detection, slope analysis, calibration guidance, and zoomed PDF report plots. | `SCPI-Instrument-Control[report-generator]` (no hardware — fully synthetic) |
 | `dialect_override_example.py` | SCPI dialect auto-detection from `*IDN?` and the `dialect=` override for forcing a command set; runs entirely on mock connections. | Core install only (no hardware) |
 
 ## Web Gateway
@@ -35,6 +35,7 @@ pip install "SCPI-Instrument-Control"
 | --- | --- | --- |
 | `gateway_rest_client.py` | Driving the web gateway's REST API from Python: creating a mock session, configuring a channel, fetching waveform JSON, downloading a screenshot, and sending a raw SCPI command — the same API the browser UI uses. | `SCPI-Instrument-Control[web]` + a running `scpi-web` gateway |
 | `trend_logging_walkthrough.py` | Recording measurement trends in-process via the gateway's session layer (no server or browser): polling measurements, recording them, and exporting to CSV. | Core install only (no hardware, no server) |
+| `network_discovery.py` | Scanning the network for SCPI instruments via `discovery.discover()`: probes a CIDR range for `*IDN?` responses and lists what it finds. | `SCPI-Instrument-Control` (core install, no hardware) |
 
 ## Function Generator / AWG
 
@@ -48,7 +49,7 @@ pip install "SCPI-Instrument-Control"
 | File | What it shows | Requirements |
 | --- | --- | --- |
 | `psu_basic_control.py` | Controlling a SCPI power supply (Siglent SPD series or generic SCPI-99) over Ethernet/LAN. | Power supply on the network |
-| `psu_advanced_features.py` | Advanced PSU features: CSV data logging, tracking modes (series/parallel), timer functionality, waveform generation, and OVP/OCP protection. | Power supply on the network |
+| `psu_advanced_features.py` | Advanced PSU features: CSV data logging, tracking modes (series/parallel), timer functionality, waveform generation, and OVP/OCP protection. | Core install only (no hardware — uses a mock connection) |
 | `psu_usb_connection.py` | Connecting to a power supply via USB/GPIB/Serial/TCP-IP using `VISAConnection`. | `SCPI-Instrument-Control[usb]`, PSU reachable via USB-TMC/GPIB/Serial/VXI-11 |
 | `psu_gui_test.py` | Testing the PSU control GUI against a mock connection, with no physical hardware required. | `SCPI-Instrument-Control[gui]` |
 
@@ -63,6 +64,9 @@ pip install "SCPI-Instrument-Control"
 | File | What it shows | Requirements |
 | --- | --- | --- |
 | `report_generation_example.py` | Generating professional PDF/Markdown test reports: loading waveform data, adding measurements with pass/fail criteria, optional AI analysis, and rendering the report. | `SCPI-Instrument-Control[report-generator]` |
+| `report_computed_analysis.py` | Deterministic, LLM-free report analysis: `ComputedAnalyzer` fills the executive summary, key findings, and recommendations from the waveform data with no model or network. | `SCPI-Instrument-Control[report-generator]` (no hardware) |
+| `report_branding.py` | Applying a `BrandingTemplate` to a report: company name, header/footer text, and a brand colour scheme, rendered to a branded Markdown report and a colour-branded PDF. | `SCPI-Instrument-Control[report-generator]` (no hardware) |
+| `report_ai_qa.py` | Interactive Q&A over a report with a local LLM using tool-calling: the model calls the report's analysis tools to answer, and the example degrades cleanly when no tool-capable Ollama model is running. | `SCPI-Instrument-Control[report-generator]`; optional local Ollama (no hardware) |
 
 ## Interactive Tutorial
 
@@ -77,8 +81,9 @@ the file — update it to match your instrument. To find an oscilloscope's
 LAN address: **Utility → I/O → LAN** on the instrument's front panel.
 
 The scripts marked "no hardware" above (`dialect_override_example.py`,
-`trend_logging_walkthrough.py`, `psu_gui_test.py`) use mock connections and
-run as-is.
+`trend_logging_walkthrough.py`, `psu_gui_test.py`, `probe_calibration_analysis.py`,
+`psu_advanced_features.py`, `network_discovery.py`, `report_computed_analysis.py`,
+`report_branding.py`, `report_ai_qa.py`) use mock connections and run as-is.
 
 ## Running an example
 

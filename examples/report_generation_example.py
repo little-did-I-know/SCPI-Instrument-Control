@@ -39,7 +39,7 @@ from scpi_control.report_generator.llm.client import LLMClient, LLMConfig
 def create_sample_waveform() -> WaveformData:
     """Create a sample waveform for demonstration."""
     # Generate a simple sine wave with some noise
-    sample_rate = 1e9  # 1 GS/s
+    sample_rate = 1e6  # 1 MS/s
     duration = 1e-3  # 1 ms
     frequency = 1e3  # 1 kHz
 
@@ -315,8 +315,8 @@ def main():
         print(f"    [FAILED] Failed to generate Markdown report")
 
     # Generate PDF report (if available)
-    if PDF_AVAILABLE:
-        print("  - Generating PDF report...")
+    print("  - Generating PDF report...")
+    try:
         pdf_path = output_dir / "example_report.pdf"
         pdf_generator = PDFReportGenerator()
 
@@ -324,7 +324,7 @@ def main():
             print(f"    [OK] PDF report saved: {pdf_path}")
         else:
             print(f"    [FAILED] Failed to generate PDF report")
-    else:
+    except ImportError:
         print("  - PDF generation skipped (reportlab not installed)")
 
     # Done!
