@@ -11,6 +11,7 @@ from unittest.mock import MagicMock
 
 import numpy as np
 
+from scpi_control.report_generator.llm._prompt_helpers import _GROUNDING
 from scpi_control.report_generator.llm.context_builder import ContextBuilder
 from scpi_control.report_generator.llm.daq_analyzer import DAQAnalyzer
 from scpi_control.report_generator.llm.daq_context_builder import DAQContextBuilder
@@ -88,3 +89,11 @@ def test_suggest_thresholds_uses_low_temperature():
     client.complete.return_value = "warning high 1.1"
     DAQAnalyzer(client).suggest_thresholds(_BUFFER, 1, _CONFIGS[1])
     assert client.complete.call_args.kwargs["temperature"] == 0.5
+
+
+def test_daq_prompts_are_grounded():
+    # One test covers both the grounding rule (all 5 prompts) and the summary
+    # no-preamble instruction, to keep the added test count minimal.
+    for key in _KEYS:
+        assert _GROUNDING in get_daq_system_prompt(key)
+    assert "Write only the summary itself" in get_daq_system_prompt("summary")
