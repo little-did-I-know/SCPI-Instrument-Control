@@ -3094,7 +3094,18 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="[Unreleased]">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#300-2026-07-17" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [3.0.0] - 2026-07-17
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[3.0.0] - 2026-07-17">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -4158,7 +4169,18 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="[Unreleased]">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#300-2026-07-17" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [3.0.0] - 2026-07-17
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[3.0.0] - 2026-07-17">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -5140,6 +5162,7 @@
 <p>The format is based on <a href="https://keepachangelog.com/en/1.0.0/">Keep a Changelog</a>,
 and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semantic Versioning</a>.</p>
 <h2 id="unreleased">[Unreleased]<a class="headerlink" href="#unreleased" title="Permanent link">&para;</a></h2>
+<h2 id="300-2026-07-17">[3.0.0] - 2026-07-17<a class="headerlink" href="#300-2026-07-17" title="Permanent link">&para;</a></h2>
 <h3 id="breaking-changes">⚠️ Breaking Changes<a class="headerlink" href="#breaking-changes" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>The report generator's <code>WaveformData</code> fields are renamed, and <code>channel</code>
@@ -5182,6 +5205,25 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   MSO58LP, MSO64), including 6- and 8-channel models.</li>
 <li>Badge-based measurements for the modern Tektronix MSO families, which also
   enables <code>measure()</code> on the MSO 2-Series.</li>
+<li><strong>Report generator — local-LLM analysis and richer PDFs</strong>
+  (<code>pip install "SCPI-Instrument-Control[report-generator]"</code>). Everything here
+  is local-only — no cloud providers, no API keys.</li>
+<li>Local-LLM (Ollama) tool calling: the model can call read-only report tools
+    to ground its answers, behind a capability gate that no-ops when the local
+    model cannot do tool calls.</li>
+<li>Waveform analysis tools for the model — <code>analyze_plateaus</code>, <code>list_edges</code>,
+    and <code>analyze_spectrum</code> — plus <code>WaveformAnalyzer.calculate_spectrum</code>.</li>
+<li>Deterministic no-LLM analysis: a <code>ComputedAnalyzer</code> populates per-waveform
+    statistics and regions on every report, and composes a summary, findings,
+    and recommendations when no LLM wrote them. Reports now attribute their
+    summary by source (manual / AI / computed) rather than a bare AI flag.</li>
+<li>Vector PDF plots: waveform, FFT, and region plots render as scalable vector
+    graphics instead of rasterized images.</li>
+<li>Page framework: a running header/footer and page numbers on every page,
+    with section headings kept from stranding at the bottom of a page.</li>
+<li>Template branding: a template's logo, company name, header/footer text, and
+    four brand colours apply to the generated PDF, and a built-in starter
+    template can be seeded from the Template Manager.</li>
 </ul>
 <h3 id="changed">Changed<a class="headerlink" href="#changed" title="Permanent link">&para;</a></h3>
 <ul>
