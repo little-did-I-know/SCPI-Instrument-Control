@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Report generator AI: every oscilloscope system prompt now carries one shared grounding rule (claim only what the report data or a tool actually returned; say so plainly when a value is missing rather than inventing it).
 - Report generator AI: key-findings and recommendations are parsed more tolerantly — multi-digit numbering, markdown-bold list markers, and a leading preamble line no longer corrupt the extracted list.
+- Report generator (internal): the oscilloscope and DAQ LLM prompt layers now share one grounding constant and the prompt-lookup / chat-prompt assembly via `llm/_prompt_helpers.py`, removing duplicated boilerplate.
 
 ### Fixed
 
@@ -26,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Screen capture on modern-dialect scopes (SDS800X HD): `ScreenCapture` now selects the correct SCDP command per dialect and reads the raw BMP sized by its own header, instead of over-reading a fixed 10&nbsp;MB — which timed out and dropped the connection. `scope.screen_capture.get_screenshot_pil()` now works on the modern scopes.
 - Report generator analysis: `WaveformAnalyzer.detect_signal_type` no longer misclassifies clean periodic signals (e.g. a square wave captured over many periods) as noise. The noise check now measures spectral concentration — whether one frequency bin dominates — instead of testing autocorrelation at an arbitrary fixed lag.
 - Report generator analysis: `WaveformAnalyzer.detect_signal_type` now classifies pulse/PWM signals (non-50%-duty square waves) as pulse instead of sawtooth. Two-level (flat-topped) signals are separated from ramps before the harmonic scorers run.
+- Report generator DAQ AI: the data-logger analysis prompts now carry the same grounding rule as the oscilloscope prompts (claim only what the data shows; say so when a value is missing), and the session-summary prompt no longer invites a "Here is the summary" preamble.
 
 ## [3.0.0] - 2026-07-17
 
