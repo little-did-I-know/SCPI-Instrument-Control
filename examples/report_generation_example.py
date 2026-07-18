@@ -315,8 +315,8 @@ def main():
         print(f"    [FAILED] Failed to generate Markdown report")
 
     # Generate PDF report (if available)
-    if PDF_AVAILABLE:
-        print("  - Generating PDF report...")
+    print("  - Generating PDF report...")
+    try:
         pdf_path = output_dir / "example_report.pdf"
         pdf_generator = PDFReportGenerator()
 
@@ -324,7 +324,7 @@ def main():
             print(f"    [OK] PDF report saved: {pdf_path}")
         else:
             print(f"    [FAILED] Failed to generate PDF report")
-    else:
+    except ImportError:
         print("  - PDF generation skipped (reportlab not installed)")
 
     # Done!

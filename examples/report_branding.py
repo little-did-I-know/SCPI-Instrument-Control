@@ -68,12 +68,12 @@ def main():
     if MarkdownReportGenerator(include_plots=False).generate(report, md_path):
         print(f"  [OK] {md_path}")
 
-    if PDF_AVAILABLE:
-        print("Rendering colour-branded PDF...")
+    print("Rendering colour-branded PDF...")
+    try:
         pdf_path = output_dir / "branded_report.pdf"
         if PDFReportGenerator(branding=branding, include_plots=False).generate(report, pdf_path):
             print(f"  [OK] {pdf_path}")
-    else:
+    except ImportError:
         print("  PDF skipped (reportlab not installed).")
 
     print("=" * 60)
