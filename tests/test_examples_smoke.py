@@ -7,8 +7,7 @@ examples as subprocesses.
 
 Limitation: hardware-bound examples (e.g. simple_capture.py, advanced_analysis.py)
 cannot be executed headless, so their fixes are covered by the token scan and the
-compile check, not by running them. report_generation_example.py is excluded from
-EXECUTE for a different reason -- see the comment above EXECUTE.
+compile check, not by running them.
 """
 
 import importlib.util
@@ -27,20 +26,10 @@ EXAMPLES_DIR = Path(__file__).resolve().parent.parent / "examples"
 FORBIDDEN = ["Siglent-Oscilloscope", ".time_interval", 'format="NPZ"']
 
 # (filename, module-that-must-import-or-skip). Only examples that run to
-# completion headless with no instrument belong here.
-#
-# report_generation_example.py is deliberately NOT included: it builds a
-# synthetic 1,000,000-sample waveform (1 GS/s over 1 ms), and generating its
-# PDF report runs WaveformAnalyzer.analyze() -> detect_signal_type() ->
-# _is_noise(), which computes a full autocorrelation via
-# np.correlate(v, v, mode="full") -- a direct (non-FFT) O(n^2)-ish
-# convolution. Benchmarked standalone: ~8s at n=50k, ~23s at n=100k, ~50s at
-# n=200k; at the example's n=1,000,000 this did not finish within several
-# minutes. That's a pre-existing performance bug in
-# scpi_control/report_generator/utils/waveform_analyzer.py, not a hardware
-# or interactivity limitation, and fixing it is out of scope for this
-# test-only task. The example is still covered by test_no_stale_tokens and
-# test_example_compiles.
+# completion headless with no instrument belong here. report_generation_example.py's
+# synthetic waveform was reduced to ~1000 samples so analysis runs in ~1.8s. Note:
+# a pre-existing O(n^2) autocorrelation in scpi_control/report_generator/utils/
+# waveform_analyzer.py makes very large captures slow; this library issue is out of scope.
 EXECUTE = [
     ("dialect_override_example.py", None),
     ("trend_logging_walkthrough.py", None),
