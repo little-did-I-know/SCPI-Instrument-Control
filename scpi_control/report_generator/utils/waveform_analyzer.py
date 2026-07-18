@@ -423,6 +423,11 @@ class WaveformAnalyzer:
         try:
             v = waveform.voltage
 
+            # No samples: nothing to classify. (Guards the analysis below, which
+            # would otherwise divide/transform an empty array.)
+            if v.size == 0:
+                return SignalType.UNKNOWN, 0.0
+
             # Check for DC signal first
             if WaveformAnalyzer._is_dc_signal(v):
                 return SignalType.DC, 95.0

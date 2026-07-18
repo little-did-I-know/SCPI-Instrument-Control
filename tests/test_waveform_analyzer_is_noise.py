@@ -1,12 +1,13 @@
 """_is_noise is O(n) and behaviorally identical to the old O(n^2) autocorrelation."""
 
 import time
+import types
 import warnings
 
 import numpy as np
 import pytest
 
-from scpi_control.report_generator.utils.waveform_analyzer import WaveformAnalyzer
+from scpi_control.report_generator.utils.waveform_analyzer import SignalType, WaveformAnalyzer
 
 
 def _reference_is_noise(v: np.ndarray) -> bool:
@@ -64,6 +65,24 @@ def test_constant_is_not_noise_and_raises_no_warning():
     with warnings.catch_warnings():
         warnings.simplefilter("error")  # any RuntimeWarning becomes a test failure
         assert WaveformAnalyzer._is_noise(np.full(4000, 2.5)) is False
+
+
+def test_empty_is_not_noise():
+    # Old code RAISED ValueError here (np.correlate on an empty array); the new
+    # code returns False without raising. (detect_signal_type guards empty before
+    # ever calling this, so numpy's benign "mean of empty" warning is unreachable
+    # in practice -- ignore it here.) See test_detect_signal_type_empty for the
+    # preserved caller-level behavior.
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        assert WaveformAnalyzer._is_noise(np.array([])) is False
+
+
+def test_detect_signal_type_empty_is_unknown():
+    # Behavior-preserving: an empty capture still classifies as (UNKNOWN, 0.0),
+    # as it did when the old _is_noise raised and detect_signal_type swallowed it.
+    waveform = types.SimpleNamespace(voltage=np.array([]))
+    assert WaveformAnalyzer.detect_signal_type(waveform) == (SignalType.UNKNOWN, 0.0)
 
 
 def test_large_input_is_fast():
