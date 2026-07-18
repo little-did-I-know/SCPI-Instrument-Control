@@ -37,6 +37,7 @@ EXECUTE = [
     ("probe_calibration_analysis.py", "reportlab"),
     ("report_generation_example.py", "matplotlib"),
     ("report_computed_analysis.py", None),
+    ("report_branding.py", None),
 ]
 
 _TIMEOUTS = {"report_ai_qa.py": 240}
