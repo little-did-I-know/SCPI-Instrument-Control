@@ -5,6 +5,7 @@ Provides convenient methods for common analysis tasks.
 """
 
 import logging
+import re
 from typing import List, Optional
 
 from scpi_control.report_generator.llm.client import LLMClient
@@ -14,6 +15,33 @@ from scpi_control.report_generator.llm.tools import ReportTools
 from scpi_control.report_generator.models.report_data import MeasurementResult, TestReport
 
 logger = logging.getLogger(__name__)
+
+# The local model is asked for a numbered list but does not always oblige: it
+# may bold the numbers, count past 9, or open with a "Here are the findings:"
+# line. Match list markers tolerantly; if the reply has no markers at all,
+# salvage its non-preamble lines rather than returning nothing.
+_LIST_ITEM = re.compile(r"^\s*\*{0,2}\s*(?:\d+[.)]|[-*•])\*{0,2}\s+")
+
+
+def _parse_numbered_list(text: Optional[str], max_items: int) -> Optional[List[str]]:
+    """Parse a model's numbered/bulleted list into clean items.
+
+    Handles multi-digit prefixes, markdown-bold numbering (``**1.**``), and a
+    leading preamble line. Falls back to plain non-preamble lines when the model
+    emits no list markers at all. Returns None for empty/whitespace/None input.
+
+    Args:
+        text: The raw model reply.
+        max_items: Cap on the number of items returned.
+    """
+    if not text:
+        return None
+    lines = [line.strip() for line in text.strip().splitlines() if line.strip()]
+    items = [line[m.end() :].strip().strip("*").strip() for line in lines if (m := _LIST_ITEM.match(line))]
+    if not items:
+        items = [line for line in lines if not line.endswith(":")]
+    items = [item for item in items if item]
+    return items[:max_items] if items else None
 
 
 class ReportAnalyzer:
@@ -215,7 +243,8 @@ class ReportAnalyzer:
 
         prompt = (
             f"Please identify the {max_findings} most important findings from this test report. "
-            "Return them as a numbered list, with each finding on its own line. "
+            "Return ONLY a numbered list, one finding per line, starting at '1.'. "
+            "No heading, no preamble, no text before the first item or after the last. "
             "Focus on the most significant results, issues, or noteworthy observations.\n\n"
             "=== TEST REPORT ===\n\n"
         )
@@ -227,26 +256,7 @@ class ReportAnalyzer:
             temperature=0.7,
         )
 
-        if not response:
-            return None
-
-        # Parse numbered list into individual findings
-        findings = []
-        for line in response.strip().split("\n"):
-            line = line.strip()
-            if not line:
-                continue
-
-            # Remove list numbering (e.g., "1.", "1)", "- ", etc.)
-            for prefix in ["1.", "2.", "3.", "4.", "5.", "6.", "7.", "8.", "9.", "1)", "2)", "3)", "4)", "5)", "6)", "7)", "8)", "9)", "- ", "* ", "• "]:
-                if line.startswith(prefix):
-                    line = line[len(prefix) :].strip()
-                    break
-
-            if line:
-                findings.append(line)
-
-        return findings[:max_findings] if findings else None
+        return _parse_numbered_list(response, max_findings)
 
     def generate_recommendations(self, report: TestReport, max_recommendations: int = 5) -> Optional[List[str]]:
         """
@@ -265,7 +275,8 @@ class ReportAnalyzer:
         prompt = (
             f"Based on this test report, provide {max_recommendations} specific, actionable recommendations. "
             "These should be practical next steps or suggestions for the technician. "
-            "Return them as a numbered list, with each recommendation on its own line. "
+            "Return ONLY a numbered list, one recommendation per line, starting at '1.'. "
+            "No heading, no preamble, no text before the first item or after the last. "
             "Focus on what actions should be taken based on the results.\n\n"
             "=== TEST REPORT ===\n\n"
         )
@@ -277,23 +288,4 @@ class ReportAnalyzer:
             temperature=0.7,
         )
 
-        if not response:
-            return None
-
-        # Parse numbered list into individual recommendations
-        recommendations = []
-        for line in response.strip().split("\n"):
-            line = line.strip()
-            if not line:
-                continue
-
-            # Remove list numbering (e.g., "1.", "1)", "- ", etc.)
-            for prefix in ["1.", "2.", "3.", "4.", "5.", "6.", "7.", "8.", "9.", "1)", "2)", "3)", "4)", "5)", "6)", "7)", "8)", "9)", "- ", "* ", "• "]:
-                if line.startswith(prefix):
-                    line = line[len(prefix) :].strip()
-                    break
-
-            if line:
-                recommendations.append(line)
-
-        return recommendations[:max_recommendations] if recommendations else None
+        return _parse_numbered_list(response, max_recommendations)
