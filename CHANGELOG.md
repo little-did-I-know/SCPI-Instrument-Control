@@ -7,10 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Examples: four new runnable, no-hardware examples — `report_ai_qa.py` (local-LLM tool-calling Q&A over a report), `network_discovery.py` (scan the network for SCPI instruments), `report_branding.py` (apply company branding/colours to a report), and `report_computed_analysis.py` (deterministic, LLM-free report analysis).
+- Examples: a `tests/test_examples_smoke.py` guard that executes the no-hardware examples, compile-checks the rest, and blocks known-stale tokens from reappearing.
+
 ### Changed
 
 - Report generator AI: every oscilloscope system prompt now carries one shared grounding rule (claim only what the report data or a tool actually returned; say so plainly when a value is missing rather than inventing it).
 - Report generator AI: key-findings and recommendations are parsed more tolerantly — multi-digit numbering, markdown-bold list markers, and a leading preamble line no longer corrupt the extracted list.
+
+### Fixed
+
+- Examples: repaired broken examples — `simple_capture.py` and `advanced_analysis.py` referenced a non-existent `waveform.time_interval` (now the sample period `1.0 / sample_rate`), and the interactive tutorial saved with an invalid `format="NPZ"` (now `"NPY"`). The report-generation and branding examples now degrade cleanly when reportlab is absent instead of crashing.
+- Examples: updated the stale `Siglent-Oscilloscope` package name (and dead repo links) to `SCPI-Instrument-Control`, and corrected the README's hardware/no-hardware annotations.
 
 ## [3.0.0] - 2026-07-17
 
