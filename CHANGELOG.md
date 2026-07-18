@@ -25,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Examples: updated the stale `Siglent-Oscilloscope` package name (and dead repo links) to `SCPI-Instrument-Control`, and corrected the README's hardware/no-hardware annotations.
 - Screen capture on modern-dialect scopes (SDS800X HD): `ScreenCapture` now selects the correct SCDP command per dialect and reads the raw BMP sized by its own header, instead of over-reading a fixed 10&nbsp;MB — which timed out and dropped the connection. `scope.screen_capture.get_screenshot_pil()` now works on the modern scopes.
 - Report generator analysis: `WaveformAnalyzer.detect_signal_type` no longer misclassifies clean periodic signals (e.g. a square wave captured over many periods) as noise. The noise check now measures spectral concentration — whether one frequency bin dominates — instead of testing autocorrelation at an arbitrary fixed lag.
+- Report generator analysis: `WaveformAnalyzer.detect_signal_type` now classifies pulse/PWM signals (non-50%-duty square waves) as pulse instead of sawtooth. Two-level (flat-topped) signals are separated from ramps before the harmonic scorers run.
 
 ## [3.0.0] - 2026-07-17
 
