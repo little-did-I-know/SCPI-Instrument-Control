@@ -5,7 +5,7 @@ Contains expert knowledge about oscilloscopes, signal analysis,
 and test procedures to guide LLM responses.
 """
 
-from scpi_control.report_generator.llm._prompt_helpers import _GROUNDING
+from scpi_control.report_generator.llm._prompt_helpers import _GROUNDING, lookup_prompt
 
 OSCILLOSCOPE_EXPERT_SYSTEM_PROMPT = f"""You are an expert oscilloscope technician and test engineer with deep knowledge of:
 
@@ -135,4 +135,4 @@ def get_system_prompt(prompt_type: str = "expert") -> str:
         "chat_tools": CHAT_WITH_TOOLS_SYSTEM_PROMPT,
     }
 
-    return prompts.get(prompt_type, OSCILLOSCOPE_EXPERT_SYSTEM_PROMPT)
+    return lookup_prompt(prompts, prompt_type, OSCILLOSCOPE_EXPERT_SYSTEM_PROMPT)

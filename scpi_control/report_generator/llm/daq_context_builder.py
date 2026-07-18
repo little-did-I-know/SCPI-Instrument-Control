@@ -11,6 +11,8 @@ from typing import Any, Dict, List, Optional
 
 import numpy as np
 
+from scpi_control.report_generator.llm._prompt_helpers import build_chat_prompt
+
 logger = logging.getLogger(__name__)
 
 
@@ -284,18 +286,8 @@ class DAQContextBuilder:
             Full prompt with context and question
         """
         context = DAQContextBuilder.build_session_context(data_buffer, channels, channel_configs)
-
-        prompt = (
-            "You are a data acquisition expert assistant. "
-            "Answer the following question about this DAQ session data. "
-            "Be specific and reference actual measurement values.\n\n"
-            "=== DAQ SESSION DATA ===\n\n"
-        )
-        prompt += context
-        prompt += "\n\n=== USER QUESTION ===\n\n"
-        prompt += user_question
-
-        return prompt
+        preamble = "You are a data acquisition expert assistant. " "Answer the following question about this DAQ session data. " "Be specific and reference actual measurement values.\n\n"
+        return build_chat_prompt(preamble, "DAQ SESSION DATA", context, user_question)
 
     @staticmethod
     def _get_unit_for_function(func_id: str) -> str:

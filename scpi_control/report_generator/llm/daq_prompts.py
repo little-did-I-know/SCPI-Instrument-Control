@@ -5,7 +5,7 @@ Contains expert knowledge about data acquisition, trend analysis,
 and measurement interpretation to guide LLM responses.
 """
 
-from scpi_control.report_generator.llm._prompt_helpers import _GROUNDING
+from scpi_control.report_generator.llm._prompt_helpers import _GROUNDING, lookup_prompt
 
 DAQ_EXPERT_SYSTEM_PROMPT = f"""You are an expert data acquisition engineer and test technician with deep knowledge of:
 
@@ -125,4 +125,4 @@ def get_daq_system_prompt(prompt_type: str = "expert") -> str:
         "chat": DAQ_CHAT_ASSISTANT_SYSTEM_PROMPT,
     }
 
-    return prompts.get(prompt_type, DAQ_EXPERT_SYSTEM_PROMPT)
+    return lookup_prompt(prompts, prompt_type, DAQ_EXPERT_SYSTEM_PROMPT)

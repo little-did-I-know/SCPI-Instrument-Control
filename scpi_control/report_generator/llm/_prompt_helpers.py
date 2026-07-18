@@ -16,3 +16,15 @@ _GROUNDING = (
     "if a specific number or detail isn't in the data you have, say so plainly "
     "instead of guessing."
 )
+
+
+def lookup_prompt(table: Dict[str, str], prompt_type: str, default: str) -> str:
+    """Return `table[prompt_type]`, or `default` if the key is unknown."""
+    return table.get(prompt_type, default)
+
+
+def build_chat_prompt(preamble: str, data_label: str, context: str, question: str) -> str:
+    """Assemble the 4-part chat prompt shared by the oscilloscope and DAQ chats:
+    a preamble, a `=== <data_label> ===` data block, then the user question.
+    """
+    return f"{preamble}=== {data_label} ===\n\n{context}\n\n=== USER QUESTION ===\n\n{question}"
