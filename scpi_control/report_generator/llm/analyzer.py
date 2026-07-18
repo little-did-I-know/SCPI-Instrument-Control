@@ -23,6 +23,21 @@ logger = logging.getLogger(__name__)
 _LIST_ITEM = re.compile(r"^\s*\*{0,2}\s*(?:\d+[.)]|[-*•])\*{0,2}\s+")
 
 
+def _unwrap_bold(text: str) -> str:
+    """Remove a markdown emphasis wrapper only when it surrounds the WHOLE item.
+
+    ``**foo**`` -> ``foo`` and ``*foo*`` -> ``foo``, but a partially-bolded item
+    like ``**foo** bar`` or a leading glob like ``*.tmp`` is left untouched --
+    stripping those would strand an interior marker or eat real content.
+    """
+    for marker in ("**", "*"):
+        if len(text) > 2 * len(marker) and text.startswith(marker) and text.endswith(marker):
+            inner = text[len(marker) : -len(marker)].strip()
+            if inner:
+                return inner
+    return text
+
+
 def _parse_numbered_list(text: Optional[str], max_items: int) -> Optional[List[str]]:
     """Parse a model's numbered/bulleted list into clean items.
 
@@ -37,7 +52,7 @@ def _parse_numbered_list(text: Optional[str], max_items: int) -> Optional[List[s
     if not text:
         return None
     lines = [line.strip() for line in text.strip().splitlines() if line.strip()]
-    items = [line[m.end() :].strip().strip("*").strip() for line in lines if (m := _LIST_ITEM.match(line))]
+    items = [_unwrap_bold(line[m.end() :].strip()) for line in lines if (m := _LIST_ITEM.match(line))]
     if not items:
         items = [line for line in lines if not line.endswith(":")]
     items = [item for item in items if item]

@@ -46,6 +46,21 @@ def test_bold_wrapped_item_is_unwrapped():
     assert _parse_numbered_list("1. **Rise time slow**", 5) == ["Rise time slow"]
 
 
+def test_italic_wrapped_item_is_unwrapped():
+    assert _parse_numbered_list("1. *emphasis*", 5) == ["emphasis"]
+
+
+def test_partial_bold_leaves_valid_markdown():
+    # Only the leading keyword is bolded: the item is NOT symmetrically wrapped,
+    # so it must be left intact rather than losing its leading ** and stranding
+    # the interior one (which produced "Clipping** detected on CH1" before).
+    assert _parse_numbered_list("1. **Clipping** detected on CH1", 5) == ["**Clipping** detected on CH1"]
+
+
+def test_leading_glob_star_is_preserved():
+    assert _parse_numbered_list("1. *.tmp files should be deleted", 5) == ["*.tmp files should be deleted"]
+
+
 def test_preamble_line_is_dropped_when_markers_exist():
     assert _parse_numbered_list("Here are the findings:\n1. First\n2. Second", 5) == ["First", "Second"]
 
