@@ -27,6 +27,7 @@ def build_report() -> TestReport:
     """A one-channel synthetic report: a 1 kHz sine with light noise."""
     sample_rate = 1e6
     t = np.arange(2000) / sample_rate
+    np.random.seed(0)
     v = 3.3 * np.sin(2 * np.pi * 1000 * t) + 0.02 * np.random.randn(t.size)
     waveform = WaveformData(
         channel="C1",

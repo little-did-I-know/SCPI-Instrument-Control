@@ -82,7 +82,8 @@ LAN address: **Utility → I/O → LAN** on the instrument's front panel.
 
 The scripts marked "no hardware" above (`dialect_override_example.py`,
 `trend_logging_walkthrough.py`, `psu_gui_test.py`, `probe_calibration_analysis.py`,
-`psu_advanced_features.py`) use mock connections and run as-is.
+`psu_advanced_features.py`, `network_discovery.py`, `report_computed_analysis.py`,
+`report_branding.py`, `report_ai_qa.py`) use mock connections and run as-is.
 
 ## Running an example
 

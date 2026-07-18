@@ -24,6 +24,7 @@ from scpi_control.report_generator.models.report_data import ReportMetadata, Tes
 def build_report() -> TestReport:
     sample_rate = 1e6
     t = np.arange(2000) / sample_rate
+    np.random.seed(0)
     v = 3.3 * np.sin(2 * np.pi * 1000 * t) + 0.02 * np.random.randn(t.size)
     waveform = WaveformData(channel="C1", time=t, voltage=v, sample_rate=sample_rate, record_length=t.size, label="1 kHz reference")
     return TestReport(
@@ -61,7 +62,7 @@ def main():
         except Exception as exc:  # never let a model hiccup crash the example
             print(f"A: (the model call failed: {exc})")
             continue
-        print(f"A: {answer}")
+        print(f"A: {answer if answer is not None else '(no answer)'}")
 
     print("\n" + "=" * 60)
     print("Done.")
