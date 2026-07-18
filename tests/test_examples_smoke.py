@@ -7,11 +7,16 @@ examples as subprocesses.
 
 Limitation: hardware-bound examples (e.g. simple_capture.py, advanced_analysis.py)
 cannot be executed headless, so their fixes are covered by the token scan and the
-compile check, not by running them.
+compile check, not by running them. report_generation_example.py is excluded from
+EXECUTE for a different reason -- see the comment above EXECUTE.
 """
 
+import importlib.util
 import json
+import os
 import py_compile
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -20,6 +25,35 @@ EXAMPLES_DIR = Path(__file__).resolve().parent.parent / "examples"
 
 # Strings that must never appear under examples/ again.
 FORBIDDEN = ["Siglent-Oscilloscope", ".time_interval", 'format="NPZ"']
+
+# (filename, module-that-must-import-or-skip). Only examples that run to
+# completion headless with no instrument belong here.
+#
+# report_generation_example.py is deliberately NOT included: it builds a
+# synthetic 1,000,000-sample waveform (1 GS/s over 1 ms), and generating its
+# PDF report runs WaveformAnalyzer.analyze() -> detect_signal_type() ->
+# _is_noise(), which computes a full autocorrelation via
+# np.correlate(v, v, mode="full") -- a direct (non-FFT) O(n^2)-ish
+# convolution. Benchmarked standalone: ~8s at n=50k, ~23s at n=100k, ~50s at
+# n=200k; at the example's n=1,000,000 this did not finish within several
+# minutes. That's a pre-existing performance bug in
+# scpi_control/report_generator/utils/waveform_analyzer.py, not a hardware
+# or interactivity limitation, and fixing it is out of scope for this
+# test-only task. The example is still covered by test_no_stale_tokens and
+# test_example_compiles.
+EXECUTE = [
+    ("dialect_override_example.py", None),
+    ("trend_logging_walkthrough.py", None),
+    ("psu_advanced_features.py", None),
+    ("probe_calibration_analysis.py", "reportlab"),
+]
+
+_TIMEOUTS = {"report_ai_qa.py": 240}
+_DEFAULT_TIMEOUT = 90
+
+
+def _available(module):
+    return module is None or importlib.util.find_spec(module) is not None
 
 
 def _example_text(path):
@@ -55,3 +89,33 @@ def test_example_compiles(path):
 def test_notebook_is_valid_json():
     nb = EXAMPLES_DIR / "interactive_tutorial.ipynb"
     json.loads(nb.read_text(encoding="utf-8"))
+
+
+@pytest.mark.parametrize("filename, module", EXECUTE, ids=[f for f, _ in EXECUTE])
+def test_no_hardware_example_runs(filename, module, tmp_path):
+    if not _available(module):
+        pytest.skip(f"optional dependency {module!r} not installed")
+    path = EXAMPLES_DIR / filename
+    assert path.exists(), f"missing example: {filename}"
+    # PYTHONIOENCODING: some examples print unicode (checkmarks, etc.) and
+    # Windows defaults a captured child's stdout/stderr to the cp1252
+    # console codepage, which raises UnicodeEncodeError. utf-8 matches what
+    # a real terminal on any platform would accept.
+    env = {**os.environ, "MPLBACKEND": "Agg", "PYTHONIOENCODING": "utf-8"}
+    result = subprocess.run(
+        [sys.executable, str(path)],
+        cwd=tmp_path,
+        env=env,
+        # input="" (rather than stdin=subprocess.DEVNULL) closes stdin after
+        # writing nothing. On Windows, stdin=DEVNULL wires stdin to the NUL
+        # device, and sys.stdin.isatty() reports True for NUL -- so an
+        # example's "am I interactive?" check is fooled into calling input()
+        # and hanging until the timeout. An empty piped stdin reports
+        # isatty() False (as DEVNULL correctly does on POSIX) while still
+        # never blocking: any input() call gets an immediate EOFError.
+        input="",
+        capture_output=True,
+        text=True,
+        timeout=_TIMEOUTS.get(filename, _DEFAULT_TIMEOUT),
+    )
+    assert result.returncode == 0, f"{filename} exited {result.returncode}\n--- stderr ---\n{result.stderr[-3000:]}"
