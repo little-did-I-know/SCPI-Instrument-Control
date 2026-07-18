@@ -28,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Report generator analysis: `WaveformAnalyzer.detect_signal_type` no longer misclassifies clean periodic signals (e.g. a square wave captured over many periods) as noise. The noise check now measures spectral concentration — whether one frequency bin dominates — instead of testing autocorrelation at an arbitrary fixed lag.
 - Report generator analysis: `WaveformAnalyzer.detect_signal_type` now classifies pulse/PWM signals (non-50%-duty square waves) as pulse instead of sawtooth. Two-level (flat-topped) signals are separated from ramps before the harmonic scorers run.
 - Report generator DAQ AI: the data-logger analysis prompts now carry the same grounding rule as the oscilloscope prompts (claim only what the data shows; say so when a value is missing), and the session-summary prompt no longer invites a "Here is the summary" preamble.
+- Report generator PDF: characters outside the built-in font's range (⚠, ✓/✗, σ, Ω, …) no longer render as blank boxes — they are normalized to readable text, with a catch-all so any unexpected glyph can never box out.
 
 ## [3.0.0] - 2026-07-17
 
