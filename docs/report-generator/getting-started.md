@@ -2,6 +2,11 @@
 
 This guide will help you install and start using the Siglent Report Generator.
 
+The generator turns real captures into analysed reports. Here is the kind of input it works
+from — a genuine 1&nbsp;kHz calibration square wave captured from a Siglent SDS824X HD:
+
+![Real 1 kHz calibration square wave](../images/cal-square-waveform.png)
+
 ## Installation
 
 ### Option 1: Install from Source (Development)
