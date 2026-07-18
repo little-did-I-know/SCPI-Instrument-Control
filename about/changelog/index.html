@@ -5252,6 +5252,7 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 </ul>
 <h3 id="fixed">Fixed<a class="headerlink" href="#fixed" title="Permanent link">&para;</a></h3>
 <ul>
+<li>Report generator analysis: <code>WaveformAnalyzer</code>'s noise check no longer computes an O(n²) full autocorrelation — it now reads only the two autocorrelation lags it uses, so analysing large captures (e.g. 1,000,000-sample records) completes in milliseconds instead of hanging. Also removes a divide-by-zero <code>RuntimeWarning</code> on constant signals.</li>
 <li>Examples: repaired broken examples — <code>simple_capture.py</code> and <code>advanced_analysis.py</code> referenced a non-existent <code>waveform.time_interval</code> (now the sample period <code>1.0 / sample_rate</code>), and the interactive tutorial saved with an invalid <code>format="NPZ"</code> (now <code>"NPY"</code>). The report-generation and branding examples now degrade cleanly when reportlab is absent instead of crashing.</li>
 <li>Examples: updated the stale <code>Siglent-Oscilloscope</code> package name (and dead repo links) to <code>SCPI-Instrument-Control</code>, and corrected the README's hardware/no-hardware annotations.</li>
 </ul>
