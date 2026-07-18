@@ -69,6 +69,16 @@ class TemplateManagerDialog(QDialog):
         create_default_btn.clicked.connect(self._create_default_template)
         action_layout.addWidget(create_default_btn)
 
+        create_probe_cal_btn = QPushButton("Create Probe Cal Template")
+        create_probe_cal_btn.setToolTip(
+            "Adds a probe-compensation template: probe_calibration test type, "
+            "a comp procedure, and overshoot/undershoot/ringing/flatness limits. "
+            "Its sections are carried for future use but are not yet applied "
+            "when the template is loaded."
+        )
+        create_probe_cal_btn.clicked.connect(self._create_probe_calibration_template)
+        action_layout.addWidget(create_probe_cal_btn)
+
         left_layout.addLayout(action_layout)
 
         layout.addLayout(left_layout, 60)
@@ -381,6 +391,24 @@ class TemplateManagerDialog(QDialog):
                 self,
                 "Error Creating Default Template",
                 f"Failed to create default template:\n{str(e)}",
+            )
+
+    def _create_probe_calibration_template(self):
+        """Create and save the built-in probe-calibration template."""
+        try:
+            template = ReportTemplate.create_probe_calibration_template()
+            template.save_to_library()
+            QMessageBox.information(
+                self,
+                "Probe Cal Template Created",
+                f"Template '{template.name}' created successfully.\n" "Its sections are not yet applied when the template is loaded.",
+            )
+            self._refresh_template_list()
+        except Exception as e:
+            QMessageBox.critical(
+                self,
+                "Error Creating Probe Cal Template",
+                f"Failed to create probe calibration template:\n{str(e)}",
             )
 
     def _export_template(self):
