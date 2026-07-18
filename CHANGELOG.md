@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.0.0] - 2026-07-17
+
 ### ⚠️ Breaking Changes
 
 - **The report generator's `WaveformData` fields are renamed, and `channel`
@@ -49,6 +51,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   MSO58LP, MSO64), including 6- and 8-channel models.
 - Badge-based measurements for the modern Tektronix MSO families, which also
   enables `measure()` on the MSO 2-Series.
+- **Report generator — local-LLM analysis and richer PDFs**
+  (`pip install "SCPI-Instrument-Control[report-generator]"`). Everything here
+  is local-only — no cloud providers, no API keys.
+  - Local-LLM (Ollama) tool calling: the model can call read-only report tools
+    to ground its answers, behind a capability gate that no-ops when the local
+    model cannot do tool calls.
+  - Waveform analysis tools for the model — `analyze_plateaus`, `list_edges`,
+    and `analyze_spectrum` — plus `WaveformAnalyzer.calculate_spectrum`.
+  - Deterministic no-LLM analysis: a `ComputedAnalyzer` populates per-waveform
+    statistics and regions on every report, and composes a summary, findings,
+    and recommendations when no LLM wrote them. Reports now attribute their
+    summary by source (manual / AI / computed) rather than a bare AI flag.
+  - Vector PDF plots: waveform, FFT, and region plots render as scalable vector
+    graphics instead of rasterized images.
+  - Page framework: a running header/footer and page numbers on every page,
+    with section headings kept from stranding at the bottom of a page.
+  - Template branding: a template's logo, company name, header/footer text, and
+    four brand colours apply to the generated PDF, and a built-in starter
+    template can be seeded from the Template Manager.
 
 ### Changed
 
