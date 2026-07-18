@@ -442,6 +442,15 @@ class WaveformAnalyzer:
             if WaveformAnalyzer._is_noise(v):
                 return SignalType.NOISE, 85.0
 
+            # A two-level signal is a square (symmetric) or a pulse (asymmetric
+            # duty), never a ramp -- decide by duty cycle here, before the
+            # triangle/sawtooth scorers below can mislabel a pulse as sawtooth.
+            if WaveformAnalyzer._is_two_level(v):
+                duty_cycle = WaveformAnalyzer._estimate_duty_cycle(v)
+                if duty_cycle is not None and not (40 <= duty_cycle <= 60):
+                    return SignalType.PULSE, 85.0
+                return SignalType.SQUARE, 90.0
+
             # Analyze frequency content
             harmonics = WaveformAnalyzer._get_harmonic_ratios(waveform)
 
@@ -494,6 +503,24 @@ class WaveformAnalyzer:
         if mean == 0:
             return std < threshold
         return (std / mean) < threshold
+
+    @staticmethod
+    def _is_two_level(v: np.ndarray, band: float = 0.15, min_fraction: float = 0.8) -> bool:
+        """Return True if the signal sits at two discrete levels (square/pulse).
+
+        A flat-topped signal clusters near its min and max; a ramp (triangle,
+        sawtooth) or a sine spreads across the range. Measures the fraction of
+        samples within `band` of either extreme.
+        """
+        v = np.asarray(v, dtype=float)
+        lo = float(np.min(v))
+        hi = float(np.max(v))
+        span = hi - lo
+        if span == 0.0:
+            return False  # constant: handled upstream by _is_dc_signal
+        edge = band * span
+        near_extremes = (v <= lo + edge) | (v >= hi - edge)
+        return bool(np.mean(near_extremes) >= min_fraction)
 
     @staticmethod
     def _is_noise(v: np.ndarray) -> bool:
