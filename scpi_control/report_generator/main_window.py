@@ -41,7 +41,7 @@ from scpi_control.report_generator.models.app_settings import AppSettings
 from scpi_control.report_generator.models.plot_style import PlotStyle
 from scpi_control.report_generator.models.report_data import SUMMARY_SOURCE_AI, TestReport, TestSection, WaveformData
 from scpi_control.report_generator.models.report_options import ReportOptions
-from scpi_control.report_generator.models.template import ReportTemplate
+from scpi_control.report_generator.models.template import BrandingTemplate, ReportTemplate
 from scpi_control.report_generator.utils.waveform_loader import WaveformLoader
 
 try:
@@ -406,6 +406,8 @@ class MainWindow(QMainWindow):
                         progress.setLabelText(f"Generating PDF... {percent}%")
                     QApplication.processEvents()  # Keep UI responsive
 
+                branding = BrandingTemplate(**self.metadata_panel.get_branding_colors())
+
                 generator = PDFReportGenerator(
                     page_size=page_size,
                     include_plots=self.current_options.include_waveform_plots,
@@ -414,6 +416,7 @@ class MainWindow(QMainWindow):
                     plot_style=plot_style,
                     report_options=self.current_options,
                     progress_callback=update_progress,
+                    branding=branding,
                 )
 
                 success = generator.generate(report, temp_pdf_path)
@@ -745,6 +748,19 @@ class MainWindow(QMainWindow):
         self.current_options.plot_height_inches = template.plot_height_inches
         self.current_options.plot_dpi = template.plot_dpi
 
+        # Apply the template's branding (logo/company/header/footer + colors)
+        metadata = self.metadata_panel.get_metadata()
+        template.branding.apply_to_metadata(metadata)
+        self.metadata_panel.set_metadata(metadata)
+        self.metadata_panel.set_branding_colors(
+            {
+                "primary_color": template.branding.primary_color,
+                "secondary_color": template.branding.secondary_color,
+                "success_color": template.branding.success_color,
+                "failure_color": template.branding.failure_color,
+            }
+        )
+
         self.statusBar().showMessage(f"Loaded template: {template.name}")
 
     def _save_template(self):
@@ -798,6 +814,7 @@ class MainWindow(QMainWindow):
                 default_temperature=metadata.temperature,
                 default_humidity=metadata.humidity,
                 default_location=metadata.location,
+                branding=BrandingTemplate.from_metadata(metadata, colors=self.metadata_panel.get_branding_colors()),
             )
 
             if self.llm_config:

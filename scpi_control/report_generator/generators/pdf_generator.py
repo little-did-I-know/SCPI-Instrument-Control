@@ -42,6 +42,7 @@ from scpi_control.report_generator.generators.base import BaseReportGenerator
 from scpi_control.report_generator.models.plot_style import PlotStyle
 from scpi_control.report_generator.models.report_data import MeasurementResult, TestReport, TestSection, WaveformData, WaveformRegion
 from scpi_control.report_generator.models.report_options import ReportOptions
+from scpi_control.report_generator.models.template import BrandingTemplate
 from scpi_control.report_generator.utils.waveform_analyzer import WaveformAnalyzer
 
 logger = logging.getLogger(__name__)
@@ -115,6 +116,7 @@ class PDFReportGenerator(BaseReportGenerator):
         plot_style: PlotStyle = None,
         report_options: ReportOptions = None,
         progress_callback: Optional[Callable[[int, str], None]] = None,
+        branding=None,
     ):
         """
         Initialize PDF generator.
@@ -127,6 +129,8 @@ class PDFReportGenerator(BaseReportGenerator):
             plot_style: Plot style configuration for matplotlib plots
             report_options: Report options for statistics and other settings
             progress_callback: Optional callback function(progress_percent, status_message)
+            branding: Optional BrandingTemplate providing brand colors for the
+                report styles. Defaults to BrandingTemplate() (today's colors).
         """
         if not REPORTLAB_AVAILABLE:
             raise ImportError("reportlab is required for PDF generation. " "Install with: pip install reportlab")
@@ -142,6 +146,7 @@ class PDFReportGenerator(BaseReportGenerator):
         self.plot_style = plot_style or PlotStyle()
         self.report_options = report_options or ReportOptions()
         self.progress_callback = progress_callback
+        self.branding = branding or BrandingTemplate()
 
         # Set up styles
         self.styles = getSampleStyleSheet()
@@ -155,7 +160,7 @@ class PDFReportGenerator(BaseReportGenerator):
                 name="ReportTitle",
                 parent=self.styles["Heading1"],
                 fontSize=24,
-                textColor=colors.HexColor("#1f77b4"),
+                textColor=colors.HexColor(self.branding.primary_color),
                 spaceAfter=30,
                 alignment=TA_CENTER,
             )
@@ -167,7 +172,7 @@ class PDFReportGenerator(BaseReportGenerator):
                 name="SectionHeading",
                 parent=self.styles["Heading2"],
                 fontSize=16,
-                textColor=colors.HexColor("#1f77b4"),
+                textColor=colors.HexColor(self.branding.primary_color),
                 spaceAfter=12,
                 spaceBefore=20,
             )
@@ -179,25 +184,16 @@ class PDFReportGenerator(BaseReportGenerator):
                 name="SubsectionHeading",
                 parent=self.styles["Heading3"],
                 fontSize=14,
-                textColor=colors.HexColor("#2ca02c"),
+                textColor=colors.HexColor(self.branding.success_color),
                 spaceAfter=10,
                 spaceBefore=15,
             )
         )
 
-        # Waveform heading (for individual waveforms)
-        # Only add if it doesn't exist
-        if "Heading4" not in self.styles:
-            self.styles.add(
-                ParagraphStyle(
-                    name="Heading4",
-                    parent=self.styles["Heading3"],
-                    fontSize=12,
-                    textColor=colors.HexColor("#ff7f0e"),
-                    spaceAfter=6,
-                    spaceBefore=10,
-                )
-            )
+        # Waveform heading (for individual waveforms). reportlab's sample stylesheet
+        # already ships a "Heading4", so recolor it with the brand's secondary color
+        # rather than adding a duplicate that the stylesheet would ignore.
+        self.styles["Heading4"].textColor = colors.HexColor(self.branding.secondary_color)
 
         # Result PASS style
         self.styles.add(
@@ -205,7 +201,7 @@ class PDFReportGenerator(BaseReportGenerator):
                 name="ResultPass",
                 parent=self.styles["Normal"],
                 fontSize=18,
-                textColor=colors.HexColor("#2ca02c"),
+                textColor=colors.HexColor(self.branding.success_color),
                 alignment=TA_CENTER,
                 spaceAfter=20,
             )
@@ -217,7 +213,7 @@ class PDFReportGenerator(BaseReportGenerator):
                 name="ResultFail",
                 parent=self.styles["Normal"],
                 fontSize=18,
-                textColor=colors.HexColor("#d62728"),
+                textColor=colors.HexColor(self.branding.failure_color),
                 alignment=TA_CENTER,
                 spaceAfter=20,
             )
