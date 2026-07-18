@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Examples: repaired broken examples — `simple_capture.py` and `advanced_analysis.py` referenced a non-existent `waveform.time_interval` (now the sample period `1.0 / sample_rate`), and the interactive tutorial saved with an invalid `format="NPZ"` (now `"NPY"`). The report-generation and branding examples now degrade cleanly when reportlab is absent instead of crashing.
 - Examples: updated the stale `Siglent-Oscilloscope` package name (and dead repo links) to `SCPI-Instrument-Control`, and corrected the README's hardware/no-hardware annotations.
 - Screen capture on modern-dialect scopes (SDS800X HD): `ScreenCapture` now selects the correct SCDP command per dialect and reads the raw BMP sized by its own header, instead of over-reading a fixed 10&nbsp;MB — which timed out and dropped the connection. `scope.screen_capture.get_screenshot_pil()` now works on the modern scopes.
+- Report generator analysis: `WaveformAnalyzer.detect_signal_type` no longer misclassifies clean periodic signals (e.g. a square wave captured over many periods) as noise. The noise check now measures spectral concentration — whether one frequency bin dominates — instead of testing autocorrelation at an arbitrary fixed lag.
 
 ## [3.0.0] - 2026-07-17
 
