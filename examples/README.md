@@ -26,7 +26,7 @@ pip install "SCPI-Instrument-Control"
 | `continuous_capture.py` | Collecting waveforms continuously over a period of time, for monitoring, statistics, or time-varying phenomena. | Oscilloscope on the network |
 | `trigger_based_capture.py` | Waiting for specific trigger conditions and capturing waveforms when they occur, for sporadic events. | Oscilloscope on the network |
 | `advanced_analysis.py` | Advanced waveform analysis and visualization: FFT analysis, statistical analysis, and matplotlib plots. | Oscilloscope on the network, matplotlib |
-| `probe_calibration_analysis.py` | Waveform region extraction for probe compensation analysis: plateau detection, slope analysis, calibration guidance, and zoomed PDF report plots. | Oscilloscope on the network, `SCPI-Instrument-Control[report-generator]` |
+| `probe_calibration_analysis.py` | Waveform region extraction for probe compensation analysis: plateau detection, slope analysis, calibration guidance, and zoomed PDF report plots. | `SCPI-Instrument-Control[report-generator]` (no hardware — fully synthetic) |
 | `dialect_override_example.py` | SCPI dialect auto-detection from `*IDN?` and the `dialect=` override for forcing a command set; runs entirely on mock connections. | Core install only (no hardware) |
 
 ## Web Gateway
@@ -48,7 +48,7 @@ pip install "SCPI-Instrument-Control"
 | File | What it shows | Requirements |
 | --- | --- | --- |
 | `psu_basic_control.py` | Controlling a SCPI power supply (Siglent SPD series or generic SCPI-99) over Ethernet/LAN. | Power supply on the network |
-| `psu_advanced_features.py` | Advanced PSU features: CSV data logging, tracking modes (series/parallel), timer functionality, waveform generation, and OVP/OCP protection. | Power supply on the network |
+| `psu_advanced_features.py` | Advanced PSU features: CSV data logging, tracking modes (series/parallel), timer functionality, waveform generation, and OVP/OCP protection. | Core install only (no hardware — uses a mock connection) |
 | `psu_usb_connection.py` | Connecting to a power supply via USB/GPIB/Serial/TCP-IP using `VISAConnection`. | `SCPI-Instrument-Control[usb]`, PSU reachable via USB-TMC/GPIB/Serial/VXI-11 |
 | `psu_gui_test.py` | Testing the PSU control GUI against a mock connection, with no physical hardware required. | `SCPI-Instrument-Control[gui]` |
 
@@ -77,8 +77,8 @@ the file — update it to match your instrument. To find an oscilloscope's
 LAN address: **Utility → I/O → LAN** on the instrument's front panel.
 
 The scripts marked "no hardware" above (`dialect_override_example.py`,
-`trend_logging_walkthrough.py`, `psu_gui_test.py`) use mock connections and
-run as-is.
+`trend_logging_walkthrough.py`, `psu_gui_test.py`, `probe_calibration_analysis.py`,
+`psu_advanced_features.py`) use mock connections and run as-is.
 
 ## Running an example
 
