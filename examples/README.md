@@ -63,6 +63,7 @@ pip install "SCPI-Instrument-Control"
 | File | What it shows | Requirements |
 | --- | --- | --- |
 | `report_generation_example.py` | Generating professional PDF/Markdown test reports: loading waveform data, adding measurements with pass/fail criteria, optional AI analysis, and rendering the report. | `SCPI-Instrument-Control[report-generator]` |
+| `report_computed_analysis.py` | Deterministic, LLM-free report analysis: `ComputedAnalyzer` fills the executive summary, key findings, and recommendations from the waveform data with no model or network. | `SCPI-Instrument-Control[report-generator]` (no hardware) |
 
 ## Interactive Tutorial
 
