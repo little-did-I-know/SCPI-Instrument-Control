@@ -8,7 +8,7 @@ Connection Methods:
     - USB: See psu_usb_connection.py
 
 For USB support:
-    pip install "Siglent-Oscilloscope[usb]"
+    pip install "SCPI-Instrument-Control[usb]"
 """
 
 from scpi_control import PowerSupply

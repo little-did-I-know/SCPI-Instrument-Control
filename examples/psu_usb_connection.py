@@ -4,7 +4,7 @@ This example demonstrates how to connect to a Siglent power supply via USB
 using the VISAConnection class.
 
 Requirements:
-    pip install "Siglent-Oscilloscope[usb]"
+    pip install "SCPI-Instrument-Control[usb]"
 
 Supports:
     - USB (USB-TMC protocol)
@@ -39,7 +39,7 @@ def discover_devices():
     except ImportError as e:
         print(f"  Error: {e}")
         print("\nInstall USB support with:")
-        print("  pip install 'Siglent-Oscilloscope[usb]'")
+        print("  pip install 'SCPI-Instrument-Control[usb]'")
         return None
 
     # Find Siglent devices specifically
@@ -226,7 +226,7 @@ def main():
         print("\nMake sure:")
         print("  1. Device is connected via USB")
         print("  2. USB drivers are installed")
-        print("  3. PyVISA is installed: pip install 'Siglent-Oscilloscope[usb]'")
+        print("  3. PyVISA is installed: pip install 'SCPI-Instrument-Control[usb]'")
         print("\nFor testing without hardware:")
         print("  - See examples below (commented out)")
         return
@@ -260,7 +260,7 @@ if __name__ == "__main__":
         print("=" * 60)
         print("\nUSB support requires PyVISA.")
         print("\nInstall with:")
-        print("  pip install 'Siglent-Oscilloscope[usb]'")
+        print("  pip install 'SCPI-Instrument-Control[usb]'")
         print("\nThis includes:")
         print("  - pyvisa: VISA library interface")
         print("  - pyvisa-py: Pure Python backend (no NI-VISA needed)")
