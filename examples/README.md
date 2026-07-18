@@ -35,6 +35,7 @@ pip install "SCPI-Instrument-Control"
 | --- | --- | --- |
 | `gateway_rest_client.py` | Driving the web gateway's REST API from Python: creating a mock session, configuring a channel, fetching waveform JSON, downloading a screenshot, and sending a raw SCPI command — the same API the browser UI uses. | `SCPI-Instrument-Control[web]` + a running `scpi-web` gateway |
 | `trend_logging_walkthrough.py` | Recording measurement trends in-process via the gateway's session layer (no server or browser): polling measurements, recording them, and exporting to CSV. | Core install only (no hardware, no server) |
+| `network_discovery.py` | Scanning the network for SCPI instruments via `discovery.discover()`: probes a CIDR range for `*IDN?` responses and lists what it finds. | `SCPI-Instrument-Control` (core install, no hardware) |
 
 ## Function Generator / AWG
 
