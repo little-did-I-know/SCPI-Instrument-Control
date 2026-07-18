@@ -39,7 +39,7 @@ from scpi_control.report_generator.llm.client import LLMClient, LLMConfig
 def create_sample_waveform() -> WaveformData:
     """Create a sample waveform for demonstration."""
     # Generate a simple sine wave with some noise
-    sample_rate = 1e9  # 1 GS/s
+    sample_rate = 1e6  # 1 MS/s
     duration = 1e-3  # 1 ms
     frequency = 1e3  # 1 kHz
 

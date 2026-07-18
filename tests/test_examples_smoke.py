@@ -46,6 +46,7 @@ EXECUTE = [
     ("trend_logging_walkthrough.py", None),
     ("psu_advanced_features.py", None),
     ("probe_calibration_analysis.py", "reportlab"),
+    ("report_generation_example.py", "matplotlib"),
 ]
 
 _TIMEOUTS = {"report_ai_qa.py": 240}
