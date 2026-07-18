@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Report generator: a built-in **probe-calibration template preset** (`ReportTemplate.create_probe_calibration_template()`, seedable from the Template Manager via "Create Probe Cal Template") — probe_calibration test type, a compensation procedure, and overshoot/undershoot/ringing/flatness pass/fail limits.
 - Examples: four new runnable, no-hardware examples — `report_ai_qa.py` (local-LLM tool-calling Q&A over a report), `network_discovery.py` (scan the network for SCPI instruments), `report_branding.py` (apply company branding/colours to a report), and `report_computed_analysis.py` (deterministic, LLM-free report analysis).
 - Examples: a `tests/test_examples_smoke.py` guard that executes the no-hardware examples, compile-checks the rest, and blocks known-stale tokens from reappearing.
 - Docs: a real screen capture and a real 1&nbsp;kHz calibration-square-wave plot from a Siglent SDS824X HD (in `docs/images/`), plus the raw capture committed as a test fixture (`tests/fixtures/cal_square_sds824x.npz`) that exercises the analyzer against genuine hardware data.
