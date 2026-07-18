@@ -423,6 +423,11 @@ class WaveformAnalyzer:
         try:
             v = waveform.voltage
 
+            # No samples: nothing to classify. (Guards the analysis below, which
+            # would otherwise divide/transform an empty array.)
+            if v.size == 0:
+                return SignalType.UNKNOWN, 0.0
+
             # Check for DC signal first
             if WaveformAnalyzer._is_dc_signal(v):
                 return SignalType.DC, 95.0
@@ -486,19 +491,22 @@ class WaveformAnalyzer:
 
     @staticmethod
     def _is_noise(v: np.ndarray) -> bool:
-        """Check if signal is primarily noise."""
-        # Calculate autocorrelation
-        v_normalized = v - np.mean(v)
-        autocorr = np.correlate(v_normalized, v_normalized, mode="full")
-        autocorr = autocorr[len(autocorr) // 2 :]
-        autocorr = autocorr / autocorr[0]
+        """Check whether the signal is primarily noise.
 
-        # For noise, autocorrelation drops quickly
-        # Check if autocorrelation at lag=10% of signal is < 0.3
-        lag = max(1, len(autocorr) // 10)
-        if lag < len(autocorr):
-            return autocorr[lag] < 0.3
-        return False
+        Noise decorrelates quickly, so its autocorrelation at a lag of 10% of the
+        record is small relative to lag 0. Only those two autocorrelation values
+        are needed, so compute them directly as O(n) dot products rather than
+        forming the full O(n^2) autocorrelation.
+        """
+        x = v - np.mean(v)
+        r0 = float(np.dot(x, x))  # autocorrelation at lag 0
+        if r0 == 0.0:
+            return False  # constant/flat signal: not noise (and avoids divide-by-zero)
+        lag = max(1, len(x) // 10)
+        if lag >= len(x):
+            return False
+        rk = float(np.dot(x[:-lag], x[lag:]))  # autocorrelation at `lag`
+        return bool((rk / r0) < 0.3)
 
     @staticmethod
     def _get_harmonic_ratios(waveform: WaveformData, num_harmonics: int = 5) -> Optional[np.ndarray]:
