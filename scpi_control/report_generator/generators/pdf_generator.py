@@ -297,6 +297,23 @@ class PDFReportGenerator(BaseReportGenerator):
         text = text.replace("\u2103", " C")  # degree celsius
         text = text.replace("\u2109", " F")  # degree fahrenheit
 
+        # Report/analysis symbols the built-in Type-1 font cannot draw
+        text = text.replace("\u26a0", "!")  # warning sign
+        text = text.replace("\u2713", "[OK]")  # check mark
+        text = text.replace("\u2705", "[OK]")  # heavy/white check mark
+        text = text.replace("\u2714", "[OK]")  # heavy check mark
+        text = text.replace("\u2717", "[X]")  # ballot x
+        text = text.replace("\u2718", "[X]")  # heavy ballot x
+        text = text.replace("\u274c", "[X]")  # cross mark
+        text = text.replace("\u03c3", "sigma")  # greek small sigma
+        text = text.replace("\u03a9", "ohm")  # greek capital omega (ohms)
+        text = text.replace("\u2139", "i")  # information source
+        text = text.replace("\ufe0f", "")  # emoji variation selector (remove)
+
+        # Catch-all: anything still outside the built-in font's WinAnsi/cp1252
+        # coverage is replaced so it can never render as a blank box in the PDF.
+        text = text.encode("cp1252", "replace").decode("cp1252")
+
         # Store markdown patterns before escaping
         # We'll process them in order to avoid conflicts
 
@@ -833,7 +850,7 @@ class PDFReportGenerator(BaseReportGenerator):
         # Flatness
         if region.flatness is not None:
             flatness_formatted = f"{region.flatness*1e3:.2f} mV"
-            analysis_data.append(["Flatness (σ):", flatness_formatted])
+            analysis_data.append(["Flatness (std):", flatness_formatted])
 
         # Noise level
         if region.noise_level is not None:
@@ -856,7 +873,7 @@ class PDFReportGenerator(BaseReportGenerator):
 
         # Pass/fail status
         if region.passes_spec is not None:
-            status = "✓ PASS" if region.passes_spec else "✗ FAIL"
+            status = "PASS" if region.passes_spec else "FAIL"
             analysis_data.append(["Spec Check:", status])
 
         # Create analysis table
