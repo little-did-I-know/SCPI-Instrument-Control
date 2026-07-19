@@ -5242,6 +5242,7 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 <h2 id="unreleased">[Unreleased]<a class="headerlink" href="#unreleased" title="Permanent link">&para;</a></h2>
 <h3 id="added">Added<a class="headerlink" href="#added" title="Permanent link">&para;</a></h3>
 <ul>
+<li>Report generator: a built-in <strong>probe-calibration template preset</strong> (<code>ReportTemplate.create_probe_calibration_template()</code>, seedable from the Template Manager via "Create Probe Cal Template") — probe_calibration test type, a compensation procedure, and overshoot/undershoot/ringing/flatness pass/fail limits.</li>
 <li>Examples: four new runnable, no-hardware examples — <code>report_ai_qa.py</code> (local-LLM tool-calling Q&amp;A over a report), <code>network_discovery.py</code> (scan the network for SCPI instruments), <code>report_branding.py</code> (apply company branding/colours to a report), and <code>report_computed_analysis.py</code> (deterministic, LLM-free report analysis).</li>
 <li>Examples: a <code>tests/test_examples_smoke.py</code> guard that executes the no-hardware examples, compile-checks the rest, and blocks known-stale tokens from reappearing.</li>
 <li>Docs: a real screen capture and a real 1&nbsp;kHz calibration-square-wave plot from a Siglent SDS824X HD (in <code>docs/images/</code>), plus the raw capture committed as a test fixture (<code>tests/fixtures/cal_square_sds824x.npz</code>) that exercises the analyzer against genuine hardware data.</li>

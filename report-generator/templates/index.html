@@ -1880,6 +1880,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#probe-calibration-preset" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Probe Calibration Preset
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -4100,6 +4111,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#probe-calibration-preset" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Probe Calibration Preset
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -4757,6 +4779,24 @@
 <li>Measurement Results</li>
 <li>Conclusions</li>
 </ul>
+<h3 id="probe-calibration-preset">Probe Calibration Preset<a class="headerlink" href="#probe-calibration-preset" title="Permanent link">&para;</a></h3>
+<p>A second built-in preset covers oscilloscope probe-compensation checks against
+the 1 kHz calibration square wave:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-24-1"><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a><span class="c1"># Get the probe-calibration template</span>
+</span><span id="__span-24-2"><a id="__codelineno-24-2" name="__codelineno-24-2" href="#__codelineno-24-2"></a><span class="n">template</span> <span class="o">=</span> <span class="n">ReportTemplate</span><span class="o">.</span><span class="n">create_probe_calibration_template</span><span class="p">()</span>
+</span></code></pre></div>
+<p>It sets <code>default_test_type="probe_calibration"</code>, ships a step-by-step
+compensation procedure, and disables FFT analysis
+(<code>include_fft_analysis=False</code> — not relevant to a comp check). Four sections
+are included — Test Setup, Compensation Waveform, Flatness &amp; Edge Analysis,
+Conclusions — carried on the template but, like the default template's
+sections, not yet applied when the template is loaded. Its "Probe
+Compensation Limits" criteria set checks Overshoot, Undershoot, Ringing, and
+Top Flatness as a percentage of signal amplitude: 5% (critical) for
+overshoot and undershoot, 5% (warning) for ringing, and 2% (warning) for top
+flatness.</p>
+<p>To seed it from the GUI, use the <strong>Create Probe Cal Template</strong> button in the
+Template Manager (<strong>File → Manage Templates...</strong>).</p>
 <h2 id="best-practices">Best Practices<a class="headerlink" href="#best-practices" title="Permanent link">&para;</a></h2>
 <h3 id="template-design">Template Design<a class="headerlink" href="#template-design" title="Permanent link">&para;</a></h3>
 <ol>
@@ -4792,30 +4832,30 @@
 <h2 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">&para;</a></h2>
 <h3 id="template-wont-load">Template Won't Load<a class="headerlink" href="#template-wont-load" title="Permanent link">&para;</a></h3>
 <p><strong>Check JSON syntax:</strong></p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-24-1"><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a>python<span class="w"> </span>-m<span class="w"> </span>json.tool<span class="w"> </span>templates/my_template.json
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-25-1"><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a>python<span class="w"> </span>-m<span class="w"> </span>json.tool<span class="w"> </span>templates/my_template.json
 </span></code></pre></div>
 <p><strong>Verify file path:</strong></p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-25-1"><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
-</span><span id="__span-25-2"><a id="__codelineno-25-2" name="__codelineno-25-2" href="#__codelineno-25-2"></a><span class="n">template_path</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="s2">&quot;templates/my_template.json&quot;</span><span class="p">)</span>
-</span><span id="__span-25-3"><a id="__codelineno-25-3" name="__codelineno-25-3" href="#__codelineno-25-3"></a><span class="k">assert</span> <span class="n">template_path</span><span class="o">.</span><span class="n">exists</span><span class="p">(),</span> <span class="sa">f</span><span class="s2">&quot;Not found: </span><span class="si">{</span><span class="n">template_path</span><span class="si">}</span><span class="s2">&quot;</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-26-1"><a id="__codelineno-26-1" name="__codelineno-26-1" href="#__codelineno-26-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+</span><span id="__span-26-2"><a id="__codelineno-26-2" name="__codelineno-26-2" href="#__codelineno-26-2"></a><span class="n">template_path</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="s2">&quot;templates/my_template.json&quot;</span><span class="p">)</span>
+</span><span id="__span-26-3"><a id="__codelineno-26-3" name="__codelineno-26-3" href="#__codelineno-26-3"></a><span class="k">assert</span> <span class="n">template_path</span><span class="o">.</span><span class="n">exists</span><span class="p">(),</span> <span class="sa">f</span><span class="s2">&quot;Not found: </span><span class="si">{</span><span class="n">template_path</span><span class="si">}</span><span class="s2">&quot;</span>
 </span></code></pre></div>
 <h3 id="criteria-not-applied">Criteria Not Applied<a class="headerlink" href="#criteria-not-applied" title="Permanent link">&para;</a></h3>
 <p><strong>Check measurement names match exactly:</strong></p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-26-1"><a id="__codelineno-26-1" name="__codelineno-26-1" href="#__codelineno-26-1"></a><span class="c1"># Criteria</span>
-</span><span id="__span-26-2"><a id="__codelineno-26-2" name="__codelineno-26-2" href="#__codelineno-26-2"></a><span class="n">measurement_name</span><span class="o">=</span><span class="s2">&quot;Frequency&quot;</span>  <span class="c1"># Must match exactly</span>
-</span><span id="__span-26-3"><a id="__codelineno-26-3" name="__codelineno-26-3" href="#__codelineno-26-3"></a>
-</span><span id="__span-26-4"><a id="__codelineno-26-4" name="__codelineno-26-4" href="#__codelineno-26-4"></a><span class="c1"># Measurement</span>
-</span><span id="__span-26-5"><a id="__codelineno-26-5" name="__codelineno-26-5" href="#__codelineno-26-5"></a><span class="n">name</span><span class="o">=</span><span class="s2">&quot;frequency&quot;</span>  <span class="c1"># Won&#39;t match (case sensitive)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-27-1"><a id="__codelineno-27-1" name="__codelineno-27-1" href="#__codelineno-27-1"></a><span class="c1"># Criteria</span>
+</span><span id="__span-27-2"><a id="__codelineno-27-2" name="__codelineno-27-2" href="#__codelineno-27-2"></a><span class="n">measurement_name</span><span class="o">=</span><span class="s2">&quot;Frequency&quot;</span>  <span class="c1"># Must match exactly</span>
+</span><span id="__span-27-3"><a id="__codelineno-27-3" name="__codelineno-27-3" href="#__codelineno-27-3"></a>
+</span><span id="__span-27-4"><a id="__codelineno-27-4" name="__codelineno-27-4" href="#__codelineno-27-4"></a><span class="c1"># Measurement</span>
+</span><span id="__span-27-5"><a id="__codelineno-27-5" name="__codelineno-27-5" href="#__codelineno-27-5"></a><span class="n">name</span><span class="o">=</span><span class="s2">&quot;frequency&quot;</span>  <span class="c1"># Won&#39;t match (case sensitive)</span>
 </span></code></pre></div>
 <p><strong>Check channels:</strong></p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-27-1"><a id="__codelineno-27-1" name="__codelineno-27-1" href="#__codelineno-27-1"></a><span class="c1"># Channel-specific criteria requires channel match</span>
-</span><span id="__span-27-2"><a id="__codelineno-27-2" name="__codelineno-27-2" href="#__codelineno-27-2"></a><span class="n">criteria</span><span class="o">.</span><span class="n">channel</span> <span class="o">=</span> <span class="s2">&quot;CH1&quot;</span>
-</span><span id="__span-27-3"><a id="__codelineno-27-3" name="__codelineno-27-3" href="#__codelineno-27-3"></a><span class="n">measurement</span><span class="o">.</span><span class="n">channel</span> <span class="o">=</span> <span class="s2">&quot;C1&quot;</span>  <span class="c1"># Won&#39;t match</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-28-1"><a id="__codelineno-28-1" name="__codelineno-28-1" href="#__codelineno-28-1"></a><span class="c1"># Channel-specific criteria requires channel match</span>
+</span><span id="__span-28-2"><a id="__codelineno-28-2" name="__codelineno-28-2" href="#__codelineno-28-2"></a><span class="n">criteria</span><span class="o">.</span><span class="n">channel</span> <span class="o">=</span> <span class="s2">&quot;CH1&quot;</span>
+</span><span id="__span-28-3"><a id="__codelineno-28-3" name="__codelineno-28-3" href="#__codelineno-28-3"></a><span class="n">measurement</span><span class="o">.</span><span class="n">channel</span> <span class="o">=</span> <span class="s2">&quot;C1&quot;</span>  <span class="c1"># Won&#39;t match</span>
 </span></code></pre></div>
 <h3 id="branding-not-showing">Branding Not Showing<a class="headerlink" href="#branding-not-showing" title="Permanent link">&para;</a></h3>
 <p><strong>Verify logo path exists:</strong></p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-28-1"><a id="__codelineno-28-1" name="__codelineno-28-1" href="#__codelineno-28-1"></a><span class="n">logo_path</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="s2">&quot;logo.png&quot;</span><span class="p">)</span>
-</span><span id="__span-28-2"><a id="__codelineno-28-2" name="__codelineno-28-2" href="#__codelineno-28-2"></a><span class="k">assert</span> <span class="n">logo_path</span><span class="o">.</span><span class="n">exists</span><span class="p">(),</span> <span class="s2">&quot;Logo not found&quot;</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-29-1"><a id="__codelineno-29-1" name="__codelineno-29-1" href="#__codelineno-29-1"></a><span class="n">logo_path</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="s2">&quot;logo.png&quot;</span><span class="p">)</span>
+</span><span id="__span-29-2"><a id="__codelineno-29-2" name="__codelineno-29-2" href="#__codelineno-29-2"></a><span class="k">assert</span> <span class="n">logo_path</span><span class="o">.</span><span class="n">exists</span><span class="p">(),</span> <span class="s2">&quot;Logo not found&quot;</span>
 </span></code></pre></div>
 <p><strong>Check logo format:</strong></p>
 <ul>
