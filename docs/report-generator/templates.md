@@ -606,6 +606,30 @@ This includes standard sections:
 - Measurement Results
 - Conclusions
 
+### Probe Calibration Preset
+
+A second built-in preset covers oscilloscope probe-compensation checks against
+the 1 kHz calibration square wave:
+
+```python
+# Get the probe-calibration template
+template = ReportTemplate.create_probe_calibration_template()
+```
+
+It sets `default_test_type="probe_calibration"`, ships a step-by-step
+compensation procedure, and disables FFT analysis
+(`include_fft_analysis=False` — not relevant to a comp check). Four sections
+are included — Test Setup, Compensation Waveform, Flatness & Edge Analysis,
+Conclusions — carried on the template but, like the default template's
+sections, not yet applied when the template is loaded. Its "Probe
+Compensation Limits" criteria set checks Overshoot, Undershoot, Ringing, and
+Top Flatness as a percentage of signal amplitude: 5% (critical) for
+overshoot and undershoot, 5% (warning) for ringing, and 2% (warning) for top
+flatness.
+
+To seed it from the GUI, use the **Create Probe Cal Template** button in the
+Template Manager (**File → Manage Templates...**).
+
 ## Best Practices
 
 ### Template Design

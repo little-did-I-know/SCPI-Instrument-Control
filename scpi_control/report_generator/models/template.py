@@ -13,7 +13,11 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from scpi_control.report_generator.models.criteria import CriteriaSet
+from scpi_control.report_generator.models.criteria import (
+    ComparisonType,
+    CriteriaSet,
+    MeasurementCriteria,
+)
 from scpi_control.report_generator.models.plot_style import PlotStyle
 
 
@@ -429,6 +433,116 @@ class ReportTemplate:
                 order=5,
             )
         )
+
+        return template
+
+    @classmethod
+    def create_probe_calibration_template(cls) -> "ReportTemplate":
+        """Create a preset for oscilloscope probe-compensation checks.
+
+        Configured for the 1 kHz calibration square wave: links to the
+        ``probe_calibration`` test type, ships a probe-comp procedure and
+        percentage-based pass/fail limits (overshoot, undershoot, ringing,
+        top flatness), and omits FFT (irrelevant to a comp check). No
+        measurement data is baked in -- apply it to any capture.
+        """
+        template = cls(
+            name="Probe Calibration Template",
+            description=("Oscilloscope probe compensation check using the 1 kHz " "calibration square wave. Verifies a flat top with no " "overshoot, undershoot, or ringing."),
+            default_test_type="probe_calibration",
+            default_test_procedure=(
+                "1. Connect the probe tip to the scope's ~1 kHz calibration "
+                "output and the ground clip to the cal ground.\n"
+                "2. Set the timebase to show a few full cycles and autoscale "
+                "the amplitude.\n"
+                "3. Inspect the top of the square wave: it should be flat, "
+                "with no overshoot (spike up), undershoot (dip), or ringing.\n"
+                "4. If the corners are rounded (under-compensated) or spiked "
+                "(over-compensated), adjust the probe's compensation trimmer "
+                "until the top is flat."
+            ),
+            include_fft_analysis=False,
+        )
+
+        template.add_section(
+            SectionTemplate(
+                title="Test Setup",
+                content=("Probe, calibration source, and scope configuration used " "for the compensation check."),
+                include_waveforms=False,
+                include_measurements=False,
+                order=0,
+            )
+        )
+        template.add_section(
+            SectionTemplate(
+                title="Compensation Waveform",
+                content="Captured calibration square wave.",
+                include_waveforms=True,
+                include_measurements=True,
+                order=1,
+            )
+        )
+        template.add_section(
+            SectionTemplate(
+                title="Flatness & Edge Analysis",
+                content=("Overshoot, undershoot, ringing, and top flatness against " "the compensation limits."),
+                include_waveforms=True,
+                include_measurements=True,
+                order=2,
+            )
+        )
+        template.add_section(
+            SectionTemplate(
+                title="Conclusions",
+                content="Compensation verdict and any adjustment needed.",
+                include_waveforms=False,
+                include_measurements=False,
+                include_ai_insights=True,
+                order=3,
+            )
+        )
+
+        criteria = CriteriaSet(
+            name="Probe Compensation Limits",
+            description=("Conventional probe-compensation pass/fail limits, expressed " "as a percentage of signal amplitude."),
+        )
+        criteria.add_criteria(
+            MeasurementCriteria(
+                measurement_name="Overshoot",
+                comparison_type=ComparisonType.MAX_ONLY,
+                max_value=5.0,
+                severity="critical",
+                description="Peak above the flat top, as % of amplitude.",
+            )
+        )
+        criteria.add_criteria(
+            MeasurementCriteria(
+                measurement_name="Undershoot",
+                comparison_type=ComparisonType.MAX_ONLY,
+                max_value=5.0,
+                severity="critical",
+                description="Dip below the flat base, as % of amplitude.",
+            )
+        )
+        criteria.add_criteria(
+            MeasurementCriteria(
+                measurement_name="Ringing",
+                comparison_type=ComparisonType.MAX_ONLY,
+                max_value=5.0,
+                severity="warning",
+                description="Post-transition oscillation, as % of amplitude.",
+            )
+        )
+        criteria.add_criteria(
+            MeasurementCriteria(
+                measurement_name="Top Flatness",
+                comparison_type=ComparisonType.MAX_ONLY,
+                max_value=2.0,
+                severity="warning",
+                description="Top deviation, as % of amplitude.",
+            )
+        )
+        template.criteria_set = criteria
 
         return template
 
