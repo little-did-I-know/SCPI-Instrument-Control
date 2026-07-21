@@ -307,6 +307,7 @@ class Waveform:
         filename: str,
         format: Optional[str] = None,
         metadata: Optional[dict] = None,
+        bare: bool = False,
     ) -> None:
         """Save waveform data to file.
 
@@ -316,6 +317,8 @@ class Waveform:
             format: File format - 'CSV', 'CSV_ENHANCED', 'NPY', 'MAT', 'HDF5'
                    If None, auto-detect from file extension
             metadata: Optional metadata dictionary to include in file
+            bare: CSV only: suppress the provenance comment header, reproducing the
+                  fully headerless legacy layout (default: False)
 
         Supported formats:
             - CSV: Simple CSV with time and voltage columns
@@ -343,7 +346,7 @@ class Waveform:
         format = format.upper()
 
         if format == "CSV":
-            self._save_csv(waveform, filename, include_metadata=False, metadata=metadata)
+            self._save_csv(waveform, filename, include_metadata=False, metadata=metadata, bare=bare)
 
         elif format == "CSV_ENHANCED":
             self._save_csv(waveform, filename, include_metadata=True, metadata=metadata)
@@ -360,12 +363,29 @@ class Waveform:
         else:
             raise exceptions.InvalidParameterError(f"Invalid format: {format}. Supported: CSV, CSV_ENHANCED, NPY, MAT, HDF5")
 
+    def _write_provenance_header(self, f, waveform: WaveformData) -> None:
+        """Append provenance comment lines. Purely additive: called after any legacy header lines."""
+        prov = waveform.provenance
+        if waveform.timebase is not None:
+            f.write(f"{ws.CSV_COMMENT} {ws.CSV_HEADER_TIMEBASE}: {waveform.timebase} s/div\n")
+        if waveform.voltage_scale is not None:
+            f.write(f"{ws.CSV_COMMENT} {ws.CSV_HEADER_VOLTAGE_SCALE}: {waveform.voltage_scale} V/div\n")
+        f.write(f"{ws.CSV_COMMENT} {ws.CSV_HEADER_VOLTAGE_OFFSET}: {waveform.voltage_offset} V\n")
+        if prov is None:
+            return
+        if prov.instrument is not None:
+            f.write(f"{ws.CSV_COMMENT} Instrument: {prov.instrument.manufacturer} {prov.instrument.model} (serial {prov.instrument.serial}, firmware {prov.instrument.firmware})\n")
+        if prov.acquired_at:
+            f.write(f"{ws.CSV_COMMENT} Acquired (UTC): {prov.acquired_at}\n")
+        f.write(f"{ws.CSV_COMMENT} {ws.CSV_HEADER_PROVENANCE}: {prov.to_json()}\n")
+
     def _save_csv(
         self,
         waveform: WaveformData,
         filename: str,
         include_metadata: bool = False,
         metadata: Optional[dict] = None,
+        bare: bool = False,
     ) -> None:
         """Save waveform as CSV file.
 
@@ -374,6 +394,7 @@ class Waveform:
             filename: Output filename
             include_metadata: Whether to include metadata header
             metadata: Optional additional metadata
+            bare: Suppress provenance header (CSV format only)
         """
         import csv
         from datetime import datetime
@@ -392,6 +413,11 @@ class Waveform:
                     for key, value in metadata.items():
                         f.write(f"{ws.CSV_COMMENT} {key}: {value}\n")
 
+                self._write_provenance_header(f, waveform)
+                f.write(f"{ws.CSV_COMMENT}\n")
+            elif not bare and waveform.provenance is not None:
+                f.write(f"{ws.CSV_COMMENT} SCPI Instrument Control Waveform Data\n")
+                self._write_provenance_header(f, waveform)
                 f.write(f"{ws.CSV_COMMENT}\n")
 
             # Write data
@@ -420,6 +446,15 @@ class Waveform:
             ws.SAMPLE_RATE: waveform.sample_rate,
             ws.TIMESTAMP: datetime.now().isoformat(),
         }
+
+        # Add scale fields (additive)
+        for key, value in ((ws.TIMEBASE, waveform.timebase), (ws.VOLTAGE_SCALE, waveform.voltage_scale), (ws.VOLTAGE_OFFSET, waveform.voltage_offset)):
+            if value is not None:
+                data[key] = value
+
+        # Add provenance if present
+        if waveform.provenance is not None:
+            data[ws.PROVENANCE_JSON] = waveform.provenance.to_json()
 
         # Add optional metadata
         if metadata:
@@ -457,6 +492,15 @@ class Waveform:
             ws.SAMPLE_RATE: waveform.sample_rate,
             ws.TIMESTAMP: datetime.now().isoformat(),
         }
+
+        # Add scale fields (additive)
+        for key, value in ((ws.TIMEBASE, waveform.timebase), (ws.VOLTAGE_SCALE, waveform.voltage_scale), (ws.VOLTAGE_OFFSET, waveform.voltage_offset)):
+            if value is not None:
+                data[key] = value
+
+        # Add provenance if present
+        if waveform.provenance is not None:
+            data[ws.PROVENANCE_JSON] = waveform.provenance.to_json()
 
         # Add metadata
         if metadata:
@@ -499,6 +543,15 @@ class Waveform:
             f.attrs[ws.SAMPLE_RATE] = waveform.sample_rate
             f.attrs[ws.HDF5_NUM_SAMPLES] = len(waveform.time)
             f.attrs[ws.TIMESTAMP] = datetime.now().isoformat()
+
+            # Add scale fields (additive)
+            for key, value in ((ws.TIMEBASE, waveform.timebase), (ws.VOLTAGE_SCALE, waveform.voltage_scale), (ws.VOLTAGE_OFFSET, waveform.voltage_offset)):
+                if value is not None:
+                    f.attrs[key] = value
+
+            # Add provenance if present
+            if waveform.provenance is not None:
+                f.attrs[ws.PROVENANCE_JSON] = waveform.provenance.to_json()
 
             # Add optional metadata
             if metadata:
