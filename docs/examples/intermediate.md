@@ -12,10 +12,11 @@ Intermediate examples showing automation patterns, real-time data capture, and b
 | [Live plotting example for Siglent oscilloscope](#live-plotting-example-for-siglent-oscilloscope) | Live plotting example for Siglent oscilloscope. |
 | [Advanced PSU features demonstration](#advanced-psu-features-demonstration) | Advanced PSU features demonstration. |
 | [Power supply control via USB connection](#power-supply-control-via-usb-connection) | Power supply control via USB connection. |
+| [Synthetic signal generation: parameterized test waveforms, and the mock](#synthetic-signal-generation-parameterized-test-waveforms-and-the-mock) | Synthetic signal generation: parameterized test waveforms, and the mock
+oscilloscope's state-coupled synthesis. |
 | [Record measurement trends in-process and export them as CSV](#record-measurement-trends-in-process-and-export-them-as-csv) | Record measurement trends in-process and export them as CSV. |
 | [Trigger-based event capture](#trigger-based-event-capture) | Trigger-based event capture. |
-| [Synthetic Signal Generation](#synthetic-signal-generation) | Parameterized synthetic waveforms and the mock's state-coupled synthesis. |
-| [Waveform Provenance and scpi-extract](#waveform-provenance-and-scpi-extract) | Read back a waveform's recorded instrument state with `load_waveform()` and `scpi-extract`. |
+| [Acquisition provenance and the load_waveform() / scpi-extract workflow](#acquisition-provenance-and-the-load_waveform-scpi-extract-workflow) | Acquisition provenance and the load_waveform() / scpi-extract workflow. |
 
 ---
 
@@ -46,6 +47,13 @@ python examples/batch_capture.py
 This example demonstrates how to capture multiple waveforms with different
 timebase and voltage scale settings. This is useful for characterizing
 signals at different time scales or for automated testing.
+
+Requirements: an oscilloscope reachable on the network -- edit SCOPE_IP below
+to match its LAN address.
+
+Expected output: progress lines for each capture, a summary of the first
+five results, and the batch saved to a 'batch_output/' directory (waveform
+files plus metadata.txt) in the current directory.
 """
 
 from scpi_control.automation import DataCollector
@@ -133,6 +141,13 @@ python examples/continuous_capture.py
 This example demonstrates how to collect waveforms continuously over a
 period of time. This is useful for monitoring signals, collecting statistics,
 or capturing time-varying phenomena.
+
+Requirements: an oscilloscope reachable on the network -- edit SCOPE_IP below
+to match its LAN address.
+
+Expected output: a 10-second in-memory capture run with Vpp statistics
+printed to the console, followed by a 30-second run that saves waveform
+files to a 'continuous_data/' directory in the current directory.
 """
 
 from scpi_control.automation import DataCollector
@@ -294,18 +309,6 @@ if __name__ == "__main__":
     main()
 ```
 
-### Related Example: LAN Instrument Discovery
-
-**`examples/network_discovery.py`** - Scans a CIDR range for SCPI instruments
-by probing each address for an `*IDN?` response, printing whatever it finds.
-The example scans a safe, hostless TEST-NET-1 range by default so it returns
-quickly with no results; pass a real subnet (or `cidr=None` to auto-scan your
-local `/24`) to find real instruments. No hardware required to run it as-is.
-
-```bash
-python examples/network_discovery.py
-```
-
 ---
 
 ## Live plotting example for Siglent oscilloscope
@@ -334,6 +337,14 @@ python examples/live_plot.py
 
 This script demonstrates real-time waveform acquisition and plotting
 using matplotlib animation.
+
+Requirements: an oscilloscope reachable on the network -- edit SCOPE_IP below
+to match its LAN address. matplotlib is a core dependency, no extra install
+needed.
+
+Expected output: an interactive plot window that updates every 200ms with
+the live Channel 1 waveform, until the window is closed. No files are
+written.
 """
 
 import time
@@ -502,6 +513,13 @@ Demonstrates:
 - Timer functionality
 - Waveform generation
 - OVP/OCP protection
+
+Requirements: SCPI-Instrument-Control (core install) -- runs entirely against
+a mock connection, no hardware needed.
+
+Expected output: console narration of each demo, plus CSV logs
+('psu_manual_log.csv', 'psu_timed_log.csv', 'psu_output1_log.csv',
+'characterization_log.csv') saved to the current directory.
 """
 
 import time
@@ -1067,7 +1085,7 @@ def main():
     devices = discover_devices()
 
     if not devices:
-        print("\n⚠️  No Siglent devices found")
+        print("\nWARNING: No Siglent devices found")
         print("\nMake sure:")
         print("  1. Device is connected via USB")
         print("  2. USB drivers are installed")
@@ -1078,7 +1096,7 @@ def main():
 
     # Step 2: Use the first discovered device
     resource_string, idn = devices[0]
-    print(f"\n✓ Using device: {resource_string}")
+    print(f"\n[OK] Using device: {resource_string}")
 
     # Run USB example
     usb_connection_example(resource_string)
@@ -1110,6 +1128,147 @@ if __name__ == "__main__":
         print("  - pyvisa: VISA library interface")
         print("  - pyvisa-py: Pure Python backend (no NI-VISA needed)")
         print("\nAfter installation, run this example again.")
+```
+
+---
+
+## Synthetic signal generation: parameterized test waveforms, and the mock
+
+Synthetic signal generation: parameterized test waveforms, and the mock
+oscilloscope's state-coupled synthesis.
+
+### Requirements
+
+- scpi_control - Core library
+- Oscilloscope connected to network
+
+### Configuration
+
+Update `SCOPE_IP` to match your oscilloscope's IP address (default: `192.168.1.100`).
+
+### Usage
+
+```bash
+python examples/synthetic_signals.py
+```
+
+### Source Code
+
+```python
+"""Synthetic signal generation: parameterized test waveforms, and the mock
+oscilloscope's state-coupled synthesis.
+
+scpi_control.signal_synth.SignalSpec describes a waveform (kind, frequency,
+amplitude, offset, phase, duty, additive noise, and an optional seed for
+reproducibility); synthesize()/make_waveform() turn a spec into a numpy array
+or a full WaveformData ready for analysis, saving, or the report generator.
+The same engine powers MockConnection: channels without an explicit
+waveform_payloads entry synthesize live from the mock's current state, so
+SCPI commands that change the timebase or voltage scale visibly change the
+next capture -- exactly like a real scope.
+
+This example (1) generates a few signal kinds directly and prints basic
+stats, (2) opens a mock oscilloscope session, acquires, then changes TDIV and
+VDIV over SCPI to show the capture's length and clipping respond, and (3)
+saves one synthesized capture and reloads it with load_waveform() to show the
+chain composes.
+
+Requirements: SCPI-Instrument-Control (core install) -- runs entirely against
+a mock connection, no instrument needed.
+"""
+
+from pathlib import Path
+
+from scpi_control.connection import MockConnection
+from scpi_control.oscilloscope import Oscilloscope
+from scpi_control.signal_synth import SignalSpec, make_waveform
+from scpi_control.waveform_io import load_waveform
+
+OUTPUT_DIR = Path.cwd()
+NPZ_PATH = OUTPUT_DIR / "synthetic_demo.npz"
+
+# 8-bit code path constants the mock synthesizer uses internally
+# (scpi_control/connection/mock/synth.py) -- reused here only to predict the
+# voltage ceiling a given V/div setting clips at.
+CODES_PER_DIV = 25
+CODE_LIMIT = 127
+
+
+def _print_stats(label: str, voltage) -> None:
+    vpp = float(voltage.max() - voltage.min())
+    print(f"{label:12s}: Vpp={vpp:.4f} V  mean={voltage.mean():.4f} V  std={voltage.std():.4f} V  n={len(voltage)}")
+
+
+def demo_make_waveform() -> None:
+    """Generate a few signal kinds directly and print basic stats."""
+    print("=== Part 1: make_waveform() -- basic stats per kind ===")
+    kinds = [
+        ("square", SignalSpec(kind="square", frequency=1_000.0, amplitude=1.0, duty=0.5)),
+        ("sine", SignalSpec(kind="sine", frequency=1_000.0, amplitude=1.0)),
+        ("noisy sine", SignalSpec(kind="sine", frequency=1_000.0, amplitude=1.0, noise_rms=0.05, seed=7)),
+    ]
+    for label, spec in kinds:
+        waveform = make_waveform(spec, sample_rate=100_000.0, n_points=1_000)
+        _print_stats(label, waveform.voltage)
+
+
+def demo_mock_session() -> None:
+    """Open a mock scope session and show SCPI writes change the next capture."""
+    print()
+    print("=== Part 2: mock oscilloscope session -- state-coupled synthesis ===")
+    conn = MockConnection(
+        "mock",
+        idn="Siglent Technologies,SDS1104X-E,MOCK0001,1.0.0.0",
+        channel_states={1: True, 2: False, 3: False, 4: False},
+        trigger_status=["Stop"],
+        sample_rate=1_000_000.0,
+        timebase=1e-3,
+        signals={1: SignalSpec(kind="sine", frequency=2_000.0, amplitude=0.8, noise_rms=0.02, seed=42)},
+    )
+    scope = Oscilloscope("mock", connection=conn)
+    scope.connect()
+    try:
+        waveform = scope.get_waveform(1, provenance=False)
+        print(f"Initial capture (TDIV=1e-3, C1:VDIV=1.0): {len(waveform.voltage)} points, " f"Vpp={float(waveform.voltage.max() - waveform.voltage.min()):.3f} V")
+
+        # Shrinking the timebase shrinks the acquisition window (14 divisions
+        # x timebase), so fewer points come back at the same sample rate.
+        scope.write("TDIV 1e-4")
+        shorter = scope.get_waveform(1, provenance=False)
+        print(f"After TDIV 1e-4: {len(shorter.voltage)} points (window shrank from 14 ms to 1.4 ms)")
+
+        # Tightening the voltage scale below the signal's amplitude clips the
+        # capture, just like an 8-bit scope's ADC would over-range.
+        scope.write("C1:VDIV 0.1")
+        clipped = scope.get_waveform(1, provenance=False)
+        clip_ceiling = CODE_LIMIT * 0.1 / CODES_PER_DIV
+        peak = float(max(abs(clipped.voltage.max()), abs(clipped.voltage.min())))
+        print(f"After C1:VDIV 0.1: peak |V| = {peak:.3f} V (signal amplitude is 0.8 V, " f"but the 8-bit code path ceilings at ~{clip_ceiling:.3f} V for this V/div)")
+
+        print()
+        print("=== Part 3: save + load_waveform() -- the chain composes ===")
+        final = scope.get_waveform(1, provenance=True)
+        scope.waveform.save_waveform(final, str(NPZ_PATH))
+        print(f"Saved {NPZ_PATH.name} ({len(final.voltage)} points)")
+    finally:
+        scope.disconnect()
+
+
+def demo_reload() -> None:
+    """Reload the saved capture and show the raw data survives the round trip."""
+    loaded = load_waveform(NPZ_PATH)
+    print(f"Reloaded {NPZ_PATH.name} ({loaded.source_format}): {len(loaded.voltage)} points, " f"channel {loaded.channel}, sample_rate {loaded.sample_rate}")
+    print(f"First 5 samples (V): {loaded.voltage[:5].tolist()}")
+
+
+def main() -> None:
+    demo_make_waveform()
+    demo_mock_session()
+    demo_reload()
+
+
+if __name__ == "__main__":
+    main()
 ```
 
 ---
@@ -1219,6 +1378,13 @@ python examples/trigger_based_capture.py
 This example demonstrates how to wait for specific trigger conditions
 and capture waveforms when they occur. This is useful for capturing
 sporadic events or signals that meet specific criteria.
+
+Requirements: an oscilloscope reachable on the network -- edit SCOPE_IP below
+to match its LAN address.
+
+Expected output: a single trigger wait (up to 30s) that saves to
+'trigger_captures/' if it fires, followed by up to 10 polled trigger events
+saved to 'multi_trigger_captures/' in the current directory.
 """
 
 from scpi_control.automation import DataCollector, TriggerWaitCollector
@@ -1308,81 +1474,114 @@ if __name__ == "__main__":
 
 ---
 
-## Synthetic Signal Generation
+## Acquisition provenance and the load_waveform() / scpi-extract workflow
 
-`SignalSpec` describes a waveform (kind, frequency, amplitude, offset, phase,
-duty, additive noise, and an optional seed for reproducibility);
-`synthesize()`/`make_waveform()` turn a spec into a numpy array or a full
-`WaveformData` ready for analysis, saving, or the report generator. The same
-engine powers `MockConnection`: a channel without an explicit
-`waveform_payloads` entry synthesizes live from the mock's current state, so
-SCPI commands that change the timebase or voltage scale visibly change the
-next capture, exactly like a real scope. This example generates a few signal
-kinds directly, opens a mock oscilloscope session and changes `TDIV`/`VDIV`
-over SCPI to show the capture respond, then saves a synthesized capture and
-reloads it with `load_waveform()` to show the pieces compose.
+Acquisition provenance and the load_waveform() / scpi-extract workflow.
 
 ### Requirements
 
-- scpi_control - Core library (no hardware — runs entirely against a mock connection)
+- scpi_control - Core library
+- Oscilloscope connected to network
 
-### Usage
+### Configuration
 
-```bash
-python examples/synthetic_signals.py
-```
-
-### Key Snippet
-
-```python
-from scpi_control.signal_synth import SignalSpec, make_waveform
-
-spec = SignalSpec(kind="sine", frequency=1_000.0, amplitude=1.0, noise_rms=0.05, seed=7)
-waveform = make_waveform(spec, sample_rate=100_000.0, n_points=1_000)
-```
-
-See also: [Synthetic Signals](../user-guide/synthetic-signals.md) (user guide),
-[Signal Synthesis API](../api/signal_synth.md).
-
----
-
-## Waveform Provenance and scpi-extract
-
-Every waveform saved by the library now embeds a snapshot of the instrument
-state that produced it: instrument IDN, per-channel settings (scale,
-coupling, probe ratio), trigger configuration, timebase, sample rate, and a
-UTC timestamp. This example acquires from a mock oscilloscope (no hardware
-required), saves NPZ and CSV, then reads both back with
-`scpi_control.waveform_io.load_waveform()` and prints the instrument model,
-channel scale, and first few samples — exactly what the `scpi-extract`
-command-line tool does.
-
-### Requirements
-
-- scpi_control - Core library (no hardware — runs entirely against a mock connection)
+Update `SCOPE_IP` to match your oscilloscope's IP address (default: `192.168.1.100`).
 
 ### Usage
 
 ```bash
 python examples/waveform_provenance_and_extract.py
-
-# Inspect the saved files directly from the command line:
-scpi-extract provenance_demo.npz
-scpi-extract provenance_demo.csv --json
 ```
 
-### Key Snippet
+### Source Code
 
 ```python
+"""Acquisition provenance and the load_waveform() / scpi-extract workflow.
+
+Every saved waveform now embeds a snapshot of the instrument state that
+produced it: instrument IDN, per-channel settings (scale, coupling, probe
+ratio), trigger configuration, timebase, sample rate, and a UTC timestamp.
+This example acquires from a mock oscilloscope (no hardware required), saves
+NPZ and CSV, then reads both back with scpi_control.waveform_io.load_waveform()
+and prints the instrument model, channel scale, and first few samples --
+exactly what scpi-extract does from the command line.
+
+To inspect the saved files yourself:
+    scpi-extract provenance_demo.npz
+    scpi-extract provenance_demo.csv --json
+
+Requirements: SCPI-Instrument-Control (core install) -- runs entirely against
+a mock connection, no instrument needed.
+"""
+
+from pathlib import Path
+
+from scpi_control.connection import MockConnection
+from scpi_control.oscilloscope import Oscilloscope
 from scpi_control.waveform_io import load_waveform
 
-loaded = load_waveform("provenance_demo.npz")
-print(loaded.provenance.instrument.model, loaded.channel, loaded.voltage[:5])
-```
+OUTPUT_DIR = Path.cwd()
+NPZ_PATH = OUTPUT_DIR / "provenance_demo.npz"
+CSV_PATH = OUTPUT_DIR / "provenance_demo.csv"
 
-See also: [Data Provenance](../user-guide/data-provenance.md) (user guide),
-[Waveform I/O API](../api/waveform_io.md), [Provenance API](../api/provenance.md),
-[SCPI Extract CLI API](../api/scpi_extract.md).
+
+def acquire_and_save() -> None:
+    """Connect to a mock scope, acquire channel 1 with provenance, and save it."""
+    conn = MockConnection(
+        "mock",
+        idn="Siglent Technologies,SDS1104X-E,MOCK0001,1.0.0.0",
+        channel_states={1: True, 2: False, 3: False, 4: False},
+        trigger_status=["Stop"],
+        sample_rate=1_000.0,
+        timebase=1e-3,
+        waveform_payloads={1: bytes(range(256))},
+        # The base mock doesn't answer every legacy-dialect query (e.g. probe
+        # ratio); fill in the ones the provenance snapshot reads so channel 1
+        # comes back fully populated instead of silently falling back to None.
+        custom_responses={"C1:ATTN?": "10", "C1:BWL?": "OFF", "C1:UNIT?": "V"},
+    )
+    scope = Oscilloscope("mock", connection=conn)
+    scope.connect()
+    try:
+        # provenance=True is the default; shown here for clarity.
+        waveform = scope.get_waveform(1, provenance=True)
+        scope.waveform.save_waveform(waveform, str(NPZ_PATH), format="NPY")
+        scope.waveform.save_waveform(waveform, str(CSV_PATH), format="CSV")
+        print(f"Saved {NPZ_PATH.name} and {CSV_PATH.name}")
+    finally:
+        scope.disconnect()
+
+
+def inspect(path: Path) -> None:
+    """Reload a saved waveform and print what its provenance records."""
+    loaded = load_waveform(path)
+    print(f"\n--- {path.name} ({loaded.source_format}) ---")
+
+    prov = loaded.provenance
+    if prov is None:
+        print("No provenance recorded (file predates this feature).")
+        return
+
+    if prov.instrument is not None:
+        print(f"Instrument model: {prov.instrument.model}")
+
+    channel_settings = prov.channels.get(loaded.channel) or prov.channels.get(1)
+    if channel_settings is not None:
+        print(f"Channel {channel_settings.channel} scale: {channel_settings.voltage_scale} V/div (probe {channel_settings.probe_ratio}x)")
+
+    print(f"Acquired (UTC): {prov.acquired_at}")
+    print(f"First 5 samples (V): {loaded.voltage[:5].tolist()}")
+
+
+def main() -> None:
+    acquire_and_save()
+    inspect(NPZ_PATH)
+    inspect(CSV_PATH)
+
+
+if __name__ == "__main__":
+    main()
+```
 
 ---
 

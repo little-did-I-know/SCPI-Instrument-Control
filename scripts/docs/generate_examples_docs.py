@@ -16,6 +16,7 @@ Output:
 
 import ast
 import re
+import unicodedata
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Optional
@@ -153,6 +154,30 @@ def get_example_title(filename: str, docstring: str) -> str:
     # Generate from filename
     name = filename.replace(".py", "").replace("_", " ").title()
     return name
+
+
+def slugify_heading(title: str) -> str:
+    """Slugify a heading the same way Python-Markdown's ``toc`` extension does.
+
+    MkDocs (via Python-Markdown's ``toc`` extension, as configured with
+    ``permalink: true`` and no custom slugify function) generates heading
+    anchors with ``markdown.extensions.toc.slugify(value, '-')``. That
+    function: NFKD-normalizes and drops non-ASCII characters, strips
+    everything that isn't a word character, whitespace, or hyphen, lowercases
+    the result, then collapses runs of whitespace into a single separator.
+    Reimplemented here (rather than importing ``markdown``) so the TOC links
+    generated in this script always match the anchors MkDocs actually emits.
+
+    Args:
+        title: Heading text (e.g. an example's title).
+
+    Returns:
+        URL anchor fragment (without the leading '#').
+    """
+    value = unicodedata.normalize("NFKD", title)
+    value = value.encode("ascii", "ignore").decode("ascii")
+    value = re.sub(r"[^\w\s-]", "", value).strip().lower()
+    return re.sub(r"[-\s]+", "-", value)
 
 
 def categorize_example(filename: str, config: dict) -> str:
@@ -299,7 +324,7 @@ def generate_category_page(category: str, examples: List[ExampleMetadata], confi
     lines.append("| Example | Description |")
     lines.append("|---------|-------------|")
     for example in examples:
-        anchor = example.title.lower().replace(" ", "-")
+        anchor = slugify_heading(example.title)
         lines.append(f"| [{example.title}](#{anchor}) | {example.description} |")
     lines.append("")
 

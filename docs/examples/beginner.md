@@ -11,6 +11,7 @@ Complete examples for getting started with the Siglent Oscilloscope library. The
 | [SCPI dialect auto-detection and manual override](#scpi-dialect-auto-detection-and-manual-override) | SCPI dialect auto-detection and manual override. |
 | [Basic Function Generator / AWG Usage Example](#basic-function-generator-awg-usage-example) | Basic Function Generator / AWG Usage Example. |
 | [Measurement example for Siglent oscilloscope](#measurement-example-for-siglent-oscilloscope) | Measurement example for Siglent oscilloscope. |
+| [Discover SCPI instruments on the local network](#discover-scpi-instruments-on-the-local-network) | Discover SCPI instruments on the local network. |
 | [Basic power supply control example](#basic-power-supply-control-example) | Basic power supply control example. |
 | [Simple single capture example](#simple-single-capture-example) | Simple single capture example. |
 | [Waveform capture example for Siglent oscilloscope](#waveform-capture-example-for-siglent-oscilloscope) | Waveform capture example for Siglent oscilloscope. |
@@ -43,6 +44,13 @@ python examples/basic_usage.py
 
 This script demonstrates how to connect to an oscilloscope,
 configure channels and trigger, and perform basic operations.
+
+Requirements: an oscilloscope reachable on the network -- edit SCOPE_IP below
+to match its LAN address.
+
+Expected output: connection/device info, channel and trigger configuration
+echoed to the console, frequency/Vpp measurements on Channel 1, and a summary
+of each enabled channel's configuration. No files are written.
 """
 
 from scpi_control import Oscilloscope
@@ -562,6 +570,13 @@ python examples/measurements.py
 
 This script demonstrates how to perform automated measurements
 on oscilloscope channels.
+
+Requirements: an oscilloscope reachable on the network -- edit SCOPE_IP below
+to match its LAN address.
+
+Expected output: individual measurements (frequency, period, Vpp, amplitude,
+max/min, RMS, mean) on Channel 1 printed to the console, followed by the
+combined result of measure_all(). No files are written.
 """
 
 import time
@@ -601,7 +616,7 @@ def main():
 
         try:
             period = scope.measurement.measure_period(1)
-            print(f"Period:       {period*1e6:.6f} µs")
+            print(f"Period:       {period*1e6:.6f} us")
         except Exception as e:
             print(f"Period:       Error - {e}")
 
@@ -650,13 +665,78 @@ def main():
                 if "freq" in name.lower():
                     print(f"{name:12s}: {value/1e6:.6f} MHz")
                 elif "period" in name.lower():
-                    print(f"{name:12s}: {value*1e6:.6f} µs")
+                    print(f"{name:12s}: {value*1e6:.6f} us")
                 else:
                     print(f"{name:12s}: {value:.6f} V")
             else:
                 print(f"{name:12s}: N/A")
 
         print("\nDone!")
+
+
+if __name__ == "__main__":
+    main()
+```
+
+---
+
+## Discover SCPI instruments on the local network
+
+Discover SCPI instruments on the local network.
+
+### Requirements
+
+- scpi_control - Core library
+- Oscilloscope connected to network
+
+### Configuration
+
+Update `SCOPE_IP` to match your oscilloscope's IP address (default: `192.168.1.100`).
+
+### Usage
+
+```bash
+python examples/network_discovery.py
+```
+
+### Source Code
+
+```python
+"""Discover SCPI instruments on the local network.
+
+Scans a range of addresses, probes each for a SCPI *IDN? response, and prints
+what it finds. This example scans a documentation-only TEST-NET range so it
+returns quickly with no results in most environments; change `cidr` (or pass
+cidr=None to auto-scan your local /24) to find real instruments.
+
+Requirements: SCPI-Instrument-Control (core install, no hardware)
+"""
+
+from scpi_control.server.discovery import discover
+
+
+def main():
+    print("=" * 60)
+    print("Network instrument discovery")
+    print("=" * 60)
+
+    # A small TEST-NET-1 range (RFC 5737): fast and hostless, for a safe demo.
+    # For real use: discover(cidr=None) auto-scans your local subnet, or pass a
+    # CIDR like discover(cidr="192.168.1.0/24").
+    cidr = "192.0.2.0/30"
+    print(f"Scanning {cidr} ...")
+    found = discover(cidr=cidr, connect_timeout=0.3, probe_timeout=0.5)
+
+    if not found:
+        print("No instruments found in this range.")
+    else:
+        print(f"Found {len(found)} instrument(s):")
+        for entry in found:
+            print(f"  {entry}")
+
+    print("=" * 60)
+    print("Done.")
+    print("=" * 60)
 
 
 if __name__ == "__main__":
@@ -702,10 +782,13 @@ For USB support:
 
 from scpi_control import PowerSupply
 
+# Replace with your power supply's IP address
+PSU_IP = "192.168.1.200"
+
 
 def main():
     # Connect to power supply (use your PSU's IP address)
-    psu = PowerSupply("192.168.1.200")
+    psu = PowerSupply(PSU_IP)
 
     print("Connecting to power supply...")
     psu.connect()
@@ -764,7 +847,7 @@ def main():
 def multi_output_example():
     """Example for multi-output power supplies (e.g., SPD3303X)."""
 
-    psu = PowerSupply("192.168.1.200")
+    psu = PowerSupply(PSU_IP)
     psu.connect()
 
     if psu.model_capability.num_outputs < 3:
@@ -806,7 +889,7 @@ def context_manager_example():
     """Example using context manager for automatic connection management."""
 
     # Using 'with' ensures proper connection/disconnection
-    with PowerSupply("192.168.1.200") as psu:
+    with PowerSupply(PSU_IP) as psu:
         print(f"Connected to {psu.model_capability.model_name}")
 
         psu.output1.voltage = 3.3
@@ -869,6 +952,13 @@ python examples/simple_capture.py
 
 This example shows how to capture a single waveform from one or more channels
 and save it to a file.
+
+Requirements: an oscilloscope reachable on the network -- edit SCOPE_IP below
+to match its LAN address.
+
+Expected output: per-channel capture stats and basic analysis (Vpp, mean,
+RMS, frequency) printed to the console, and 'simple_capture.npz' saved to
+the current directory.
 """
 
 from scpi_control.automation import DataCollector
@@ -892,7 +982,7 @@ def main():
             print(f"\nChannel {ch}:")
             print(f"  Samples: {len(waveform.voltage)}")
             print(f"  Sample rate: {waveform.sample_rate / 1e6:.2f} MSa/s")
-            print(f"  Time interval: {waveform.time_interval * 1e9:.2f} ns")
+            print(f"  Time interval: {(1.0 / waveform.sample_rate) * 1e9:.2f} ns")
             print(f"  Voltage range: {waveform.voltage.min():.3f}V to {waveform.voltage.max():.3f}V")
 
         # Analyze waveforms
@@ -946,6 +1036,13 @@ python examples/waveform_capture.py
 
 This script demonstrates how to capture waveform data from
 the oscilloscope and save it to a file.
+
+Requirements: an oscilloscope reachable on the network -- edit SCOPE_IP below
+to match its LAN address. matplotlib is a core dependency, no extra install
+needed.
+
+Expected output: captures Channel 1, saves 'waveform.csv' and 'waveform.png'
+to the current directory, and opens a plot window.
 """
 
 import matplotlib.pyplot as plt
@@ -982,7 +1079,7 @@ def main():
 
         print(f"Captured {len(waveform)} samples")
         print(f"Sample rate: {waveform.sample_rate/1e9:.3f} GSa/s")
-        print(f"Timebase: {waveform.timebase*1e6:.3f} µs/div")
+        print(f"Timebase: {waveform.timebase*1e6:.3f} us/div")
 
         # Save waveform to CSV
         print("\nSaving waveform data to 'waveform.csv'...")

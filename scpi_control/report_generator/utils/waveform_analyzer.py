@@ -1204,36 +1204,36 @@ class WaveformAnalyzer:
         abs_slope = abs(slope)
 
         if abs_slope < SLOPE_THRESHOLD_GOOD:
-            return "✓ Probe compensation is good. Plateau is flat and stable."
+            return "[OK] Probe compensation is good. Plateau is flat and stable."
 
         elif abs_slope < SLOPE_THRESHOLD_MODERATE:
             # Determine direction based on slope sign
             if slope > 0:
                 # Positive slope (rising plateau) indicates undercompensation
-                return "⚠ Probe is slightly undercompensated. " "Turn trimmer capacitor clockwise 10-15° and retest. " f"(Measured slope: {slope:.0f} V/s)"
+                return "[WARNING] Probe is slightly undercompensated. " "Turn trimmer capacitor clockwise 10-15 degrees and retest. " f"(Measured slope: {slope:.0f} V/s)"
             else:
                 # Negative slope (falling plateau) indicates overcompensation
-                return "⚠ Probe is slightly overcompensated. " "Turn trimmer capacitor counter-clockwise 10-15° and retest. " f"(Measured slope: {slope:.0f} V/s)"
+                return "[WARNING] Probe is slightly overcompensated. " "Turn trimmer capacitor counter-clockwise 10-15 degrees and retest. " f"(Measured slope: {slope:.0f} V/s)"
 
         elif abs_slope < SLOPE_THRESHOLD_POOR:
             if slope > 0:
-                return "⚠⚠ Probe is undercompensated. " "Turn trimmer capacitor clockwise 30-45° and retest. " f"(Measured slope: {slope:.0f} V/s)"
+                return "[WARNING] Probe is undercompensated. " "Turn trimmer capacitor clockwise 30-45 degrees and retest. " f"(Measured slope: {slope:.0f} V/s)"
             else:
-                return "⚠⚠ Probe is overcompensated. " "Turn trimmer capacitor counter-clockwise 30-45° and retest. " f"(Measured slope: {slope:.0f} V/s)"
+                return "[WARNING] Probe is overcompensated. " "Turn trimmer capacitor counter-clockwise 30-45 degrees and retest. " f"(Measured slope: {slope:.0f} V/s)"
 
         else:
             # Severe compensation issue
             if slope > 0:
                 return (
-                    "⚠⚠⚠ Probe is severely undercompensated! "
-                    "Turn trimmer capacitor clockwise 60-90° and retest. "
+                    "[WARNING] Probe is severely undercompensated! "
+                    "Turn trimmer capacitor clockwise 60-90 degrees and retest. "
                     "If problem persists, check probe connection and cable. "
                     f"(Measured slope: {slope:.0f} V/s)"
                 )
             else:
                 return (
-                    "⚠⚠⚠ Probe is severely overcompensated! "
-                    "Turn trimmer capacitor counter-clockwise 60-90° and retest. "
+                    "[WARNING] Probe is severely overcompensated! "
+                    "Turn trimmer capacitor counter-clockwise 60-90 degrees and retest. "
                     "If problem persists, check probe connection and cable. "
                     f"(Measured slope: {slope:.0f} V/s)"
                 )
