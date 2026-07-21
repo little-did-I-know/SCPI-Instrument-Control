@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Examples: four new runnable, no-hardware examples — `report_ai_qa.py` (local-LLM tool-calling Q&A over a report), `network_discovery.py` (scan the network for SCPI instruments), `report_branding.py` (apply company branding/colours to a report), and `report_computed_analysis.py` (deterministic, LLM-free report analysis).
 - Examples: a `tests/test_examples_smoke.py` guard that executes the no-hardware examples, compile-checks the rest, and blocks known-stale tokens from reappearing.
 - Docs: a real screen capture and a real 1&nbsp;kHz calibration-square-wave plot from a Siglent SDS824X HD (in `docs/images/`), plus the raw capture committed as a test fixture (`tests/fixtures/cal_square_sds824x.npz`) that exercises the analyzer against genuine hardware data.
+- Acquisition provenance: waveforms captured with `acquire()`/`get_waveform()` now record the instrument identity, per-channel settings, trigger configuration, timebase, and UTC timestamp, embedded in every save format (new keys only — existing files and keys are unchanged; pass `provenance=False` to skip the snapshot on high-rate paths).
+- `scpi_control.waveform_io.load_waveform()`: public parser that reads all five waveform file formats (old and new files) into numpy arrays plus normalized metadata/provenance, with an optional `to_dataframe()` pandas helper.
+- `scpi-extract` CLI: inspect provenance (`--info`), dump raw data (`--csv`), or emit machine-readable metadata (`--json`) from any saved waveform file.
+- Waveform savers now persist the previously dropped `timebase`, `voltage_scale`, and `voltage_offset` fields; plain CSV gains a `#`-commented provenance header (channel, sample rate, scales, instrument, timestamp) (suppress with `save_waveform(..., bare=True)`).
 
 ### Changed
 

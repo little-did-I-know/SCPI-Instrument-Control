@@ -34,6 +34,7 @@ pip install "SCPI-Instrument-Control"
 | `advanced_analysis.py` | Advanced waveform analysis and visualization: FFT analysis, statistical analysis, and matplotlib plots. | Oscilloscope on the network, matplotlib |
 | `probe_calibration_analysis.py` | Waveform region extraction for probe compensation analysis: plateau detection, slope analysis, calibration guidance, and zoomed PDF report plots. | `SCPI-Instrument-Control[report-generator]` (no hardware — fully synthetic) |
 | `dialect_override_example.py` | SCPI dialect auto-detection from `*IDN?` and the `dialect=` override for forcing a command set; runs entirely on mock connections. | Core install only (no hardware) |
+| `waveform_provenance_and_extract.py` | Acquisition provenance: capturing a waveform with the instrument/settings snapshot attached, saving NPZ and CSV, and reading them back with `load_waveform()`; runs entirely against a mock connection -- no instrument needed. | Core install only (no hardware) |
 
 ## Web Gateway
 
@@ -87,9 +88,10 @@ the file — update it to match your instrument. To find an oscilloscope's
 LAN address: **Utility → I/O → LAN** on the instrument's front panel.
 
 The scripts marked "no hardware" above (`dialect_override_example.py`,
-`trend_logging_walkthrough.py`, `psu_gui_test.py`, `probe_calibration_analysis.py`,
-`psu_advanced_features.py`, `network_discovery.py`, `report_computed_analysis.py`,
-`report_branding.py`, `report_ai_qa.py`) use mock connections and run as-is.
+`waveform_provenance_and_extract.py`, `trend_logging_walkthrough.py`, `psu_gui_test.py`,
+`probe_calibration_analysis.py`, `psu_advanced_features.py`, `network_discovery.py`,
+`report_computed_analysis.py`, `report_branding.py`, `report_ai_qa.py`) use mock
+connections and run as-is.
 
 ## Running an example
 

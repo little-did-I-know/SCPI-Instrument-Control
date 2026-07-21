@@ -138,6 +138,7 @@ all = [
 siglent-gui = "scpi_control.gui.app:main"
 siglent-report-generator = "scpi_control.report_generator.app:main"
 scpi-web = "scpi_control.server.__main__:main"
+scpi-extract = "scpi_control.scpi_extract:main"
 
 [tool.setuptools]
 include-package-data = true

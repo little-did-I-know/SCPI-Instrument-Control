@@ -92,6 +92,7 @@ def test_field_order_is_the_library_core_then_report_concerns():
         "timebase",
         "voltage_scale",
         "voltage_offset",
+        "provenance",
         "probe_ratio",
         "coupling",
         "source_file",

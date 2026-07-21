@@ -117,6 +117,7 @@ nav:
       - Basic Usage: user-guide/basic-usage.md
       - SCPI Dialects: user-guide/scpi-dialects.md
       - Waveform Capture: user-guide/waveform-capture.md
+      - Data Provenance: user-guide/data-provenance.md
       - Measurements: user-guide/measurements.md
       - Trigger Control: user-guide/trigger-control.md
       - Advanced Features: user-guide/advanced-features.md

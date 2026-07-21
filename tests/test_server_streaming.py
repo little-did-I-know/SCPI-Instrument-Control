@@ -110,7 +110,7 @@ class _StubScope:
     def __init__(self, n):
         self._data = WaveformData(time=np.linspace(0.0, 1.0, n), voltage=np.zeros(n), channel=1)
 
-    def get_waveform(self, channel):
+    def get_waveform(self, channel, provenance=True):
         return self._data
 
 

@@ -13,6 +13,7 @@ import numpy as np
 
 from scpi_control import waveform_schema as ws
 from scpi_control.report_generator.models.report_data import WaveformData
+from scpi_control.waveform_io import load_waveform as _load_native
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +40,27 @@ def _require_numeric_time(time_data: np.ndarray, filepath: Path) -> np.ndarray:
     if not np.issubdtype(time_data.dtype, np.number):
         raise ValueError(f"Time data in {filepath} is not numeric (found dtype {time_data.dtype})")
     return time_data
+
+
+def _from_loaded(loaded) -> WaveformData:
+    """Adapt a waveform_io.LoadedWaveform into the report generator's model."""
+    voltage = np.asarray(loaded.voltage)
+    time_data = _require_numeric_time(np.asarray(loaded.time), loaded.source_path)
+    if loaded.sample_rate:
+        sample_rate = float(loaded.sample_rate)
+    else:
+        sample_rate = WaveformLoader._rate_from_time(time_data)
+    # Foreign HDF5 files can carry time/voltage datasets without a channel
+    # attr; the old ours-branch fell back to "voltage" (line 319) — keep that.
+    channel = str(loaded.channel) if loaded.channel is not None else ws.VOLTAGE
+    return WaveformData(
+        channel=channel,
+        time=time_data,
+        voltage=voltage,
+        sample_rate=sample_rate,
+        record_length=len(voltage),
+        source_file=loaded.source_path,
+    )
 
 
 class WaveformLoader:
@@ -86,21 +108,8 @@ class WaveformLoader:
         data = np.load(filepath, allow_pickle=True)
 
         if _looks_like_ours(data.files):
-            return [WaveformLoader._npz_from_schema(data, filepath)]
+            return [_from_loaded(_load_native(filepath))]
         return WaveformLoader._npz_heuristic(data, filepath)
-
-    @staticmethod
-    def _npz_from_schema(data, filepath: Path) -> WaveformData:
-        """Read an NPZ written by scpi_control.waveform's _save_npy."""
-        voltage = np.asarray(data[ws.VOLTAGE])
-        return WaveformData(
-            channel=str(data[ws.CHANNEL]),
-            time=np.asarray(data[ws.TIME]),
-            voltage=voltage,
-            sample_rate=float(data[ws.SAMPLE_RATE]),
-            record_length=len(voltage),
-            source_file=filepath,
-        )
 
     @staticmethod
     def _npz_heuristic(data, filepath: Path) -> List[WaveformData]:
@@ -262,18 +271,7 @@ class WaveformLoader:
         keys = [k for k in data.keys() if not k.startswith("__")]
 
         if _looks_like_ours(keys):
-            voltage = np.asarray(data[ws.VOLTAGE]).flatten()
-            # loadmat returns even scalars as 2-D arrays; .item() unwraps them.
-            return [
-                WaveformData(
-                    channel=str(np.asarray(data[ws.CHANNEL]).item()),
-                    time=np.asarray(data[ws.TIME]).flatten(),
-                    voltage=voltage,
-                    sample_rate=float(np.asarray(data[ws.SAMPLE_RATE]).item()),
-                    record_length=len(voltage),
-                    source_file=filepath,
-                )
-            ]
+            return [_from_loaded(_load_native(filepath, format="MAT"))]
 
         time_key = WaveformLoader._pick_time_key(keys)
         voltage_keys = [k for k in keys if k != time_key and np.issubdtype(np.asarray(data[k]).dtype, np.number) and np.asarray(data[k]).size > 1]
@@ -310,29 +308,7 @@ class WaveformLoader:
             datasets = [k for k in f.keys() if isinstance(f[k], h5py.Dataset)]
 
             if ws.TIME in datasets and ws.VOLTAGE in datasets:
-                # Core fields live on the FILE's attrs, not the dataset's.
-                attrs = dict(f.attrs)
-                voltage = f[ws.VOLTAGE][:]
-                # Foreign files can name a dataset 'time' and fill it with strings;
-                # the sample_rate default below feeds it to `_rate_from_time`.
-                time_data = _require_numeric_time(f[ws.TIME][:], filepath)
-                channel = attrs.get(ws.CHANNEL, ws.VOLTAGE)
-                if isinstance(channel, bytes):
-                    channel = channel.decode()
-                return [
-                    WaveformData(
-                        channel=str(channel),
-                        time=time_data,
-                        voltage=voltage,
-                        # Foreign files can name datasets 'time'/'voltage' without
-                        # carrying our sample_rate attr; derive it from the
-                        # numeric time axis instead of silently reporting 0.0,
-                        # matching the heuristic path below.
-                        sample_rate=float(attrs.get(ws.SAMPLE_RATE, WaveformLoader._rate_from_time(time_data))),
-                        record_length=len(voltage),
-                        source_file=filepath,
-                    )
-                ]
+                return [_from_loaded(_load_native(filepath, format="HDF5"))]
 
             time_key = WaveformLoader._pick_time_key(datasets)
             if time_key is None:

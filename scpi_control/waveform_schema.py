@@ -42,3 +42,23 @@ HDF5_FILE_ATTRS: Tuple[str, ...] = (CHANNEL, SAMPLE_RATE, HDF5_NUM_SAMPLES, TIME
 CSV_COMMENT = "#"
 CSV_HEADER_CHANNEL = "Channel"
 CSV_HEADER_SAMPLE_RATE = "Sample Rate"
+
+# ---- Acquisition scale fields (added 2026-07; additive, may be absent) -----
+TIMEBASE = "timebase"
+VOLTAGE_SCALE = "voltage_scale"
+VOLTAGE_OFFSET = "voltage_offset"
+SCALE_FIELDS: Tuple[str, ...] = (TIMEBASE, VOLTAGE_SCALE, VOLTAGE_OFFSET)
+
+# ---- Provenance (added 2026-07; additive, may be absent) -------------------
+# One JSON document (scpi_control.provenance.AcquisitionProvenance.to_json()).
+# NPZ/MAT: a string under this key. HDF5: a FILE attr. CSV (both variants):
+# a "# Provenance-JSON: {...}" comment line.
+# Plain CSV writes channel, sample rate, scale fields, and provenance ONLY when
+# the waveform carries a provenance object; a provenance-less save stays
+# byte-identical to the legacy headerless layout. The binary formats write
+# scale fields regardless.
+PROVENANCE_JSON = "provenance_json"
+CSV_HEADER_PROVENANCE = "Provenance-JSON"
+CSV_HEADER_TIMEBASE = "Timebase"
+CSV_HEADER_VOLTAGE_SCALE = "Voltage Scale"
+CSV_HEADER_VOLTAGE_OFFSET = "Voltage Offset"

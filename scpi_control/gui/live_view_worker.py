@@ -140,7 +140,7 @@ class LiveViewWorker(QThread):
             try:
                 self.status_update.emit(f"Acquiring CH{ch_num}...")
                 logger.debug(f"Worker acquiring waveform from channel {ch_num}")
-                waveform = self.scope.get_waveform(ch_num)
+                waveform = self.scope.get_waveform(ch_num, provenance=False)
                 if waveform:
                     waveforms.append(waveform)
                     logger.debug(f"Worker got {len(waveform.voltage)} samples from CH{ch_num}")

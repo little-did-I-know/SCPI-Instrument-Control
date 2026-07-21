@@ -78,7 +78,7 @@ def _decimate_frame(channel, time_axis, voltage) -> Dict[str, Any]:
 
 
 def _waveform_frame(scope: Oscilloscope, channel: int) -> Dict[str, Any]:
-    data = scope.get_waveform(channel)
+    data = scope.get_waveform(channel, provenance=False)
     return _decimate_frame(channel, data.time, data.voltage)
 
 
@@ -306,7 +306,7 @@ class InstrumentSession:
             for n in scope.supported_channels:
                 ch = scope.get_channel(n)
                 if ch is not None and _safe(lambda: ch.enabled, default=False):
-                    data = scope.get_waveform(n)
+                    data = scope.get_waveform(n, provenance=False)
                     acquired["C{0}".format(n)] = data
                     self.publish(_decimate_frame(n, data.time, data.voltage))
             shown_now = set()
