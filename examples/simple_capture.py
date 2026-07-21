@@ -2,6 +2,13 @@
 
 This example shows how to capture a single waveform from one or more channels
 and save it to a file.
+
+Requirements: an oscilloscope reachable on the network -- edit SCOPE_IP below
+to match its LAN address.
+
+Expected output: per-channel capture stats and basic analysis (Vpp, mean,
+RMS, frequency) printed to the console, and 'simple_capture.npz' saved to
+the current directory.
 """
 
 from scpi_control.automation import DataCollector

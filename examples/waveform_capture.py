@@ -2,6 +2,13 @@
 
 This script demonstrates how to capture waveform data from
 the oscilloscope and save it to a file.
+
+Requirements: an oscilloscope reachable on the network -- edit SCOPE_IP below
+to match its LAN address. matplotlib is a core dependency, no extra install
+needed.
+
+Expected output: captures Channel 1, saves 'waveform.csv' and 'waveform.png'
+to the current directory, and opens a plot window.
 """
 
 import matplotlib.pyplot as plt
@@ -38,7 +45,7 @@ def main():
 
         print(f"Captured {len(waveform)} samples")
         print(f"Sample rate: {waveform.sample_rate/1e9:.3f} GSa/s")
-        print(f"Timebase: {waveform.timebase*1e6:.3f} µs/div")
+        print(f"Timebase: {waveform.timebase*1e6:.3f} us/div")
 
         # Save waveform to CSV
         print("\nSaving waveform data to 'waveform.csv'...")

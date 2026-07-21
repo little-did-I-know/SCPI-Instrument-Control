@@ -7,6 +7,143 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.3.0] - 2026-07-21
+
+### Added
+
+- `signal_synth.stream()`: an infinite or duration-bounded generator of phase-continuous voltage chunks for live-signal simulation — optional wall-clock pacing (`realtime=True`), correct seeded-noise semantics (seed advances per chunk, so seeded streams are reproducible without repeating noise blocks), and eager parameter validation.
+- Dev tooling: `pytest-testmon` in the `dev` extra for impact-based local test selection (`python -m pytest --testmon`); CI and pre-merge checks still run the full suite.
+
+## [3.2.0] - 2026-07-21
+
+### Added
+
+- Synthetic signals: a public generator API — `SignalSpec` plus `synthesize()`/`make_waveform()` in `scpi_control.signal_synth` — producing sine, square (with duty cycle), triangle, ramp, DC, and Gaussian-noise waveforms as numpy arrays or ready-to-analyze `WaveformData`, with seedable reproducibility.
+- Mock scopes now synthesize realistic waveforms by default (all vendor personalities): traces are computed from the mock's live timebase, V/div, offset, and trigger state at every acquisition — over-range clips at 8-bit full scale, the trigger level/slope aligns the edge at the window center, and unseeded captures animate with fresh noise. Pass `signals={ch: SignalSpec(...)}` to choose the signal, or `waveform_payloads` bytes for the old fixed-payload behavior (unchanged). Web-gateway mock sessions stream synthesized signals out of the box.
+
+### Changed
+
+- MockConnection's default (no `waveform_payloads` given) no longer serves a fixed 4-byte payload — channels synthesize state-coupled signals instead.
+
+## [3.1.0] - 2026-07-21
+
+### Added
+
+- Report generator: a built-in **probe-calibration template preset** (`ReportTemplate.create_probe_calibration_template()`, seedable from the Template Manager via "Create Probe Cal Template") — probe_calibration test type, a compensation procedure, and overshoot/undershoot/ringing/flatness pass/fail limits.
+- Examples: four new runnable, no-hardware examples — `report_ai_qa.py` (local-LLM tool-calling Q&A over a report), `network_discovery.py` (scan the network for SCPI instruments), `report_branding.py` (apply company branding/colours to a report), and `report_computed_analysis.py` (deterministic, LLM-free report analysis).
+- Examples: a `tests/test_examples_smoke.py` guard that executes the no-hardware examples, compile-checks the rest, and blocks known-stale tokens from reappearing.
+- Docs: a real screen capture and a real 1&nbsp;kHz calibration-square-wave plot from a Siglent SDS824X HD (in `docs/images/`), plus the raw capture committed as a test fixture (`tests/fixtures/cal_square_sds824x.npz`) that exercises the analyzer against genuine hardware data.
+- Acquisition provenance: waveforms captured with `acquire()`/`get_waveform()` now record the instrument identity, per-channel settings, trigger configuration, timebase, and UTC timestamp, embedded in every save format (new keys only — existing files and keys are unchanged; pass `provenance=False` to skip the snapshot on high-rate paths).
+- `scpi_control.waveform_io.load_waveform()`: public parser that reads all five waveform file formats (old and new files) into numpy arrays plus normalized metadata/provenance, with an optional `to_dataframe()` pandas helper.
+- `scpi-extract` CLI: inspect provenance (`--info`), dump raw data (`--csv`), or emit machine-readable metadata (`--json`) from any saved waveform file.
+- Waveform savers now persist the previously dropped `timebase`, `voltage_scale`, and `voltage_offset` fields; plain CSV gains a `#`-commented provenance header (channel, sample rate, scales, instrument, timestamp) (suppress with `save_waveform(..., bare=True)`).
+
+### Changed
+
+- Report generator AI: every oscilloscope system prompt now carries one shared grounding rule (claim only what the report data or a tool actually returned; say so plainly when a value is missing rather than inventing it).
+- Report generator AI: key-findings and recommendations are parsed more tolerantly — multi-digit numbering, markdown-bold list markers, and a leading preamble line no longer corrupt the extracted list.
+- Report generator (internal): the oscilloscope and DAQ LLM prompt layers now share one grounding constant and the prompt-lookup / chat-prompt assembly via `llm/_prompt_helpers.py`, removing duplicated boilerplate.
+
+### Fixed
+
+- Report generator analysis: `WaveformAnalyzer`'s noise check no longer computes an O(n²) full autocorrelation — it now reads only the two autocorrelation lags it uses, so analysing large captures (e.g. 1,000,000-sample records) completes in milliseconds instead of hanging. Also removes a divide-by-zero `RuntimeWarning` on constant signals.
+- Examples: repaired broken examples — `simple_capture.py` and `advanced_analysis.py` referenced a non-existent `waveform.time_interval` (now the sample period `1.0 / sample_rate`), and the interactive tutorial saved with an invalid `format="NPZ"` (now `"NPY"`). The report-generation and branding examples now degrade cleanly when reportlab is absent instead of crashing.
+- Examples: updated the stale `Siglent-Oscilloscope` package name (and dead repo links) to `SCPI-Instrument-Control`, and corrected the README's hardware/no-hardware annotations.
+- Screen capture on modern-dialect scopes (SDS800X HD): `ScreenCapture` now selects the correct SCDP command per dialect and reads the raw BMP sized by its own header, instead of over-reading a fixed 10&nbsp;MB — which timed out and dropped the connection. `scope.screen_capture.get_screenshot_pil()` now works on the modern scopes.
+- Report generator analysis: `WaveformAnalyzer.detect_signal_type` no longer misclassifies clean periodic signals (e.g. a square wave captured over many periods) as noise. The noise check now measures spectral concentration — whether one frequency bin dominates — instead of testing autocorrelation at an arbitrary fixed lag.
+- Report generator analysis: `WaveformAnalyzer.detect_signal_type` now classifies pulse/PWM signals (non-50%-duty square waves) as pulse instead of sawtooth. Two-level (flat-topped) signals are separated from ramps before the harmonic scorers run.
+- Report generator DAQ AI: the data-logger analysis prompts now carry the same grounding rule as the oscilloscope prompts (claim only what the data shows; say so when a value is missing), and the session-summary prompt no longer invites a "Here is the summary" preamble.
+- Report generator PDF: characters outside the built-in font's range (⚠, ✓/✗, σ, Ω, …) no longer render as blank boxes — they are normalized to readable text, with a catch-all so any unexpected glyph can never box out.
+
+## [3.0.0] - 2026-07-17
+
+### ⚠️ Breaking Changes
+
+- **The report generator's `WaveformData` fields are renamed, and `channel`
+  moved from the first constructor argument to the third.** `channel_name`,
+  `time_data`, and `voltage_data` are now `channel`, `time`, and `voltage`,
+  matching the base class's field order (`time`, `voltage`, `channel`, ...).
+  Because the position changed along with the name, positional construction
+  such as `WaveformData("CH1", t, v, ...)` does **not** fail with a
+  recognizable rename error — it silently assigns `"CH1"` to `time` and
+  blows up later with `AttributeError: 'str' object has no attribute
+  'shape'`. Construct with keywords (`channel=`, `time=`, `voltage=`) to
+  migrate safely. This is a documented public API — see
+  [`docs/report-generator/api-reference.md`](../report-generator/api-reference.md).
+- **`WaveformData.source` and `WaveformData.description` are removed**, on
+  both the library and report waveform types. `WaveformData(..., source="x")`
+  now raises `TypeError` instead of silently accepting the keyword.
+- **`WaveformData.timebase` and `WaveformData.voltage_scale` are `None`
+  unless an instrument actually reported them**, instead of being derived by
+  assuming a 14-division horizontal grid and an 8-division vertical one —
+  Siglent's geometry, previously applied to Tektronix and LeCroy captures too
+  — with a flat trace given a bare 1.0 V/div. Real acquisitions are
+  unaffected: all three vendor backends pass genuine scope values. Code that
+  does arithmetic on `timebase`/`voltage_scale` from a *synthetic* waveform
+  (a math channel, or hand-built test data) — e.g. `wf.timebase * 1e6` — now
+  raises `TypeError` on `None` instead of silently using an invented number.
+  Guard with a `None` check, or supply real values.
+
+### Added
+
+- Tektronix and LeCroy oscilloscope support (core control, waveform
+  acquisition, measurements): two more wire dialects (`tektronix`, `lecroy`)
+  alongside the existing Siglent legacy/modern pair, auto-detected from
+  `*IDN?` via a manufacturer-first routing step. Covers the Tektronix
+  TBS1000C Series and 2 Series MSO, and the LeCroy WaveSurfer 3000z and
+  WaveRunner 8000 series. See the
+  [SCPI Dialects guide](../user-guide/scpi-dialects.md) for the full
+  per-vendor command tables and known gaps (e.g. LeCroy
+  statistics/cursors/holdoff, Tek 16-bit waveform transfer).
+- Tektronix MSO 4/5/6 Series support (MSO44, MSO46, MSO54, MSO56, MSO58,
+  MSO58LP, MSO64), including 6- and 8-channel models.
+- Badge-based measurements for the modern Tektronix MSO families, which also
+  enables `measure()` on the MSO 2-Series.
+- **Report generator — local-LLM analysis and richer PDFs**
+  (`pip install "SCPI-Instrument-Control[report-generator]"`). Everything here
+  is local-only — no cloud providers, no API keys.
+  - Local-LLM (Ollama) tool calling: the model can call read-only report tools
+    to ground its answers, behind a capability gate that no-ops when the local
+    model cannot do tool calls.
+  - Waveform analysis tools for the model — `analyze_plateaus`, `list_edges`,
+    and `analyze_spectrum` — plus `WaveformAnalyzer.calculate_spectrum`.
+  - Deterministic no-LLM analysis: a `ComputedAnalyzer` populates per-waveform
+    statistics and regions on every report, and composes a summary, findings,
+    and recommendations when no LLM wrote them. Reports now attribute their
+    summary by source (manual / AI / computed) rather than a bare AI flag.
+  - Vector PDF plots: waveform, FFT, and region plots render as scalable vector
+    graphics instead of rasterized images.
+  - Page framework: a running header/footer and page numbers on every page,
+    with section headings kept from stranding at the bottom of a page.
+  - Template branding: a template's logo, company name, header/footer text, and
+    four brand colours apply to the generated PDF, and a built-in starter
+    template can be seeded from the Template Manager.
+
+### Changed
+
+- On the Siglent modern dialect, `trigger.holdoff`, measurement statistics,
+  cursors, and `channel.unit` now raise `FeatureNotSupportedError` immediately
+  instead of writing an unsupported command and timing out
+  (`SiglentTimeoutError`). Code that caught the timeout to detect these
+  unsupported operations must now catch `FeatureNotSupportedError` instead.
+- Probe-ratio wire format on the legacy and modern dialects now serializes
+  floats compactly (`10.0` is sent as `10`), matching how real scopes echo the
+  value back.
+- `add_measurement` now validates and case-normalizes its measurement type
+  (unknown types raise instead of being sent verbatim to the instrument).
+- Channel numbers are validated against the connected model's channel count
+  instead of a fixed 1-4 range. Scopes with fewer than four channels now raise
+  `InvalidParameterError` for a channel they do not have, where they
+  previously queried it.
+- The report generator's `WaveformData` is now a subclass of
+  `scpi_control.waveform.WaveformData` (see Breaking Changes above for the
+  field rename and reorder this involved). Report waveforms now inherit the
+  library's array-shape validation, and `channel` is now guaranteed to be a
+  `str` by the type itself. The loader's explicit `str()` calls at each
+  construction site are unchanged and now redundant, not removed — they stay
+  as a defensive measure against `np.str_`/`bytes` values handed back at the
+  MAT/HDF5 boundary.
+
 ## [2.0.0] - 2026-07-15
 
 ### ⚠️ Breaking Changes
@@ -241,7 +378,7 @@ Users have until v2.0.0 to migrate their imports.
   - Integrated with existing `make docs-generate` automation
 - Updated PyPI documentation URL
   - Changed from README-only link to proper documentation site
-  - PyPI now links to https://little-did-I-know.github.io/Siglent-Oscilloscope/
+  - PyPI now links to https://little-did-I-know.github.io/SCPI-Instrument-Control/
   - Users can access complete API documentation and guides from PyPI
 
 **MkDocs Build System**
@@ -1240,4 +1377,4 @@ pip install "Siglent-Oscilloscope[power-supply-beta,usb]==0.4.0-beta.1"
 - Context manager support for oscilloscope connections
 - Comprehensive error handling with custom exceptions
 
-[0.1.0]: https://github.com/siglent-control/siglent/releases/tag/v0.1.0
+[0.1.0]: https://github.com/little-did-I-know/SCPI-Instrument-Control/releases

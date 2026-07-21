@@ -13,10 +13,13 @@ For USB support:
 
 from scpi_control import PowerSupply
 
+# Replace with your power supply's IP address
+PSU_IP = "192.168.1.200"
+
 
 def main():
     # Connect to power supply (use your PSU's IP address)
-    psu = PowerSupply("192.168.1.200")
+    psu = PowerSupply(PSU_IP)
 
     print("Connecting to power supply...")
     psu.connect()
@@ -75,7 +78,7 @@ def main():
 def multi_output_example():
     """Example for multi-output power supplies (e.g., SPD3303X)."""
 
-    psu = PowerSupply("192.168.1.200")
+    psu = PowerSupply(PSU_IP)
     psu.connect()
 
     if psu.model_capability.num_outputs < 3:
@@ -117,7 +120,7 @@ def context_manager_example():
     """Example using context manager for automatic connection management."""
 
     # Using 'with' ensures proper connection/disconnection
-    with PowerSupply("192.168.1.200") as psu:
+    with PowerSupply(PSU_IP) as psu:
         print(f"Connected to {psu.model_capability.model_name}")
 
         psu.output1.voltage = 3.3

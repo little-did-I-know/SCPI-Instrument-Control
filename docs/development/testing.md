@@ -397,62 +397,78 @@ pytest -m "not hardware and not gui and not slow"
 
 ### MockConnection
 
-The project provides a MockConnection for testing without hardware:
+The project provides `MockConnection` (`scpi_control/connection/mock/base.py`) for
+testing without hardware. There is no `add_response()`/`sent_commands` API — state
+is configured via constructor keyword arguments and inspected via public
+attributes:
 
 ```python
 from scpi_control.connection import MockConnection
+from scpi_control.oscilloscope import Oscilloscope
 
-# Create mock connection
-mock = MockConnection()
+# Create a mock connection with initial state
+mock = MockConnection(
+    "mock",
+    idn="Siglent Technologies,SDS824X HD,MOCK0001,3.8.12",
+    channel_states={1: True, 2: False},
+    voltage_scales={1: 0.5},
+    sample_rate=1_000_000.0,
+    timebase=1e-3,
+)
 
-# Configure responses
-mock.add_response("*IDN?", "SIGLENT TECHNOLOGIES,SDS2104X Plus,...")
-mock.add_response("C1:TRA?", "C1:TRA ON")
+scope = Oscilloscope("mock", connection=mock)
+scope.connect()
 
-# Use with Oscilloscope
-scope = Oscilloscope(connection=mock)
-
-# Verify sent commands
-assert "C1:TRA ON" in mock.sent_commands
+# Inspect what the code under test actually sent
+waveform = scope.get_waveform(1)
+assert mock.waveform_requests == [1]
+assert any("TIMebase" in q or "TDIV" in q for q in mock.queries)
 ```
 
-### Mock Responses
+Key constructor keyword arguments (all optional, keyword-only after `host`,
+`port`, `timeout`):
 
-**File: `tests/fixtures/mock_responses.json`**
+- `idn` - the `*IDN?` response string; drives dialect/vendor auto-detection
+- `channel_states`, `voltage_scales`, `voltage_offsets` - per-channel dicts,
+  e.g. `{1: True}`, `{1: 0.5}`
+- `waveform_payloads` - `{channel: bytes}` to serve a fixed captured payload
+  instead of synthesis
+- `signals` - `{channel: SignalSpec(...)}` to choose what a channel
+  synthesizes (see [Synthetic Signals](../user-guide/synthetic-signals.md));
+  channels without an explicit `SignalSpec` still synthesize a state-coupled
+  default waveform - there is no "no signal" option
+- `sample_rate`, `timebase` - initial acquisition settings
+- `trigger_status` - a list of trigger-state tokens the mock returns
+- `custom_responses` - `{command: response}` (or `{command: [responses, ...]}`
+  to pop successive values on repeated queries) for exact-match query
+  overrides, checked before any built-in handling
+- `psu_mode`, `awg_mode`, `daq_mode` (with matching `psu_idn`/`psu_outputs`,
+  `awg_idn`/`awg_channels`, `daq_idn`/`daq_readings`) - switch the mock to a
+  power supply, function generator, or data logger personality instead of an
+  oscilloscope
 
-```json
-{
-  "*IDN?": "SIGLENT TECHNOLOGIES,SDS2104X Plus,SERIAL123,1.0.0",
-  "C1:TRA?": "C1:TRA ON",
-  "C1:VDIV?": "C1:VDIV 1V",
-  "C1:OFST?": "C1:OFST 0V",
-  "TRIG_MODE?": "TRIG_MODE AUTO",
-  "C1:WF? DAT2": "<waveform binary data>"
-}
-```
+Instrumentation attributes recorded automatically, for assertions:
 
-**Load in tests:**
+- `mock.writes` - every command passed to `write()`, in order
+- `mock.queries` - every command passed to `query()`, in order
+- `mock.waveform_requests` - channel numbers requested via `C{n}:WF?`, in order
+- `mock.timebase_updates` - timebase values as they're changed
+- `mock.scale_updates` - `{channel: [values, ...]}` as voltage scale changes,
+  per channel
+
+### Overriding Specific Responses
+
+Use `custom_responses` for exact-match overrides that don't fit synthesis:
 
 ```python
-import json
-from pathlib import Path
+mock = MockConnection(custom_responses={"C1:VDIV?": "C1:VDIV 2.00E+00V"})
+```
 
-@pytest.fixture
-def mock_responses():
-    """Load mock responses from JSON."""
-    path = Path(__file__).parent / "fixtures" / "mock_responses.json"
-    with open(path) as f:
-        return json.load(f)
+Pass a list to return successive values across repeated queries of the same
+command:
 
-
-def test_with_mock_responses(mock_responses):
-    """Test using mock responses."""
-    mock = MockConnection()
-    for cmd, response in mock_responses.items():
-        mock.add_response(cmd, response)
-
-    scope = Oscilloscope(connection=mock)
-    assert scope.model == "SDS2104X Plus"
+```python
+mock = MockConnection(custom_responses={"SAST?": ["Stop", "Run", "Stop"]})
 ```
 
 ### Mocking External Dependencies

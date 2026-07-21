@@ -222,7 +222,7 @@ def main():
     devices = discover_devices()
 
     if not devices:
-        print("\n⚠️  No Siglent devices found")
+        print("\nWARNING: No Siglent devices found")
         print("\nMake sure:")
         print("  1. Device is connected via USB")
         print("  2. USB drivers are installed")
@@ -233,7 +233,7 @@ def main():
 
     # Step 2: Use the first discovered device
     resource_string, idn = devices[0]
-    print(f"\n✓ Using device: {resource_string}")
+    print(f"\n[OK] Using device: {resource_string}")
 
     # Run USB example
     usb_connection_example(resource_string)

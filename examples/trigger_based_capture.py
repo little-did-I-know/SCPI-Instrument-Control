@@ -3,6 +3,13 @@
 This example demonstrates how to wait for specific trigger conditions
 and capture waveforms when they occur. This is useful for capturing
 sporadic events or signals that meet specific criteria.
+
+Requirements: an oscilloscope reachable on the network -- edit SCOPE_IP below
+to match its LAN address.
+
+Expected output: a single trigger wait (up to 30s) that saves to
+'trigger_captures/' if it fires, followed by up to 10 polled trigger events
+saved to 'multi_trigger_captures/' in the current directory.
 """
 
 from scpi_control.automation import DataCollector, TriggerWaitCollector

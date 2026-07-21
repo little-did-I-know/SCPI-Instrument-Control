@@ -27,18 +27,20 @@ A universal Python library for controlling SCPI-compatible test equipment via Et
 ### Core Features
 
 - **Programmatic API**: Control your oscilloscope from Python scripts
+- **Multi-Vendor Oscilloscope Support**: Siglent (legacy SDS1000X-E/SDS2000X Plus and modern SDS800X HD/SDS5000X dialects), Tektronix, and LeCroy, auto-detected from `*IDN?`
+- **Power Supply & DAQ Support**: drive Siglent SPD-series power supplies and SCPI data-acquisition/data-logger units alongside the scope
 - **Automation & Data Collection**: High-level API for batch capture, continuous monitoring, and analysis
 - **GUI Application**: Modern PyQt6-based graphical interface
-- **Waveform Acquisition**: Capture and download waveform data in multiple formats (NPZ, CSV, MAT, HDF5)
+- **Waveform Acquisition**: Capture and download waveform data in multiple formats (.npz, .csv, .mat, .h5)
 - **Acquisition Provenance**: every saved waveform records the instrument, settings, and timestamp that produced it; extract raw data from any saved file with load_waveform() or the scpi-extract CLI
-- **Synthetic Signals & Realistic Mock**: generate parameterized test waveforms (sine/square/triangle/ramp/DC/noise) with SignalSpec/make_waveform, and develop without hardware against a mock scope that synthesizes state-coupled, trigger-aligned waveforms by default
+- **Synthetic Signals & Realistic Mock**: generate parameterized test waveforms (sine/square/triangle/ramp/DC/noise) with `SignalSpec`/`make_waveform`, or `synthesize()`/`stream()` for one-shot arrays and phase-continuous, optionally real-time-paced chunks; develop without hardware against a mock scope that synthesizes state-coupled, trigger-aligned waveforms by default
 - **Channel Configuration**: Control voltage scale, coupling, offset, bandwidth
 - **Trigger Settings**: Configure trigger modes, levels, edge detection
 - **Advanced Analysis**: Built-in FFT, SNR, THD, and statistical analysis tools
 
 ### GUI Features (New!)
 
-- **High-Performance Live View**: Real-time waveform display at 1000+ fps using PyQtGraph
+- **High-Performance Live View**: Real-time waveform display (5-20 fps, configurable) using PyQtGraph
 - **Interactive Visual Measurements**: Click-and-drag measurement markers directly on waveforms
   - 15+ measurement types: Frequency, Vpp, Rise Time, Duty Cycle, etc.
   - Visual gates and markers with real-time calculation
@@ -58,39 +60,31 @@ A universal Python library for controlling SCPI-compatible test equipment via Et
 # Install report generator dependencies
 # pip install "SCPI-Instrument-Control[report-generator]"
 
-from scpi_control.report_generator import ReportGenerator, PDFGenerator, MarkdownGenerator
+from datetime import datetime
 from pathlib import Path
 
-# Create a report generator
-report = ReportGenerator(
-    title="Probe Calibration Test Report",
-    test_id="CAL-2024-001",
-    operator="Lab Technician"
-)
+from scpi_control.report_generator.generators.markdown_generator import MarkdownReportGenerator
+from scpi_control.report_generator.generators.pdf_generator import PDFReportGenerator
+from scpi_control.report_generator.models.report_data import ReportMetadata, TestReport, TestSection, WaveformData
 
-# Add waveform captures
-waveform = scope.get_waveform(channel=1)
-report.add_waveform(waveform, channel_number=1, name="Calibration Signal")
+# time_data / voltage_data: your captured numpy arrays (e.g. from scope.get_waveform)
+waveform = WaveformData(channel="CH1", time=time_data, voltage=voltage_data, sample_rate=1e6, record_length=len(voltage_data))
 
-# Automatic signal analysis
-waveform.analyze()  # Auto-detects signal type, calculates 25+ statistics
+metadata = ReportMetadata(title="Probe Calibration Test Report", technician="Lab Technician", test_date=datetime.now(), equipment_model="SDS824X HD")
+report = TestReport(metadata=metadata)
+report.add_section(TestSection(title="Waveform Captures", waveforms=[waveform], order=1))
+report.overall_result = report.calculate_overall_result()
 
-# Optional: Add AI insights (requires Ollama)
-report.set_ai_model("llama3.2")  # Local LLM analysis
-
-# Generate reports in multiple formats
-pdf_gen = PDFGenerator(report_data=report.data)
-pdf_gen.generate(Path("calibration_report.pdf"))
-
-markdown_gen = MarkdownGenerator(report_data=report.data)
-markdown_gen.generate(Path("calibration_report.md"))
+MarkdownReportGenerator().generate(report, Path("calibration_report.md"))
+PDFReportGenerator().generate(report, Path("calibration_report.pdf"))
 ```
 
 **Key Features:**
 
 - ✅ **Automatic Signal Detection** - FFT-based classification (sine, square, triangle, pulse, etc.)
 - ✅ **Comprehensive Statistics** - 25+ parameters including Vpp, RMS, frequency, SNR, THD, jitter, overshoot
-- ✅ **AI-Powered Analysis** - Optional LLM integration via Ollama for intelligent waveform insights
+- ✅ **Template Presets** - Ready-made report templates such as `ReportTemplate.create_probe_calibration_template()`, manageable from the GUI's Template Manager
+- ✅ **Local-LLM Analysis** - Optional AI insights and Q&A tool-calling via Ollama running on your own machine (no cloud providers, no API keys)
 - ✅ **Region Extraction** - Zoom into plateaus, edges, and transients with calibration guidance
 - ✅ **Multiple Formats** - Generate PDF and Markdown reports with embedded plots
 - ✅ **Professional Layout** - Publication-ready reports with metadata, statistics tables, and visualizations
@@ -162,11 +156,26 @@ pip install "SCPI-Instrument-Control[report-generator]"
 # Vector graphics and XY mode (draw shapes on scope!)
 pip install "SCPI-Instrument-Control[fun]"
 
+# Browser-based lab gateway (scpi-web)
+pip install "SCPI-Instrument-Control[web]"
+
+# USB/GPIB/serial instruments via PyVISA
+pip install "SCPI-Instrument-Control[usb]"
+
 # Everything
 pip install "SCPI-Instrument-Control[all]"
 ```
 
 **Note**: The `siglent-gui` command includes automatic dependency checking. If you try to run the GUI without the required packages, you'll receive a clear error message with installation instructions. Missing optional dependencies (like PyQtGraph for high-performance live view) will trigger warnings but allow the GUI to launch.
+
+### Command-line tools
+
+| Command | Description |
+| --- | --- |
+| `siglent-gui` | Launch the PyQt6 GUI application |
+| `siglent-report-generator` | Launch the standalone report-generator app |
+| `scpi-web` | Serve the browser-based lab gateway (REST + WebSocket API, optional web UI) |
+| `scpi-extract` | Inspect or export a saved waveform file from the command line |
 
 ### From source
 
@@ -353,11 +362,13 @@ Install with `[gui]` extra to add:
 - **Report Generator**: Install with `[report-generator]` to add PyQt6, Pillow, requests, ReportLab, Ollama (PDF/Markdown reports with AI)
 - **HDF5 support**: Install with `[hdf5]` to add h5py >= 3.8.0
 - **Vector Graphics**: Install with `[fun]` to add shapely, Pillow, svgpathtools (XY mode drawing)
+- **Web Gateway**: Install with `[web]` to add FastAPI, Uvicorn, Pillow (browser-based lab gateway, `scpi-web`)
+- **USB/GPIB/Serial**: Install with `[usb]` to add PyVISA + pyvisa-py (USB-TMC, GPIB, and serial instrument connections)
 - **All features**: Install with `[all]` for complete functionality
 
 ## Connection
 
-The oscilloscope must be connected to your network. The default SCPI port is 5024.
+The oscilloscope must be connected to your network. The default SCPI port is 5025.
 
 To find your oscilloscope's IP address:
 
@@ -368,8 +379,6 @@ To find your oscilloscope's IP address:
 ## GUI Application Overview
 
 The SCPI Instrument Control GUI provides a comprehensive interface for controlling your oscilloscope, capturing waveforms, and performing measurements.
-
-> **Note**: Screenshots can be captured following the guide in [`docs/SCREENSHOT_GUIDE.md`](docs/SCREENSHOT_GUIDE.md). This provides visual documentation of all GUI features.
 
 ### Main Window
 
@@ -384,15 +393,13 @@ The main interface consists of:
 
 ### Getting Connected
 
-![Connection Dialog](docs/images/connection_dialog.png)
-
 To connect to your oscilloscope:
 
 1. Launch the GUI: `siglent-gui`
 2. Enter your oscilloscope's IP address
 3. Click **Connect**
 
-The oscilloscope must be connected to your network (default SCPI port: 5024).
+The oscilloscope must be connected to your network (default SCPI port: 5025).
 
 **Finding your oscilloscope's IP address**:
 
@@ -418,8 +425,6 @@ The **Channels** tab provides complete control over all input channels:
 ## GUI Application Guide
 
 ### Live View
-
-![Live View](docs/images/live_view.png)
 
 The GUI features **high-performance real-time waveform viewing** powered by PyQtGraph:
 
@@ -571,6 +576,20 @@ See `examples/vector_graphics_xy_mode.py` for programmatic usage and animation e
 
 ### Other GUI Features
 
+**Power Supply:**
+
+- Dedicated **Power Supply** tab (`Connect to Power Supply...` menu action) for Siglent SPD-series and generic SCPI-99 power supplies
+- Per-channel voltage/current setpoints, output enable, and readback
+
+**Data Logger:**
+
+- Dedicated **Data Logger** tab (`Connect to Data Logger...` menu action) for SCPI DAQ/data-acquisition units
+- Channel scan configuration and readings display
+
+**Terminal:**
+
+- Built-in **Terminal** tab for sending raw SCPI commands directly to the connected instrument
+
 **Reference Waveforms:**
 
 - Save waveforms as references
@@ -646,7 +665,7 @@ open a shared session on — plus manual IP and a hardware-free mock.
 from scpi_control import Oscilloscope
 
 # Connect
-scope = Oscilloscope('192.168.1.100', port=5024, timeout=5.0)
+scope = Oscilloscope('192.168.1.100', port=5025, timeout=5.0)
 scope.connect()
 
 # Device information
@@ -737,7 +756,7 @@ with DataCollector('192.168.1.100') as collector:
     stats = collector.analyze_waveform(data[1])
     print(f"Vpp: {stats['vpp']:.3f}V, Freq: {stats['frequency']/1e3:.2f}kHz")
 
-    # Save to file (supports NPZ, CSV, MAT, HDF5)
+    # Save to file - format is auto-detected from the extension (.npz/.csv/.mat/.h5)
     collector.save_data(data, 'measurement.npz')
 ```
 
@@ -799,15 +818,42 @@ See `examples/` directory for complete automation examples including:
 - Trigger-based capture (`trigger_based_capture.py`)
 - Advanced analysis with visualization (`advanced_analysis.py`)
 
+### Reading Saved Waveforms Back (`load_waveform` / `scpi-extract`)
+
+Any file saved by the library (.npz/.csv/.mat/.h5) can be read back with
+`load_waveform()`, which normalizes format differences and reattaches
+acquisition provenance when present:
+
+```python
+from scpi_control.waveform_io import load_waveform
+
+loaded = load_waveform("measurement.npz")
+print(loaded.time, loaded.voltage)          # numpy arrays
+print(loaded.provenance)                    # instrument/settings snapshot, or None
+df = loaded.to_dataframe()                  # pandas DataFrame, provenance in df.attrs
+```
+
+The same data is available from the command line via `scpi-extract`:
+
+```bash
+scpi-extract measurement.npz --info          # provenance + metadata summary
+scpi-extract measurement.npz --csv out.csv   # dump raw time,voltage rows
+scpi-extract measurement.npz --json          # machine-readable metadata
+```
+
 ## Examples
 
-See the `examples/` directory for complete working examples:
+This project ships 27 runnable example scripts, each documented with its
+requirements in [`examples/README.md`](examples/README.md) — see it for the
+full list. A few highlights:
 
 - **basic_usage.py** - Connection and basic operations
 - **waveform_capture.py** - Capture and save waveforms
 - **measurements.py** - Automated measurements
 - **live_plot.py** - Real-time plotting
 - **probe_calibration_analysis.py** - Automated report generation with region extraction and AI analysis
+- **synthetic_signals.py** - Generating parameterized test waveforms and streaming state-coupled mock captures (no hardware)
+- **waveform_provenance_and_extract.py** - Capturing with provenance, saving, and reading back with `load_waveform()` (no hardware)
 
 ## Supported Models
 
@@ -832,6 +878,22 @@ All Tektronix MSO models (2/4/5/6 Series) share one command variant and
 support automated measurements — see the [SCPI Dialects guide](https://little-did-I-know.github.io/SCPI-Instrument-Control/user-guide/scpi-dialects/) for the full per-vendor gap list.
 
 Command tables were verified command-by-command against the vendor programmer manuals (Tektronix TBS1000C, 2 Series MSO, and 4/5/6 Series MSO/6 Series LPD manuals; the Teledyne LeCroy MAUI Remote Control and Automation Manual) and exercised against a dialect-aware mock; not yet run against real Tektronix or LeCroy hardware.
+
+### Function Generators
+
+- **Siglent SDG1000X Series**: SDG1032X, SDG1025, SDG1020
+- **Siglent SDG2000X Series**: SDG2122X, SDG2082X, SDG2042X
+
+### Power Supplies
+
+- **Siglent SPD3303X Series**: SPD3303X, SPD3303X-E (triple output)
+- **Siglent SPD1000X Series**: SPD1305X, SPD1168X (single output)
+
+### Data Acquisition (DAQ)
+
+- **Keysight/Agilent 34970A Series**: 34970A, 34972A
+- **Keysight DAQ970A Series**: DAQ970A, DAQ973A
+- Generic SCPI-99 data loggers via the DAQ capability registry
 
 ### Compatibility
 
@@ -868,7 +930,9 @@ make format
 make check
 ```
 
-See our [Code of Conduct](CODE_OF_CONDUCT.md) and [Security Policy](SECURITY.md) for more information.
+During development, `python -m pytest --testmon` runs only the tests affected by your changes for fast feedback; the full suite is still required before opening a PR.
+
+See our [Code of Conduct](CONTRIBUTING.md#code-of-conduct) and [Security Policy](SECURITY.md) for more information.
 
 ## Community and Support
 

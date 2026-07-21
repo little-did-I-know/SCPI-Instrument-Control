@@ -2,6 +2,13 @@
 
 This script demonstrates how to connect to an oscilloscope,
 configure channels and trigger, and perform basic operations.
+
+Requirements: an oscilloscope reachable on the network -- edit SCOPE_IP below
+to match its LAN address.
+
+Expected output: connection/device info, channel and trigger configuration
+echoed to the console, frequency/Vpp measurements on Channel 1, and a summary
+of each enabled channel's configuration. No files are written.
 """
 
 from scpi_control import Oscilloscope

@@ -16,6 +16,7 @@ Output:
 
 import ast
 import re
+import unicodedata
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Optional
@@ -36,6 +37,30 @@ class ExampleMetadata:
     scope_ip: str
     category: str
     requirements: List[str]
+    no_hardware: bool
+
+
+# Phrases examples actually use in their docstrings to say they need no real
+# instrument (mock-only, synthetic data, etc.). Matched case-insensitively
+# against the module docstring so examples that document themselves as
+# hardware-free don't get an oscilloscope requirement or SCOPE_IP
+# configuration block stamped on them.
+NO_HARDWARE_PATTERN = re.compile(
+    r"no hardware|mock connection|fully synthetic|without hardware|hardware-free|no instrument needed",
+    re.IGNORECASE,
+)
+
+
+def is_no_hardware_example(docstring: str) -> bool:
+    """Detect whether an example's docstring declares it needs no real hardware.
+
+    Args:
+        docstring: Module docstring.
+
+    Returns:
+        True if the docstring indicates the example runs without hardware.
+    """
+    return bool(NO_HARDWARE_PATTERN.search(docstring))
 
 
 def load_config(config_path: Path = None) -> dict:
@@ -129,7 +154,10 @@ def extract_requirements(filepath: Path, docstring: str) -> List[str]:
     if not requirements:
         requirements = ["scpi_control - Core library"]
 
-    requirements.append("Oscilloscope connected to network")
+    if is_no_hardware_example(docstring):
+        requirements.append("No hardware required")
+    else:
+        requirements.append("Oscilloscope connected to network")
 
     return requirements
 
@@ -153,6 +181,30 @@ def get_example_title(filename: str, docstring: str) -> str:
     # Generate from filename
     name = filename.replace(".py", "").replace("_", " ").title()
     return name
+
+
+def slugify_heading(title: str) -> str:
+    """Slugify a heading the same way Python-Markdown's ``toc`` extension does.
+
+    MkDocs (via Python-Markdown's ``toc`` extension, as configured with
+    ``permalink: true`` and no custom slugify function) generates heading
+    anchors with ``markdown.extensions.toc.slugify(value, '-')``. That
+    function: NFKD-normalizes and drops non-ASCII characters, strips
+    everything that isn't a word character, whitespace, or hyphen, lowercases
+    the result, then collapses runs of whitespace into a single separator.
+    Reimplemented here (rather than importing ``markdown``) so the TOC links
+    generated in this script always match the anchors MkDocs actually emits.
+
+    Args:
+        title: Heading text (e.g. an example's title).
+
+    Returns:
+        URL anchor fragment (without the leading '#').
+    """
+    value = unicodedata.normalize("NFKD", title)
+    value = value.encode("ascii", "ignore").decode("ascii")
+    value = re.sub(r"[^\w\s-]", "", value).strip().lower()
+    return re.sub(r"[-\s]+", "-", value)
 
 
 def categorize_example(filename: str, config: dict) -> str:
@@ -205,6 +257,7 @@ def parse_example_file(filepath: Path, config: dict) -> ExampleMetadata:
         scope_ip=scope_ip,
         category=category,
         requirements=requirements,
+        no_hardware=is_no_hardware_example(docstring),
     )
 
 
@@ -239,7 +292,10 @@ def generate_example_section(example: ExampleMetadata) -> str:
     # Configuration
     lines.append("### Configuration")
     lines.append("")
-    lines.append(f"Update `SCOPE_IP` to match your oscilloscope's IP address (default: `{example.scope_ip}`).")
+    if example.no_hardware:
+        lines.append("No hardware required.")
+    else:
+        lines.append(f"Update `SCOPE_IP` to match your oscilloscope's IP address (default: `{example.scope_ip}`).")
     lines.append("")
 
     # Usage
@@ -299,7 +355,7 @@ def generate_category_page(category: str, examples: List[ExampleMetadata], confi
     lines.append("| Example | Description |")
     lines.append("|---------|-------------|")
     for example in examples:
-        anchor = example.title.lower().replace(" ", "-")
+        anchor = slugify_heading(example.title)
         lines.append(f"| [{example.title}](#{anchor}) | {example.description} |")
     lines.append("")
 

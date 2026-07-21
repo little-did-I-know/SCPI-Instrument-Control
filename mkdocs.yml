@@ -1,4 +1,6 @@
 site_name: SCPI Instrument Control
+exclude_docs: |
+  superpowers/
 site_description: Universal Python library for controlling SCPI-compatible test equipment (oscilloscopes, function generators, power supplies) via Ethernet/LAN
 site_author: Robin Mumm
 site_url: https://little-did-I-know.github.io/SCPI-Instrument-Control/
@@ -145,6 +147,10 @@ nav:
       - Channel: api/channel.md
       - Trigger: api/trigger.md
       - Waveform: api/waveform.md
+      - Signal Synthesis: api/signal_synth.md
+      - Waveform I/O: api/waveform_io.md
+      - Provenance: api/provenance.md
+      - SCPI Extract (CLI): api/scpi_extract.md
       - Measurement: api/measurement.md
       - Analysis: api/analysis.md
       - Automation: api/automation.md

@@ -17,6 +17,7 @@ examples:
       - "psu_basic_control.py"
       - "function_generator_basic.py"
       - "data_logger_basic.py"
+      - "network_discovery.py"
 
     intermediate:
       - "live_plot.py"
@@ -27,6 +28,8 @@ examples:
       - "trend_logging_walkthrough.py"
       - "psu_advanced_features.py"
       - "psu_usb_connection.py"
+      - "synthetic_signals.py"
+      - "waveform_provenance_and_extract.py"
 
     advanced:
       - "advanced_analysis.py"
@@ -34,6 +37,9 @@ examples:
       - "probe_calibration_analysis.py"
       - "report_generation_example.py"
       - "psu_gui_test.py"
+      - "report_branding.py"
+      - "report_computed_analysis.py"
+      - "report_ai_qa.py"
 
   # Files to exclude from documentation
   exclude_files:

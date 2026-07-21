@@ -2,21 +2,20 @@
 """
 Probe Calibration Analysis Example
 
-Demonstrates the new waveform region extraction features for analyzing
-probe compensation using oscilloscope calibration signals.
+Demonstrates waveform region extraction for probe compensation analysis:
+plateau detection, slope analysis, calibration guidance, and zoomed region
+plots in reports.
 
-This example shows:
-1. Automatic plateau detection in square waves
-2. Plateau slope analysis for probe compensation assessment
-3. Calibration guidance generation
-4. Zoomed region plots in PDF reports
-5. Manual region addition and analysis
+By default this example is fully synthetic/no-hardware: it generates its
+own 1kHz square waves with numpy for properly-, under-, and over-compensated
+plateaus. Optionally, for a real-world check, capture a 1kHz square wave
+from your oscilloscope's probe compensation output instead.
 
-For best results, capture a 1kHz square wave from your oscilloscope's
-probe compensation output with different probe compensation settings:
-- Properly compensated (flat plateaus)
-- Undercompensated (rising plateaus)
-- Overcompensated (falling plateaus)
+Requirements: `SCPI-Instrument-Control[report-generator]` -- no hardware
+needed.
+
+Expected output: 'probe_calibration_analysis.pdf', 'probe_calibration_analysis.md',
+and a 'plots/' directory, all saved to the current directory.
 """
 
 from datetime import datetime
@@ -259,9 +258,9 @@ trimmer capacitor requires adjustment.
     pdf_success = pdf_generator.generate(report, pdf_path)
 
     if pdf_success:
-        print(f"  ✓ PDF generated successfully ({pdf_path.stat().st_size:,} bytes)")
+        print(f"  [OK] PDF generated successfully ({pdf_path.stat().st_size:,} bytes)")
     else:
-        print(f"  ✗ PDF generation failed")
+        print(f"  [FAILED] PDF generation failed")
 
     # Generate Markdown
     md_path = Path("probe_calibration_analysis.md")
@@ -270,9 +269,9 @@ trimmer capacitor requires adjustment.
     md_success = md_generator.generate(report, md_path)
 
     if md_success:
-        print(f"  ✓ Markdown generated successfully ({md_path.stat().st_size:,} bytes)")
+        print(f"  [OK] Markdown generated successfully ({md_path.stat().st_size:,} bytes)")
     else:
-        print(f"  ✗ Markdown generation failed")
+        print(f"  [FAILED] Markdown generation failed")
 
     # ========================================================================
     # Summary
@@ -280,7 +279,7 @@ trimmer capacitor requires adjustment.
     print("\n" + "=" * 70)
     print("Feature Demonstration Summary")
     print("=" * 70)
-    print("\n✓ Features Demonstrated:")
+    print("\n[OK] Features Demonstrated:")
     print("  1. Automatic plateau detection in square waves")
     print("  2. Plateau slope analysis for probe compensation")
     print("  3. Automatic calibration guidance generation")
@@ -290,7 +289,7 @@ trimmer capacitor requires adjustment.
     print("  7. Color-coded calibration recommendations")
     print("  8. Both PDF and Markdown report generation")
 
-    print("\n✓ Report Contents:")
+    print("\n[OK] Report Contents:")
     print(f"  - {len(report.sections)} test sections")
     total_waveforms = sum(len(s.waveforms) for s in report.sections)
     total_regions = sum(len(w.regions) for w in [wf for s in report.sections for wf in s.waveforms])
@@ -299,7 +298,7 @@ trimmer capacitor requires adjustment.
     print(f"  - {len(report.key_findings)} key findings")
     print(f"  - {len(report.recommendations)} recommendations")
 
-    print("\n✓ Files Generated:")
+    print("\n[OK] Files Generated:")
     if pdf_success:
         print(f"  - {pdf_path}")
     if md_success:
@@ -308,12 +307,12 @@ trimmer capacitor requires adjustment.
 
     print("\n" + "=" * 70)
     print("Review the generated PDF to see:")
-    print("  • Full waveform plots")
-    print("  • Automatic plateau detection")
-    print("  • Zoomed region subsections")
-    print("  • Slope analysis tables")
-    print("  • Color-coded calibration guidance")
-    print("  • Detailed region-specific measurements")
+    print("  - Full waveform plots")
+    print("  - Automatic plateau detection")
+    print("  - Zoomed region subsections")
+    print("  - Slope analysis tables")
+    print("  - Color-coded calibration guidance")
+    print("  - Detailed region-specific measurements")
     print("=" * 70)
 
     return 0

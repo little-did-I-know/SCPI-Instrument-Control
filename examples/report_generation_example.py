@@ -1,15 +1,16 @@
 """
 Example: Generating Professional Test Reports
 
-This example demonstrates how to use the Report Generator to create
-professional PDF and Markdown reports from oscilloscope data.
+Demonstrates the Report Generator: synthesizing waveform data with numpy
+(no oscilloscope or input file needed), creating report metadata, adding
+measurements with pass/fail criteria, optional AI analysis, and generating
+PDF and Markdown reports.
 
-Features demonstrated:
-- Loading waveform data from files
-- Creating report metadata
-- Adding measurements with pass/fail criteria
-- Using AI for report analysis (optional)
-- Generating PDF and Markdown reports
+Requirements: `SCPI-Instrument-Control[report-generator]` -- no hardware
+needed.
+
+Expected output: 'example_reports/example_report.md' and, if reportlab is
+installed, 'example_reports/example_report.pdf'.
 """
 
 from datetime import datetime

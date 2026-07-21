@@ -508,7 +508,7 @@ For professional distribution:
 ## Additional Resources
 
 - [PyInstaller Documentation](https://pyinstaller.org/en/stable/)
-- [PyQt6 Deployment Guide](https://www.riverbankcomputing.com/static/Docs/PyQt6/deployment.html)
+- [PyQt6 Deployment Guide](https://www.riverbankcomputing.com/static/Docs/PyQt6/)
 - [GitHub Actions Documentation](https://docs.github.com/en/actions)
 
 ## Getting Help

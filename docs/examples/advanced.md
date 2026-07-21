@@ -9,7 +9,10 @@ Advanced examples demonstrating signal analysis, FFT processing, and specialized
 | [Advanced waveform analysis and visualization](#advanced-waveform-analysis-and-visualization) | Advanced waveform analysis and visualization. |
 | [Probe Calibration Analysis Example](#probe-calibration-analysis-example) | Probe Calibration Analysis Example |
 | [Test the power supply GUI with a mock connection](#test-the-power-supply-gui-with-a-mock-connection) | Test the power supply GUI with a mock connection. |
-| [Example: Generating Professional Test Reports](#example:-generating-professional-test-reports) | Example: Generating Professional Test Reports |
+| [Ask a local LLM questions about a report, using tool-calling](#ask-a-local-llm-questions-about-a-report-using-tool-calling) | Ask a local LLM questions about a report, using tool-calling. |
+| [Apply company branding to a generated report](#apply-company-branding-to-a-generated-report) | Apply company branding to a generated report. |
+| [Deterministic (LLM-free) report analysis](#deterministic-llm-free-report-analysis) | Deterministic (LLM-free) report analysis. |
+| [Example: Generating Professional Test Reports](#example-generating-professional-test-reports) | Example: Generating Professional Test Reports |
 | [Vector Graphics on Oscilloscope using XY Mode](#vector-graphics-on-oscilloscope-using-xy-mode) | Vector Graphics on Oscilloscope using XY Mode |
 
 ---
@@ -41,6 +44,14 @@ python examples/advanced_analysis.py
 This example demonstrates how to perform advanced analysis on captured
 waveforms, including FFT analysis, statistical analysis, and visualization
 using matplotlib.
+
+Requirements: an oscilloscope reachable on the network -- edit SCOPE_IP below
+to match its LAN address. matplotlib is a core dependency, no extra install
+needed.
+
+Expected output: basic and signal-quality stats printed to the console,
+three plot windows (time domain, FFT, histogram), and 'analyzed_waveform.npz'
+plus 'analysis_report.txt' saved to the current directory.
 """
 
 import matplotlib.pyplot as plt
@@ -54,7 +65,7 @@ SCOPE_IP = "192.168.1.100"
 
 def plot_waveform(waveform, channel_num, title="Waveform"):
     """Plot time-domain waveform."""
-    time = np.arange(len(waveform.voltage)) * waveform.time_interval
+    time = np.arange(len(waveform.voltage)) * (1.0 / waveform.sample_rate)
     time_ms = time * 1000  # Convert to milliseconds
 
     plt.figure(figsize=(12, 4))
@@ -70,7 +81,7 @@ def plot_fft(waveform, channel_num):
     """Plot frequency spectrum using FFT."""
     # Perform FFT
     fft_result = np.fft.fft(waveform.voltage)
-    fft_freq = np.fft.fftfreq(len(waveform.voltage), waveform.time_interval)
+    fft_freq = np.fft.fftfreq(len(waveform.voltage), 1.0 / waveform.sample_rate)
 
     # Take only positive frequencies
     positive_freq_idx = fft_freq > 0
@@ -167,7 +178,7 @@ def main():
         print(f"Min:        {basic_stats['min']:.4f} V")
         if basic_stats["frequency"] > 0:
             print(f"Frequency:  {basic_stats['frequency'] / 1e3:.2f} kHz")
-            print(f"Period:     {basic_stats['period'] * 1e6:.2f} µs")
+            print(f"Period:     {basic_stats['period'] * 1e6:.2f} us")
 
         # Advanced signal quality analysis
         print("\n" + "=" * 60)
@@ -255,11 +266,11 @@ Probe Calibration Analysis Example
 ### Requirements
 
 - scpi_control - Core library
-- Oscilloscope connected to network
+- No hardware required
 
 ### Configuration
 
-Update `SCOPE_IP` to match your oscilloscope's IP address (default: `192.168.1.100`).
+No hardware required.
 
 ### Usage
 
@@ -274,21 +285,20 @@ python examples/probe_calibration_analysis.py
 """
 Probe Calibration Analysis Example
 
-Demonstrates the new waveform region extraction features for analyzing
-probe compensation using oscilloscope calibration signals.
+Demonstrates waveform region extraction for probe compensation analysis:
+plateau detection, slope analysis, calibration guidance, and zoomed region
+plots in reports.
 
-This example shows:
-1. Automatic plateau detection in square waves
-2. Plateau slope analysis for probe compensation assessment
-3. Calibration guidance generation
-4. Zoomed region plots in PDF reports
-5. Manual region addition and analysis
+By default this example is fully synthetic/no-hardware: it generates its
+own 1kHz square waves with numpy for properly-, under-, and over-compensated
+plateaus. Optionally, for a real-world check, capture a 1kHz square wave
+from your oscilloscope's probe compensation output instead.
 
-For best results, capture a 1kHz square wave from your oscilloscope's
-probe compensation output with different probe compensation settings:
-- Properly compensated (flat plateaus)
-- Undercompensated (rising plateaus)
-- Overcompensated (falling plateaus)
+Requirements: `SCPI-Instrument-Control[report-generator]` -- no hardware
+needed.
+
+Expected output: 'probe_calibration_analysis.pdf', 'probe_calibration_analysis.md',
+and a 'plots/' directory, all saved to the current directory.
 """
 
 from datetime import datetime
@@ -311,7 +321,7 @@ def generate_test_square_wave(slope: float = 0, noise: float = 0.01):
         noise: Noise level to add (RMS voltage)
 
     Returns:
-        Tuple of (time_data, voltage_data)
+        Tuple of (time, voltage)
     """
     # 1kHz square wave, 10ms duration, 100kS/s
     sample_rate = 100000
@@ -531,9 +541,9 @@ trimmer capacitor requires adjustment.
     pdf_success = pdf_generator.generate(report, pdf_path)
 
     if pdf_success:
-        print(f"  ✓ PDF generated successfully ({pdf_path.stat().st_size:,} bytes)")
+        print(f"  [OK] PDF generated successfully ({pdf_path.stat().st_size:,} bytes)")
     else:
-        print(f"  ✗ PDF generation failed")
+        print(f"  [FAILED] PDF generation failed")
 
     # Generate Markdown
     md_path = Path("probe_calibration_analysis.md")
@@ -542,9 +552,9 @@ trimmer capacitor requires adjustment.
     md_success = md_generator.generate(report, md_path)
 
     if md_success:
-        print(f"  ✓ Markdown generated successfully ({md_path.stat().st_size:,} bytes)")
+        print(f"  [OK] Markdown generated successfully ({md_path.stat().st_size:,} bytes)")
     else:
-        print(f"  ✗ Markdown generation failed")
+        print(f"  [FAILED] Markdown generation failed")
 
     # ========================================================================
     # Summary
@@ -552,7 +562,7 @@ trimmer capacitor requires adjustment.
     print("\n" + "=" * 70)
     print("Feature Demonstration Summary")
     print("=" * 70)
-    print("\n✓ Features Demonstrated:")
+    print("\n[OK] Features Demonstrated:")
     print("  1. Automatic plateau detection in square waves")
     print("  2. Plateau slope analysis for probe compensation")
     print("  3. Automatic calibration guidance generation")
@@ -562,7 +572,7 @@ trimmer capacitor requires adjustment.
     print("  7. Color-coded calibration recommendations")
     print("  8. Both PDF and Markdown report generation")
 
-    print("\n✓ Report Contents:")
+    print("\n[OK] Report Contents:")
     print(f"  - {len(report.sections)} test sections")
     total_waveforms = sum(len(s.waveforms) for s in report.sections)
     total_regions = sum(len(w.regions) for w in [wf for s in report.sections for wf in s.waveforms])
@@ -571,7 +581,7 @@ trimmer capacitor requires adjustment.
     print(f"  - {len(report.key_findings)} key findings")
     print(f"  - {len(report.recommendations)} recommendations")
 
-    print("\n✓ Files Generated:")
+    print("\n[OK] Files Generated:")
     if pdf_success:
         print(f"  - {pdf_path}")
     if md_success:
@@ -580,12 +590,12 @@ trimmer capacitor requires adjustment.
 
     print("\n" + "=" * 70)
     print("Review the generated PDF to see:")
-    print("  • Full waveform plots")
-    print("  • Automatic plateau detection")
-    print("  • Zoomed region subsections")
-    print("  • Slope analysis tables")
-    print("  • Color-coded calibration guidance")
-    print("  • Detailed region-specific measurements")
+    print("  - Full waveform plots")
+    print("  - Automatic plateau detection")
+    print("  - Zoomed region subsections")
+    print("  - Slope analysis tables")
+    print("  - Color-coded calibration guidance")
+    print("  - Detailed region-specific measurements")
     print("=" * 70)
 
     return 0
@@ -606,11 +616,11 @@ Test the power supply GUI with a mock connection.
 ### Requirements
 
 - PyQt6 - For GUI
-- Oscilloscope connected to network
+- No hardware required
 
 ### Configuration
 
-Update `SCOPE_IP` to match your oscilloscope's IP address (default: `192.168.1.100`).
+No hardware required.
 
 ### Usage
 
@@ -625,6 +635,11 @@ python examples/psu_gui_test.py
 
 This script demonstrates the PSU control GUI using a mock connection,
 allowing you to test the interface without physical hardware.
+
+Requirements: `SCPI-Instrument-Control[gui]` -- no instrument needed, but it
+opens an interactive PyQt6 window against a mock PSU and requires a display
+and user interaction (choosing a PSU, clicking through the GUI). That is why
+this example is compile-checked only, not auto-executed in the smoke suite.
 """
 
 import sys
@@ -765,6 +780,320 @@ if __name__ == "__main__":
 
 ---
 
+## Ask a local LLM questions about a report, using tool-calling
+
+Ask a local LLM questions about a report, using tool-calling.
+
+### Requirements
+
+- scpi_control - Core library
+- No hardware required
+
+### Configuration
+
+No hardware required.
+
+### Usage
+
+```bash
+python examples/report_ai_qa.py
+```
+
+### Source Code
+
+```python
+"""Ask a local LLM questions about a report, using tool-calling.
+
+Builds a synthetic report and asks a local Ollama model questions about it. When
+the model supports tools, it answers by CALLING the report's analysis tools
+(list_waveforms, analyze_waveform, ...) rather than guessing from a summary.
+
+This needs a local Ollama running with a tool-capable model (e.g. `ollama run
+llama3.2`). With none available it prints that and exits cleanly -- so the
+example is safe to run anywhere.
+
+Requirements: SCPI-Instrument-Control[report-generator]; optional local Ollama
+for the live Q&A. No hardware.
+"""
+
+from datetime import datetime
+
+import numpy as np
+
+from scpi_control.report_generator.llm.analyzer import ReportAnalyzer
+from scpi_control.report_generator.llm.client import LLMClient, LLMConfig
+from scpi_control.report_generator.models.report_data import ReportMetadata, TestReport, TestSection, WaveformData
+
+
+def build_report() -> TestReport:
+    sample_rate = 1e6
+    t = np.arange(2000) / sample_rate
+    np.random.seed(0)
+    v = 3.3 * np.sin(2 * np.pi * 1000 * t) + 0.02 * np.random.randn(t.size)
+    waveform = WaveformData(channel="C1", time=t, voltage=v, sample_rate=sample_rate, record_length=t.size, label="1 kHz reference")
+    return TestReport(
+        metadata=ReportMetadata(title="AI Q&A Demo", technician="Lab Tech", test_date=datetime.now()),
+        sections=[TestSection(title="Captures", waveforms=[waveform], order=1)],
+    )
+
+
+def main():
+    print("=" * 60)
+    print("Local-LLM tool-calling Q&A over a report")
+    print("=" * 60)
+
+    report = build_report()
+
+    client = LLMClient(LLMConfig.create_ollama_config(model="llama3.2"))
+
+    if not client.supports_tools():
+        print("No tool-capable local model available.")
+        print("Start Ollama with a tool-capable model (e.g. `ollama run llama3.2`) to try the live Q&A.")
+        print("=" * 60)
+        print("Done (skipped live Q&A).")
+        print("=" * 60)
+        return
+
+    analyzer = ReportAnalyzer(client)
+    questions = [
+        "What channels are in this report?",
+        "What kind of signal is on C1, and what is its frequency?",
+    ]
+    for question in questions:
+        print(f"\nQ: {question}")
+        try:
+            answer = analyzer.answer_question(report, question)
+        except Exception as exc:  # never let a model hiccup crash the example
+            print(f"A: (the model call failed: {exc})")
+            continue
+        print(f"A: {answer if answer is not None else '(no answer)'}")
+
+    print("\n" + "=" * 60)
+    print("Done.")
+    print("=" * 60)
+
+
+if __name__ == "__main__":
+    main()
+```
+
+---
+
+## Apply company branding to a generated report
+
+Apply company branding to a generated report.
+
+### Requirements
+
+- scpi_control - Core library
+- No hardware required
+
+### Configuration
+
+No hardware required.
+
+### Usage
+
+```bash
+python examples/report_branding.py
+```
+
+### Source Code
+
+```python
+"""Apply company branding to a generated report.
+
+Builds a synthetic report, applies a BrandingTemplate (company name, header and
+footer text, and a brand colour scheme), then renders a branded Markdown report
+plus a colour-branded PDF. Text (company/header/footer) rides on the report
+metadata; the brand colours reach the PDF via PDFReportGenerator(branding=...).
+
+Requirements: SCPI-Instrument-Control[report-generator] (no hardware). The PDF
+step is skipped with a message if reportlab is not installed.
+"""
+
+from datetime import datetime
+from pathlib import Path
+
+import numpy as np
+
+from scpi_control.report_generator.generators.markdown_generator import MarkdownReportGenerator
+from scpi_control.report_generator.models.report_data import MeasurementResult, ReportMetadata, TestReport, TestSection, WaveformData
+from scpi_control.report_generator.models.template import BrandingTemplate
+
+try:
+    from scpi_control.report_generator.generators.pdf_generator import PDFReportGenerator
+
+    PDF_AVAILABLE = True
+except ImportError:
+    PDF_AVAILABLE = False
+
+
+def build_report() -> TestReport:
+    sample_rate = 1e6
+    t = np.arange(2000) / sample_rate
+    v = 3.3 * np.sin(2 * np.pi * 1000 * t)
+    waveform = WaveformData(channel="C1", time=t, voltage=v, sample_rate=sample_rate, record_length=t.size, label="Output")
+    measurement = MeasurementResult(name="Peak-to-Peak", value=6.6, unit="V", channel="C1", passed=True, criteria_min=6.0, criteria_max=7.0)
+    report = TestReport(
+        metadata=ReportMetadata(title="Branded Report Demo", technician="Lab Tech", test_date=datetime.now()),
+        sections=[TestSection(title="Captures", waveforms=[waveform], measurements=[measurement], order=1)],
+    )
+    report.overall_result = report.calculate_overall_result()
+    return report
+
+
+def main():
+    print("=" * 60)
+    print("Report branding demo")
+    print("=" * 60)
+
+    report = build_report()
+
+    # Text (company/header/footer) goes onto the metadata; colours go to the PDF.
+    branding = BrandingTemplate(
+        company_name="Acme Test Labs",
+        header_text="Acme Test Labs - Confidential",
+        footer_text="(c) 2026 Acme Test Labs",
+        primary_color="#0b5394",
+        secondary_color="#674ea7",
+        success_color="#38761d",
+        failure_color="#cc0000",
+    )
+    # To add a logo, set company_logo_path=Path("logo.png") on the branding above.
+    branding.apply_to_metadata(report.metadata)
+
+    output_dir = Path("branded_reports")
+    output_dir.mkdir(exist_ok=True)
+
+    print("Rendering branded Markdown...")
+    md_path = output_dir / "branded_report.md"
+    if MarkdownReportGenerator(include_plots=False).generate(report, md_path):
+        print(f"  [OK] {md_path}")
+
+    print("Rendering colour-branded PDF...")
+    try:
+        pdf_path = output_dir / "branded_report.pdf"
+        if PDFReportGenerator(branding=branding, include_plots=False).generate(report, pdf_path):
+            print(f"  [OK] {pdf_path}")
+    except ImportError:
+        print("  PDF skipped (reportlab not installed).")
+
+    print("=" * 60)
+    print("Done.")
+    print("=" * 60)
+
+
+if __name__ == "__main__":
+    main()
+```
+
+---
+
+## Deterministic (LLM-free) report analysis
+
+Deterministic (LLM-free) report analysis.
+
+### Requirements
+
+- scpi_control - Core library
+- No hardware required
+
+### Configuration
+
+No hardware required.
+
+### Usage
+
+```bash
+python examples/report_computed_analysis.py
+```
+
+### Source Code
+
+```python
+"""Deterministic (LLM-free) report analysis.
+
+Builds a synthetic test report and runs ComputedAnalyzer over it. Unlike the AI
+path, this needs no local model and no network: it fills the executive summary,
+key findings, and recommendations straight from the waveform analysis and sets
+summary_source to "computed".
+
+Requirements: SCPI-Instrument-Control[report-generator] (no hardware, no network)
+"""
+
+from datetime import datetime
+
+import numpy as np
+
+from scpi_control.report_generator.analysis.computed_analyzer import ComputedAnalyzer
+from scpi_control.report_generator.models.report_data import (
+    SUMMARY_SOURCE_COMPUTED,
+    MeasurementResult,
+    ReportMetadata,
+    TestReport,
+    TestSection,
+    WaveformData,
+)
+
+
+def build_report() -> TestReport:
+    """A one-channel synthetic report: a 1 kHz sine with light noise."""
+    sample_rate = 1e6
+    t = np.arange(2000) / sample_rate
+    np.random.seed(0)
+    v = 3.3 * np.sin(2 * np.pi * 1000 * t) + 0.02 * np.random.randn(t.size)
+    waveform = WaveformData(
+        channel="C1",
+        time=t,
+        voltage=v,
+        sample_rate=sample_rate,
+        record_length=t.size,
+        label="1 kHz reference",
+    )
+    measurements = [
+        MeasurementResult(name="Frequency", value=1000.0, unit="Hz", channel="C1", passed=True, criteria_min=990, criteria_max=1010),
+        MeasurementResult(name="Peak-to-Peak", value=6.6, unit="V", channel="C1", passed=True, criteria_min=6.0, criteria_max=7.0),
+    ]
+    report = TestReport(
+        metadata=ReportMetadata(title="Computed Analysis Demo", technician="Lab Tech", test_date=datetime.now()),
+        sections=[TestSection(title="Captures", waveforms=[waveform], measurements=measurements, order=1)],
+    )
+    report.overall_result = report.calculate_overall_result()
+    return report
+
+
+def main():
+    print("=" * 60)
+    print("Deterministic (LLM-free) report analysis")
+    print("=" * 60)
+
+    report = build_report()
+
+    print("Running ComputedAnalyzer (no model, no network)...")
+    ComputedAnalyzer().analyze_report(report)
+
+    print(f"\nsummary_source: {report.summary_source!r}  (expected {SUMMARY_SOURCE_COMPUTED!r})")
+    print("\nExecutive summary:")
+    print(f"  {report.executive_summary}")
+    print("\nKey findings:")
+    for finding in report.key_findings:
+        print(f"  - {finding}")
+    print("\nRecommendations:")
+    for recommendation in report.recommendations:
+        print(f"  - {recommendation}")
+
+    print("\n" + "=" * 60)
+    print("Done.")
+    print("=" * 60)
+
+
+if __name__ == "__main__":
+    main()
+```
+
+---
+
 ## Example: Generating Professional Test Reports
 
 Example: Generating Professional Test Reports
@@ -772,11 +1101,11 @@ Example: Generating Professional Test Reports
 ### Requirements
 
 - scpi_control - Core library
-- Oscilloscope connected to network
+- No hardware required
 
 ### Configuration
 
-Update `SCOPE_IP` to match your oscilloscope's IP address (default: `192.168.1.100`).
+No hardware required.
 
 ### Usage
 
@@ -790,15 +1119,16 @@ python examples/report_generation_example.py
 """
 Example: Generating Professional Test Reports
 
-This example demonstrates how to use the Report Generator to create
-professional PDF and Markdown reports from oscilloscope data.
+Demonstrates the Report Generator: synthesizing waveform data with numpy
+(no oscilloscope or input file needed), creating report metadata, adding
+measurements with pass/fail criteria, optional AI analysis, and generating
+PDF and Markdown reports.
 
-Features demonstrated:
-- Loading waveform data from files
-- Creating report metadata
-- Adding measurements with pass/fail criteria
-- Using AI for report analysis (optional)
-- Generating PDF and Markdown reports
+Requirements: `SCPI-Instrument-Control[report-generator]` -- no hardware
+needed.
+
+Expected output: 'example_reports/example_report.md' and, if reportlab is
+installed, 'example_reports/example_report.pdf'.
 """
 
 from datetime import datetime
@@ -808,7 +1138,7 @@ import numpy as np
 
 from scpi_control.report_generator.generators.markdown_generator import MarkdownReportGenerator
 from scpi_control.report_generator.models.criteria import ComparisonType, CriteriaSet, MeasurementCriteria
-from scpi_control.report_generator.models.report_data import MeasurementResult, ReportMetadata, TestReport, TestSection, WaveformData
+from scpi_control.report_generator.models.report_data import SUMMARY_SOURCE_AI, MeasurementResult, ReportMetadata, TestReport, TestSection, WaveformData
 
 # Import PDF generator if available
 try:
@@ -828,7 +1158,7 @@ from scpi_control.report_generator.llm.client import LLMClient, LLMConfig
 def create_sample_waveform() -> WaveformData:
     """Create a sample waveform for demonstration."""
     # Generate a simple sine wave with some noise
-    sample_rate = 1e9  # 1 GS/s
+    sample_rate = 1e6  # 1 MS/s
     duration = 1e-3  # 1 ms
     frequency = 1e3  # 1 kHz
 
@@ -966,7 +1296,7 @@ def create_report_with_ai(report: TestReport) -> TestReport:
 
         print("Generating AI-powered executive summary...")
         report.executive_summary = analyzer.generate_executive_summary(report)
-        report.summary_source = "ai"  # attributes the summary as AI-generated
+        report.summary_source = SUMMARY_SOURCE_AI
 
         print("Generating AI key findings...")
         report.key_findings = analyzer.generate_key_findings(report, max_findings=3) or []
@@ -1104,8 +1434,8 @@ def main():
         print(f"    [FAILED] Failed to generate Markdown report")
 
     # Generate PDF report (if available)
-    if PDF_AVAILABLE:
-        print("  - Generating PDF report...")
+    print("  - Generating PDF report...")
+    try:
         pdf_path = output_dir / "example_report.pdf"
         pdf_generator = PDFReportGenerator()
 
@@ -1113,7 +1443,7 @@ def main():
             print(f"    [OK] PDF report saved: {pdf_path}")
         else:
             print(f"    [FAILED] Failed to generate PDF report")
-    else:
+    except ImportError:
         print("  - PDF generation skipped (reportlab not installed)")
 
     # Done!
@@ -1158,7 +1488,7 @@ This example demonstrates how to use the oscilloscope as a vector display
 by generating waveforms for XY mode.
 
 REQUIREMENTS:
-    - Install fun extras: pip install "Siglent-Oscilloscope[fun]"
+    - Install fun extras: pip install "SCPI-Instrument-Control[fun]"
     - External AWG/DAC to feed signals into scope channels
       OR use scope's built-in AWG if available
     - Oscilloscope channels connected to AWG outputs
@@ -1211,7 +1541,7 @@ def main():
     print("Initializing vector display (CH1=X, CH2=Y)...")
     display = scope.vector_display
     display.enable_xy_mode(voltage_scale=1.0)
-    print("✓ XY mode configured")
+    print("[OK] XY mode configured")
     print()
 
     # Create output directory
@@ -1252,7 +1582,7 @@ def main():
     )
     display.save_waveforms(triangle, f"{OUTPUT_DIR}/04_triangle", sample_rate=SAMPLE_RATE, duration=DURATION)
 
-    print("✓ Basic shapes generated\n")
+    print("[OK] Basic shapes generated\n")
 
     # ==========================================
     # Demo 2: Lissajous Figures
@@ -1271,7 +1601,7 @@ def main():
         lissajous = Shape.lissajous(a=a, b=b, delta=delta, points=2000)
         display.save_waveforms(lissajous, f"{OUTPUT_DIR}/lissajous_{name}", sample_rate=SAMPLE_RATE, duration=DURATION)
 
-    print("✓ Lissajous figures generated\n")
+    print("[OK] Lissajous figures generated\n")
 
     # ==========================================
     # Demo 3: Text
@@ -1283,9 +1613,9 @@ def main():
     try:
         text = Shape.text("HELLO", font_size=0.6)
         display.save_waveforms(text, f"{OUTPUT_DIR}/text_hello", sample_rate=SAMPLE_RATE, duration=DURATION)
-        print("✓ Text generated")
+        print("[OK] Text generated")
     except Exception as e:
-        print(f"  ⚠ Text generation skipped: {e}")
+        print(f"  WARNING: Text generation skipped: {e}")
 
     print()
 
@@ -1305,9 +1635,9 @@ def main():
             sample_rate=SAMPLE_RATE,
             duration=DURATION / 10,
         )  # Faster frames
-        print(f"  Frame {i+1}/24 (angle={angle}°)")
+        print(f"  Frame {i+1}/24 (angle={angle}deg)")
 
-    print("✓ Animation frames generated\n")
+    print("[OK] Animation frames generated\n")
 
     # ==========================================
     # Demo 5: Composite Shapes
@@ -1332,7 +1662,7 @@ def main():
     # Combine all parts
     smiley = face_outer.combine(eye_left).combine(eye_right).combine(mouth)
     display.save_waveforms(smiley, f"{OUTPUT_DIR}/composite_smiley", sample_rate=SAMPLE_RATE, duration=DURATION)
-    print("✓ Smiley face generated\n")
+    print("[OK] Smiley face generated\n")
 
     # ==========================================
     # Summary
@@ -1345,8 +1675,8 @@ def main():
     print()
     print("Next Steps:")
     print("  1. Load the .csv files into your AWG")
-    print("     - Load *_x.csv → AWG Channel 1")
-    print("     - Load *_y.csv → AWG Channel 2")
+    print("     - Load *_x.csv -> AWG Channel 1")
+    print("     - Load *_y.csv -> AWG Channel 2")
     print("  2. Enable XY mode on the oscilloscope")
     print("  3. Start the AWG output")
     print("  4. Adjust timebase and voltage scales to see the pattern")
@@ -1375,7 +1705,7 @@ if __name__ == "__main__":
             print("Vector graphics features require additional packages.")
             print()
             print("Install with:")
-            print('  pip install "Siglent-Oscilloscope[fun]"')
+            print('  pip install "SCPI-Instrument-Control[fun]"')
             print()
             print("This will install:")
             print("  - shapely (geometric operations)")

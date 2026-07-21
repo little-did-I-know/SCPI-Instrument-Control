@@ -343,31 +343,35 @@ class DataCollector:
         logger.info(f"Continuous capture complete: {capture_count} captures over {duration}s")
         return results
 
-    def save_data(self, waveforms: Dict[int, WaveformData], filename: str, format: str = "npz") -> None:
+    def save_data(self, waveforms: Dict[int, WaveformData], filename: str, format: Optional[str] = None) -> None:
         """Save captured waveform data to file.
 
         Args:
             waveforms: Dictionary mapping channel number to WaveformData
             filename: Output filename
-            format: File format ('npz', 'csv', 'mat', 'h5')
+            format: File format - one of 'CSV', 'CSV_ENHANCED', 'NPY', 'MAT', 'HDF5'.
+                If None (default), the format is auto-detected from each generated
+                per-channel filename's extension.
 
         Example:
             >>> data = collector.capture_single([1, 2])
             >>> collector.save_data(data, 'measurement.npz')
         """
         for ch, waveform in waveforms.items():
-            base, ext = filename.rsplit(".", 1) if "." in filename else (filename, format)
+            base, ext = filename.rsplit(".", 1) if "." in filename else (filename, format or "npz")
             ch_filename = f"{base}_ch{ch}.{ext}"
             self.scope.waveform.save_waveform(waveform, ch_filename, format=format)
             logger.info(f"Saved channel {ch} to {ch_filename}")
 
-    def save_batch(self, batch_results: List[Dict[str, Any]], output_dir: str, format: str = "npz") -> None:
+    def save_batch(self, batch_results: List[Dict[str, Any]], output_dir: str, format: Optional[str] = None) -> None:
         """Save batch capture results to directory.
 
         Args:
             batch_results: List of batch capture results
             output_dir: Output directory path
-            format: File format ('npz', 'csv', 'mat', 'h5')
+            format: File format - one of 'CSV', 'CSV_ENHANCED', 'NPY', 'MAT', 'HDF5'.
+                If None (default), the format is auto-detected from each generated
+                filename's extension.
 
         Example:
             >>> results = collector.batch_capture(...)
@@ -398,8 +402,9 @@ class DataCollector:
             config_str = "_".join([f"{k}={v}" for k, v in result["config"].items()]).replace("/", "-")
             trigger_num = result["trigger_num"]
 
+            ext = format or "npz"
             for ch, waveform in result["waveforms"].items():
-                filename = f"capture_{i:04d}_ch{ch}_{config_str}_trig{trigger_num}.{format}"
+                filename = f"capture_{i:04d}_ch{ch}_{config_str}_trig{trigger_num}.{ext}"
                 filepath = output_path / filename
                 self.scope.waveform.save_waveform(waveform, str(filepath), format=format)
 

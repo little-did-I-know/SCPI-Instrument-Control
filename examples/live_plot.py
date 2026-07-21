@@ -2,6 +2,14 @@
 
 This script demonstrates real-time waveform acquisition and plotting
 using matplotlib animation.
+
+Requirements: an oscilloscope reachable on the network -- edit SCOPE_IP below
+to match its LAN address. matplotlib is a core dependency, no extra install
+needed.
+
+Expected output: an interactive plot window that updates every 200ms with
+the live Channel 1 waveform, until the window is closed. No files are
+written.
 """
 
 import time

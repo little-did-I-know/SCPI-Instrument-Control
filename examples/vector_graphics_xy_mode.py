@@ -57,7 +57,7 @@ def main():
     print("Initializing vector display (CH1=X, CH2=Y)...")
     display = scope.vector_display
     display.enable_xy_mode(voltage_scale=1.0)
-    print("✓ XY mode configured")
+    print("[OK] XY mode configured")
     print()
 
     # Create output directory
@@ -98,7 +98,7 @@ def main():
     )
     display.save_waveforms(triangle, f"{OUTPUT_DIR}/04_triangle", sample_rate=SAMPLE_RATE, duration=DURATION)
 
-    print("✓ Basic shapes generated\n")
+    print("[OK] Basic shapes generated\n")
 
     # ==========================================
     # Demo 2: Lissajous Figures
@@ -117,7 +117,7 @@ def main():
         lissajous = Shape.lissajous(a=a, b=b, delta=delta, points=2000)
         display.save_waveforms(lissajous, f"{OUTPUT_DIR}/lissajous_{name}", sample_rate=SAMPLE_RATE, duration=DURATION)
 
-    print("✓ Lissajous figures generated\n")
+    print("[OK] Lissajous figures generated\n")
 
     # ==========================================
     # Demo 3: Text
@@ -129,9 +129,9 @@ def main():
     try:
         text = Shape.text("HELLO", font_size=0.6)
         display.save_waveforms(text, f"{OUTPUT_DIR}/text_hello", sample_rate=SAMPLE_RATE, duration=DURATION)
-        print("✓ Text generated")
+        print("[OK] Text generated")
     except Exception as e:
-        print(f"  ⚠ Text generation skipped: {e}")
+        print(f"  WARNING: Text generation skipped: {e}")
 
     print()
 
@@ -151,9 +151,9 @@ def main():
             sample_rate=SAMPLE_RATE,
             duration=DURATION / 10,
         )  # Faster frames
-        print(f"  Frame {i+1}/24 (angle={angle}°)")
+        print(f"  Frame {i+1}/24 (angle={angle}deg)")
 
-    print("✓ Animation frames generated\n")
+    print("[OK] Animation frames generated\n")
 
     # ==========================================
     # Demo 5: Composite Shapes
@@ -178,7 +178,7 @@ def main():
     # Combine all parts
     smiley = face_outer.combine(eye_left).combine(eye_right).combine(mouth)
     display.save_waveforms(smiley, f"{OUTPUT_DIR}/composite_smiley", sample_rate=SAMPLE_RATE, duration=DURATION)
-    print("✓ Smiley face generated\n")
+    print("[OK] Smiley face generated\n")
 
     # ==========================================
     # Summary
@@ -191,8 +191,8 @@ def main():
     print()
     print("Next Steps:")
     print("  1. Load the .csv files into your AWG")
-    print("     - Load *_x.csv → AWG Channel 1")
-    print("     - Load *_y.csv → AWG Channel 2")
+    print("     - Load *_x.csv -> AWG Channel 1")
+    print("     - Load *_y.csv -> AWG Channel 2")
     print("  2. Enable XY mode on the oscilloscope")
     print("  3. Start the AWG output")
     print("  4. Adjust timebase and voltage scales to see the pattern")

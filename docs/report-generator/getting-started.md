@@ -15,18 +15,16 @@ If you have the source code:
 
 ```bash
 # Navigate to the project directory
-cd Siglent
+cd SCPI-Instrument-Control
 
 # Install with report generator dependencies
 pip install -e ".[report-generator]"
 ```
 
-### Option 2: Install from PyPI (Future)
-
-Once published to PyPI:
+### Option 2: Install from PyPI
 
 ```bash
-pip install siglent-oscilloscope[report-generator]
+pip install "SCPI-Instrument-Control[report-generator]"
 ```
 
 ### Verify Installation
