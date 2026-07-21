@@ -916,6 +916,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#streaming" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Streaming
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#mock-oscilloscope-synthesis" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3411,6 +3422,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#streaming" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Streaming
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#mock-oscilloscope-synthesis" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3643,6 +3665,49 @@ composes directly with the rest of the library:</p>
 <p>Two calls with <code>seed=None</code> (the default) produce different noise and, for
 <code>"noise"</code> itself, different signal on every call. Pass an <code>int</code> seed to get
 byte-identical output across runs.</p>
+<h2 id="streaming">Streaming<a class="headerlink" href="#streaming" title="Permanent link">&para;</a></h2>
+<p><code>synthesize()</code> and <code>make_waveform()</code> generate one fixed-length block. For
+continuous or live simulation -- feeding a loop, a plot, or a network socket
+indefinitely -- <code>stream()</code> does the same phase-continuous generation without
+hand-rolling the <code>t0</code> bookkeeping yourself:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">stream</span><span class="p">(</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>    <span class="n">spec</span><span class="p">:</span> <span class="n">SignalSpec</span><span class="p">,</span>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>    <span class="n">sample_rate</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>    <span class="n">chunk_size</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>    <span class="o">*</span><span class="p">,</span>
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>    <span class="n">start_time</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0</span><span class="p">,</span>
+</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>    <span class="n">duration</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>    <span class="n">realtime</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Iterator</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]</span>
+</span></code></pre></div>
+<p>It returns an iterator of <code>float64</code> voltage chunks, each <code>chunk_size</code>
+samples long, where every chunk picks up exactly where the previous one left
+off -- no phase discontinuity at chunk boundaries. Validation errors (the
+same ones <code>SignalSpec</code> and <code>synthesize()</code> raise) happen at call time, before
+the first chunk is produced.</p>
+<p>A minimal continuous loop:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">scpi_control.signal_synth</span><span class="w"> </span><span class="kn">import</span> <span class="n">SignalSpec</span><span class="p">,</span> <span class="n">stream</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="n">spec</span> <span class="o">=</span> <span class="n">SignalSpec</span><span class="p">(</span><span class="n">kind</span><span class="o">=</span><span class="s2">&quot;sine&quot;</span><span class="p">,</span> <span class="n">frequency</span><span class="o">=</span><span class="mf">1_000.0</span><span class="p">,</span> <span class="n">amplitude</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">noise_rms</span><span class="o">=</span><span class="mf">0.02</span><span class="p">)</span>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="k">for</span> <span class="n">chunk</span> <span class="ow">in</span> <span class="n">stream</span><span class="p">(</span><span class="n">spec</span><span class="p">,</span> <span class="n">sample_rate</span><span class="o">=</span><span class="mf">1_000_000.0</span><span class="p">,</span> <span class="n">chunk_size</span><span class="o">=</span><span class="mi">10_000</span><span class="p">):</span>
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>    <span class="n">process</span><span class="p">(</span><span class="n">chunk</span><span class="p">)</span>  <span class="c1"># phase-continuous float64 volts; break when done</span>
+</span></code></pre></div>
+<p>By default <code>stream()</code> yields chunks as fast as the consumer pulls them. With
+<code>duration=None</code> (the default) it streams forever -- <code>break</code> out of the loop
+to stop. Passing a positive <code>duration</code> bounds the stream to
+<code>round(duration * sample_rate)</code> total samples, truncating the final chunk to
+fit; <code>start_time</code> shifts the time of the very first sample, the same way
+<code>t0</code> does for <code>synthesize()</code>.</p>
+<p>Set <code>realtime=True</code> to pace chunks at wall-clock rate: chunk <code>k</code> is withheld
+until <code>k * chunk_size / sample_rate</code> seconds after the first chunk was
+produced. Scheduling is absolute (measured from the start, not
+chunk-to-chunk), so timing error never accumulates across a long stream, and
+a consumer slower than real time simply never waits -- it just gets chunks
+later than it asked for them.</p>
+<p>Seeding follows the same rule the mock uses per acquisition: <code>seed=None</code>
+re-rolls fresh noise on every chunk, while a seeded spec advances the seed
+per chunk (<code>seed + chunk_index</code>) so the whole stream is reproducible
+run-to-run without repeating the same noise block over and over.</p>
 <h2 id="mock-oscilloscope-synthesis">Mock Oscilloscope Synthesis<a class="headerlink" href="#mock-oscilloscope-synthesis" title="Permanent link">&para;</a></h2>
 <p><code>MockConnection</code> synthesizes each channel's waveform from its current state
 at every acquisition, instead of returning fixed bytes -- unless that channel
@@ -3697,23 +3762,23 @@ below).</p>
 <p>Pass a <code>signals={channel: SignalSpec(...)}</code> dict to <code>MockConnection</code> to
 override the defaults for specific channels; channels you don't mention keep
 their built-in default:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">scpi_control.connection</span><span class="w"> </span><span class="kn">import</span> <span class="n">MockConnection</span>
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">scpi_control.oscilloscope</span><span class="w"> </span><span class="kn">import</span> <span class="n">Oscilloscope</span>
-</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">scpi_control.signal_synth</span><span class="w"> </span><span class="kn">import</span> <span class="n">SignalSpec</span>
-</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>
-</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="n">conn</span> <span class="o">=</span> <span class="n">MockConnection</span><span class="p">(</span>
-</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>    <span class="s2">&quot;mock&quot;</span><span class="p">,</span>
-</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>    <span class="n">idn</span><span class="o">=</span><span class="s2">&quot;Siglent Technologies,SDS1104X-E,MOCK0001,1.0.0.0&quot;</span><span class="p">,</span>
-</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>    <span class="n">channel_states</span><span class="o">=</span><span class="p">{</span><span class="mi">1</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span> <span class="mi">2</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span> <span class="mi">3</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span> <span class="mi">4</span><span class="p">:</span> <span class="kc">False</span><span class="p">},</span>
-</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>    <span class="n">trigger_status</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;Stop&quot;</span><span class="p">],</span>
-</span><span id="__span-2-10"><a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>    <span class="n">sample_rate</span><span class="o">=</span><span class="mf">1_000_000.0</span><span class="p">,</span>
-</span><span id="__span-2-11"><a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>    <span class="n">timebase</span><span class="o">=</span><span class="mf">1e-3</span><span class="p">,</span>
-</span><span id="__span-2-12"><a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>    <span class="n">signals</span><span class="o">=</span><span class="p">{</span><span class="mi">1</span><span class="p">:</span> <span class="n">SignalSpec</span><span class="p">(</span><span class="n">kind</span><span class="o">=</span><span class="s2">&quot;sine&quot;</span><span class="p">,</span> <span class="n">frequency</span><span class="o">=</span><span class="mf">2_000.0</span><span class="p">,</span> <span class="n">amplitude</span><span class="o">=</span><span class="mf">0.8</span><span class="p">,</span> <span class="n">noise_rms</span><span class="o">=</span><span class="mf">0.02</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="mi">42</span><span class="p">)},</span>
-</span><span id="__span-2-13"><a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a><span class="p">)</span>
-</span><span id="__span-2-14"><a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a><span class="n">scope</span> <span class="o">=</span> <span class="n">Oscilloscope</span><span class="p">(</span><span class="s2">&quot;mock&quot;</span><span class="p">,</span> <span class="n">connection</span><span class="o">=</span><span class="n">conn</span><span class="p">)</span>
-</span><span id="__span-2-15"><a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a><span class="n">scope</span><span class="o">.</span><span class="n">connect</span><span class="p">()</span>
-</span><span id="__span-2-16"><a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a><span class="n">waveform</span> <span class="o">=</span> <span class="n">scope</span><span class="o">.</span><span class="n">get_waveform</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
-</span><span id="__span-2-17"><a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a><span class="n">scope</span><span class="o">.</span><span class="n">disconnect</span><span class="p">()</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">scpi_control.connection</span><span class="w"> </span><span class="kn">import</span> <span class="n">MockConnection</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">scpi_control.oscilloscope</span><span class="w"> </span><span class="kn">import</span> <span class="n">Oscilloscope</span>
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">scpi_control.signal_synth</span><span class="w"> </span><span class="kn">import</span> <span class="n">SignalSpec</span>
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="n">conn</span> <span class="o">=</span> <span class="n">MockConnection</span><span class="p">(</span>
+</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>    <span class="s2">&quot;mock&quot;</span><span class="p">,</span>
+</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>    <span class="n">idn</span><span class="o">=</span><span class="s2">&quot;Siglent Technologies,SDS1104X-E,MOCK0001,1.0.0.0&quot;</span><span class="p">,</span>
+</span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>    <span class="n">channel_states</span><span class="o">=</span><span class="p">{</span><span class="mi">1</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span> <span class="mi">2</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span> <span class="mi">3</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span> <span class="mi">4</span><span class="p">:</span> <span class="kc">False</span><span class="p">},</span>
+</span><span id="__span-4-9"><a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>    <span class="n">trigger_status</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;Stop&quot;</span><span class="p">],</span>
+</span><span id="__span-4-10"><a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a>    <span class="n">sample_rate</span><span class="o">=</span><span class="mf">1_000_000.0</span><span class="p">,</span>
+</span><span id="__span-4-11"><a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a>    <span class="n">timebase</span><span class="o">=</span><span class="mf">1e-3</span><span class="p">,</span>
+</span><span id="__span-4-12"><a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a>    <span class="n">signals</span><span class="o">=</span><span class="p">{</span><span class="mi">1</span><span class="p">:</span> <span class="n">SignalSpec</span><span class="p">(</span><span class="n">kind</span><span class="o">=</span><span class="s2">&quot;sine&quot;</span><span class="p">,</span> <span class="n">frequency</span><span class="o">=</span><span class="mf">2_000.0</span><span class="p">,</span> <span class="n">amplitude</span><span class="o">=</span><span class="mf">0.8</span><span class="p">,</span> <span class="n">noise_rms</span><span class="o">=</span><span class="mf">0.02</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="mi">42</span><span class="p">)},</span>
+</span><span id="__span-4-13"><a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a><span class="p">)</span>
+</span><span id="__span-4-14"><a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a><span class="n">scope</span> <span class="o">=</span> <span class="n">Oscilloscope</span><span class="p">(</span><span class="s2">&quot;mock&quot;</span><span class="p">,</span> <span class="n">connection</span><span class="o">=</span><span class="n">conn</span><span class="p">)</span>
+</span><span id="__span-4-15"><a id="__codelineno-4-15" name="__codelineno-4-15" href="#__codelineno-4-15"></a><span class="n">scope</span><span class="o">.</span><span class="n">connect</span><span class="p">()</span>
+</span><span id="__span-4-16"><a id="__codelineno-4-16" name="__codelineno-4-16" href="#__codelineno-4-16"></a><span class="n">waveform</span> <span class="o">=</span> <span class="n">scope</span><span class="o">.</span><span class="n">get_waveform</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+</span><span id="__span-4-17"><a id="__codelineno-4-17" name="__codelineno-4-17" href="#__codelineno-4-17"></a><span class="n">scope</span><span class="o">.</span><span class="n">disconnect</span><span class="p">()</span>
 </span></code></pre></div>
 <h3 id="state-coupling">State coupling<a class="headerlink" href="#state-coupling" title="Permanent link">&para;</a></h3>
 <p>The next capture reflects the mock's <em>current</em> SCPI state, so writes made
