@@ -792,6 +792,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../user-guide/data-provenance/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Provenance
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../user-guide/measurements/" class="md-nav__link">
         
   
@@ -5246,6 +5274,10 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 <li>Examples: four new runnable, no-hardware examples — <code>report_ai_qa.py</code> (local-LLM tool-calling Q&amp;A over a report), <code>network_discovery.py</code> (scan the network for SCPI instruments), <code>report_branding.py</code> (apply company branding/colours to a report), and <code>report_computed_analysis.py</code> (deterministic, LLM-free report analysis).</li>
 <li>Examples: a <code>tests/test_examples_smoke.py</code> guard that executes the no-hardware examples, compile-checks the rest, and blocks known-stale tokens from reappearing.</li>
 <li>Docs: a real screen capture and a real 1&nbsp;kHz calibration-square-wave plot from a Siglent SDS824X HD (in <code>docs/images/</code>), plus the raw capture committed as a test fixture (<code>tests/fixtures/cal_square_sds824x.npz</code>) that exercises the analyzer against genuine hardware data.</li>
+<li>Acquisition provenance: waveforms captured with <code>acquire()</code>/<code>get_waveform()</code> now record the instrument identity, per-channel settings, trigger configuration, timebase, and UTC timestamp, embedded in every save format (new keys only — existing files and keys are unchanged; pass <code>provenance=False</code> to skip the snapshot on high-rate paths).</li>
+<li><code>scpi_control.waveform_io.load_waveform()</code>: public parser that reads all five waveform file formats (old and new files) into numpy arrays plus normalized metadata/provenance, with an optional <code>to_dataframe()</code> pandas helper.</li>
+<li><code>scpi-extract</code> CLI: inspect provenance (<code>--info</code>), dump raw data (<code>--csv</code>), or emit machine-readable metadata (<code>--json</code>) from any saved waveform file.</li>
+<li>Waveform savers now persist the previously dropped <code>timebase</code>, <code>voltage_scale</code>, and <code>voltage_offset</code> fields; plain CSV gains a <code>#</code>-commented provenance header (channel, sample rate, scales, instrument, timestamp) (suppress with <code>save_waveform(..., bare=True)</code>).</li>
 </ul>
 <h3 id="changed">Changed<a class="headerlink" href="#changed" title="Permanent link">&para;</a></h3>
 <ul>

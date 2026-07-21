@@ -12,13 +12,13 @@
         <meta name="author" content="Robin Mumm">
       
       
-        <link rel="canonical" href="https://little-did-I-know.github.io/SCPI-Instrument-Control/api/server_discovery/">
+        <link rel="canonical" href="https://little-did-I-know.github.io/SCPI-Instrument-Control/user-guide/data-provenance/">
       
       
-        <link rel="prev" href="../server_compute/">
+        <link rel="prev" href="../waveform-capture/">
       
       
-        <link rel="next" href="../gui/">
+        <link rel="next" href="../measurements/">
       
       
         
@@ -29,7 +29,7 @@
     
     
       
-        <title>Discovery - SCPI Instrument Control</title>
+        <title>Data Provenance - SCPI Instrument Control</title>
       
     
     
@@ -82,7 +82,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#gateway-discovery" class="md-skip">
+        <a href="#data-provenance" class="md-skip">
           Skip to content
         </a>
       
@@ -122,7 +122,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Discovery
+              Data Provenance
             
           </span>
         </div>
@@ -266,11 +266,13 @@
   
   
   
+    
+  
   
     
     
-      <li class="md-tabs__item">
-        <a href="../../user-guide/basic-usage/" class="md-tabs__link">
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../basic-usage/" class="md-tabs__link">
           
   
   
@@ -346,13 +348,11 @@
   
   
   
-    
-  
   
     
     
-      <li class="md-tabs__item md-tabs__item--active">
-        <a href="../oscilloscope/" class="md-tabs__link">
+      <li class="md-tabs__item">
+        <a href="../../api/oscilloscope/" class="md-tabs__link">
           
   
   
@@ -651,28 +651,31 @@
       
   
   
+    
   
   
+  
     
     
     
     
+      
+        
+        
       
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
       
         
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
         
           
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
-        
-          
-          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
             
   
   
@@ -690,7 +693,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_3">
             <span class="md-nav__icon md-icon"></span>
             
@@ -708,7 +711,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../user-guide/basic-usage/" class="md-nav__link">
+      <a href="../basic-usage/" class="md-nav__link">
         
   
   
@@ -736,7 +739,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../user-guide/scpi-dialects/" class="md-nav__link">
+      <a href="../scpi-dialects/" class="md-nav__link">
         
   
   
@@ -764,7 +767,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../user-guide/waveform-capture/" class="md-nav__link">
+      <a href="../waveform-capture/" class="md-nav__link">
         
   
   
@@ -789,10 +792,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../../user-guide/data-provenance/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Provenance
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -808,6 +838,126 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#what-provenance-is" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What Provenance Is
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="What Provenance Is">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#skipping-provenance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Skipping Provenance
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#where-it-lives-in-each-format" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Where It Lives in Each Format
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Where It Lives in Each Format">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#restoring-the-legacy-csv-layout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Restoring the Legacy CSV Layout
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#extracting-your-data" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Extracting Your Data
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-scpi-extract-command" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The scpi-extract Command
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#legacy-files" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Legacy Files
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#see-also" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        See Also
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -820,7 +970,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../user-guide/measurements/" class="md-nav__link">
+      <a href="../measurements/" class="md-nav__link">
         
   
   
@@ -848,7 +998,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../user-guide/trigger-control/" class="md-nav__link">
+      <a href="../trigger-control/" class="md-nav__link">
         
   
   
@@ -876,7 +1026,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../user-guide/advanced-features/" class="md-nav__link">
+      <a href="../advanced-features/" class="md-nav__link">
         
   
   
@@ -1511,31 +1661,28 @@
       
   
   
-    
   
   
-  
     
     
     
     
-      
-        
-        
       
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" checked>
         
           
-          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="">
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
             
   
   
@@ -1553,7 +1700,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_7">
             <span class="md-nav__icon md-icon"></span>
             
@@ -1571,7 +1718,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../oscilloscope/" class="md-nav__link">
+      <a href="../../api/oscilloscope/" class="md-nav__link">
         
   
   
@@ -1599,7 +1746,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../channel/" class="md-nav__link">
+      <a href="../../api/channel/" class="md-nav__link">
         
   
   
@@ -1627,7 +1774,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../trigger/" class="md-nav__link">
+      <a href="../../api/trigger/" class="md-nav__link">
         
   
   
@@ -1655,7 +1802,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../waveform/" class="md-nav__link">
+      <a href="../../api/waveform/" class="md-nav__link">
         
   
   
@@ -1683,7 +1830,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../measurement/" class="md-nav__link">
+      <a href="../../api/measurement/" class="md-nav__link">
         
   
   
@@ -1711,7 +1858,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../analysis/" class="md-nav__link">
+      <a href="../../api/analysis/" class="md-nav__link">
         
   
   
@@ -1739,7 +1886,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../automation/" class="md-nav__link">
+      <a href="../../api/automation/" class="md-nav__link">
         
   
   
@@ -1767,7 +1914,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../connection_socket/" class="md-nav__link">
+      <a href="../../api/connection_socket/" class="md-nav__link">
         
   
   
@@ -1795,7 +1942,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../exceptions/" class="md-nav__link">
+      <a href="../../api/exceptions/" class="md-nav__link">
         
   
   
@@ -1823,7 +1970,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../models/" class="md-nav__link">
+      <a href="../../api/models/" class="md-nav__link">
         
   
   
@@ -1851,7 +1998,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../vector_graphics/" class="md-nav__link">
+      <a href="../../api/vector_graphics/" class="md-nav__link">
         
   
   
@@ -1879,7 +2026,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../screen_capture/" class="md-nav__link">
+      <a href="../../api/screen_capture/" class="md-nav__link">
         
   
   
@@ -1907,7 +2054,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../reference_waveform/" class="md-nav__link">
+      <a href="../../api/reference_waveform/" class="md-nav__link">
         
   
   
@@ -1935,7 +2082,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../math_channel/" class="md-nav__link">
+      <a href="../../api/math_channel/" class="md-nav__link">
         
   
   
@@ -1963,7 +2110,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../function_generator/" class="md-nav__link">
+      <a href="../../api/function_generator/" class="md-nav__link">
         
   
   
@@ -1991,7 +2138,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../awg_output/" class="md-nav__link">
+      <a href="../../api/awg_output/" class="md-nav__link">
         
   
   
@@ -2019,7 +2166,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../power_supply/" class="md-nav__link">
+      <a href="../../api/power_supply/" class="md-nav__link">
         
   
   
@@ -2047,7 +2194,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../power_supply_output/" class="md-nav__link">
+      <a href="../../api/power_supply_output/" class="md-nav__link">
         
   
   
@@ -2075,7 +2222,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../data_logger/" class="md-nav__link">
+      <a href="../../api/data_logger/" class="md-nav__link">
         
   
   
@@ -2103,7 +2250,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../psu_data_logger/" class="md-nav__link">
+      <a href="../../api/psu_data_logger/" class="md-nav__link">
         
   
   
@@ -2131,7 +2278,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../protocol_decode/" class="md-nav__link">
+      <a href="../../api/protocol_decode/" class="md-nav__link">
         
   
   
@@ -2156,31 +2303,28 @@
                 
   
   
-    
   
   
-  
     
     
     
     
       
       
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
         
           
-          
         
-      
-    
-    
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
-      
-        
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7_22" checked>
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_22" >
         
           
-          <label class="md-nav__link" for="__nav_7_22" id="__nav_7_22_label" tabindex="">
+          <label class="md-nav__link" for="__nav_7_22" id="__nav_7_22_label" tabindex="0">
             
   
   
@@ -2198,7 +2342,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_22_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_22_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_7_22">
             <span class="md-nav__icon md-icon"></span>
             
@@ -2216,7 +2360,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../server_sessions/" class="md-nav__link">
+      <a href="../../api/server_sessions/" class="md-nav__link">
         
   
   
@@ -2244,7 +2388,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../server_recorder/" class="md-nav__link">
+      <a href="../../api/server_recorder/" class="md-nav__link">
         
   
   
@@ -2272,7 +2416,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../server_compute/" class="md-nav__link">
+      <a href="../../api/server_compute/" class="md-nav__link">
         
   
   
@@ -2297,37 +2441,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Discovery
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../../api/server_discovery/" class="md-nav__link">
         
   
   
@@ -2343,37 +2460,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#scpi_control.server.discovery" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        <code class="doc-symbol doc-symbol-toc doc-symbol-module"></code>&nbsp;discovery
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -2394,7 +2480,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../gui/" class="md-nav__link">
+      <a href="../../api/gui/" class="md-nav__link">
         
   
   
@@ -3226,10 +3312,99 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#scpi_control.server.discovery" class="md-nav__link">
+  <a href="#what-provenance-is" class="md-nav__link">
     <span class="md-ellipsis">
       
-        <code class="doc-symbol doc-symbol-toc doc-symbol-module"></code>&nbsp;discovery
+        What Provenance Is
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="What Provenance Is">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#skipping-provenance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Skipping Provenance
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#where-it-lives-in-each-format" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Where It Lives in Each Format
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Where It Lives in Each Format">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#restoring-the-legacy-csv-layout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Restoring the Legacy CSV Layout
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#extracting-your-data" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Extracting Your Data
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-scpi-extract-command" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The scpi-extract Command
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#legacy-files" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Legacy Files
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#see-also" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        See Also
       
     </span>
   </a>
@@ -3256,51 +3431,190 @@
   
 
 
-<h1 id="gateway-discovery">Gateway Discovery<a class="headerlink" href="#gateway-discovery" title="Permanent link">&para;</a></h1>
-<p>LAN instrument discovery</p>
-
-
-<div class="doc doc-object doc-module">
-
-
-
-<a id="scpi_control.server.discovery"></a>
-    <div class="doc doc-contents first">
-
-        <p>LAN discovery of SCPI instruments: TCP port scan + *IDN? probe.</p>
-<p>FastAPI-free (stdlib + scpi_control only; Python 3.8-clean), mirroring
-sessions.py. The scan runs on the caller's thread; instrument session worker
-threads are never involved. Callers must pass already-held addresses in
-<code>skip</code> — Siglent raw sockets allow one client, so probing a live session's
-instrument could disturb it.</p>
-
-
-
-
-
-
-
-
-
-
-<div class="doc doc-children">
-
-
-
-
-
-
-
-
-
-
-
-
-  </div>
-
-    </div>
-
-</div>
+<h1 id="data-provenance">Data Provenance<a class="headerlink" href="#data-provenance" title="Permanent link">&para;</a></h1>
+<p>Every waveform you save now carries a record of the instrument and settings
+that produced it. This guide covers what that record contains, where it
+lives in each file format, and how to get it (and your raw data) back out
+with <code>load_waveform()</code> or the <code>scpi-extract</code> command-line tool.</p>
+<h2 id="what-provenance-is">What Provenance Is<a class="headerlink" href="#what-provenance-is" title="Permanent link">&para;</a></h2>
+<p>When you acquire a waveform, the library snapshots the instrument state at
+that moment and attaches it to the returned <code>WaveformData</code>:</p>
+<ul>
+<li><strong>Instrument</strong>: manufacturer, model, serial number, firmware</li>
+<li><strong>Channel settings</strong>: enabled, coupling, voltage scale, voltage offset,
+  probe ratio, bandwidth limit, unit -- for the channel(s) acquired</li>
+<li><strong>Trigger settings</strong>: mode, type, source, level, slope, coupling, holdoff</li>
+<li><strong>Timebase and sample rate</strong></li>
+<li><strong><code>acquired_at</code></strong>: a UTC ISO-8601 timestamp</li>
+<li><strong>Connection details</strong>: instrument address, SCPI dialect</li>
+<li><strong>Library version</strong> that produced the file</li>
+</ul>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">scpi_control</span><span class="w"> </span><span class="kn">import</span> <span class="n">Oscilloscope</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="k">with</span> <span class="n">Oscilloscope</span><span class="p">(</span><span class="s1">&#39;192.168.1.100&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">scope</span><span class="p">:</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="n">waveform</span> <span class="o">=</span> <span class="n">scope</span><span class="o">.</span><span class="n">get_waveform</span><span class="p">(</span><span class="n">channel</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>  <span class="c1"># provenance=True by default</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">prov</span> <span class="o">=</span> <span class="n">waveform</span><span class="o">.</span><span class="n">provenance</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="nb">print</span><span class="p">(</span><span class="n">prov</span><span class="o">.</span><span class="n">instrument</span><span class="o">.</span><span class="n">model</span><span class="p">)</span>              <span class="c1"># e.g. &#39;SDS824X HD&#39;</span>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>    <span class="nb">print</span><span class="p">(</span><span class="n">prov</span><span class="o">.</span><span class="n">channels</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">probe_ratio</span><span class="p">)</span>        <span class="c1"># e.g. 10.0</span>
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>    <span class="nb">print</span><span class="p">(</span><span class="n">prov</span><span class="o">.</span><span class="n">acquired_at</span><span class="p">)</span>                    <span class="c1"># UTC timestamp</span>
+</span></code></pre></div>
+<p>The snapshot is taken at acquisition time, so it reflects the settings that
+actually produced the trace -- not whatever the scope happens to be set to
+later. Individual fields that a model can't answer come back as <code>None</code>
+rather than failing the acquisition, and if the snapshot itself fails (a
+communication hiccup, an unsupported query), the library logs a warning and
+returns the waveform with <code>provenance=None</code> instead of losing the capture.</p>
+<h3 id="skipping-provenance">Skipping Provenance<a class="headerlink" href="#skipping-provenance" title="Permanent link">&para;</a></h3>
+<p>High-rate paths -- live view, streaming -- pass <code>provenance=False</code> to skip
+the extra queries:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="n">waveform</span> <span class="o">=</span> <span class="n">scope</span><span class="o">.</span><span class="n">get_waveform</span><span class="p">(</span><span class="n">channel</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">provenance</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="c1"># or, calling the lower-level API directly:</span>
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="n">waveform</span> <span class="o">=</span> <span class="n">scope</span><span class="o">.</span><span class="n">waveform</span><span class="o">.</span><span class="n">acquire</span><span class="p">(</span><span class="n">channel</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">provenance</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+</span></code></pre></div>
+<h2 id="where-it-lives-in-each-format">Where It Lives in Each Format<a class="headerlink" href="#where-it-lives-in-each-format" title="Permanent link">&para;</a></h2>
+<p>Provenance is stored additively -- existing readers of these files (your own
+scripts, other tools) that don't know about it simply ignore the new keys.</p>
+<table>
+<thead>
+<tr>
+<th>Format</th>
+<th>Where</th>
+<th>Key/Field</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>NPZ</td>
+<td>Array key</td>
+<td><code>provenance_json</code> (JSON string)</td>
+</tr>
+<tr>
+<td>MAT</td>
+<td>Struct key</td>
+<td><code>provenance_json</code> (JSON string)</td>
+</tr>
+<tr>
+<td>HDF5</td>
+<td>File attribute</td>
+<td><code>provenance_json</code> (JSON string)</td>
+</tr>
+<tr>
+<td>Enhanced CSV (<code>CSV_ENHANCED</code>)</td>
+<td>Header comment line</td>
+<td><code># Provenance-JSON: {...}</code></td>
+</tr>
+<tr>
+<td>Plain CSV</td>
+<td>Header comment line (only when provenance is present)</td>
+<td><code># Provenance-JSON: {...}</code></td>
+</tr>
+</tbody>
+</table>
+<p>All formats also gained three scale fields, written alongside the existing
+<code>time</code>, <code>voltage</code>, <code>channel</code>, and <code>sample_rate</code> data:</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>NPZ/MAT/HDF5 key</th>
+<th>CSV header line</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Timebase (s/div)</td>
+<td><code>timebase</code></td>
+<td><code># Timebase: &lt;value&gt; s/div</code></td>
+</tr>
+<tr>
+<td>Voltage scale (V/div)</td>
+<td><code>voltage_scale</code></td>
+<td><code># Voltage Scale: &lt;value&gt; V/div</code></td>
+</tr>
+<tr>
+<td>Voltage offset (V)</td>
+<td><code>voltage_offset</code></td>
+<td><code># Voltage Offset: &lt;value&gt; V</code></td>
+</tr>
+</tbody>
+</table>
+<p>The binary formats (NPZ, MAT, HDF5) always write the scale fields. Plain CSV
+only writes its header block -- title, <code># Channel:</code>, <code># Sample Rate:</code>, the
+scale lines, <code># Instrument:</code>, <code># Acquired (UTC):</code>, and <code># Provenance-JSON:</code>
+-- when the waveform actually carries a provenance object. A capture saved
+with <code>provenance=False</code> produces a plain CSV that is byte-for-byte identical
+to what the library wrote before this feature existed.</p>
+<h3 id="restoring-the-legacy-csv-layout">Restoring the Legacy CSV Layout<a class="headerlink" href="#restoring-the-legacy-csv-layout" title="Permanent link">&para;</a></h3>
+<p>If you need the fully headerless plain-CSV layout regardless of whether
+provenance is present -- for a downstream tool that chokes on comment
+lines, for example -- pass <code>bare=True</code>:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">scope</span><span class="o">.</span><span class="n">waveform</span><span class="o">.</span><span class="n">save_waveform</span><span class="p">(</span><span class="n">waveform</span><span class="p">,</span> <span class="s2">&quot;capture.csv&quot;</span><span class="p">,</span> <span class="nb">format</span><span class="o">=</span><span class="s2">&quot;CSV&quot;</span><span class="p">,</span> <span class="n">bare</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</span></code></pre></div>
+<h2 id="extracting-your-data">Extracting Your Data<a class="headerlink" href="#extracting-your-data" title="Permanent link">&para;</a></h2>
+<p><code>scpi_control.waveform_io.load_waveform()</code> reads all five saved formats --
+NPZ, plain CSV, enhanced CSV, MAT, HDF5 -- whether or not they carry
+provenance:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">scpi_control.waveform_io</span><span class="w"> </span><span class="kn">import</span> <span class="n">load_waveform</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="n">lw</span> <span class="o">=</span> <span class="n">load_waveform</span><span class="p">(</span><span class="s2">&quot;capture.npz&quot;</span><span class="p">)</span>          <span class="c1"># any of the 5 formats, old or new</span>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="n">lw</span><span class="o">.</span><span class="n">time</span><span class="p">,</span> <span class="n">lw</span><span class="o">.</span><span class="n">voltage</span>                        <span class="c1"># numpy arrays</span>
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="n">lw</span><span class="o">.</span><span class="n">provenance</span><span class="o">.</span><span class="n">instrument</span><span class="o">.</span><span class="n">model</span>             <span class="c1"># &#39;SDS824X HD&#39;</span>
+</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="n">lw</span><span class="o">.</span><span class="n">provenance</span><span class="o">.</span><span class="n">channels</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">probe_ratio</span>      <span class="c1"># 10.0</span>
+</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="n">df</span> <span class="o">=</span> <span class="n">lw</span><span class="o">.</span><span class="n">to_dataframe</span><span class="p">()</span>                     <span class="c1"># pandas; metadata in df.attrs</span>
+</span></code></pre></div>
+<p><code>load_waveform()</code> auto-detects the format from the file extension
+(<code>.npz</code>/<code>.npy</code>, <code>.csv</code>, <code>.mat</code>, <code>.h5</code>/<code>.hdf5</code>); pass <code>format="CSV"</code> (etc.) to
+override it. The returned <code>LoadedWaveform</code> normalizes the three binary
+formats' differing metadata conventions into one flat <code>metadata</code> dict, plus
+<code>time</code>, <code>voltage</code>, <code>channel</code>, <code>sample_rate</code>, <code>provenance</code>, <code>source_format</code>,
+and <code>source_path</code>.</p>
+<p><code>to_dataframe()</code> needs pandas installed (<code>pip install pandas</code>); it raises
+<code>ImportError</code> with an install hint if it's missing.</p>
+<h2 id="the-scpi-extract-command">The <code>scpi-extract</code> Command<a class="headerlink" href="#the-scpi-extract-command" title="Permanent link">&para;</a></h2>
+<p><code>scpi-extract</code> inspects and exports saved waveform files without writing any
+Python:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>scpi-extract<span class="w"> </span>capture.npz
+</span></code></pre></div>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>File:        capture.npz (NPZ)
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>Channel:     1
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>Samples:     256
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>Sample rate: 1000.0
+</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>Instrument:  Siglent Technologies SDS1104X-E (serial MOCK0001, firmware 1.0.0.0)
+</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>Acquired:    2026-07-21T16:09:04.840835+00:00
+</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>Address:     mock:5025  Dialect: legacy  Library: v3.0.0
+</span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>Channel 1:   scale=1.0 V/div offset=0.0 V coupling=DC probe=10.0x bw=OFF
+</span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a>Timebase:    0.001 s/div
+</span><span id="__span-5-10"><a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a>Metadata:
+</span><span id="__span-5-11"><a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a>  timebase: 0.001
+</span><span id="__span-5-12"><a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a>  timestamp: 2026-07-21T09:09:04.840835
+</span><span id="__span-5-13"><a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a>  voltage_offset: 0.0
+</span><span id="__span-5-14"><a id="__codelineno-5-14" name="__codelineno-5-14" href="#__codelineno-5-14"></a>  voltage_scale: 1.0
+</span></code></pre></div>
+<p><code>--info</code> (the default when no other flag is given) prints that summary.
+<code>--csv OUT</code> dumps the raw <code>time,voltage</code> rows to a new CSV file:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>scpi-extract<span class="w"> </span>capture.mat<span class="w"> </span>--csv<span class="w"> </span>out.csv
+</span></code></pre></div>
+<p><code>--json</code> prints metadata and provenance as machine-readable JSON, for
+piping into other tools:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>scpi-extract<span class="w"> </span>capture.h5<span class="w"> </span>--json
+</span></code></pre></div>
+<p><code>--format {NPZ,CSV,MAT,HDF5}</code> overrides format auto-detection when a file's
+extension doesn't match its contents. Errors (missing file, unparseable
+format, missing optional dependency) print to stderr and exit with status 1.</p>
+<h2 id="legacy-files">Legacy Files<a class="headerlink" href="#legacy-files" title="Permanent link">&para;</a></h2>
+<p>Any file saved before this release loads exactly as before -- <code>load_waveform()</code>
+and <code>scpi-extract</code> both handle it, and <code>provenance</code> simply comes back <code>None</code>:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="n">lw</span> <span class="o">=</span> <span class="n">load_waveform</span><span class="p">(</span><span class="s2">&quot;old_capture.npz&quot;</span><span class="p">)</span>
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="k">assert</span> <span class="n">lw</span><span class="o">.</span><span class="n">provenance</span> <span class="ow">is</span> <span class="kc">None</span>   <span class="c1"># file predates provenance capture</span>
+</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="n">lw</span><span class="o">.</span><span class="n">time</span><span class="p">,</span> <span class="n">lw</span><span class="o">.</span><span class="n">voltage</span>            <span class="c1"># still there</span>
+</span></code></pre></div>
+<h2 id="see-also">See Also<a class="headerlink" href="#see-also" title="Permanent link">&para;</a></h2>
+<ul>
+<li><a href="../waveform-capture/">Waveform Capture</a> for acquisition and saving basics</li>
+<li><code>examples/waveform_provenance_and_extract.py</code> for a runnable, hardware-free
+  walkthrough of this entire flow</li>
+</ul>
 
 
 
