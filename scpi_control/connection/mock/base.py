@@ -4,13 +4,16 @@ and personality dispatch to the vendor-specific scope write/query/waveform modul
 from __future__ import annotations
 
 import re
-from typing import Dict, Iterable, List, Optional, Union
+from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Union
 
 from scpi_control import exceptions
 from scpi_control.connection.base import BaseConnection
 from scpi_control.connection.mock.helpers import MOCK_SCREENSHOT_BMP, _build_ieee_block
 from scpi_control.connection.mock import lecroy, siglent, tektronix
 from scpi_control.models import detect_model_from_idn
+
+if TYPE_CHECKING:
+    from scpi_control.signal_synth import SignalSpec
 
 _PERSONALITIES = {
     "siglent": siglent,
@@ -24,7 +27,10 @@ class MockConnection(BaseConnection):
 
     The mock is designed for offline tests that want to exercise the full
     oscilloscope/automation stack without touching networked hardware. It keeps
-    lightweight internal state for common SCPI queries and waveforms.
+    lightweight internal state for common SCPI queries and waveforms. Waveform
+    bytes are state-coupled synthesis by default (see connection/mock/synth.py),
+    driven by each channel's SignalSpec (or a built-in default); explicit
+    waveform_payloads bytes for a channel always take precedence.
     """
 
     def __init__(
@@ -38,6 +44,7 @@ class MockConnection(BaseConnection):
         voltage_scales: Optional[Dict[int, float]] = None,
         voltage_offsets: Optional[Dict[int, float]] = None,
         waveform_payloads: Optional[Dict[int, bytes]] = None,
+        signals: Optional[Dict[int, "SignalSpec"]] = None,
         sample_rate: float = 1_000.0,
         timebase: float = 1e-3,
         trigger_status: Optional[List[str]] = None,
@@ -67,7 +74,11 @@ class MockConnection(BaseConnection):
         self._channel_enabled: Dict[int, bool] = {ch: channel_states.get(ch, True) if channel_states else True for ch in channels}
         self._voltage_scales: Dict[int, float] = {ch: voltage_scales.get(ch, 1.0) if voltage_scales else 1.0 for ch in channels}
         self._voltage_offsets: Dict[int, float] = {ch: voltage_offsets.get(ch, 0.0) if voltage_offsets else 0.0 for ch in channels}
-        self._waveform_payloads: Dict[int, bytes] = {ch: (waveform_payloads.get(ch, bytes([0, 25, 50, 75])) if waveform_payloads else bytes([0, 25, 50, 75])) for ch in channels}
+        # Explicit payloads only; channels without one get state-coupled synthesis
+        # (connection/mock/synth.py). The old fixed 4-byte default is gone.
+        self._waveform_payloads: Dict[int, bytes] = dict(waveform_payloads) if waveform_payloads else {}
+        self._signals: Dict[int, "SignalSpec"] = dict(signals) if signals else {}
+        self._acquisition_counts: Dict[int, int] = {}
         self._channel_coupling: Dict[int, str] = {ch: "D1M" for ch in channels}
 
         self.sample_rate = sample_rate

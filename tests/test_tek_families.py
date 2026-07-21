@@ -33,6 +33,10 @@ def test_mso58_connects_with_eight_channels():
         "mock",
         idn="TEKTRONIX,MSO58,MOCK0300,CF:91.1CT FV:2.0",
         channel_states={i: True for i in range(1, 9)},
+        # Tek/LeCroy waveform paths aren't wired to the synthesizer yet (Task 4);
+        # channel 8 needs an explicit payload since the removed fixed default
+        # no longer supplies one.
+        waveform_payloads={8: bytes([0, 25, 50, 75])},
     )
     scope = Oscilloscope("mock", connection=conn)
     scope.connect()

@@ -1,0 +1,112 @@
+"""State-coupled mock waveform synthesis (Siglent dialects)."""
+
+import numpy as np
+import pytest
+
+from scpi_control.connection import MockConnection
+from scpi_control.oscilloscope import Oscilloscope
+from scpi_control.signal_synth import SignalSpec
+
+LEGACY_IDN = "Siglent Technologies,SDS1104X-E,MOCK0001,1.0.0.0"
+MODERN_IDN = "Siglent Technologies,SDS824X HD,MOCK0002,3.8.12"
+
+
+def _scope(idn=LEGACY_IDN, **kwargs):
+    conn = MockConnection(
+        "mock",
+        idn=idn,
+        channel_states={1: True, 2: False, 3: False, 4: False},
+        trigger_status=["Stop"],
+        sample_rate=1_000_000.0,
+        timebase=1e-3,
+        **kwargs,
+    )
+    scope = Oscilloscope("mock", connection=conn)
+    scope.connect()
+    return scope, conn
+
+
+def _measured_frequency(data):
+    v = data.voltage - np.mean(data.voltage)
+    spectrum = np.abs(np.fft.rfft(v))
+    return np.fft.rfftfreq(len(v), 1.0 / data.sample_rate)[np.argmax(spectrum)]
+
+
+@pytest.mark.parametrize("idn", [LEGACY_IDN, MODERN_IDN])
+def test_seeded_square_round_trip(idn):
+    scope, _ = _scope(idn, signals={1: SignalSpec(kind="square", frequency=1_000.0, amplitude=1.0, seed=7)})
+    data = scope.get_waveform(1, provenance=False)
+    scope.disconnect()
+    # 14 divisions x 1 ms/div at 1 MSa/s
+    assert len(data.voltage) == 14_000
+    assert np.max(data.voltage) == pytest.approx(1.0, abs=0.1)
+    assert np.min(data.voltage) == pytest.approx(-1.0, abs=0.1)
+    assert _measured_frequency(data) == pytest.approx(1_000.0, rel=0.05)
+
+
+def test_default_specs_without_signals_kwarg():
+    scope, _ = _scope()
+    data = scope.get_waveform(1, provenance=False)
+    scope.disconnect()
+    assert len(data.voltage) == 14_000
+    assert np.ptp(data.voltage) > 1.5  # default CH1: 2 Vpp square (plus small noise)
+
+
+def test_timebase_coupling():
+    scope, _ = _scope(signals={1: SignalSpec(seed=1)})
+    scope.write("TDIV 1e-4")
+    data = scope.get_waveform(1, provenance=False)
+    scope.disconnect()
+    assert len(data.voltage) == 1_400  # 14 divisions x 0.1 ms/div at 1 MSa/s
+
+
+def test_overrange_clips_at_full_scale():
+    # 2 Vpp signal on a 0.1 V/div scale: full scale is 127 codes = 0.508 V
+    scope, _ = _scope(signals={1: SignalSpec(kind="square", amplitude=1.0, seed=2)})
+    scope.write("C1:VDIV 0.1")
+    data = scope.get_waveform(1, provenance=False)
+    scope.disconnect()
+    assert np.max(data.voltage) == pytest.approx(127 * 0.1 / 25, abs=0.01)
+    assert np.min(data.voltage) == pytest.approx(-127 * 0.1 / 25, abs=0.01)
+
+
+def test_vertical_offset_round_trips():
+    scope, _ = _scope(signals={1: SignalSpec(kind="dc", offset=0.5, seed=3)})
+    scope.write("C1:OFST 0.2")
+    data = scope.get_waveform(1, provenance=False)
+    scope.disconnect()
+    # Converter subtracts the channel offset; synthesis adds it back, so the
+    # recovered trace is the signal itself.
+    # One int8 code = 40 mV at 1 V/div, so quantization alone can shift the
+    # recovered level by up to ~20 mV; allow for it.
+    assert np.mean(data.voltage) == pytest.approx(0.5, abs=0.03)
+
+
+def test_explicit_payload_precedence():
+    scope, _ = _scope(waveform_payloads={1: bytes([0, 25, 50, 75])})
+    data = scope.get_waveform(1, provenance=False)
+    scope.disconnect()
+    np.testing.assert_allclose(data.voltage, [0.0, 1.0, 2.0, 3.0])
+
+
+def test_unseeded_captures_differ():
+    scope, _ = _scope()  # default specs carry noise_rms=0.01, seed=None
+    a = scope.get_waveform(1, provenance=False)
+    b = scope.get_waveform(1, provenance=False)
+    scope.disconnect()
+    assert not np.array_equal(a.voltage, b.voltage)
+
+
+def test_seeded_sequences_reproduce_across_connections():
+    signals = {1: SignalSpec(kind="sine", noise_rms=0.05, seed=11)}
+    scope1, _ = _scope(signals=signals)
+    first_a = scope1.get_waveform(1, provenance=False)
+    second_a = scope1.get_waveform(1, provenance=False)
+    scope1.disconnect()
+    scope2, _ = _scope(signals=signals)
+    first_b = scope2.get_waveform(1, provenance=False)
+    second_b = scope2.get_waveform(1, provenance=False)
+    scope2.disconnect()
+    np.testing.assert_array_equal(first_a.voltage, first_b.voltage)
+    np.testing.assert_array_equal(second_a.voltage, second_b.voltage)
+    assert not np.array_equal(first_a.voltage, second_a.voltage)  # seed advances per acquisition
