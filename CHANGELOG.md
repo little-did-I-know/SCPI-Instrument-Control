@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.3.1] - 2026-07-21
+
 ### Changed
 
 - README and docs now cover the full current feature set: multi-vendor scopes, DAQ, PSU/AWG models, the web gateway and `usb` extras, all four CLI tools, `load_waveform()`/`scpi-extract` usage, and API reference pages for `signal_synth`, `waveform_io`, `provenance`, and `scpi_extract`. Every example now carries a fully spelled-out docstring (what it shows, what it needs, what to expect).
