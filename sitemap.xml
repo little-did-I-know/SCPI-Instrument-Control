@@ -81,11 +81,19 @@
          <lastmod>2026-07-21</lastmod>
     </url>
     <url>
+         <loc>https://little-did-I-know.github.io/SCPI-Instrument-Control/api/provenance/</loc>
+         <lastmod>2026-07-21</lastmod>
+    </url>
+    <url>
          <loc>https://little-did-I-know.github.io/SCPI-Instrument-Control/api/psu_data_logger/</loc>
          <lastmod>2026-07-21</lastmod>
     </url>
     <url>
          <loc>https://little-did-I-know.github.io/SCPI-Instrument-Control/api/reference_waveform/</loc>
+         <lastmod>2026-07-21</lastmod>
+    </url>
+    <url>
+         <loc>https://little-did-I-know.github.io/SCPI-Instrument-Control/api/scpi_extract/</loc>
          <lastmod>2026-07-21</lastmod>
     </url>
     <url>
@@ -109,6 +117,10 @@
          <lastmod>2026-07-21</lastmod>
     </url>
     <url>
+         <loc>https://little-did-I-know.github.io/SCPI-Instrument-Control/api/signal_synth/</loc>
+         <lastmod>2026-07-21</lastmod>
+    </url>
+    <url>
          <loc>https://little-did-I-know.github.io/SCPI-Instrument-Control/api/trigger/</loc>
          <lastmod>2026-07-21</lastmod>
     </url>
@@ -118,6 +130,10 @@
     </url>
     <url>
          <loc>https://little-did-I-know.github.io/SCPI-Instrument-Control/api/waveform/</loc>
+         <lastmod>2026-07-21</lastmod>
+    </url>
+    <url>
+         <loc>https://little-did-I-know.github.io/SCPI-Instrument-Control/api/waveform_io/</loc>
          <lastmod>2026-07-21</lastmod>
     </url>
     <url>

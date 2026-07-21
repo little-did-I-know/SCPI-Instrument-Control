@@ -1858,6 +1858,118 @@
   
   
     <li class="md-nav__item">
+      <a href="api/signal_synth/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Signal Synthesis
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="api/waveform_io/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Waveform I/O
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="api/provenance/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Provenance
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="api/scpi_extract/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SCPI Extract (CLI)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="api/measurement/" class="md-nav__link">
         
   
@@ -2349,10 +2461,10 @@
         
           
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_22" >
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_26" >
         
           
-          <label class="md-nav__link" for="__nav_7_22" id="__nav_7_22_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_7_26" id="__nav_7_26_label" tabindex="0">
             
   
   
@@ -2370,8 +2482,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_22_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_7_22">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_26_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_26">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -3519,6 +3631,8 @@
 <li><strong>FFT Analysis</strong> - Frequency domain analysis of captured waveforms</li>
 <li><strong>Protocol Decoding</strong> - Decode I2C, SPI, and UART protocols</li>
 <li><strong>Automation</strong> - High-level automation classes for data collection</li>
+<li><strong>Data Provenance</strong> - Every capture records the instrument, settings, and timestamp that produced it; read it back with <code>load_waveform()</code> or the <code>scpi-extract</code> CLI</li>
+<li><strong>Synthetic Signals</strong> - Generate parameterized waveforms (sine, square, triangle, ramp, DC, noise) with no instrument required; mock scopes synthesize state-coupled captures by default</li>
 </ul>
 </div>
 <div class="tabbed-block">
@@ -3537,7 +3651,7 @@
 <li><strong>Multi-channel</strong> - Simultaneous capture from all channels</li>
 <li><strong>Thread-safe</strong> - Background data acquisition without blocking</li>
 <li><strong>Type hints</strong> - Full type annotation for IDE support</li>
-<li><strong>Extensive tests</strong> - 660+ automated tests</li>
+<li><strong>Extensive tests</strong> - 1,100+ automated tests</li>
 <li><strong>Documentation</strong> - Comprehensive docstrings and guides</li>
 </ul>
 </div>

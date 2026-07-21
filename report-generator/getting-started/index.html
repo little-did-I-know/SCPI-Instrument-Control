@@ -1509,10 +1509,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#option-2-install-from-pypi-future" class="md-nav__link">
+  <a href="#option-2-install-from-pypi" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Option 2: Install from PyPI (Future)
+        Option 2: Install from PyPI
       
     </span>
   </a>
@@ -2224,6 +2224,118 @@
   
   
     <li class="md-nav__item">
+      <a href="../../api/signal_synth/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Signal Synthesis
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/waveform_io/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Waveform I/O
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/provenance/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Provenance
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/scpi_extract/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SCPI Extract (CLI)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../api/measurement/" class="md-nav__link">
         
   
@@ -2715,10 +2827,10 @@
         
           
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_22" >
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_26" >
         
           
-          <label class="md-nav__link" for="__nav_7_22" id="__nav_7_22_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_7_26" id="__nav_7_26_label" tabindex="0">
             
   
   
@@ -2736,8 +2848,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_22_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_7_22">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_26_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_26">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -3729,10 +3841,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#option-2-install-from-pypi-future" class="md-nav__link">
+  <a href="#option-2-install-from-pypi" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Option 2: Install from PyPI (Future)
+        Option 2: Install from PyPI
       
     </span>
   </a>
@@ -4200,14 +4312,13 @@ from — a genuine 1&nbsp;kHz calibration square wave captured from a Siglent SD
 <h3 id="option-1-install-from-source-development">Option 1: Install from Source (Development)<a class="headerlink" href="#option-1-install-from-source-development" title="Permanent link">&para;</a></h3>
 <p>If you have the source code:</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1"># Navigate to the project directory</span>
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="nb">cd</span><span class="w"> </span>Siglent
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="nb">cd</span><span class="w"> </span>SCPI-Instrument-Control
 </span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>
 </span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="c1"># Install with report generator dependencies</span>
 </span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span><span class="s2">&quot;.[report-generator]&quot;</span>
 </span></code></pre></div>
-<h3 id="option-2-install-from-pypi-future">Option 2: Install from PyPI (Future)<a class="headerlink" href="#option-2-install-from-pypi-future" title="Permanent link">&para;</a></h3>
-<p>Once published to PyPI:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>pip<span class="w"> </span>install<span class="w"> </span>siglent-oscilloscope<span class="o">[</span>report-generator<span class="o">]</span>
+<h3 id="option-2-install-from-pypi">Option 2: Install from PyPI<a class="headerlink" href="#option-2-install-from-pypi" title="Permanent link">&para;</a></h3>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot;SCPI-Instrument-Control[report-generator]&quot;</span>
 </span></code></pre></div>
 <h3 id="verify-installation">Verify Installation<a class="headerlink" href="#verify-installation" title="Permanent link">&para;</a></h3>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># Check that the command is available</span>

@@ -12,31 +12,31 @@
         <meta name="author" content="Robin Mumm">
       
       
-        <link rel="canonical" href="https://little-did-I-know.github.io/SCPI-Instrument-Control/report-generator/">
+        <link rel="canonical" href="https://little-did-I-know.github.io/SCPI-Instrument-Control/api/waveform_io/">
       
       
-        <link rel="prev" href="../gui/vector-graphics/">
+        <link rel="prev" href="../signal_synth/">
       
       
-        <link rel="next" href="getting-started/">
+        <link rel="next" href="../provenance/">
       
       
         
       
       
-      <link rel="icon" href="../assets/images/favicon.png">
+      <link rel="icon" href="../../assets/images/favicon.png">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
-        <title>Overview - SCPI Instrument Control</title>
+        <title>Waveform I/O - SCPI Instrument Control</title>
       
     
     
-      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
       
         
-        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
       
       
 
@@ -55,9 +55,9 @@
       
     
     
-      <link rel="stylesheet" href="../assets/_mkdocstrings.css">
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
     
-    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
 
@@ -82,7 +82,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#report-generator" class="md-skip">
+        <a href="#waveform-io" class="md-skip">
           Skip to content
         </a>
       
@@ -102,7 +102,7 @@
 
 <header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href=".." title="SCPI Instrument Control" class="md-header__button md-logo" aria-label="SCPI Instrument Control" data-md-component="logo">
+    <a href="../.." title="SCPI Instrument Control" class="md-header__button md-logo" aria-label="SCPI Instrument Control" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -122,7 +122,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Overview
+              Waveform I/O
             
           </span>
         </div>
@@ -229,7 +229,7 @@
   
   
     <li class="md-tabs__item">
-      <a href=".." class="md-tabs__link">
+      <a href="../.." class="md-tabs__link">
         
   
   
@@ -250,7 +250,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../getting-started/installation/" class="md-tabs__link">
+        <a href="../../getting-started/installation/" class="md-tabs__link">
           
   
   
@@ -270,7 +270,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../user-guide/basic-usage/" class="md-tabs__link">
+        <a href="../../user-guide/basic-usage/" class="md-tabs__link">
           
   
   
@@ -290,7 +290,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../gateway/" class="md-tabs__link">
+        <a href="../../gateway/" class="md-tabs__link">
           
   
   
@@ -310,11 +310,31 @@
     
     
       <li class="md-tabs__item">
-        <a href="../gui/overview/" class="md-tabs__link">
+        <a href="../../gui/overview/" class="md-tabs__link">
           
   
   
   GUI Application
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../report-generator/" class="md-tabs__link">
+          
+  
+  
+  Report Generator
 
         </a>
       </li>
@@ -332,27 +352,7 @@
     
     
       <li class="md-tabs__item md-tabs__item--active">
-        <a href="./" class="md-tabs__link">
-          
-  
-  
-  Report Generator
-
-        </a>
-      </li>
-    
-  
-
-      
-        
-  
-  
-  
-  
-    
-    
-      <li class="md-tabs__item">
-        <a href="../api/oscilloscope/" class="md-tabs__link">
+        <a href="../oscilloscope/" class="md-tabs__link">
           
   
   
@@ -372,7 +372,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../examples/beginner/" class="md-tabs__link">
+        <a href="../../examples/beginner/" class="md-tabs__link">
           
   
   
@@ -392,7 +392,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../development/contributing/" class="md-tabs__link">
+        <a href="../../development/contributing/" class="md-tabs__link">
           
   
   
@@ -412,7 +412,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../about/changelog/" class="md-tabs__link">
+        <a href="../../about/changelog/" class="md-tabs__link">
           
   
   
@@ -452,7 +452,7 @@
 
 <nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href=".." title="SCPI Instrument Control" class="md-nav__button md-logo" aria-label="SCPI Instrument Control" data-md-component="logo">
+    <a href="../.." title="SCPI Instrument Control" class="md-nav__button md-logo" aria-label="SCPI Instrument Control" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -482,7 +482,7 @@
   
   
     <li class="md-nav__item">
-      <a href=".." class="md-nav__link">
+      <a href="../.." class="md-nav__link">
         
   
   
@@ -563,7 +563,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../getting-started/installation/" class="md-nav__link">
+      <a href="../../getting-started/installation/" class="md-nav__link">
         
   
   
@@ -591,7 +591,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../getting-started/quickstart/" class="md-nav__link">
+      <a href="../../getting-started/quickstart/" class="md-nav__link">
         
   
   
@@ -619,7 +619,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../getting-started/connection/" class="md-nav__link">
+      <a href="../../getting-started/connection/" class="md-nav__link">
         
   
   
@@ -708,7 +708,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../user-guide/basic-usage/" class="md-nav__link">
+      <a href="../../user-guide/basic-usage/" class="md-nav__link">
         
   
   
@@ -736,7 +736,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../user-guide/scpi-dialects/" class="md-nav__link">
+      <a href="../../user-guide/scpi-dialects/" class="md-nav__link">
         
   
   
@@ -764,7 +764,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../user-guide/waveform-capture/" class="md-nav__link">
+      <a href="../../user-guide/waveform-capture/" class="md-nav__link">
         
   
   
@@ -792,7 +792,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../user-guide/data-provenance/" class="md-nav__link">
+      <a href="../../user-guide/data-provenance/" class="md-nav__link">
         
   
   
@@ -820,7 +820,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../user-guide/synthetic-signals/" class="md-nav__link">
+      <a href="../../user-guide/synthetic-signals/" class="md-nav__link">
         
   
   
@@ -848,7 +848,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../user-guide/measurements/" class="md-nav__link">
+      <a href="../../user-guide/measurements/" class="md-nav__link">
         
   
   
@@ -876,7 +876,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../user-guide/trigger-control/" class="md-nav__link">
+      <a href="../../user-guide/trigger-control/" class="md-nav__link">
         
   
   
@@ -904,7 +904,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../user-guide/advanced-features/" class="md-nav__link">
+      <a href="../../user-guide/advanced-features/" class="md-nav__link">
         
   
   
@@ -993,7 +993,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../gateway/" class="md-nav__link">
+      <a href="../../gateway/" class="md-nav__link">
         
   
   
@@ -1021,7 +1021,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../gateway/browser-ui/" class="md-nav__link">
+      <a href="../../gateway/browser-ui/" class="md-nav__link">
         
   
   
@@ -1049,7 +1049,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../gateway/api/" class="md-nav__link">
+      <a href="../../gateway/api/" class="md-nav__link">
         
   
   
@@ -1138,7 +1138,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../gui/overview/" class="md-nav__link">
+      <a href="../../gui/overview/" class="md-nav__link">
         
   
   
@@ -1166,7 +1166,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../gui/interface/" class="md-nav__link">
+      <a href="../../gui/interface/" class="md-nav__link">
         
   
   
@@ -1194,7 +1194,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../gui/live-view/" class="md-nav__link">
+      <a href="../../gui/live-view/" class="md-nav__link">
         
   
   
@@ -1222,7 +1222,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../gui/visual-measurements/" class="md-nav__link">
+      <a href="../../gui/visual-measurements/" class="md-nav__link">
         
   
   
@@ -1250,7 +1250,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../gui/fft-analysis/" class="md-nav__link">
+      <a href="../../gui/fft-analysis/" class="md-nav__link">
         
   
   
@@ -1278,7 +1278,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../gui/protocol-decoding/" class="md-nav__link">
+      <a href="../../gui/protocol-decoding/" class="md-nav__link">
         
   
   
@@ -1306,7 +1306,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../gui/vector-graphics/" class="md-nav__link">
+      <a href="../../gui/vector-graphics/" class="md-nav__link">
         
   
   
@@ -1314,6 +1314,207 @@
     
   
     Vector Graphics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Report Generator
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Report Generator
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../report-generator/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../report-generator/getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../report-generator/llm-setup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    LLM Setup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../report-generator/templates/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Templates & Criteria
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../report-generator/api-reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
   
 
     
@@ -1359,502 +1560,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" checked>
         
           
-          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
-            
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Report Generator
-  
-
-    
-  </span>
-  
-  
-
-            <span class="md-nav__icon md-icon"></span>
-          </label>
-        
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="true">
-          <label class="md-nav__title" for="__nav_6">
-            <span class="md-nav__icon md-icon"></span>
-            
-  
-    Report Generator
-  
-
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-    
-  
-  
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Overview
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Overview
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#key-features" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Key Features
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Key Features">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#professional-reports" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        📊 Professional Reports
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#data-import" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        🔬 Data Import
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#ai-powered-analysis" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        🤖 AI-Powered Analysis
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#passfail-testing" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        ✅ Pass/Fail Testing
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#quick-start" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Quick Start
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Quick Start">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#installation" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Installation
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#launch-the-application" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Launch the Application
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#your-first-report" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Your First Report
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#documentation-sections" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Documentation Sections
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Documentation Sections">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#getting-started" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Getting Started
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#ai-features" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        AI Features
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#advanced-usage" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Advanced Usage
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#example-use-cases" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Example Use Cases
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Example Use Cases">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#quality-assurance" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Quality Assurance
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#research-development" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Research &amp; Development
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#field-service" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Field Service
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#system-requirements" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        System Requirements
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#need-help" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Need Help?
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#whats-next" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        What's Next?
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="getting-started/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Getting Started
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="llm-setup/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    LLM Setup
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="templates/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Templates & Criteria
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="api-reference/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    API Reference
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-          </ul>
-        </nav>
-      
-    </li>
-  
-
-    
-      
-      
-  
-  
-  
-  
-    
-    
-    
-    
-      
-      
-        
-      
-    
-    
-    <li class="md-nav__item md-nav__item--nested">
-      
-        
-        
-          
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
-        
-          
-          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="">
             
   
   
@@ -1872,7 +1581,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_7">
             <span class="md-nav__icon md-icon"></span>
             
@@ -1890,7 +1599,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../api/oscilloscope/" class="md-nav__link">
+      <a href="../oscilloscope/" class="md-nav__link">
         
   
   
@@ -1918,7 +1627,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../api/channel/" class="md-nav__link">
+      <a href="../channel/" class="md-nav__link">
         
   
   
@@ -1946,7 +1655,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../api/trigger/" class="md-nav__link">
+      <a href="../trigger/" class="md-nav__link">
         
   
   
@@ -1974,7 +1683,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../api/waveform/" class="md-nav__link">
+      <a href="../waveform/" class="md-nav__link">
         
   
   
@@ -2002,7 +1711,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../api/signal_synth/" class="md-nav__link">
+      <a href="../signal_synth/" class="md-nav__link">
         
   
   
@@ -2027,10 +1736,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../api/waveform_io/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Waveform I/O
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -2046,6 +1782,87 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#scpi_control.waveform_io" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-module"></code>&nbsp;waveform_io
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#scpi_control.waveform_io.LoadedWaveform" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;LoadedWaveform
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label=" LoadedWaveform">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#scpi_control.waveform_io.LoadedWaveform.to_dataframe" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;to_dataframe
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#scpi_control.waveform_io.load_waveform" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;load_waveform
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#see-also" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        See Also
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -2058,7 +1875,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../api/provenance/" class="md-nav__link">
+      <a href="../provenance/" class="md-nav__link">
         
   
   
@@ -2086,7 +1903,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../api/scpi_extract/" class="md-nav__link">
+      <a href="../scpi_extract/" class="md-nav__link">
         
   
   
@@ -2114,7 +1931,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../api/measurement/" class="md-nav__link">
+      <a href="../measurement/" class="md-nav__link">
         
   
   
@@ -2142,7 +1959,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../api/analysis/" class="md-nav__link">
+      <a href="../analysis/" class="md-nav__link">
         
   
   
@@ -2170,7 +1987,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../api/automation/" class="md-nav__link">
+      <a href="../automation/" class="md-nav__link">
         
   
   
@@ -2198,7 +2015,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../api/connection_socket/" class="md-nav__link">
+      <a href="../connection_socket/" class="md-nav__link">
         
   
   
@@ -2226,7 +2043,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../api/exceptions/" class="md-nav__link">
+      <a href="../exceptions/" class="md-nav__link">
         
   
   
@@ -2254,7 +2071,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../api/models/" class="md-nav__link">
+      <a href="../models/" class="md-nav__link">
         
   
   
@@ -2282,7 +2099,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../api/vector_graphics/" class="md-nav__link">
+      <a href="../vector_graphics/" class="md-nav__link">
         
   
   
@@ -2310,7 +2127,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../api/screen_capture/" class="md-nav__link">
+      <a href="../screen_capture/" class="md-nav__link">
         
   
   
@@ -2338,7 +2155,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../api/reference_waveform/" class="md-nav__link">
+      <a href="../reference_waveform/" class="md-nav__link">
         
   
   
@@ -2366,7 +2183,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../api/math_channel/" class="md-nav__link">
+      <a href="../math_channel/" class="md-nav__link">
         
   
   
@@ -2394,7 +2211,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../api/function_generator/" class="md-nav__link">
+      <a href="../function_generator/" class="md-nav__link">
         
   
   
@@ -2422,7 +2239,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../api/awg_output/" class="md-nav__link">
+      <a href="../awg_output/" class="md-nav__link">
         
   
   
@@ -2450,7 +2267,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../api/power_supply/" class="md-nav__link">
+      <a href="../power_supply/" class="md-nav__link">
         
   
   
@@ -2478,7 +2295,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../api/power_supply_output/" class="md-nav__link">
+      <a href="../power_supply_output/" class="md-nav__link">
         
   
   
@@ -2506,7 +2323,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../api/data_logger/" class="md-nav__link">
+      <a href="../data_logger/" class="md-nav__link">
         
   
   
@@ -2534,7 +2351,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../api/psu_data_logger/" class="md-nav__link">
+      <a href="../psu_data_logger/" class="md-nav__link">
         
   
   
@@ -2562,7 +2379,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../api/protocol_decode/" class="md-nav__link">
+      <a href="../protocol_decode/" class="md-nav__link">
         
   
   
@@ -2596,10 +2413,13 @@
       
       
         
+          
+          
+        
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
       
         
         
@@ -2608,7 +2428,7 @@
         <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_26" >
         
           
-          <label class="md-nav__link" for="__nav_7_26" id="__nav_7_26_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_7_26" id="__nav_7_26_label" tabindex="">
             
   
   
@@ -2644,7 +2464,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../api/server_sessions/" class="md-nav__link">
+      <a href="../server_sessions/" class="md-nav__link">
         
   
   
@@ -2672,7 +2492,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../api/server_recorder/" class="md-nav__link">
+      <a href="../server_recorder/" class="md-nav__link">
         
   
   
@@ -2700,7 +2520,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../api/server_compute/" class="md-nav__link">
+      <a href="../server_compute/" class="md-nav__link">
         
   
   
@@ -2728,7 +2548,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../api/server_discovery/" class="md-nav__link">
+      <a href="../server_discovery/" class="md-nav__link">
         
   
   
@@ -2764,7 +2584,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../api/gui/" class="md-nav__link">
+      <a href="../gui/" class="md-nav__link">
         
   
   
@@ -2853,7 +2673,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../examples/beginner/" class="md-nav__link">
+      <a href="../../examples/beginner/" class="md-nav__link">
         
   
   
@@ -2881,7 +2701,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../examples/intermediate/" class="md-nav__link">
+      <a href="../../examples/intermediate/" class="md-nav__link">
         
   
   
@@ -2909,7 +2729,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../examples/advanced/" class="md-nav__link">
+      <a href="../../examples/advanced/" class="md-nav__link">
         
   
   
@@ -2998,7 +2818,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../development/contributing/" class="md-nav__link">
+      <a href="../../development/contributing/" class="md-nav__link">
         
   
   
@@ -3026,7 +2846,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../development/building/" class="md-nav__link">
+      <a href="../../development/building/" class="md-nav__link">
         
   
   
@@ -3054,7 +2874,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../development/structure/" class="md-nav__link">
+      <a href="../../development/structure/" class="md-nav__link">
         
   
   
@@ -3082,7 +2902,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../development/testing/" class="md-nav__link">
+      <a href="../../development/testing/" class="md-nav__link">
         
   
   
@@ -3164,7 +2984,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../development/PRE_COMMIT_CHECKS/" class="md-nav__link">
+      <a href="../../development/PRE_COMMIT_CHECKS/" class="md-nav__link">
         
   
   
@@ -3192,7 +3012,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../development/BUILDING_EXECUTABLES/" class="md-nav__link">
+      <a href="../../development/BUILDING_EXECUTABLES/" class="md-nav__link">
         
   
   
@@ -3220,7 +3040,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../development/CODE_SIGNING/" class="md-nav__link">
+      <a href="../../development/CODE_SIGNING/" class="md-nav__link">
         
   
   
@@ -3248,7 +3068,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../development/ICON_SETUP/" class="md-nav__link">
+      <a href="../../development/ICON_SETUP/" class="md-nav__link">
         
   
   
@@ -3276,7 +3096,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../development/PYPI_DEPLOYMENT/" class="md-nav__link">
+      <a href="../../development/PYPI_DEPLOYMENT/" class="md-nav__link">
         
   
   
@@ -3304,7 +3124,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../development/VERSION_BUMPING/" class="md-nav__link">
+      <a href="../../development/VERSION_BUMPING/" class="md-nav__link">
         
   
   
@@ -3332,7 +3152,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../development/TESTING_BUILD_WORKFLOW/" class="md-nav__link">
+      <a href="../../development/TESTING_BUILD_WORKFLOW/" class="md-nav__link">
         
   
   
@@ -3360,7 +3180,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../development/EXPERIMENTAL_FEATURES/" class="md-nav__link">
+      <a href="../../development/EXPERIMENTAL_FEATURES/" class="md-nav__link">
         
   
   
@@ -3388,7 +3208,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../development/PROJECT_STRUCTURE/" class="md-nav__link">
+      <a href="../../development/PROJECT_STRUCTURE/" class="md-nav__link">
         
   
   
@@ -3485,7 +3305,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../about/changelog/" class="md-nav__link">
+      <a href="../../about/changelog/" class="md-nav__link">
         
   
   
@@ -3513,7 +3333,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../about/license/" class="md-nav__link">
+      <a href="../../about/license/" class="md-nav__link">
         
   
   
@@ -3541,7 +3361,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../about/security/" class="md-nav__link">
+      <a href="../../about/security/" class="md-nav__link">
         
   
   
@@ -3596,55 +3416,33 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#key-features" class="md-nav__link">
+  <a href="#scpi_control.waveform_io" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Key Features
+        <code class="doc-symbol doc-symbol-toc doc-symbol-module"></code>&nbsp;waveform_io
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Key Features">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#scpi_control.waveform_io.LoadedWaveform" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;LoadedWaveform
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label=" LoadedWaveform">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#professional-reports" class="md-nav__link">
+  <a href="#scpi_control.waveform_io.LoadedWaveform.to_dataframe" class="md-nav__link">
     <span class="md-ellipsis">
       
-        📊 Professional Reports
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#data-import" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        🔬 Data Import
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#ai-powered-analysis" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        🤖 AI-Powered Analysis
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#passfail-testing" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        ✅ Pass/Fail Testing
+        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;to_dataframe
       
     </span>
   </a>
@@ -3657,160 +3455,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#quick-start" class="md-nav__link">
+  <a href="#scpi_control.waveform_io.load_waveform" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Quick Start
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Quick Start">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#installation" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Installation
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#launch-the-application" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Launch the Application
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#your-first-report" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Your First Report
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#documentation-sections" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Documentation Sections
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Documentation Sections">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#getting-started" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Getting Started
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#ai-features" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        AI Features
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#advanced-usage" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Advanced Usage
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#example-use-cases" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Example Use Cases
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Example Use Cases">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#quality-assurance" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Quality Assurance
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#research-development" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Research &amp; Development
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#field-service" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Field Service
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#system-requirements" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        System Requirements
+        <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;load_waveform
       
     </span>
   </a>
@@ -3818,21 +3466,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#need-help" class="md-nav__link">
+  <a href="#see-also" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Need Help?
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#whats-next" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        What's Next?
+        See Also
       
     </span>
   </a>
@@ -3859,134 +3496,328 @@
   
 
 
-<h1 id="report-generator">Report Generator<a class="headerlink" href="#report-generator" title="Permanent link">&para;</a></h1>
-<p>The <strong>Siglent Report Generator</strong> is a powerful standalone application for creating professional test reports from oscilloscope waveform data. Generate beautiful PDF and Markdown reports with AI-powered insights, all running completely offline.</p>
-<h2 id="key-features">Key Features<a class="headerlink" href="#key-features" title="Permanent link">&para;</a></h2>
-<h3 id="professional-reports">📊 Professional Reports<a class="headerlink" href="#professional-reports" title="Permanent link">&para;</a></h3>
-<ul>
-<li><strong>PDF Reports</strong> - Publication-ready PDFs with company branding, logos, and custom headers/footers</li>
-<li><strong>Markdown Reports</strong> - Version-control friendly documentation with embedded plots</li>
-<li><strong>Multiple Sections</strong> - Organize your reports with customizable sections</li>
-<li><strong>Automatic Plots</strong> - Beautiful waveform graphs, FFT analysis, and measurement tables</li>
-</ul>
-<h3 id="data-import">🔬 Data Import<a class="headerlink" href="#data-import" title="Permanent link">&para;</a></h3>
-<ul>
-<li><strong>Multi-Format Support</strong> - Import NPZ, CSV, MATLAB (.mat), and HDF5 files</li>
-<li><strong>Batch Import</strong> - Load multiple waveform files at once</li>
-<li><strong>Image Support</strong> - Add screenshots, setup photos, and diagrams</li>
-<li><strong>Live Capture</strong> - Ready for future real-time oscilloscope integration</li>
-</ul>
-<h3 id="ai-powered-analysis">🤖 AI-Powered Analysis<a class="headerlink" href="#ai-powered-analysis" title="Permanent link">&para;</a></h3>
-<ul>
-<li><strong>Executive Summaries</strong> - Auto-generate professional report summaries</li>
-<li><strong>Signal Analysis</strong> - AI analyzes waveform quality and identifies issues</li>
-<li><strong>Pass/Fail Interpretation</strong> - Explains why tests failed and suggests solutions</li>
-<li><strong>Interactive Chat</strong> - Ask questions about your test data in natural language</li>
-<li><strong>100% Private</strong> - Uses local LLMs (Ollama/LM Studio) - no cloud, no data sharing</li>
-</ul>
-<h3 id="passfail-testing">✅ Pass/Fail Testing<a class="headerlink" href="#passfail-testing" title="Permanent link">&para;</a></h3>
-<ul>
-<li><strong>Measurement Criteria</strong> - Define acceptable ranges for all measurements</li>
-<li><strong>Multiple Comparison Types</strong> - Range, min/max only, equals, not-equals</li>
-<li><strong>Template System</strong> - Save and reuse test procedures</li>
-<li><strong>Visual Indicators</strong> - Color-coded pass/fail status in reports</li>
-</ul>
-<h2 id="quick-start">Quick Start<a class="headerlink" href="#quick-start" title="Permanent link">&para;</a></h2>
-<h3 id="installation">Installation<a class="headerlink" href="#installation" title="Permanent link">&para;</a></h3>
-<p>Install the Report Generator with all required dependencies:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span><span class="s2">&quot;.[report-generator]&quot;</span>
+<h1 id="waveform-io">Waveform I/O<a class="headerlink" href="#waveform-io" title="Permanent link">&para;</a></h1>
+<p>Read saved waveform files back into arrays and normalized metadata</p>
+
+
+<div class="doc doc-object doc-module">
+
+
+
+<a id="scpi_control.waveform_io"></a>
+    <div class="doc doc-contents first">
+
+        <p>Read saved waveform files back into numpy arrays + normalized metadata.</p>
+<p>The public entry point for users who want their raw data out of the library's
+five on-disk formats (NPZ, plain CSV, enhanced CSV, MAT, HDF5) for their own
+analysis. Reads files written before provenance existed (provenance is then
+None) and normalizes the three binary formats' differing metadata
+conventions (see scpi_control.waveform_schema) into one flat dict.</p>
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="scpi_control.waveform_io.LoadedWaveform" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>            <span class="doc doc-object-name doc-class-name">LoadedWaveform</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-dataclass"><code>dataclass</code></small>
+  </span>
+
+<a href="#scpi_control.waveform_io.LoadedWaveform" class="headerlink" title="Permanent link">&para;</a></h2>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">LoadedWaveform</span><span class="p">(</span><span class="n">time</span><span class="p">:</span> <span class="n">ndarray</span><span class="p">,</span> <span class="n">voltage</span><span class="p">:</span> <span class="n">ndarray</span><span class="p">,</span> <span class="n">channel</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Union</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">str</span><span class="p">]],</span> <span class="n">sample_rate</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">],</span> <span class="n">metadata</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(),</span> <span class="n">provenance</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">AcquisitionProvenance</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">source_format</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;NPZ&#39;</span><span class="p">,</span> <span class="n">source_path</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Path</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span>
 </span></code></pre></div>
-<p>Or install everything:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span><span class="s2">&quot;.[all]&quot;</span>
+
+    <div class="doc doc-contents ">
+
+
+
+        <p>One waveform read back from disk, format differences normalized away.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="scpi_control.waveform_io.LoadedWaveform.to_dataframe" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">to_dataframe</span>
+
+
+<a href="#scpi_control.waveform_io.LoadedWaveform.to_dataframe" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">to_dataframe</span><span class="p">()</span>
 </span></code></pre></div>
-<h3 id="launch-the-application">Launch the Application<a class="headerlink" href="#launch-the-application" title="Permanent link">&para;</a></h3>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># Using the installed command</span>
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>siglent-report-generator
-</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>
-</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="c1"># Or using Python module</span>
-</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>python<span class="w"> </span>-m<span class="w"> </span>scpi_control.report_generator.app
+
+    <div class="doc doc-contents ">
+
+        <p>Return a pandas DataFrame (columns: time, voltage; metadata in .attrs).</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>scpi_control/waveform_io.py</code></summary>
+              <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-38">38</a></span>
+<span class="normal"><a href="#__codelineno-0-39">39</a></span>
+<span class="normal"><a href="#__codelineno-0-40">40</a></span>
+<span class="normal"><a href="#__codelineno-0-41">41</a></span>
+<span class="normal"><a href="#__codelineno-0-42">42</a></span>
+<span class="normal"><a href="#__codelineno-0-43">43</a></span>
+<span class="normal"><a href="#__codelineno-0-44">44</a></span>
+<span class="normal"><a href="#__codelineno-0-45">45</a></span>
+<span class="normal"><a href="#__codelineno-0-46">46</a></span>
+<span class="normal"><a href="#__codelineno-0-47">47</a></span>
+<span class="normal"><a href="#__codelineno-0-48">48</a></span>
+<span class="normal"><a href="#__codelineno-0-49">49</a></span>
+<span class="normal"><a href="#__codelineno-0-50">50</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-38"><a id="__codelineno-0-38" name="__codelineno-0-38"></a><span class="k">def</span><span class="w"> </span><span class="nf">to_dataframe</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span id="__span-0-39"><a id="__codelineno-0-39" name="__codelineno-0-39"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Return a pandas DataFrame (columns: time, voltage; metadata in .attrs).&quot;&quot;&quot;</span>
+</span><span id="__span-0-40"><a id="__codelineno-0-40" name="__codelineno-0-40"></a>    <span class="k">try</span><span class="p">:</span>
+</span><span id="__span-0-41"><a id="__codelineno-0-41" name="__codelineno-0-41"></a>        <span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
+</span><span id="__span-0-42"><a id="__codelineno-0-42" name="__codelineno-0-42"></a>    <span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
+</span><span id="__span-0-43"><a id="__codelineno-0-43" name="__codelineno-0-43"></a>        <span class="k">raise</span> <span class="ne">ImportError</span><span class="p">(</span><span class="s2">&quot;pandas is required for to_dataframe(). Install with: pip install pandas&quot;</span><span class="p">)</span>
+</span><span id="__span-0-44"><a id="__codelineno-0-44" name="__codelineno-0-44"></a>    <span class="n">df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span><span class="s2">&quot;time&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">time</span><span class="p">,</span> <span class="s2">&quot;voltage&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">voltage</span><span class="p">})</span>
+</span><span id="__span-0-45"><a id="__codelineno-0-45" name="__codelineno-0-45"></a>    <span class="n">df</span><span class="o">.</span><span class="n">attrs</span><span class="p">[</span><span class="s2">&quot;channel&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">channel</span>
+</span><span id="__span-0-46"><a id="__codelineno-0-46" name="__codelineno-0-46"></a>    <span class="n">df</span><span class="o">.</span><span class="n">attrs</span><span class="p">[</span><span class="s2">&quot;sample_rate&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">sample_rate</span>
+</span><span id="__span-0-47"><a id="__codelineno-0-47" name="__codelineno-0-47"></a>    <span class="n">df</span><span class="o">.</span><span class="n">attrs</span><span class="p">[</span><span class="s2">&quot;metadata&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">metadata</span><span class="p">)</span>
+</span><span id="__span-0-48"><a id="__codelineno-0-48" name="__codelineno-0-48"></a>    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">provenance</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="__span-0-49"><a id="__codelineno-0-49" name="__codelineno-0-49"></a>        <span class="n">df</span><span class="o">.</span><span class="n">attrs</span><span class="p">[</span><span class="s2">&quot;provenance&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">provenance</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()</span>
+</span><span id="__span-0-50"><a id="__codelineno-0-50" name="__codelineno-0-50"></a>    <span class="k">return</span> <span class="n">df</span>
+</span></code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="scpi_control.waveform_io.load_waveform" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <span class="doc doc-object-name doc-function-name">load_waveform</span>
+
+
+<a href="#scpi_control.waveform_io.load_waveform" class="headerlink" title="Permanent link">&para;</a></h2>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">load_waveform</span><span class="p">(</span><span class="n">path</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Path</span><span class="p">],</span> <span class="nb">format</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">LoadedWaveform</span>
 </span></code></pre></div>
-<h3 id="your-first-report">Your First Report<a class="headerlink" href="#your-first-report" title="Permanent link">&para;</a></h3>
-<ol>
-<li><strong>Import Data</strong> - Click "Import Waveforms..." and select saved waveform files</li>
-<li><strong>Add Metadata</strong> - Fill in technician name, test date, and equipment details</li>
-<li><strong>Generate</strong> - Click "Generate PDF Report" or "Generate Markdown Report"</li>
-<li><strong>Done!</strong> - Your professional report is ready</li>
-</ol>
-<h2 id="documentation-sections">Documentation Sections<a class="headerlink" href="#documentation-sections" title="Permanent link">&para;</a></h2>
-<h3 id="getting-started">Getting Started<a class="headerlink" href="#getting-started" title="Permanent link">&para;</a></h3>
+
+    <div class="doc doc-contents ">
+
+        <p>Load a waveform file saved by scpi_control (any version, any format).</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>path</code>
+            </td>
+            <td>
+                  <code><span title="typing.Union">Union</span>[<span title="str">str</span>, <span title="pathlib.Path">Path</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>File to read.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>format</code>
+            </td>
+            <td>
+                  <code><span title="typing.Optional">Optional</span>[<span title="str">str</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Force a format ("NPZ", "CSV", "MAT", "HDF5"); None auto-detects
+from the extension.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="FileNotFoundError">FileNotFoundError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If path does not exist.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="ValueError">ValueError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If the format is unknown or the file cannot be parsed.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="ImportError">ImportError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If the format needs an uninstalled optional dependency.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>scpi_control/waveform_io.py</code></summary>
+              <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-53">53</a></span>
+<span class="normal"><a href="#__codelineno-0-54">54</a></span>
+<span class="normal"><a href="#__codelineno-0-55">55</a></span>
+<span class="normal"><a href="#__codelineno-0-56">56</a></span>
+<span class="normal"><a href="#__codelineno-0-57">57</a></span>
+<span class="normal"><a href="#__codelineno-0-58">58</a></span>
+<span class="normal"><a href="#__codelineno-0-59">59</a></span>
+<span class="normal"><a href="#__codelineno-0-60">60</a></span>
+<span class="normal"><a href="#__codelineno-0-61">61</a></span>
+<span class="normal"><a href="#__codelineno-0-62">62</a></span>
+<span class="normal"><a href="#__codelineno-0-63">63</a></span>
+<span class="normal"><a href="#__codelineno-0-64">64</a></span>
+<span class="normal"><a href="#__codelineno-0-65">65</a></span>
+<span class="normal"><a href="#__codelineno-0-66">66</a></span>
+<span class="normal"><a href="#__codelineno-0-67">67</a></span>
+<span class="normal"><a href="#__codelineno-0-68">68</a></span>
+<span class="normal"><a href="#__codelineno-0-69">69</a></span>
+<span class="normal"><a href="#__codelineno-0-70">70</a></span>
+<span class="normal"><a href="#__codelineno-0-71">71</a></span>
+<span class="normal"><a href="#__codelineno-0-72">72</a></span>
+<span class="normal"><a href="#__codelineno-0-73">73</a></span>
+<span class="normal"><a href="#__codelineno-0-74">74</a></span>
+<span class="normal"><a href="#__codelineno-0-75">75</a></span>
+<span class="normal"><a href="#__codelineno-0-76">76</a></span>
+<span class="normal"><a href="#__codelineno-0-77">77</a></span>
+<span class="normal"><a href="#__codelineno-0-78">78</a></span>
+<span class="normal"><a href="#__codelineno-0-79">79</a></span>
+<span class="normal"><a href="#__codelineno-0-80">80</a></span>
+<span class="normal"><a href="#__codelineno-0-81">81</a></span>
+<span class="normal"><a href="#__codelineno-0-82">82</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-53"><a id="__codelineno-0-53" name="__codelineno-0-53"></a><span class="k">def</span><span class="w"> </span><span class="nf">load_waveform</span><span class="p">(</span><span class="n">path</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Path</span><span class="p">],</span> <span class="nb">format</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">LoadedWaveform</span><span class="p">:</span>
+</span><span id="__span-0-54"><a id="__codelineno-0-54" name="__codelineno-0-54"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Load a waveform file saved by scpi_control (any version, any format).</span>
+</span><span id="__span-0-55"><a id="__codelineno-0-55" name="__codelineno-0-55"></a>
+</span><span id="__span-0-56"><a id="__codelineno-0-56" name="__codelineno-0-56"></a><span class="sd">    Args:</span>
+</span><span id="__span-0-57"><a id="__codelineno-0-57" name="__codelineno-0-57"></a><span class="sd">        path: File to read.</span>
+</span><span id="__span-0-58"><a id="__codelineno-0-58" name="__codelineno-0-58"></a><span class="sd">        format: Force a format (&quot;NPZ&quot;, &quot;CSV&quot;, &quot;MAT&quot;, &quot;HDF5&quot;); None auto-detects</span>
+</span><span id="__span-0-59"><a id="__codelineno-0-59" name="__codelineno-0-59"></a><span class="sd">            from the extension.</span>
+</span><span id="__span-0-60"><a id="__codelineno-0-60" name="__codelineno-0-60"></a>
+</span><span id="__span-0-61"><a id="__codelineno-0-61" name="__codelineno-0-61"></a><span class="sd">    Raises:</span>
+</span><span id="__span-0-62"><a id="__codelineno-0-62" name="__codelineno-0-62"></a><span class="sd">        FileNotFoundError: If path does not exist.</span>
+</span><span id="__span-0-63"><a id="__codelineno-0-63" name="__codelineno-0-63"></a><span class="sd">        ValueError: If the format is unknown or the file cannot be parsed.</span>
+</span><span id="__span-0-64"><a id="__codelineno-0-64" name="__codelineno-0-64"></a><span class="sd">        ImportError: If the format needs an uninstalled optional dependency.</span>
+</span><span id="__span-0-65"><a id="__codelineno-0-65" name="__codelineno-0-65"></a><span class="sd">    &quot;&quot;&quot;</span>
+</span><span id="__span-0-66"><a id="__codelineno-0-66" name="__codelineno-0-66"></a>    <span class="n">path</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+</span><span id="__span-0-67"><a id="__codelineno-0-67" name="__codelineno-0-67"></a>    <span class="k">if</span> <span class="ow">not</span> <span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+</span><span id="__span-0-68"><a id="__codelineno-0-68" name="__codelineno-0-68"></a>        <span class="k">raise</span> <span class="ne">FileNotFoundError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Waveform file not found: </span><span class="si">{</span><span class="n">path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</span><span id="__span-0-69"><a id="__codelineno-0-69" name="__codelineno-0-69"></a>    <span class="k">if</span> <span class="nb">format</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="__span-0-70"><a id="__codelineno-0-70" name="__codelineno-0-70"></a>        <span class="nb">format</span> <span class="o">=</span> <span class="n">_EXTENSION_FORMATS</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">path</span><span class="o">.</span><span class="n">suffix</span><span class="o">.</span><span class="n">lower</span><span class="p">())</span>
+</span><span id="__span-0-71"><a id="__codelineno-0-71" name="__codelineno-0-71"></a>        <span class="k">if</span> <span class="nb">format</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="__span-0-72"><a id="__codelineno-0-72" name="__codelineno-0-72"></a>            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Cannot detect format from extension </span><span class="si">{</span><span class="n">path</span><span class="o">.</span><span class="n">suffix</span><span class="si">!r}</span><span class="s2">. Pass format= explicitly (NPZ, CSV, MAT, HDF5).&quot;</span><span class="p">)</span>
+</span><span id="__span-0-73"><a id="__codelineno-0-73" name="__codelineno-0-73"></a>    <span class="nb">format</span> <span class="o">=</span> <span class="nb">format</span><span class="o">.</span><span class="n">upper</span><span class="p">()</span>
+</span><span id="__span-0-74"><a id="__codelineno-0-74" name="__codelineno-0-74"></a>    <span class="k">if</span> <span class="nb">format</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;NPY&quot;</span><span class="p">,</span> <span class="s2">&quot;NPZ&quot;</span><span class="p">):</span>
+</span><span id="__span-0-75"><a id="__codelineno-0-75" name="__codelineno-0-75"></a>        <span class="k">return</span> <span class="n">_load_npz</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+</span><span id="__span-0-76"><a id="__codelineno-0-76" name="__codelineno-0-76"></a>    <span class="k">if</span> <span class="nb">format</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;CSV&quot;</span><span class="p">,</span> <span class="s2">&quot;CSV_ENHANCED&quot;</span><span class="p">):</span>
+</span><span id="__span-0-77"><a id="__codelineno-0-77" name="__codelineno-0-77"></a>        <span class="k">return</span> <span class="n">_load_csv</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+</span><span id="__span-0-78"><a id="__codelineno-0-78" name="__codelineno-0-78"></a>    <span class="k">if</span> <span class="nb">format</span> <span class="o">==</span> <span class="s2">&quot;MAT&quot;</span><span class="p">:</span>
+</span><span id="__span-0-79"><a id="__codelineno-0-79" name="__codelineno-0-79"></a>        <span class="k">return</span> <span class="n">_load_mat</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+</span><span id="__span-0-80"><a id="__codelineno-0-80" name="__codelineno-0-80"></a>    <span class="k">if</span> <span class="nb">format</span> <span class="o">==</span> <span class="s2">&quot;HDF5&quot;</span><span class="p">:</span>
+</span><span id="__span-0-81"><a id="__codelineno-0-81" name="__codelineno-0-81"></a>        <span class="k">return</span> <span class="n">_load_hdf5</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+</span><span id="__span-0-82"><a id="__codelineno-0-82" name="__codelineno-0-82"></a>    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unknown format: </span><span class="si">{</span><span class="nb">format</span><span class="si">}</span><span class="s2">. Supported: NPZ, CSV, MAT, HDF5&quot;</span><span class="p">)</span>
+</span></code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div><h2 id="see-also">See Also<a class="headerlink" href="#see-also" title="Permanent link">&para;</a></h2>
 <ul>
-<li><a href="getting-started/"><strong>Installation &amp; Setup</strong></a> - Install and configure the Report Generator</li>
-<li><a href="getting-started/#creating-your-first-report"><strong>Creating Your First Report</strong></a> - Step-by-step tutorial</li>
-<li><a href="getting-started/#gui-overview"><strong>GUI Overview</strong></a> - Tour of the interface</li>
-</ul>
-<h3 id="ai-features">AI Features<a class="headerlink" href="#ai-features" title="Permanent link">&para;</a></h3>
-<ul>
-<li><a href="llm-setup/"><strong>LLM Setup</strong></a> - Configure Ollama or LM Studio for AI features</li>
-<li><a href="llm-setup/#using-ai-features"><strong>Using AI Analysis</strong></a> - Generate summaries and insights</li>
-<li><a href="llm-setup/#chat-assistant"><strong>Chat Assistant</strong></a> - Ask questions about your data</li>
-</ul>
-<h3 id="advanced-usage">Advanced Usage<a class="headerlink" href="#advanced-usage" title="Permanent link">&para;</a></h3>
-<ul>
-<li><a href="templates/"><strong>Template System</strong></a> - Save and reuse report configurations</li>
-<li><a href="templates/#passfail-criteria"><strong>Pass/Fail Criteria</strong></a> - Define test criteria</li>
-<li><a href="api-reference/"><strong>Programmatic API</strong></a> - Use Python API for automation</li>
-<li><a href="../development/BUILDING_EXECUTABLES/"><strong>Building Executables</strong></a> - Create standalone apps</li>
-</ul>
-<h2 id="example-use-cases">Example Use Cases<a class="headerlink" href="#example-use-cases" title="Permanent link">&para;</a></h2>
-<h3 id="quality-assurance">Quality Assurance<a class="headerlink" href="#quality-assurance" title="Permanent link">&para;</a></h3>
-<p>Generate automated test reports for production testing with pass/fail criteria and audit trails.</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># Automated QA report generation</span>
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="n">report</span> <span class="o">=</span> <span class="n">create_qa_report</span><span class="p">(</span><span class="n">waveforms</span><span class="p">,</span> <span class="n">criteria_set</span><span class="p">)</span>
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="k">if</span> <span class="ow">not</span> <span class="n">report</span><span class="o">.</span><span class="n">calculate_overall_result</span><span class="p">()</span> <span class="o">==</span> <span class="s2">&quot;PASS&quot;</span><span class="p">:</span>
-</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>    <span class="n">send_alert</span><span class="p">(</span><span class="n">report</span><span class="p">)</span>
-</span></code></pre></div>
-<h3 id="research-development">Research &amp; Development<a class="headerlink" href="#research-development" title="Permanent link">&para;</a></h3>
-<p>Create publication-ready figures and comprehensive analysis reports.</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1"># Research report with AI insights</span>
-</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="n">report</span> <span class="o">=</span> <span class="n">create_research_report</span><span class="p">(</span><span class="n">experiment_data</span><span class="p">)</span>
-</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="n">add_ai_analysis</span><span class="p">(</span><span class="n">report</span><span class="p">,</span> <span class="n">llm_client</span><span class="p">)</span>
-</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="n">export_pdf</span><span class="p">(</span><span class="n">report</span><span class="p">,</span> <span class="s2">&quot;research_findings.pdf&quot;</span><span class="p">)</span>
-</span></code></pre></div>
-<h3 id="field-service">Field Service<a class="headerlink" href="#field-service" title="Permanent link">&para;</a></h3>
-<p>Generate quick reports for customers on-site, completely offline.</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="c1"># On-site service report</span>
-</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="n">report</span> <span class="o">=</span> <span class="n">create_service_report</span><span class="p">(</span><span class="n">measurements</span><span class="p">)</span>
-</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="n">add_technician_notes</span><span class="p">(</span><span class="n">report</span><span class="p">,</span> <span class="n">notes</span><span class="p">)</span>
-</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="n">export_pdf</span><span class="p">(</span><span class="n">report</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;service_</span><span class="si">{</span><span class="n">customer_id</span><span class="si">}</span><span class="s2">.pdf&quot;</span><span class="p">)</span>
-</span></code></pre></div>
-<h2 id="system-requirements">System Requirements<a class="headerlink" href="#system-requirements" title="Permanent link">&para;</a></h2>
-<p><strong>Minimum:</strong></p>
-<ul>
-<li>Python 3.9 or later</li>
-<li>4 GB RAM</li>
-<li>500 MB disk space</li>
-</ul>
-<p><strong>Recommended:</strong></p>
-<ul>
-<li>Python 3.10 or later</li>
-<li>8 GB RAM (16 GB for AI features)</li>
-<li>2 GB disk space</li>
-</ul>
-<p><strong>For AI features:</strong></p>
-<ul>
-<li>8 GB RAM minimum (16 GB recommended)</li>
-<li>Multi-core CPU (GPU optional but helpful)</li>
-<li>Ollama or LM Studio installed</li>
-</ul>
-<h2 id="need-help">Need Help?<a class="headerlink" href="#need-help" title="Permanent link">&para;</a></h2>
-<ul>
-<li><strong>Getting Started</strong> - See the <a href="getting-started/">Getting Started Guide</a></li>
-<li><strong>AI Setup</strong> - See the <a href="llm-setup/">LLM Setup Tutorial</a></li>
-<li><strong>Templates</strong> - See the <a href="templates/">Template Guide</a></li>
-<li><strong>API</strong> - See the <a href="api-reference/">API Reference</a></li>
-<li><strong>Issues</strong> - Report bugs on <a href="https://github.com/little-did-I-know/SCPI-Instrument-Control/issues">GitHub Issues</a></li>
-</ul>
-<h2 id="whats-next">What's Next?<a class="headerlink" href="#whats-next" title="Permanent link">&para;</a></h2>
-<ul>
-<li><a href="getting-started/"><strong>Get Started →</strong></a> - Install and create your first report</li>
-<li><a href="llm-setup/"><strong>Setup AI →</strong></a> - Enable AI-powered features</li>
-<li><a href="templates/"><strong>Learn Templates →</strong></a> - Save time with reusable templates</li>
+<li><a href="../waveform/">Waveform</a> - Waveform acquisition and data handling</li>
+<li><a href="../provenance/">Provenance</a> - Acquisition provenance attached to saved waveforms</li>
 </ul>
 
 
@@ -4070,10 +3901,10 @@
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.instant", "navigation.tracking", "navigation.tabs", "navigation.tabs.sticky", "navigation.sections", "navigation.expand", "navigation.top", "search.suggest", "search.highlight", "content.code.annotate", "content.code.copy", "toc.follow"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.instant", "navigation.tracking", "navigation.tabs", "navigation.tabs.sticky", "navigation.sections", "navigation.expand", "navigation.top", "search.suggest", "search.highlight", "content.code.annotate", "content.code.copy", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
     
     
-      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
       
     
   </body>

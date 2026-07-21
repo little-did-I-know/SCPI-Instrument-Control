@@ -1708,6 +1708,118 @@
   
   
     <li class="md-nav__item">
+      <a href="../../api/signal_synth/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Signal Synthesis
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/waveform_io/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Waveform I/O
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/provenance/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Provenance
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/scpi_extract/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SCPI Extract (CLI)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../api/measurement/" class="md-nav__link">
         
   
@@ -2199,10 +2311,10 @@
         
           
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_22" >
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_26" >
         
           
-          <label class="md-nav__link" for="__nav_7_22" id="__nav_7_22_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_7_26" id="__nav_7_26_label" tabindex="0">
             
   
   
@@ -2220,8 +2332,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_22_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_7_22">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_26_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_26">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -2973,10 +3085,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#mock-responses" class="md-nav__link">
+  <a href="#overriding-specific-responses" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Mock Responses
+        Overriding Specific Responses
       
     </span>
   </a>
@@ -4132,10 +4244,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#mock-responses" class="md-nav__link">
+  <a href="#overriding-specific-responses" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Mock Responses
+        Overriding Specific Responses
       
     </span>
   </a>
@@ -4883,53 +4995,69 @@
 </span></code></pre></div>
 <h2 id="mocking">Mocking<a class="headerlink" href="#mocking" title="Permanent link">&para;</a></h2>
 <h3 id="mockconnection">MockConnection<a class="headerlink" href="#mockconnection" title="Permanent link">&para;</a></h3>
-<p>The project provides a MockConnection for testing without hardware:</p>
+<p>The project provides <code>MockConnection</code> (<code>scpi_control/connection/mock/base.py</code>) for
+testing without hardware. There is no <code>add_response()</code>/<code>sent_commands</code> API — state
+is configured via constructor keyword arguments and inspected via public
+attributes:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-23-1"><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">scpi_control.connection</span><span class="w"> </span><span class="kn">import</span> <span class="n">MockConnection</span>
-</span><span id="__span-23-2"><a id="__codelineno-23-2" name="__codelineno-23-2" href="#__codelineno-23-2"></a>
-</span><span id="__span-23-3"><a id="__codelineno-23-3" name="__codelineno-23-3" href="#__codelineno-23-3"></a><span class="c1"># Create mock connection</span>
-</span><span id="__span-23-4"><a id="__codelineno-23-4" name="__codelineno-23-4" href="#__codelineno-23-4"></a><span class="n">mock</span> <span class="o">=</span> <span class="n">MockConnection</span><span class="p">()</span>
-</span><span id="__span-23-5"><a id="__codelineno-23-5" name="__codelineno-23-5" href="#__codelineno-23-5"></a>
-</span><span id="__span-23-6"><a id="__codelineno-23-6" name="__codelineno-23-6" href="#__codelineno-23-6"></a><span class="c1"># Configure responses</span>
-</span><span id="__span-23-7"><a id="__codelineno-23-7" name="__codelineno-23-7" href="#__codelineno-23-7"></a><span class="n">mock</span><span class="o">.</span><span class="n">add_response</span><span class="p">(</span><span class="s2">&quot;*IDN?&quot;</span><span class="p">,</span> <span class="s2">&quot;SIGLENT TECHNOLOGIES,SDS2104X Plus,...&quot;</span><span class="p">)</span>
-</span><span id="__span-23-8"><a id="__codelineno-23-8" name="__codelineno-23-8" href="#__codelineno-23-8"></a><span class="n">mock</span><span class="o">.</span><span class="n">add_response</span><span class="p">(</span><span class="s2">&quot;C1:TRA?&quot;</span><span class="p">,</span> <span class="s2">&quot;C1:TRA ON&quot;</span><span class="p">)</span>
-</span><span id="__span-23-9"><a id="__codelineno-23-9" name="__codelineno-23-9" href="#__codelineno-23-9"></a>
-</span><span id="__span-23-10"><a id="__codelineno-23-10" name="__codelineno-23-10" href="#__codelineno-23-10"></a><span class="c1"># Use with Oscilloscope</span>
-</span><span id="__span-23-11"><a id="__codelineno-23-11" name="__codelineno-23-11" href="#__codelineno-23-11"></a><span class="n">scope</span> <span class="o">=</span> <span class="n">Oscilloscope</span><span class="p">(</span><span class="n">connection</span><span class="o">=</span><span class="n">mock</span><span class="p">)</span>
-</span><span id="__span-23-12"><a id="__codelineno-23-12" name="__codelineno-23-12" href="#__codelineno-23-12"></a>
-</span><span id="__span-23-13"><a id="__codelineno-23-13" name="__codelineno-23-13" href="#__codelineno-23-13"></a><span class="c1"># Verify sent commands</span>
-</span><span id="__span-23-14"><a id="__codelineno-23-14" name="__codelineno-23-14" href="#__codelineno-23-14"></a><span class="k">assert</span> <span class="s2">&quot;C1:TRA ON&quot;</span> <span class="ow">in</span> <span class="n">mock</span><span class="o">.</span><span class="n">sent_commands</span>
+</span><span id="__span-23-2"><a id="__codelineno-23-2" name="__codelineno-23-2" href="#__codelineno-23-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">scpi_control.oscilloscope</span><span class="w"> </span><span class="kn">import</span> <span class="n">Oscilloscope</span>
+</span><span id="__span-23-3"><a id="__codelineno-23-3" name="__codelineno-23-3" href="#__codelineno-23-3"></a>
+</span><span id="__span-23-4"><a id="__codelineno-23-4" name="__codelineno-23-4" href="#__codelineno-23-4"></a><span class="c1"># Create a mock connection with initial state</span>
+</span><span id="__span-23-5"><a id="__codelineno-23-5" name="__codelineno-23-5" href="#__codelineno-23-5"></a><span class="n">mock</span> <span class="o">=</span> <span class="n">MockConnection</span><span class="p">(</span>
+</span><span id="__span-23-6"><a id="__codelineno-23-6" name="__codelineno-23-6" href="#__codelineno-23-6"></a>    <span class="s2">&quot;mock&quot;</span><span class="p">,</span>
+</span><span id="__span-23-7"><a id="__codelineno-23-7" name="__codelineno-23-7" href="#__codelineno-23-7"></a>    <span class="n">idn</span><span class="o">=</span><span class="s2">&quot;Siglent Technologies,SDS824X HD,MOCK0001,3.8.12&quot;</span><span class="p">,</span>
+</span><span id="__span-23-8"><a id="__codelineno-23-8" name="__codelineno-23-8" href="#__codelineno-23-8"></a>    <span class="n">channel_states</span><span class="o">=</span><span class="p">{</span><span class="mi">1</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span> <span class="mi">2</span><span class="p">:</span> <span class="kc">False</span><span class="p">},</span>
+</span><span id="__span-23-9"><a id="__codelineno-23-9" name="__codelineno-23-9" href="#__codelineno-23-9"></a>    <span class="n">voltage_scales</span><span class="o">=</span><span class="p">{</span><span class="mi">1</span><span class="p">:</span> <span class="mf">0.5</span><span class="p">},</span>
+</span><span id="__span-23-10"><a id="__codelineno-23-10" name="__codelineno-23-10" href="#__codelineno-23-10"></a>    <span class="n">sample_rate</span><span class="o">=</span><span class="mf">1_000_000.0</span><span class="p">,</span>
+</span><span id="__span-23-11"><a id="__codelineno-23-11" name="__codelineno-23-11" href="#__codelineno-23-11"></a>    <span class="n">timebase</span><span class="o">=</span><span class="mf">1e-3</span><span class="p">,</span>
+</span><span id="__span-23-12"><a id="__codelineno-23-12" name="__codelineno-23-12" href="#__codelineno-23-12"></a><span class="p">)</span>
+</span><span id="__span-23-13"><a id="__codelineno-23-13" name="__codelineno-23-13" href="#__codelineno-23-13"></a>
+</span><span id="__span-23-14"><a id="__codelineno-23-14" name="__codelineno-23-14" href="#__codelineno-23-14"></a><span class="n">scope</span> <span class="o">=</span> <span class="n">Oscilloscope</span><span class="p">(</span><span class="s2">&quot;mock&quot;</span><span class="p">,</span> <span class="n">connection</span><span class="o">=</span><span class="n">mock</span><span class="p">)</span>
+</span><span id="__span-23-15"><a id="__codelineno-23-15" name="__codelineno-23-15" href="#__codelineno-23-15"></a><span class="n">scope</span><span class="o">.</span><span class="n">connect</span><span class="p">()</span>
+</span><span id="__span-23-16"><a id="__codelineno-23-16" name="__codelineno-23-16" href="#__codelineno-23-16"></a>
+</span><span id="__span-23-17"><a id="__codelineno-23-17" name="__codelineno-23-17" href="#__codelineno-23-17"></a><span class="c1"># Inspect what the code under test actually sent</span>
+</span><span id="__span-23-18"><a id="__codelineno-23-18" name="__codelineno-23-18" href="#__codelineno-23-18"></a><span class="n">waveform</span> <span class="o">=</span> <span class="n">scope</span><span class="o">.</span><span class="n">get_waveform</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+</span><span id="__span-23-19"><a id="__codelineno-23-19" name="__codelineno-23-19" href="#__codelineno-23-19"></a><span class="k">assert</span> <span class="n">mock</span><span class="o">.</span><span class="n">waveform_requests</span> <span class="o">==</span> <span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+</span><span id="__span-23-20"><a id="__codelineno-23-20" name="__codelineno-23-20" href="#__codelineno-23-20"></a><span class="k">assert</span> <span class="nb">any</span><span class="p">(</span><span class="s2">&quot;TIMebase&quot;</span> <span class="ow">in</span> <span class="n">q</span> <span class="ow">or</span> <span class="s2">&quot;TDIV&quot;</span> <span class="ow">in</span> <span class="n">q</span> <span class="k">for</span> <span class="n">q</span> <span class="ow">in</span> <span class="n">mock</span><span class="o">.</span><span class="n">queries</span><span class="p">)</span>
 </span></code></pre></div>
-<h3 id="mock-responses">Mock Responses<a class="headerlink" href="#mock-responses" title="Permanent link">&para;</a></h3>
-<p><strong>File: <code>tests/fixtures/mock_responses.json</code></strong></p>
-<div class="language-json highlight"><pre><span></span><code><span id="__span-24-1"><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a><span class="p">{</span>
-</span><span id="__span-24-2"><a id="__codelineno-24-2" name="__codelineno-24-2" href="#__codelineno-24-2"></a><span class="w">  </span><span class="nt">&quot;*IDN?&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;SIGLENT TECHNOLOGIES,SDS2104X Plus,SERIAL123,1.0.0&quot;</span><span class="p">,</span>
-</span><span id="__span-24-3"><a id="__codelineno-24-3" name="__codelineno-24-3" href="#__codelineno-24-3"></a><span class="w">  </span><span class="nt">&quot;C1:TRA?&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;C1:TRA ON&quot;</span><span class="p">,</span>
-</span><span id="__span-24-4"><a id="__codelineno-24-4" name="__codelineno-24-4" href="#__codelineno-24-4"></a><span class="w">  </span><span class="nt">&quot;C1:VDIV?&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;C1:VDIV 1V&quot;</span><span class="p">,</span>
-</span><span id="__span-24-5"><a id="__codelineno-24-5" name="__codelineno-24-5" href="#__codelineno-24-5"></a><span class="w">  </span><span class="nt">&quot;C1:OFST?&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;C1:OFST 0V&quot;</span><span class="p">,</span>
-</span><span id="__span-24-6"><a id="__codelineno-24-6" name="__codelineno-24-6" href="#__codelineno-24-6"></a><span class="w">  </span><span class="nt">&quot;TRIG_MODE?&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;TRIG_MODE AUTO&quot;</span><span class="p">,</span>
-</span><span id="__span-24-7"><a id="__codelineno-24-7" name="__codelineno-24-7" href="#__codelineno-24-7"></a><span class="w">  </span><span class="nt">&quot;C1:WF? DAT2&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;&lt;waveform binary data&gt;&quot;</span>
-</span><span id="__span-24-8"><a id="__codelineno-24-8" name="__codelineno-24-8" href="#__codelineno-24-8"></a><span class="p">}</span>
+<p>Key constructor keyword arguments (all optional, keyword-only after <code>host</code>,
+<code>port</code>, <code>timeout</code>):</p>
+<ul>
+<li><code>idn</code> - the <code>*IDN?</code> response string; drives dialect/vendor auto-detection</li>
+<li><code>channel_states</code>, <code>voltage_scales</code>, <code>voltage_offsets</code> - per-channel dicts,
+  e.g. <code>{1: True}</code>, <code>{1: 0.5}</code></li>
+<li><code>waveform_payloads</code> - <code>{channel: bytes}</code> to serve a fixed captured payload
+  instead of synthesis</li>
+<li><code>signals</code> - <code>{channel: SignalSpec(...)}</code> to choose what a channel
+  synthesizes (see <a href="../../user-guide/synthetic-signals/">Synthetic Signals</a>);
+  channels without an explicit <code>SignalSpec</code> still synthesize a state-coupled
+  default waveform - there is no "no signal" option</li>
+<li><code>sample_rate</code>, <code>timebase</code> - initial acquisition settings</li>
+<li><code>trigger_status</code> - a list of trigger-state tokens the mock returns</li>
+<li><code>custom_responses</code> - <code>{command: response}</code> (or <code>{command: [responses, ...]}</code>
+  to pop successive values on repeated queries) for exact-match query
+  overrides, checked before any built-in handling</li>
+<li><code>psu_mode</code>, <code>awg_mode</code>, <code>daq_mode</code> (with matching <code>psu_idn</code>/<code>psu_outputs</code>,
+  <code>awg_idn</code>/<code>awg_channels</code>, <code>daq_idn</code>/<code>daq_readings</code>) - switch the mock to a
+  power supply, function generator, or data logger personality instead of an
+  oscilloscope</li>
+</ul>
+<p>Instrumentation attributes recorded automatically, for assertions:</p>
+<ul>
+<li><code>mock.writes</code> - every command passed to <code>write()</code>, in order</li>
+<li><code>mock.queries</code> - every command passed to <code>query()</code>, in order</li>
+<li><code>mock.waveform_requests</code> - channel numbers requested via <code>C{n}:WF?</code>, in order</li>
+<li><code>mock.timebase_updates</code> - timebase values as they're changed</li>
+<li><code>mock.scale_updates</code> - <code>{channel: [values, ...]}</code> as voltage scale changes,
+  per channel</li>
+</ul>
+<h3 id="overriding-specific-responses">Overriding Specific Responses<a class="headerlink" href="#overriding-specific-responses" title="Permanent link">&para;</a></h3>
+<p>Use <code>custom_responses</code> for exact-match overrides that don't fit synthesis:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-24-1"><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a><span class="n">mock</span> <span class="o">=</span> <span class="n">MockConnection</span><span class="p">(</span><span class="n">custom_responses</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;C1:VDIV?&quot;</span><span class="p">:</span> <span class="s2">&quot;C1:VDIV 2.00E+00V&quot;</span><span class="p">})</span>
 </span></code></pre></div>
-<p><strong>Load in tests:</strong></p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-25-1"><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
-</span><span id="__span-25-2"><a id="__codelineno-25-2" name="__codelineno-25-2" href="#__codelineno-25-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
-</span><span id="__span-25-3"><a id="__codelineno-25-3" name="__codelineno-25-3" href="#__codelineno-25-3"></a>
-</span><span id="__span-25-4"><a id="__codelineno-25-4" name="__codelineno-25-4" href="#__codelineno-25-4"></a><span class="nd">@pytest</span><span class="o">.</span><span class="n">fixture</span>
-</span><span id="__span-25-5"><a id="__codelineno-25-5" name="__codelineno-25-5" href="#__codelineno-25-5"></a><span class="k">def</span><span class="w"> </span><span class="nf">mock_responses</span><span class="p">():</span>
-</span><span id="__span-25-6"><a id="__codelineno-25-6" name="__codelineno-25-6" href="#__codelineno-25-6"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Load mock responses from JSON.&quot;&quot;&quot;</span>
-</span><span id="__span-25-7"><a id="__codelineno-25-7" name="__codelineno-25-7" href="#__codelineno-25-7"></a>    <span class="n">path</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="vm">__file__</span><span class="p">)</span><span class="o">.</span><span class="n">parent</span> <span class="o">/</span> <span class="s2">&quot;fixtures&quot;</span> <span class="o">/</span> <span class="s2">&quot;mock_responses.json&quot;</span>
-</span><span id="__span-25-8"><a id="__codelineno-25-8" name="__codelineno-25-8" href="#__codelineno-25-8"></a>    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">path</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
-</span><span id="__span-25-9"><a id="__codelineno-25-9" name="__codelineno-25-9" href="#__codelineno-25-9"></a>        <span class="k">return</span> <span class="n">json</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">f</span><span class="p">)</span>
-</span><span id="__span-25-10"><a id="__codelineno-25-10" name="__codelineno-25-10" href="#__codelineno-25-10"></a>
-</span><span id="__span-25-11"><a id="__codelineno-25-11" name="__codelineno-25-11" href="#__codelineno-25-11"></a>
-</span><span id="__span-25-12"><a id="__codelineno-25-12" name="__codelineno-25-12" href="#__codelineno-25-12"></a><span class="k">def</span><span class="w"> </span><span class="nf">test_with_mock_responses</span><span class="p">(</span><span class="n">mock_responses</span><span class="p">):</span>
-</span><span id="__span-25-13"><a id="__codelineno-25-13" name="__codelineno-25-13" href="#__codelineno-25-13"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Test using mock responses.&quot;&quot;&quot;</span>
-</span><span id="__span-25-14"><a id="__codelineno-25-14" name="__codelineno-25-14" href="#__codelineno-25-14"></a>    <span class="n">mock</span> <span class="o">=</span> <span class="n">MockConnection</span><span class="p">()</span>
-</span><span id="__span-25-15"><a id="__codelineno-25-15" name="__codelineno-25-15" href="#__codelineno-25-15"></a>    <span class="k">for</span> <span class="n">cmd</span><span class="p">,</span> <span class="n">response</span> <span class="ow">in</span> <span class="n">mock_responses</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
-</span><span id="__span-25-16"><a id="__codelineno-25-16" name="__codelineno-25-16" href="#__codelineno-25-16"></a>        <span class="n">mock</span><span class="o">.</span><span class="n">add_response</span><span class="p">(</span><span class="n">cmd</span><span class="p">,</span> <span class="n">response</span><span class="p">)</span>
-</span><span id="__span-25-17"><a id="__codelineno-25-17" name="__codelineno-25-17" href="#__codelineno-25-17"></a>
-</span><span id="__span-25-18"><a id="__codelineno-25-18" name="__codelineno-25-18" href="#__codelineno-25-18"></a>    <span class="n">scope</span> <span class="o">=</span> <span class="n">Oscilloscope</span><span class="p">(</span><span class="n">connection</span><span class="o">=</span><span class="n">mock</span><span class="p">)</span>
-</span><span id="__span-25-19"><a id="__codelineno-25-19" name="__codelineno-25-19" href="#__codelineno-25-19"></a>    <span class="k">assert</span> <span class="n">scope</span><span class="o">.</span><span class="n">model</span> <span class="o">==</span> <span class="s2">&quot;SDS2104X Plus&quot;</span>
+<p>Pass a list to return successive values across repeated queries of the same
+command:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-25-1"><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a><span class="n">mock</span> <span class="o">=</span> <span class="n">MockConnection</span><span class="p">(</span><span class="n">custom_responses</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;SAST?&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;Stop&quot;</span><span class="p">,</span> <span class="s2">&quot;Run&quot;</span><span class="p">,</span> <span class="s2">&quot;Stop&quot;</span><span class="p">]})</span>
 </span></code></pre></div>
 <h3 id="mocking-external-dependencies">Mocking External Dependencies<a class="headerlink" href="#mocking-external-dependencies" title="Permanent link">&para;</a></h3>
 <p><strong>Using unittest.mock:</strong></p>
