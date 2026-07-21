@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- `DataCollector.save_data()`/`save_batch()` no longer raise `InvalidParameterError` with their default format — the format is now auto-detected from the filename extension (pass CSV, CSV_ENHANCED, NPY, MAT, or HDF5 explicitly to override).
+- Report-analyzer calibration guidance and example-script output are now ASCII-safe, so they no longer crash on Windows consoles with legacy codepages.
+- Documentation sweep: corrected the README's report-generator sample to the real API, fixed the default SCPI port (5025) and GUI frame-rate claims, repaired all broken links and anchors across README and the docs site, synced the docs changelog page through 3.3.0, and excluded internal planning files from the built documentation site.
+
+### Changed
+
+- README and docs now cover the full current feature set: multi-vendor scopes, DAQ, PSU/AWG models, the web gateway and `usb` extras, all four CLI tools, `load_waveform()`/`scpi-extract` usage, and API reference pages for `signal_synth`, `waveform_io`, `provenance`, and `scpi_extract`. Every example now carries a fully spelled-out docstring (what it shows, what it needs, what to expect).
+
 ## [3.3.0] - 2026-07-21
 
 ### Added
