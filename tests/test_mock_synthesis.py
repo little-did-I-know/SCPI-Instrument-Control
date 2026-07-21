@@ -195,3 +195,15 @@ def test_unattainable_level_free_runs():
     b = scope.get_waveform(1, provenance=False)
     scope.disconnect()
     assert not np.array_equal(a.voltage, b.voltage)
+
+
+def test_server_mock_connection_synthesizes():
+    from scpi_control.server.sessions import _make_mock_connection
+
+    conn = _make_mock_connection(None)
+    scope = Oscilloscope("mock", connection=conn)
+    scope.connect()
+    data = scope.get_waveform(1, provenance=False)
+    scope.disconnect()
+    assert len(data.voltage) >= 1_000  # real trace, not the old 256-byte ramp
+    assert np.ptp(data.voltage) > 1.0  # default CH1 square, ~2 Vpp
