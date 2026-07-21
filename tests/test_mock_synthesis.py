@@ -89,8 +89,12 @@ def test_explicit_payload_precedence():
     np.testing.assert_allclose(data.voltage, [0.0, 1.0, 2.0, 3.0])
 
 
-def test_unseeded_captures_differ():
-    scope, _ = _scope()  # default specs carry noise_rms=0.01, seed=None
+def test_unseeded_noise_rerolls_each_capture():
+    # The default CH1 spec is trigger-aligned (stable t0), so consecutive
+    # captures differ ONLY because unseeded noise (noise_rms=0.01) re-rolls
+    # each acquisition. Free-run drift is covered separately by
+    # test_unattainable_level_free_runs.
+    scope, _ = _scope()
     a = scope.get_waveform(1, provenance=False)
     b = scope.get_waveform(1, provenance=False)
     scope.disconnect()
