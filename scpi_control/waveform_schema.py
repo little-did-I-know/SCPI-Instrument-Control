@@ -53,6 +53,9 @@ SCALE_FIELDS: Tuple[str, ...] = (TIMEBASE, VOLTAGE_SCALE, VOLTAGE_OFFSET)
 # One JSON document (scpi_control.provenance.AcquisitionProvenance.to_json()).
 # NPZ/MAT: a string under this key. HDF5: a FILE attr. CSV (both variants):
 # a "# Provenance-JSON: {...}" comment line.
+# Plain CSV writes scale fields and provenance ONLY when the waveform carries
+# a provenance object; a provenance-less save stays byte-identical to the
+# legacy headerless layout. The binary formats write scale fields regardless.
 PROVENANCE_JSON = "provenance_json"
 CSV_HEADER_PROVENANCE = "Provenance-JSON"
 CSV_HEADER_TIMEBASE = "Timebase"

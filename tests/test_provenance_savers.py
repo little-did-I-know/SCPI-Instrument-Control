@@ -102,3 +102,20 @@ def test_enhanced_csv_appends_provenance_lines(saver, tmp_path):
     assert "operator: robin" in text
     assert ws.CSV_HEADER_TIMEBASE in text
     assert ws.CSV_HEADER_PROVENANCE in text
+
+
+def test_binary_formats_write_scales_even_without_provenance(saver, tmp_path):
+    out = tmp_path / "wf.npz"
+    saver.save_waveform(_waveform(with_provenance=False), str(out))
+    data = np.load(out)
+    assert float(data[ws.TIMEBASE]) == 1e-4
+    assert float(data[ws.VOLTAGE_SCALE]) == 0.5
+    assert float(data[ws.VOLTAGE_OFFSET]) == 0.1
+
+
+def test_plain_csv_without_provenance_stays_headerless(saver, tmp_path):
+    """Documented contract: plain CSV carries scale fields only inside the
+    provenance header; a provenance-less save is byte-identical legacy output."""
+    out = tmp_path / "wf.csv"
+    saver.save_waveform(_waveform(with_provenance=False), str(out), format="CSV")
+    assert not out.read_text().startswith(ws.CSV_COMMENT)
