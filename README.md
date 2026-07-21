@@ -67,6 +67,7 @@ from scpi_control.report_generator.generators.markdown_generator import Markdown
 from scpi_control.report_generator.generators.pdf_generator import PDFReportGenerator
 from scpi_control.report_generator.models.report_data import ReportMetadata, TestReport, TestSection, WaveformData
 
+# time_data / voltage_data: your captured numpy arrays (e.g. from scope.get_waveform)
 waveform = WaveformData(channel="CH1", time=time_data, voltage=voltage_data, sample_rate=1e6, record_length=len(voltage_data))
 
 metadata = ReportMetadata(title="Probe Calibration Test Report", technician="Lab Technician", test_date=datetime.now(), equipment_model="SDS824X HD")

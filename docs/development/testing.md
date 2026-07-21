@@ -422,7 +422,7 @@ scope.connect()
 # Inspect what the code under test actually sent
 waveform = scope.get_waveform(1)
 assert mock.waveform_requests == [1]
-assert any("TDIV" in cmd for cmd in mock.writes)
+assert any("TIMebase" in q or "TDIV" in q for q in mock.queries)
 ```
 
 Key constructor keyword arguments (all optional, keyword-only after `host`,

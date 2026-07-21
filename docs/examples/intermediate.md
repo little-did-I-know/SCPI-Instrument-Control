@@ -221,11 +221,11 @@ Drive the web gateway's REST API from Python — no browser needed.
 ### Requirements
 
 - scpi_control - Core library
-- Oscilloscope connected to network
+- No hardware required
 
 ### Configuration
 
-Update `SCOPE_IP` to match your oscilloscope's IP address (default: `192.168.1.100`).
+No hardware required.
 
 ### Usage
 
@@ -490,11 +490,11 @@ Advanced PSU features demonstration.
 ### Requirements
 
 - scpi_control - Core library
-- Oscilloscope connected to network
+- No hardware required
 
 ### Configuration
 
-Update `SCOPE_IP` to match your oscilloscope's IP address (default: `192.168.1.100`).
+No hardware required.
 
 ### Usage
 
@@ -1140,11 +1140,11 @@ oscilloscope's state-coupled synthesis.
 ### Requirements
 
 - scpi_control - Core library
-- Oscilloscope connected to network
+- No hardware required
 
 ### Configuration
 
-Update `SCOPE_IP` to match your oscilloscope's IP address (default: `192.168.1.100`).
+No hardware required.
 
 ### Usage
 
@@ -1481,11 +1481,11 @@ Acquisition provenance and the load_waveform() / scpi-extract workflow.
 ### Requirements
 
 - scpi_control - Core library
-- Oscilloscope connected to network
+- No hardware required
 
 ### Configuration
 
-Update `SCOPE_IP` to match your oscilloscope's IP address (default: `192.168.1.100`).
+No hardware required.
 
 ### Usage
 

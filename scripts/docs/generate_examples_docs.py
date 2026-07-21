@@ -37,6 +37,30 @@ class ExampleMetadata:
     scope_ip: str
     category: str
     requirements: List[str]
+    no_hardware: bool
+
+
+# Phrases examples actually use in their docstrings to say they need no real
+# instrument (mock-only, synthetic data, etc.). Matched case-insensitively
+# against the module docstring so examples that document themselves as
+# hardware-free don't get an oscilloscope requirement or SCOPE_IP
+# configuration block stamped on them.
+NO_HARDWARE_PATTERN = re.compile(
+    r"no hardware|mock connection|fully synthetic|without hardware|hardware-free|no instrument needed",
+    re.IGNORECASE,
+)
+
+
+def is_no_hardware_example(docstring: str) -> bool:
+    """Detect whether an example's docstring declares it needs no real hardware.
+
+    Args:
+        docstring: Module docstring.
+
+    Returns:
+        True if the docstring indicates the example runs without hardware.
+    """
+    return bool(NO_HARDWARE_PATTERN.search(docstring))
 
 
 def load_config(config_path: Path = None) -> dict:
@@ -130,7 +154,10 @@ def extract_requirements(filepath: Path, docstring: str) -> List[str]:
     if not requirements:
         requirements = ["scpi_control - Core library"]
 
-    requirements.append("Oscilloscope connected to network")
+    if is_no_hardware_example(docstring):
+        requirements.append("No hardware required")
+    else:
+        requirements.append("Oscilloscope connected to network")
 
     return requirements
 
@@ -230,6 +257,7 @@ def parse_example_file(filepath: Path, config: dict) -> ExampleMetadata:
         scope_ip=scope_ip,
         category=category,
         requirements=requirements,
+        no_hardware=is_no_hardware_example(docstring),
     )
 
 
@@ -264,7 +292,10 @@ def generate_example_section(example: ExampleMetadata) -> str:
     # Configuration
     lines.append("### Configuration")
     lines.append("")
-    lines.append(f"Update `SCOPE_IP` to match your oscilloscope's IP address (default: `{example.scope_ip}`).")
+    if example.no_hardware:
+        lines.append("No hardware required.")
+    else:
+        lines.append(f"Update `SCOPE_IP` to match your oscilloscope's IP address (default: `{example.scope_ip}`).")
     lines.append("")
 
     # Usage

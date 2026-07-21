@@ -266,11 +266,11 @@ Probe Calibration Analysis Example
 ### Requirements
 
 - scpi_control - Core library
-- Oscilloscope connected to network
+- No hardware required
 
 ### Configuration
 
-Update `SCOPE_IP` to match your oscilloscope's IP address (default: `192.168.1.100`).
+No hardware required.
 
 ### Usage
 
@@ -616,11 +616,11 @@ Test the power supply GUI with a mock connection.
 ### Requirements
 
 - PyQt6 - For GUI
-- Oscilloscope connected to network
+- No hardware required
 
 ### Configuration
 
-Update `SCOPE_IP` to match your oscilloscope's IP address (default: `192.168.1.100`).
+No hardware required.
 
 ### Usage
 
@@ -787,11 +787,11 @@ Ask a local LLM questions about a report, using tool-calling.
 ### Requirements
 
 - scpi_control - Core library
-- Oscilloscope connected to network
+- No hardware required
 
 ### Configuration
 
-Update `SCOPE_IP` to match your oscilloscope's IP address (default: `192.168.1.100`).
+No hardware required.
 
 ### Usage
 
@@ -886,11 +886,11 @@ Apply company branding to a generated report.
 ### Requirements
 
 - scpi_control - Core library
-- Oscilloscope connected to network
+- No hardware required
 
 ### Configuration
 
-Update `SCOPE_IP` to match your oscilloscope's IP address (default: `192.168.1.100`).
+No hardware required.
 
 ### Usage
 
@@ -997,11 +997,11 @@ Deterministic (LLM-free) report analysis.
 ### Requirements
 
 - scpi_control - Core library
-- Oscilloscope connected to network
+- No hardware required
 
 ### Configuration
 
-Update `SCOPE_IP` to match your oscilloscope's IP address (default: `192.168.1.100`).
+No hardware required.
 
 ### Usage
 
@@ -1101,11 +1101,11 @@ Example: Generating Professional Test Reports
 ### Requirements
 
 - scpi_control - Core library
-- Oscilloscope connected to network
+- No hardware required
 
 ### Configuration
 
-Update `SCOPE_IP` to match your oscilloscope's IP address (default: `192.168.1.100`).
+No hardware required.
 
 ### Usage
 

@@ -317,11 +317,11 @@ SCPI dialect auto-detection and manual override.
 ### Requirements
 
 - scpi_control - Core library
-- Oscilloscope connected to network
+- No hardware required
 
 ### Configuration
 
-Update `SCOPE_IP` to match your oscilloscope's IP address (default: `192.168.1.100`).
+No hardware required.
 
 ### Usage
 
@@ -687,11 +687,11 @@ Discover SCPI instruments on the local network.
 ### Requirements
 
 - scpi_control - Core library
-- Oscilloscope connected to network
+- No hardware required
 
 ### Configuration
 
-Update `SCOPE_IP` to match your oscilloscope's IP address (default: `192.168.1.100`).
+No hardware required.
 
 ### Usage
 
