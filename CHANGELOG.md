@@ -1,4 +1,4 @@
-﻿# Changelog
+# Changelog
 
 All notable changes to this project will be documented in this file.
 
@@ -1369,4 +1369,3 @@ pip install "Siglent-Oscilloscope[power-supply-beta,usb]==0.4.0-beta.1"
 - Comprehensive error handling with custom exceptions
 
 [0.1.0]: https://github.com/siglent-control/siglent/releases/tag/v0.1.0
-

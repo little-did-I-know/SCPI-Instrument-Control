@@ -64,9 +64,10 @@ WIRE = {
 @pytest.fixture(params=["legacy", "modern", "tektronix", "lecroy"])
 def rig(request):
     dialect = request.param
-    # Explicit payloads keep the waveform assertions dialect-agnostic: legacy/modern
-    # (Siglent) would otherwise get state-coupled synthesis while tektronix/lecroy
-    # (not wired to the synthesizer until Task 4) would see no payload at all.
+    # Explicit payloads keep this test's expectations deterministic at the wire
+    # level, independent of synthesis: legacy/modern (Siglent) would otherwise
+    # get state-coupled synthesis while tektronix/lecroy would see no payload
+    # at all.
     conn = MockConnection(
         "mock",
         idn=IDN[dialect],

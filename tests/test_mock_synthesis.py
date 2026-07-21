@@ -1,4 +1,4 @@
-"""State-coupled mock waveform synthesis (Siglent dialects)."""
+"""State-coupled mock waveform synthesis: all vendor personalities, trigger alignment, and server mock sessions."""
 
 import numpy as np
 import pytest
@@ -174,6 +174,21 @@ def test_trigger_falling_slope():
     n = len(data.voltage)
     assert data.voltage[n // 2] == pytest.approx(0.0, abs=0.05)
     assert data.voltage[n // 2 + 20] < data.voltage[n // 2 - 20]  # falling through it
+
+
+def test_trigger_centered_even_when_point_cap_clamps():
+    # TDIV 10 ms/div at 1 MSa/s wants 140k points; MAX_POINTS clamps to 14k,
+    # so the sampled span (14 ms) is shorter than the nominal window (140 ms).
+    # The trigger edge must sit at the center of the SAMPLED span.
+    scope, _ = _scope(signals={1: SignalSpec(kind="sine", frequency=1_000.0, amplitude=1.0, noise_rms=0.0, seed=1)})
+    scope.write("TDIV 1e-2")
+    scope.write("C1:TRLV 0.0")
+    data = scope.get_waveform(1, provenance=False)
+    scope.disconnect()
+    n = len(data.voltage)
+    assert n == 14_000
+    assert data.voltage[n // 2] == pytest.approx(0.0, abs=0.05)
+    assert data.voltage[n // 2 + 20] > data.voltage[n // 2 - 20]
 
 
 def test_triggered_display_is_stable():

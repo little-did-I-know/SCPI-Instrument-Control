@@ -85,7 +85,7 @@ def payload_for(conn: "MockConnection", channel: int, *, include_offset: bool) -
     window = DIVISIONS * conn.timebase
     crossing = _trigger_crossing(spec, conn.trigger_level.get(channel, 0.0), _is_rising(conn.trigger_slope))
     if crossing is not None:
-        t0 = crossing - window / 2.0  # matching edge lands at the window center
+        t0 = crossing - (n / conn.sample_rate) / 2.0  # center of the SAMPLED span (may be shorter than the nominal window when MAX_POINTS clamps)
     else:
         t0 = count * window * _DRIFT_FRACTION  # untriggerable: free-run drift
     per_acquisition = spec if spec.seed is None else replace(spec, seed=spec.seed + count)

@@ -148,7 +148,9 @@ before an acquisition change what comes back:
   unattainable for the signal (e.g. a level outside its range), the mock
   free-runs instead: each acquisition's window drifts forward by a fixed
   fraction of the window, so consecutive captures visibly shift rather than
-  repeating.
+  repeating. Each channel aligns to its own trigger level and signal; the
+  mock does not model `trigger_source` routing (triggering one channel off
+  another channel's crossing) between channels.
 
 ### Precedence vs. `waveform_payloads`
 
@@ -172,8 +174,8 @@ byte-identical tests unaffected by this feature.
 
 Mock sessions created through the web gateway now default to
 `sample_rate=1_000_000.0`, so a default mock session's captures are 14,000
-points long (14 divisions x 1 ms/div timebase) instead of the much shorter
-traces earlier default sample rates produced.
+points long (14 divisions x 1 ms/div timebase) instead of the fixed 256-byte
+explicit ramp payloads earlier sessions served.
 
 ## Extensibility
 
