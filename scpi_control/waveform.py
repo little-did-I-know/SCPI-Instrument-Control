@@ -417,6 +417,8 @@ class Waveform:
                 f.write(f"{ws.CSV_COMMENT}\n")
             elif not bare and waveform.provenance is not None:
                 f.write(f"{ws.CSV_COMMENT} SCPI Instrument Control Waveform Data\n")
+                f.write(f"{ws.CSV_COMMENT} {ws.CSV_HEADER_CHANNEL}: {waveform.channel}\n")
+                f.write(f"{ws.CSV_COMMENT} {ws.CSV_HEADER_SAMPLE_RATE}: {waveform.sample_rate} Sa/s\n")
                 self._write_provenance_header(f, waveform)
                 f.write(f"{ws.CSV_COMMENT}\n")
 
