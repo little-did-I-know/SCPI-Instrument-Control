@@ -10,6 +10,7 @@ import numpy as np
 from scpi_control import exceptions
 from scpi_control import waveform_schema as ws
 from scpi_control.models import validate_channel
+from scpi_control.provenance import AcquisitionProvenance
 from scpi_control.scpi_commands import BARE_NR3_DIALECTS
 
 if TYPE_CHECKING:
@@ -37,6 +38,7 @@ class WaveformData:
         timebase: Timebase setting (seconds/division)
         voltage_scale: Voltage scale (volts/division)
         voltage_offset: Voltage offset in volts
+        provenance: Instrument settings snapshot at acquisition time (optional)
     """
 
     time: np.ndarray
@@ -47,6 +49,7 @@ class WaveformData:
     timebase: Optional[float] = None
     voltage_scale: Optional[float] = None
     voltage_offset: float = 0.0
+    provenance: Optional[AcquisitionProvenance] = None
 
     def __len__(self) -> int:
         """Get number of samples."""
@@ -94,12 +97,14 @@ class Waveform:
         """Wire dialect of the parent scope; defaults to legacy before connect."""
         return getattr(self._scope, "dialect", None) or "legacy"
 
-    def acquire(self, channel: int, format: str = "BYTE") -> WaveformData:
+    def acquire(self, channel: int, format: str = "BYTE", provenance: bool = True) -> WaveformData:
         """Acquire waveform data from a channel.
 
         Args:
             channel: Channel number (1-4)
             format: Data format - 'BYTE' or 'WORD' (default: 'BYTE')
+            provenance: Snapshot instrument settings alongside the data
+                (default True; pass False on high-rate paths)
 
         Returns:
             WaveformData object with time and voltage arrays
@@ -114,7 +119,13 @@ class Waveform:
 
         from scpi_control.waveform_transfer import make_transfer
 
-        return make_transfer(self._scope).acquire(channel, format)
+        data = make_transfer(self._scope).acquire(channel, format)
+        if provenance:
+            try:
+                data.provenance = AcquisitionProvenance.from_scope(self._scope, channels=[channel])
+            except Exception:
+                logger.warning("Provenance snapshot failed; waveform returned without provenance", exc_info=True)
+        return data
 
     def _get_voltage_scale(self, channel: str) -> float:
         """Get voltage scale for channel.

@@ -107,4 +107,5 @@ def test_the_canonical_field_set_is_exactly_the_shared_core():
         "timebase",
         "voltage_scale",
         "voltage_offset",
+        "provenance",
     ]

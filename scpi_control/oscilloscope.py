@@ -370,18 +370,20 @@ class Oscilloscope:
         """Perform automatic setup."""
         self.write(self._get_command("auto_setup"))
 
-    def get_waveform(self, channel: int) -> WaveformData:
+    def get_waveform(self, channel: int, provenance: bool = True) -> WaveformData:
         """Acquire waveform data from a channel.
 
         Convenience method that calls waveform.acquire().
 
         Args:
             channel: Channel number (1-4)
+            provenance: Snapshot instrument settings alongside the data
+                (default True; pass False on high-rate paths)
 
         Returns:
             WaveformData object with time and voltage arrays
         """
-        return self.waveform.acquire(channel)
+        return self.waveform.acquire(channel, provenance=provenance)
 
     @property
     def device_info(self) -> Optional[Dict[str, str]]:
