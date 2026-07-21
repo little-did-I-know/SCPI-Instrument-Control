@@ -7,7 +7,6 @@ None) and normalizes the three binary formats' differing metadata
 conventions (see scpi_control.waveform_schema) into one flat dict.
 """
 
-import json
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path

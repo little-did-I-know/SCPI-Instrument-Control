@@ -1,5 +1,6 @@
 """load_waveform round-trips every saver format, old files included."""
 
+import logging
 from pathlib import Path
 from unittest.mock import Mock
 
@@ -93,3 +94,15 @@ def test_to_dataframe(saver, tmp_path):
     df = load_waveform(out).to_dataframe()
     assert list(df.columns) == ["time", "voltage"]
     assert df.attrs["provenance"]["instrument"]["model"] == "SDS824X HD"
+
+
+def test_corrupt_provenance_yields_none_with_warning(tmp_path, caplog):
+    from scpi_control import waveform_schema as ws
+
+    out = tmp_path / "wf.npz"
+    np.savez(out, **{ws.TIME: np.linspace(0.0, 1.0, 10), ws.VOLTAGE: np.zeros(10), ws.CHANNEL: 1, ws.SAMPLE_RATE: 10.0, ws.PROVENANCE_JSON: "{not valid json"})
+    with caplog.at_level(logging.WARNING):
+        loaded = load_waveform(out)
+    assert loaded.provenance is None
+    assert len(loaded.voltage) == 10
+    assert any("provenance" in record.message.lower() for record in caplog.records)
