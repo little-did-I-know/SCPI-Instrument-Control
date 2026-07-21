@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.1.0] - 2026-07-21
+
 ### Added
 
 - Report generator: a built-in **probe-calibration template preset** (`ReportTemplate.create_probe_calibration_template()`, seedable from the Template Manager via "Create Probe Cal Template") — probe_calibration test type, a compensation procedure, and overshoot/undershoot/ringing/flatness pass/fail limits.
