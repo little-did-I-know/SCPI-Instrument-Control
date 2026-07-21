@@ -40,6 +40,7 @@ EXECUTE = [
     ("report_branding.py", None),
     ("network_discovery.py", None),
     ("report_ai_qa.py", "requests"),
+    ("waveform_provenance_and_extract.py", None),
 ]
 
 _TIMEOUTS = {"report_ai_qa.py": 240}

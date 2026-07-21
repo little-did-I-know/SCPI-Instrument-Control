@@ -22,7 +22,7 @@ from scpi_control.connection import MockConnection
 from scpi_control.oscilloscope import Oscilloscope
 from scpi_control.waveform_io import load_waveform
 
-OUTPUT_DIR = Path(__file__).parent
+OUTPUT_DIR = Path.cwd()
 NPZ_PATH = OUTPUT_DIR / "provenance_demo.npz"
 CSV_PATH = OUTPUT_DIR / "provenance_demo.csv"
 

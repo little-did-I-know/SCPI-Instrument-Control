@@ -25,7 +25,7 @@ def _info_lines(loaded: LoadedWaveform) -> List[str]:
     ]
     prov = loaded.provenance
     if prov is None:
-        lines.append("Provenance:  (none — file predates provenance capture)")
+        lines.append("Provenance:  (none - file predates provenance capture)")
     else:
         if prov.instrument is not None:
             lines.append(f"Instrument:  {prov.instrument.manufacturer} {prov.instrument.model} (serial {prov.instrument.serial}, firmware {prov.instrument.firmware})")
