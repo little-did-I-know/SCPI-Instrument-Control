@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `signal_synth.stream()`: an infinite or duration-bounded generator of phase-continuous voltage chunks for live-signal simulation — optional wall-clock pacing (`realtime=True`), correct seeded-noise semantics (seed advances per chunk, so seeded streams are reproducible without repeating noise blocks), and eager parameter validation.
+- Dev tooling: `pytest-testmon` in the `dev` extra for impact-based local test selection (`python -m pytest --testmon`); CI and pre-merge checks still run the full suite.
+
 ## [3.2.0] - 2026-07-21
 
 ### Added

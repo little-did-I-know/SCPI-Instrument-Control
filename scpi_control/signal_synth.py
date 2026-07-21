@@ -6,8 +6,9 @@ dispatch table of generator functions -- adding a kind is one new generator plus
 docs and tests; the mock coupling and code-conversion layers are kind-agnostic.
 """
 
-from dataclasses import dataclass
-from typing import Callable, Dict, Optional
+import time
+from dataclasses import dataclass, replace
+from typing import Callable, Dict, Iterator, Optional
 
 import numpy as np
 
@@ -115,6 +116,64 @@ def synthesize(spec: SignalSpec, sample_rate: float, n_points: int, t0: float = 
     if spec.noise_rms > 0:
         samples = samples + rng.normal(0.0, spec.noise_rms, n_points)
     return samples
+
+
+def stream(
+    spec: SignalSpec,
+    sample_rate: float,
+    chunk_size: int,
+    *,
+    start_time: float = 0.0,
+    duration: Optional[float] = None,
+    realtime: bool = False,
+) -> Iterator[np.ndarray]:
+    """Yield phase-continuous voltage chunks for live/continuous simulation.
+
+    Args:
+        spec: Signal parameters. A seeded spec uses seed + chunk_index per
+            chunk (reproducible run-to-run, non-repeating across chunks);
+            seed=None re-rolls noise freshly every chunk.
+        sample_rate: Samples per second.
+        chunk_size: Samples per yielded chunk.
+        start_time: Time of the very first sample in seconds.
+        duration: None streams forever (stop by breaking out); a positive
+            number bounds the stream to round(duration * sample_rate) samples,
+            truncating the final chunk.
+        realtime: When True, chunks arrive at wall-clock rate (chunk k is
+            withheld until k * chunk_size / sample_rate seconds after the
+            first chunk); scheduling is absolute, so timing error never
+            accumulates, and a consumer slower than real time simply never
+            waits.
+
+    Returns:
+        Iterator of float64 voltage arrays. Validation errors raise at call
+        time, before the first chunk.
+    """
+    _validate(spec, sample_rate, chunk_size)
+    if duration is not None and duration <= 0:
+        raise exceptions.InvalidParameterError(f"duration must be positive: {duration}")
+    total = None if duration is None else int(round(duration * sample_rate))
+
+    def _chunks() -> Iterator[np.ndarray]:
+        produced = 0
+        index = 0
+        wall_start = None
+        while total is None or produced < total:
+            n = chunk_size if total is None else min(chunk_size, total - produced)
+            chunk_spec = spec if spec.seed is None else replace(spec, seed=spec.seed + index)
+            chunk = synthesize(chunk_spec, sample_rate, n, t0=start_time + produced / sample_rate)
+            if realtime:
+                if wall_start is None:
+                    wall_start = time.monotonic()
+                else:
+                    delay = wall_start + produced / sample_rate - time.monotonic()
+                    if delay > 0:
+                        time.sleep(delay)
+            yield chunk
+            produced += n
+            index += 1
+
+    return _chunks()
 
 
 def make_waveform(spec: SignalSpec, sample_rate: float, n_points: int, channel: int = 1):

@@ -1,10 +1,13 @@
 """Public synthetic-signal generators."""
 
+import itertools
+import time
+
 import numpy as np
 import pytest
 
 from scpi_control import exceptions
-from scpi_control.signal_synth import SignalSpec, make_waveform, synthesize
+from scpi_control.signal_synth import SignalSpec, make_waveform, stream, synthesize
 
 
 def _dominant_frequency(voltage, sample_rate):
@@ -118,3 +121,71 @@ def test_make_waveform():
     assert wf.sample_rate == pytest.approx(100_000.0)
     assert len(wf.time) == len(wf.voltage) == 2_000
     assert wf.time[1] - wf.time[0] == pytest.approx(1e-5)
+
+
+def test_stream_chunks_are_phase_continuous():
+    spec = SignalSpec(kind="sine", frequency=1_000.0)
+    joined = np.concatenate(list(stream(spec, 1_000_000.0, 1_000, duration=0.01)))
+    expected = synthesize(spec, 1_000_000.0, 10_000)
+    assert joined.shape == expected.shape
+    np.testing.assert_allclose(joined, expected, rtol=0, atol=1e-9)
+
+
+def test_stream_duration_yields_partial_final_chunk():
+    chunks = list(stream(SignalSpec(seed=1), 10_000.0, 300, duration=0.1))  # 1000 samples
+    assert [len(c) for c in chunks] == [300, 300, 300, 100]
+
+
+def test_stream_exact_chunk_multiple_has_no_empty_tail():
+    chunks = list(stream(SignalSpec(seed=1), 10_000.0, 250, duration=0.1))  # 1000 samples
+    assert [len(c) for c in chunks] == [250, 250, 250, 250]
+
+
+def test_stream_infinite_by_default():
+    chunks = list(itertools.islice(stream(SignalSpec(seed=1), 10_000.0, 128), 3))
+    assert [len(c) for c in chunks] == [128, 128, 128]
+
+
+def test_stream_seeded_reproducible_and_nonrepeating():
+    spec = SignalSpec(kind="noise", amplitude=0.5, seed=42)
+    a = list(itertools.islice(stream(spec, 10_000.0, 256), 3))
+    b = list(itertools.islice(stream(spec, 10_000.0, 256), 3))
+    for x, y in zip(a, b):
+        np.testing.assert_array_equal(x, y)  # run-to-run reproducible
+    assert not np.array_equal(a[0], a[1])  # non-repeating across chunks
+
+
+def test_stream_unseeded_noise_differs_per_stream():
+    spec = SignalSpec(kind="noise", amplitude=0.5)
+    a = next(iter(stream(spec, 10_000.0, 256)))
+    b = next(iter(stream(spec, 10_000.0, 256)))
+    assert not np.array_equal(a, b)
+
+
+def test_stream_start_time_offsets_the_signal():
+    spec = SignalSpec(kind="sine", frequency=1_000.0)
+    first = next(iter(stream(spec, 1_000_000.0, 500, start_time=0.25e-3)))
+    np.testing.assert_allclose(first, synthesize(spec, 1_000_000.0, 500, t0=0.25e-3), rtol=0, atol=1e-9)
+
+
+def test_stream_realtime_paces_chunks():
+    started = time.monotonic()
+    list(stream(SignalSpec(seed=1), 1_000.0, 50, duration=0.15, realtime=True))  # 3 x 50 ms
+    elapsed = time.monotonic() - started
+    # Chunk 0 is immediate; chunks 1 and 2 wait until 50 ms and 100 ms.
+    assert elapsed >= 0.09
+
+
+def test_stream_not_realtime_is_fast():
+    started = time.monotonic()
+    list(stream(SignalSpec(seed=1), 1_000.0, 50, duration=0.15))
+    assert time.monotonic() - started < 0.05
+
+
+def test_stream_validates_at_call_time():
+    with pytest.raises(exceptions.InvalidParameterError):
+        stream(SignalSpec(), 1_000.0, 0)  # no iteration needed
+    with pytest.raises(exceptions.InvalidParameterError):
+        stream(SignalSpec(), 1_000.0, 100, duration=-1.0)
+    with pytest.raises(exceptions.InvalidParameterError):
+        stream(SignalSpec(kind="sawtooth"), 1_000.0, 100)
