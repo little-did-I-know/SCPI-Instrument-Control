@@ -286,9 +286,11 @@ def test_set_active_reference_broadcasts_overlay_and_clear():
 
 
 def test_poll_publishes_reference_stats_for_active_reference():
-    session = make_session()
+    # An explicit payload (rather than the default state-coupled synthesis, which
+    # varies each acquisition) keeps the mock replaying the same record every
+    # tick, so the self-compare below is deterministic.
+    session = make_session(waveform_payloads={1: bytes([0, 25, 50, 75])})
     try:
-        # the mock replays the same record every tick -> self-compare is deterministic
         data = session.submit(lambda scope: scope.get_waveform(1)).result(timeout=5)
         session.set_active_reference("golden", 1, {"time": data.time, "voltage": data.voltage})
         msgs = collect(session, "reference_stats", n=1, timeout=8.0)

@@ -7,6 +7,7 @@ import re
 from typing import Dict, Optional, Tuple
 
 from scpi_control.connection.mock.helpers import _build_ieee_block, _format_nr3, _format_scientific
+from scpi_control.connection.mock import synth as mock_synth
 
 # Canonical PAVA? measurement values for the legacy dialect (mirrors real
 # hardware where PAVA? is legacy-only; the modern dialect has no equivalent).
@@ -230,6 +231,6 @@ def handle_query(conn, command: str) -> Optional[str]:
 
 def build_waveform_response(conn) -> bytes:
     """Construct a minimal Siglent-style waveform block response."""
-    channel = conn._last_waveform_channel or next(iter(conn._waveform_payloads.keys()))
-    payload = conn._waveform_payloads.get(channel, bytes())
+    channel = conn._last_waveform_channel or next(iter(conn._waveform_payloads), 1)
+    payload = mock_synth.payload_for(conn, channel, include_offset=True)
     return b"DESC," + _build_ieee_block(payload)

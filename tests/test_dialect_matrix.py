@@ -64,7 +64,19 @@ WIRE = {
 @pytest.fixture(params=["legacy", "modern", "tektronix", "lecroy"])
 def rig(request):
     dialect = request.param
-    conn = MockConnection("mock", idn=IDN[dialect], channel_states={1: True, 2: True}, trigger_status=["Ready", "Trig'd", "Stop"], sample_rate=1_000.0, timebase=1e-3)
+    # Explicit payloads keep this test's expectations deterministic at the wire
+    # level, independent of synthesis: legacy/modern (Siglent) would otherwise
+    # get state-coupled synthesis while tektronix/lecroy would see no payload
+    # at all.
+    conn = MockConnection(
+        "mock",
+        idn=IDN[dialect],
+        channel_states={1: True, 2: True},
+        trigger_status=["Ready", "Trig'd", "Stop"],
+        sample_rate=1_000.0,
+        timebase=1e-3,
+        waveform_payloads={1: bytes([0, 25, 50, 75]), 2: bytes([0, 25, 50, 75])},
+    )
     scope = Oscilloscope("mock", connection=conn)
     scope.connect()
     yield dialect, scope, conn

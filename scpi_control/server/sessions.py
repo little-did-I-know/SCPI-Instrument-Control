@@ -93,8 +93,9 @@ class SessionError(RuntimeError):
 
 def _make_mock_connection(model: Optional[str]) -> MockConnection:
     idn = DEFAULT_MOCK_IDN if model is None else "Siglent Technologies,{0},MOCK0001,1.0.0.0".format(model)
-    waveform_payloads = {1: bytes(range(256)), 2: bytes(range(256)), 3: bytes(range(256)), 4: bytes(range(256))}
-    return MockConnection("mock", idn=idn, channel_states={1: True, 2: False, 3: False, 4: False}, trigger_status=["Stop"], sample_rate=1_000.0, timebase=1e-3, waveform_payloads=waveform_payloads)
+    # No explicit waveform_payloads: channels serve state-coupled synthesized
+    # signals (connection/mock/synth.py). 1 MSa/s x 14 div x 1 ms/div = 14k points.
+    return MockConnection("mock", idn=idn, channel_states={1: True, 2: False, 3: False, 4: False}, trigger_status=["Stop"], sample_rate=1_000_000.0, timebase=1e-3)
 
 
 class InstrumentSession:
