@@ -148,3 +148,46 @@ def test_vendor_explicit_payload_precedence():
     data = scope.get_waveform(1, provenance=False)
     scope.disconnect()
     np.testing.assert_allclose(data.voltage, [0.0, 1.0, 2.0, 3.0])
+
+
+def test_trigger_aligns_rising_edge_at_center():
+    scope, _ = _scope(signals={1: SignalSpec(kind="sine", frequency=1_000.0, amplitude=1.0, noise_rms=0.0, seed=1)})
+    scope.write("C1:TRLV 0.0")
+    data = scope.get_waveform(1, provenance=False)
+    scope.disconnect()
+    n = len(data.voltage)
+    center = data.voltage[n // 2]
+    assert center == pytest.approx(0.0, abs=0.05)  # crossing sits at window center
+    assert data.voltage[n // 2 + 20] > data.voltage[n // 2 - 20]  # rising through it
+
+
+def test_trigger_falling_slope():
+    scope, _ = _scope(signals={1: SignalSpec(kind="sine", frequency=1_000.0, amplitude=1.0, noise_rms=0.0, seed=1)})
+    scope.write("C1:TRLV 0.0")
+    scope.write("C1:TRSL NEG")
+    data = scope.get_waveform(1, provenance=False)
+    scope.disconnect()
+    n = len(data.voltage)
+    assert data.voltage[n // 2] == pytest.approx(0.0, abs=0.05)
+    assert data.voltage[n // 2 + 20] < data.voltage[n // 2 - 20]  # falling through it
+
+
+def test_triggered_display_is_stable():
+    # A real triggered scope shows a stable trace: consecutive noise-free
+    # captures are identical when the trigger aligns them.
+    scope, _ = _scope(signals={1: SignalSpec(kind="sine", frequency=1_000.0, noise_rms=0.0)})
+    scope.write("C1:TRLV 0.0")
+    a = scope.get_waveform(1, provenance=False)
+    b = scope.get_waveform(1, provenance=False)
+    scope.disconnect()
+    np.testing.assert_array_equal(a.voltage, b.voltage)
+
+
+def test_unattainable_level_free_runs():
+    # Level above the signal: no alignment, so noise-free captures drift.
+    scope, _ = _scope(signals={1: SignalSpec(kind="sine", frequency=1_000.0, amplitude=1.0, noise_rms=0.0)})
+    scope.write("C1:TRLV 5.0")
+    a = scope.get_waveform(1, provenance=False)
+    b = scope.get_waveform(1, provenance=False)
+    scope.disconnect()
+    assert not np.array_equal(a.voltage, b.voltage)

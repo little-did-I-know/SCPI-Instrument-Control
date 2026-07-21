@@ -9,11 +9,11 @@ does not model offset (include_offset=False).
 """
 
 from dataclasses import replace
-from typing import TYPE_CHECKING, Dict
+from typing import TYPE_CHECKING, Dict, Optional
 
 import numpy as np
 
-from scpi_control.signal_synth import SignalSpec, synthesize
+from scpi_control.signal_synth import PERIODIC_KINDS, SignalSpec, synthesize
 
 if TYPE_CHECKING:
     from scpi_control.connection.mock.base import MockConnection
@@ -31,6 +31,32 @@ _DEFAULT_SPECS: Dict[int, SignalSpec] = {
     4: SignalSpec(kind="sine", frequency=10_000.0, amplitude=0.125, noise_rms=0.01),
 }
 _FALLBACK_SPEC = SignalSpec(kind="sine", frequency=1_000.0, amplitude=1.0, noise_rms=0.01)
+
+
+def _is_rising(slope_token) -> bool:
+    """Normalize per-dialect slope tokens: POS/RISing/RISE vs NEG/FALLing/FALL."""
+    token = str(slope_token).upper()
+    return not (token.startswith("NEG") or token.startswith("FALL"))
+
+
+def _trigger_crossing(spec: SignalSpec, level: float, rising: bool) -> Optional[float]:
+    """Time within one period where the ideal signal crosses `level`, or None."""
+    if spec.kind not in PERIODIC_KINDS:
+        return None
+    period = 1.0 / spec.frequency
+    n = 4096
+    ideal = synthesize(replace(spec, noise_rms=0.0, seed=0), sample_rate=n / period, n_points=n)
+    above = ideal >= level
+    # np.roll makes the comparison periodic: a crossing at the period boundary
+    # (e.g. a zero-phase sine rising through 0 at t=0/t=P) is not missed.
+    nxt = np.roll(above, -1)
+    if rising:
+        indices = np.flatnonzero(~above & nxt)
+    else:
+        indices = np.flatnonzero(above & ~nxt)
+    if indices.size == 0:
+        return None
+    return float(indices[0] + 1) * (period / n)
 
 
 def spec_for(conn: "MockConnection", channel: int) -> SignalSpec:
@@ -57,7 +83,11 @@ def payload_for(conn: "MockConnection", channel: int, *, include_offset: bool) -
     count = conn._acquisition_counts.get(channel, 0)
     conn._acquisition_counts[channel] = count + 1
     window = DIVISIONS * conn.timebase
-    t0 = count * window * _DRIFT_FRACTION  # free-run; Task 5 adds trigger alignment
+    crossing = _trigger_crossing(spec, conn.trigger_level.get(channel, 0.0), _is_rising(conn.trigger_slope))
+    if crossing is not None:
+        t0 = crossing - window / 2.0  # matching edge lands at the window center
+    else:
+        t0 = count * window * _DRIFT_FRACTION  # untriggerable: free-run drift
     per_acquisition = spec if spec.seed is None else replace(spec, seed=spec.seed + count)
     volts = synthesize(per_acquisition, conn.sample_rate, n, t0=t0)
     vdiv = conn._voltage_scales.get(channel, 1.0)
