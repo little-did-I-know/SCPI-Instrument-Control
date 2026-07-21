@@ -78,6 +78,60 @@ Two calls with `seed=None` (the default) produce different noise and, for
 `"noise"` itself, different signal on every call. Pass an `int` seed to get
 byte-identical output across runs.
 
+## Streaming
+
+`synthesize()` and `make_waveform()` generate one fixed-length block. For
+continuous or live simulation -- feeding a loop, a plot, or a network socket
+indefinitely -- `stream()` does the same phase-continuous generation without
+hand-rolling the `t0` bookkeeping yourself:
+
+```python
+def stream(
+    spec: SignalSpec,
+    sample_rate: float,
+    chunk_size: int,
+    *,
+    start_time: float = 0.0,
+    duration: Optional[float] = None,
+    realtime: bool = False,
+) -> Iterator[np.ndarray]
+```
+
+It returns an iterator of `float64` voltage chunks, each `chunk_size`
+samples long, where every chunk picks up exactly where the previous one left
+off -- no phase discontinuity at chunk boundaries. Validation errors (the
+same ones `SignalSpec` and `synthesize()` raise) happen at call time, before
+the first chunk is produced.
+
+A minimal continuous loop:
+
+```python
+from scpi_control.signal_synth import SignalSpec, stream
+
+spec = SignalSpec(kind="sine", frequency=1_000.0, amplitude=1.0, noise_rms=0.02)
+for chunk in stream(spec, sample_rate=1_000_000.0, chunk_size=10_000):
+    process(chunk)  # phase-continuous float64 volts; break when done
+```
+
+By default `stream()` yields chunks as fast as the consumer pulls them. With
+`duration=None` (the default) it streams forever -- `break` out of the loop
+to stop. Passing a positive `duration` bounds the stream to
+`round(duration * sample_rate)` total samples, truncating the final chunk to
+fit; `start_time` shifts the time of the very first sample, the same way
+`t0` does for `synthesize()`.
+
+Set `realtime=True` to pace chunks at wall-clock rate: chunk `k` is withheld
+until `k * chunk_size / sample_rate` seconds after the first chunk was
+produced. Scheduling is absolute (measured from the start, not
+chunk-to-chunk), so timing error never accumulates across a long stream, and
+a consumer slower than real time simply never waits -- it just gets chunks
+later than it asked for them.
+
+Seeding follows the same rule the mock uses per acquisition: `seed=None`
+re-rolls fresh noise on every chunk, while a seeded spec advances the seed
+per chunk (`seed + chunk_index`) so the whole stream is reproducible
+run-to-run without repeating the same noise block over and over.
+
 ## Mock Oscilloscope Synthesis
 
 `MockConnection` synthesizes each channel's waveform from its current state
