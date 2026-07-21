@@ -74,6 +74,7 @@ waveform_*.h5
 waveform_*.npy
 waveform_*.bin
 my_circle_*.csv
+provenance_demo.npz
 *.waveform
 
 # AI

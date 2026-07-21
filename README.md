@@ -30,6 +30,7 @@ A universal Python library for controlling SCPI-compatible test equipment via Et
 - **Automation & Data Collection**: High-level API for batch capture, continuous monitoring, and analysis
 - **GUI Application**: Modern PyQt6-based graphical interface
 - **Waveform Acquisition**: Capture and download waveform data in multiple formats (NPZ, CSV, MAT, HDF5)
+- **Acquisition Provenance**: every saved waveform records the instrument, settings, and timestamp that produced it; extract raw data from any saved file with load_waveform() or the scpi-extract CLI
 - **Channel Configuration**: Control voltage scale, coupling, offset, bandwidth
 - **Trigger Settings**: Configure trigger modes, levels, edge detection
 - **Advanced Analysis**: Built-in FFT, SNR, THD, and statistical analysis tools
