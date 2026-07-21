@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.2.0] - 2026-07-21
+
 ### Added
 
 - Synthetic signals: a public generator API — `SignalSpec` plus `synthesize()`/`make_waveform()` in `scpi_control.signal_synth` — producing sine, square (with duty cycle), triangle, ramp, DC, and Gaussian-noise waveforms as numpy arrays or ready-to-analyze `WaveformData`, with seedable reproducibility.

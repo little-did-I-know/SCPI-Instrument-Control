@@ -14,7 +14,7 @@
 [![GitHub last commit](https://img.shields.io/github/last-commit/little-did-I-know/SCPI-Instrument-Control)](https://github.com/little-did-I-know/SCPI-Instrument-Control/commits/main)
 [![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-Support-yellow.svg?style=flat&logo=buy-me-a-coffee)](https://buymeacoffee.com/little.did.i.know)
 
-A universal Python library for controlling SCPI-compatible test equipment via Ethernet/LAN. Supports oscilloscopes, function generators (AWGs), and power supplies with a comprehensive programmatic API and high-performance PyQt6-based GUI application.
+A universal Python library for controlling SCPI-compatible test equipment via Ethernet/LAN (plus USB, GPIB, and serial through the optional VISA backend). It drives oscilloscopes from Siglent, Tektronix, and LeCroy alongside function generators (AWGs), power supplies, and data-acquisition units through one programmatic API — with a high-performance PyQt6 GUI, a browser-based lab gateway, provenance-stamped waveform files, automated PDF/Markdown test reports with local-LLM analysis, and a realistic mock layer that synthesizes state-coupled waveforms so the whole stack can be developed and demoed without an instrument attached.
 
 <p align="center">
   <img src="docs/images/sds824x-hd-cal-square.png" alt="Live screen capture from a Siglent SDS824X HD oscilloscope" width="720">

@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "SCPI-Instrument-Control"
-version = "3.1.0"
-description = "Universal Python library for controlling SCPI-compatible test equipment via Ethernet/LAN. Supports oscilloscopes (Siglent SDS series, generic SCPI scopes), function generators/AWGs (Siglent SDG series, generic SCPI AWGs), and power supplies (Siglent SPD series, generic SCPI PSUs). Features include waveform capture, measurements, FFT analysis, PyQt6 GUI, automated report generation with AI analysis, and comprehensive SCPI command abstraction."
+version = "3.2.0"
+description = "Universal Python library for controlling SCPI-compatible test equipment via Ethernet/LAN, USB, GPIB, or serial. Drives oscilloscopes (Siglent SDS, Tektronix TBS/MSO, LeCroy MAUI, generic SCPI), function generators/AWGs (Siglent SDG series), power supplies (Siglent SPD series), and data-acquisition units (34970A-style). Features waveform capture with acquisition provenance, raw-data extraction (load_waveform and the scpi-extract CLI), measurements, FFT analysis, a PyQt6 GUI, a browser-based lab gateway, automated PDF/Markdown report generation with local-LLM analysis, synthetic-signal generation, and a realistic mock layer for developing without hardware."
 readme = { file = "README.md", content-type = "text/markdown" }
 requires-python = ">=3.9"
 license = { text = "MIT" }
