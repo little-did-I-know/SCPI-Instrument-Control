@@ -24,14 +24,14 @@ pip install "SCPI-Instrument-Control"
 | File | What it shows | Requirements |
 | --- | --- | --- |
 | `basic_usage.py` | Connecting to an oscilloscope, configuring channels and trigger, and performing basic operations. | Oscilloscope on the network |
-| `waveform_capture.py` | Capturing waveform data from the oscilloscope and saving it to a file. | Oscilloscope on the network, matplotlib |
+| `waveform_capture.py` | Capturing waveform data from the oscilloscope and saving it to a file. | Oscilloscope on the network (matplotlib is a core dependency) |
 | `measurements.py` | Automated measurements (frequency, Vpp, RMS, period, etc.) on oscilloscope channels. | Oscilloscope on the network |
-| `live_plot.py` | Real-time waveform acquisition and plotting using matplotlib animation. | Oscilloscope on the network, matplotlib |
+| `live_plot.py` | Real-time waveform acquisition and plotting using matplotlib animation. | Oscilloscope on the network (matplotlib is a core dependency) |
 | `simple_capture.py` | Single waveform capture with analysis via the automation API (Vpp, RMS, frequency) and saving to NumPy format. | Oscilloscope on the network |
 | `batch_capture.py` | Capturing multiple waveforms with different timebase and voltage-scale settings, for characterizing signals at different scales. | Oscilloscope on the network |
 | `continuous_capture.py` | Collecting waveforms continuously over a period of time, for monitoring, statistics, or time-varying phenomena. | Oscilloscope on the network |
 | `trigger_based_capture.py` | Waiting for specific trigger conditions and capturing waveforms when they occur, for sporadic events. | Oscilloscope on the network |
-| `advanced_analysis.py` | Advanced waveform analysis and visualization: FFT analysis, statistical analysis, and matplotlib plots. | Oscilloscope on the network, matplotlib |
+| `advanced_analysis.py` | Advanced waveform analysis and visualization: FFT analysis, statistical analysis, and matplotlib plots. | Oscilloscope on the network (matplotlib is a core dependency) |
 | `probe_calibration_analysis.py` | Waveform region extraction for probe compensation analysis: plateau detection, slope analysis, calibration guidance, and zoomed PDF report plots. | `SCPI-Instrument-Control[report-generator]` (no hardware — fully synthetic) |
 | `dialect_override_example.py` | SCPI dialect auto-detection from `*IDN?` and the `dialect=` override for forcing a command set; runs entirely on mock connections. | Core install only (no hardware) |
 | `waveform_provenance_and_extract.py` | Acquisition provenance: capturing a waveform with the instrument/settings snapshot attached, saving NPZ and CSV, and reading them back with `load_waveform()`; runs entirely against a mock connection -- no instrument needed. | Core install only (no hardware) |
@@ -71,7 +71,7 @@ pip install "SCPI-Instrument-Control"
 
 | File | What it shows | Requirements |
 | --- | --- | --- |
-| `report_generation_example.py` | Generating professional PDF/Markdown test reports: loading waveform data, adding measurements with pass/fail criteria, optional AI analysis, and rendering the report. | `SCPI-Instrument-Control[report-generator]` |
+| `report_generation_example.py` | Generating professional PDF/Markdown test reports: synthesizing waveform data with numpy, adding measurements with pass/fail criteria, optional AI analysis, and rendering the report. | `SCPI-Instrument-Control[report-generator]` (no hardware - fully synthetic) |
 | `report_computed_analysis.py` | Deterministic, LLM-free report analysis: `ComputedAnalyzer` fills the executive summary, key findings, and recommendations from the waveform data with no model or network. | `SCPI-Instrument-Control[report-generator]` (no hardware) |
 | `report_branding.py` | Applying a `BrandingTemplate` to a report: company name, header/footer text, and a brand colour scheme, rendered to a branded Markdown report and a colour-branded PDF. | `SCPI-Instrument-Control[report-generator]` (no hardware) |
 | `report_ai_qa.py` | Interactive Q&A over a report with a local LLM using tool-calling: the model calls the report's analysis tools to answer, and the example degrades cleanly when no tool-capable Ollama model is running. | `SCPI-Instrument-Control[report-generator]`; optional local Ollama (no hardware) |
@@ -80,7 +80,7 @@ pip install "SCPI-Instrument-Control"
 
 | File | What it shows | Requirements |
 | --- | --- | --- |
-| `interactive_tutorial.ipynb` | End-to-end Jupyter walkthrough: connect, configure channels/trigger, capture and plot a waveform, run automated measurements, FFT analysis, multi-channel capture, and export — narrated step by step. | Jupyter, oscilloscope on the network, matplotlib, scipy |
+| `interactive_tutorial.ipynb` | End-to-end Jupyter walkthrough: connect, configure channels/trigger, capture and plot a waveform, run automated measurements, FFT analysis, multi-channel capture, and export — narrated step by step. | Jupyter, oscilloscope on the network (matplotlib and scipy are core dependencies) |
 
 ## Configuration
 
@@ -91,14 +91,16 @@ LAN address: **Utility → I/O → LAN** on the instrument's front panel.
 The scripts marked "no hardware" above (`dialect_override_example.py`,
 `waveform_provenance_and_extract.py`, `synthetic_signals.py`, `trend_logging_walkthrough.py`, `psu_gui_test.py`,
 `probe_calibration_analysis.py`, `psu_advanced_features.py`, `network_discovery.py`,
-`report_computed_analysis.py`, `report_branding.py`, `report_ai_qa.py`) use mock
-connections and run as-is.
+`report_computed_analysis.py`, `report_branding.py`, `report_ai_qa.py`,
+`report_generation_example.py`) use mock connections or synthetic data and run as-is.
 
 ## Running an example
 
 ```bash
 python examples/basic_usage.py
 ```
+
+On Windows terminals with a legacy codepage, set `PYTHONIOENCODING=utf-8` first if a script prints Unicode symbols.
 
 For `gateway_rest_client.py`, start the gateway first, in another terminal:
 

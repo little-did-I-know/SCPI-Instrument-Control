@@ -2,6 +2,13 @@
 
 This script demonstrates how to perform automated measurements
 on oscilloscope channels.
+
+Requirements: an oscilloscope reachable on the network -- edit SCOPE_IP below
+to match its LAN address.
+
+Expected output: individual measurements (frequency, period, Vpp, amplitude,
+max/min, RMS, mean) on Channel 1 printed to the console, followed by the
+combined result of measure_all(). No files are written.
 """
 
 import time
@@ -41,7 +48,7 @@ def main():
 
         try:
             period = scope.measurement.measure_period(1)
-            print(f"Period:       {period*1e6:.6f} µs")
+            print(f"Period:       {period*1e6:.6f} us")
         except Exception as e:
             print(f"Period:       Error - {e}")
 
@@ -90,7 +97,7 @@ def main():
                 if "freq" in name.lower():
                     print(f"{name:12s}: {value/1e6:.6f} MHz")
                 elif "period" in name.lower():
-                    print(f"{name:12s}: {value*1e6:.6f} µs")
+                    print(f"{name:12s}: {value*1e6:.6f} us")
                 else:
                     print(f"{name:12s}: {value:.6f} V")
             else:

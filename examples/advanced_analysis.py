@@ -3,6 +3,14 @@
 This example demonstrates how to perform advanced analysis on captured
 waveforms, including FFT analysis, statistical analysis, and visualization
 using matplotlib.
+
+Requirements: an oscilloscope reachable on the network -- edit SCOPE_IP below
+to match its LAN address. matplotlib is a core dependency, no extra install
+needed.
+
+Expected output: basic and signal-quality stats printed to the console,
+three plot windows (time domain, FFT, histogram), and 'analyzed_waveform.npz'
+plus 'analysis_report.txt' saved to the current directory.
 """
 
 import matplotlib.pyplot as plt
@@ -129,7 +137,7 @@ def main():
         print(f"Min:        {basic_stats['min']:.4f} V")
         if basic_stats["frequency"] > 0:
             print(f"Frequency:  {basic_stats['frequency'] / 1e3:.2f} kHz")
-            print(f"Period:     {basic_stats['period'] * 1e6:.2f} µs")
+            print(f"Period:     {basic_stats['period'] * 1e6:.2f} us")
 
         # Advanced signal quality analysis
         print("\n" + "=" * 60)

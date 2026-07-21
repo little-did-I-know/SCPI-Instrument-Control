@@ -3,6 +3,13 @@
 This example demonstrates how to collect waveforms continuously over a
 period of time. This is useful for monitoring signals, collecting statistics,
 or capturing time-varying phenomena.
+
+Requirements: an oscilloscope reachable on the network -- edit SCOPE_IP below
+to match its LAN address.
+
+Expected output: a 10-second in-memory capture run with Vpp statistics
+printed to the console, followed by a 30-second run that saves waveform
+files to a 'continuous_data/' directory in the current directory.
 """
 
 from scpi_control.automation import DataCollector

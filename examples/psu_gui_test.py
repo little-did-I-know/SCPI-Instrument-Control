@@ -2,6 +2,11 @@
 
 This script demonstrates the PSU control GUI using a mock connection,
 allowing you to test the interface without physical hardware.
+
+Requirements: `SCPI-Instrument-Control[gui]` -- no instrument needed, but it
+opens an interactive PyQt6 window against a mock PSU and requires a display
+and user interaction (choosing a PSU, clicking through the GUI). That is why
+this example is compile-checked only, not auto-executed in the smoke suite.
 """
 
 import sys

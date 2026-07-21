@@ -3,6 +3,13 @@
 This example demonstrates how to capture multiple waveforms with different
 timebase and voltage scale settings. This is useful for characterizing
 signals at different time scales or for automated testing.
+
+Requirements: an oscilloscope reachable on the network -- edit SCOPE_IP below
+to match its LAN address.
+
+Expected output: progress lines for each capture, a summary of the first
+five results, and the batch saved to a 'batch_output/' directory (waveform
+files plus metadata.txt) in the current directory.
 """
 
 from scpi_control.automation import DataCollector

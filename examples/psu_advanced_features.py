@@ -6,6 +6,13 @@ Demonstrates:
 - Timer functionality
 - Waveform generation
 - OVP/OCP protection
+
+Requirements: SCPI-Instrument-Control (core install) -- runs entirely against
+a mock connection, no hardware needed.
+
+Expected output: console narration of each demo, plus CSV logs
+('psu_manual_log.csv', 'psu_timed_log.csv', 'psu_output1_log.csv',
+'characterization_log.csv') saved to the current directory.
 """
 
 import time
