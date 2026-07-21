@@ -110,3 +110,41 @@ def test_seeded_sequences_reproduce_across_connections():
     np.testing.assert_array_equal(first_a.voltage, first_b.voltage)
     np.testing.assert_array_equal(second_a.voltage, second_b.voltage)
     assert not np.array_equal(first_a.voltage, second_a.voltage)  # seed advances per acquisition
+
+
+TEK_IDN = "TEKTRONIX,MSO24,MOCK0100,CF:91.1CT FV:1.28"
+LECROY_IDN = "LECROY,WAVESURFER3024Z,MOCK0200,8.5.0"
+
+
+@pytest.mark.parametrize("idn", [TEK_IDN, LECROY_IDN])
+def test_vendor_round_trip(idn):
+    scope, _ = _scope(idn, signals={1: SignalSpec(kind="square", frequency=1_000.0, amplitude=1.0, seed=7)})
+    data = scope.get_waveform(1, provenance=False)
+    scope.disconnect()
+    assert len(data.voltage) == 14_000
+    assert np.max(data.voltage) == pytest.approx(1.0, abs=0.1)
+    assert np.min(data.voltage) == pytest.approx(-1.0, abs=0.1)
+    assert _measured_frequency(data) == pytest.approx(1_000.0, rel=0.05)
+
+
+def test_tek_nr_pt_matches_curve_length():
+    scope, conn = _scope(TEK_IDN, signals={1: SignalSpec(seed=1)})
+    scope.write("HORIZONTAL:SCALE 1.0E-4")
+    data = scope.get_waveform(1, provenance=False)
+    scope.disconnect()
+    assert len(data.voltage) == 1_400  # preamble NR_Pt and CURVe? payload agree
+
+
+def test_lecroy_timebase_coupling():
+    scope, _ = _scope(LECROY_IDN, signals={1: SignalSpec(seed=1)})
+    scope.write("TDIV 1e-4")
+    data = scope.get_waveform(1, provenance=False)
+    scope.disconnect()
+    assert len(data.voltage) == 1_400
+
+
+def test_vendor_explicit_payload_precedence():
+    scope, _ = _scope(TEK_IDN, waveform_payloads={1: bytes([0, 25, 50, 75])})
+    data = scope.get_waveform(1, provenance=False)
+    scope.disconnect()
+    np.testing.assert_allclose(data.voltage, [0.0, 1.0, 2.0, 3.0])

@@ -7,6 +7,7 @@ responses use HEADer OFF format (bare values), matching CONNECT_SETUP.
 import re
 from typing import Optional
 
+from scpi_control.connection.mock import synth as mock_synth
 from scpi_control.connection.mock.helpers import _build_ieee_block, _format_nr3
 
 # Immediate-measurement values mirror _MOCK_PAVA_VALUES semantically (same
@@ -191,7 +192,7 @@ def handle_query(conn, command: str) -> Optional[str]:
     if upper == "TRIGGER:A:HOLDOFF:TIME?":
         return _format_nr3(conn.holdoff_time)
     if upper == "WFMOUTPRE:NR_PT?":
-        return str(len(conn._waveform_payloads.get(conn.data_source, b"")))
+        return str(mock_synth.point_count(conn, conn.data_source))
     if upper == "WFMOUTPRE:XINCR?":
         return _format_nr3(1.0 / conn.sample_rate)
     if upper == "WFMOUTPRE:XZERO?":
@@ -222,5 +223,7 @@ def handle_query(conn, command: str) -> Optional[str]:
 
 
 def build_waveform_response(conn) -> bytes:
-    payload = conn._waveform_payloads.get(conn.data_source, bytes())
+    # Tek's converter is (code - yoff)*ymult + yzero with yoff=yzero=0 here, so
+    # codes carry no channel-offset term (include_offset=False).
+    payload = mock_synth.payload_for(conn, conn.data_source, include_offset=False)
     return _build_ieee_block(payload)  # CURVe? responses are a bare IEEE block

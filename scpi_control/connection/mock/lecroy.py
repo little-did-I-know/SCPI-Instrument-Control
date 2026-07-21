@@ -8,6 +8,7 @@ import re
 import struct
 from typing import Optional
 
+from scpi_control.connection.mock import synth as mock_synth
 from scpi_control.connection.mock.helpers import _build_ieee_block, _format_nr3
 from scpi_control.connection.mock.siglent import _MOCK_PAVA_VALUES, handle_write as _legacy_write
 
@@ -75,8 +76,8 @@ def handle_query(conn, command: str) -> Optional[str]:
 
 def build_waveform_response(conn) -> bytes:
     """Construct a LeCroy WAVEDESC + sample-array block (WF? ALL, CORD LO)."""
-    channel = conn._last_waveform_channel or next(iter(conn._waveform_payloads))
-    codes = conn._waveform_payloads.get(channel, bytes())
+    channel = conn._last_waveform_channel or 1
+    codes = mock_synth.payload_for(conn, channel, include_offset=True)
     gain = conn._voltage_scales.get(channel, 1.0) / 25.0  # mirror Siglent scaling for comparable volts
     desc = bytearray(346)
     desc[0:8] = b"WAVEDESC"
