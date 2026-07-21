@@ -156,6 +156,27 @@ pytest tests/test_waveform_parsing.py
 pytest tests/ -v
 ```
 
+### Faster Local Runs with testmon
+
+`pytest-testmon` (installed with the `dev` extra) tracks which tests execute
+which lines and re-runs only the tests affected by your changes:
+
+```bash
+python -m pytest --testmon
+```
+
+The first `--testmon` run is slower (it builds the coverage map into a local
+`.testmondata` file, which is git-ignored); later runs select only impacted
+tests. Two caveats: it tracks Python-line dependencies only (changes to data
+files, configuration, or environment are invisible to it), so always finish
+with a plain full run before committing:
+
+```bash
+python -m pytest tests/
+```
+
+CI and pre-merge checks always run the full suite.
+
 ### Writing Tests
 
 - Place tests in the `tests/` directory
