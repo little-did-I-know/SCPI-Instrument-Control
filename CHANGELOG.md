@@ -1,4 +1,4 @@
-# Changelog
+﻿# Changelog
 
 All notable changes to this project will be documented in this file.
 
@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+### Added
+
+- Synthetic signals: a public generator API — `SignalSpec` plus `synthesize()`/`make_waveform()` in `scpi_control.signal_synth` — producing sine, square (with duty cycle), triangle, ramp, DC, and Gaussian-noise waveforms as numpy arrays or ready-to-analyze `WaveformData`, with seedable reproducibility.
+- Mock scopes now synthesize realistic waveforms by default (all vendor personalities): traces are computed from the mock's live timebase, V/div, offset, and trigger state at every acquisition — over-range clips at 8-bit full scale, the trigger level/slope aligns the edge at the window center, and unseeded captures animate with fresh noise. Pass `signals={ch: SignalSpec(...)}` to choose the signal, or `waveform_payloads` bytes for the old fixed-payload behavior (unchanged). Web-gateway mock sessions stream synthesized signals out of the box.
+
+### Changed
+
+- MockConnection's default (no `waveform_payloads` given) no longer serves a fixed 4-byte payload — channels synthesize state-coupled signals instead.
 
 ## [3.1.0] - 2026-07-21
 
@@ -1360,3 +1369,4 @@ pip install "Siglent-Oscilloscope[power-supply-beta,usb]==0.4.0-beta.1"
 - Comprehensive error handling with custom exceptions
 
 [0.1.0]: https://github.com/siglent-control/siglent/releases/tag/v0.1.0
+
