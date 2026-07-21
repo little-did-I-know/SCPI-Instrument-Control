@@ -181,7 +181,7 @@ with DataCollector('192.168.1.100') as collector:
 
 ## Next Steps
 
-!!! tip "Learn More" - [Connection Setup](connection.md) - Configure network and connection settings - [Basic Usage](../user-guide/basic-usage.md) - Detailed usage guide - [Waveform Capture](../user-guide/waveform-capture.md) - Advanced capture techniques - [Measurements](../user-guide/measurements.md) - All measurement types - [GUI Guide](../gui/overview.md) - GUI application features - [Web Gateway](../gateway/index.md) - Browser-based lab gateway
+!!! tip "Learn More" - [Connection Setup](connection.md) - Configure network and connection settings - [Basic Usage](../user-guide/basic-usage.md) - Detailed usage guide - [Waveform Capture](../user-guide/waveform-capture.md) - Advanced capture techniques - [Data Provenance](../user-guide/data-provenance.md) - What gets recorded with every capture - [Synthetic Signals](../user-guide/synthetic-signals.md) - Generate test waveforms without hardware - [Measurements](../user-guide/measurements.md) - All measurement types - [GUI Guide](../gui/overview.md) - GUI application features - [Web Gateway](../gateway/index.md) - Browser-based lab gateway
 
 !!! example "Examples"
 Check out the [examples directory](https://github.com/little-did-I-know/SCPI-Instrument-Control/tree/main/examples) for more code samples:

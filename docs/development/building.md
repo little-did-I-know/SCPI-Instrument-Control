@@ -1106,4 +1106,4 @@ pip freeze > requirements.txt
 - [Project Structure](structure.md) - Understand the codebase organization
 - [Testing Guide](testing.md) - Learn about the test suite
 - [Contributing Guidelines](contributing.md) - How to contribute
-- [Code of Conduct](../CODE_OF_CONDUCT.md) - Community guidelines
+- [Code of Conduct](contributing.md#code-of-conduct) - Community guidelines

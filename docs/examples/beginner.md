@@ -7,9 +7,9 @@ Complete examples for getting started with the Siglent Oscilloscope library. The
 | Example | Description |
 |---------|-------------|
 | [Basic usage example for Siglent oscilloscope control](#basic-usage-example-for-siglent-oscilloscope-control) | Basic usage example for Siglent oscilloscope control. |
-| [Basic Data Logger / DAQ example](#basic-data-logger-/-daq-example) | Basic Data Logger / DAQ example. |
+| [Basic Data Logger / DAQ example](#basic-data-logger-daq-example) | Basic Data Logger / DAQ example. |
 | [SCPI dialect auto-detection and manual override](#scpi-dialect-auto-detection-and-manual-override) | SCPI dialect auto-detection and manual override. |
-| [Basic Function Generator / AWG Usage Example](#basic-function-generator-/-awg-usage-example) | Basic Function Generator / AWG Usage Example. |
+| [Basic Function Generator / AWG Usage Example](#basic-function-generator-awg-usage-example) | Basic Function Generator / AWG Usage Example. |
 | [Measurement example for Siglent oscilloscope](#measurement-example-for-siglent-oscilloscope) | Measurement example for Siglent oscilloscope. |
 | [Basic power supply control example](#basic-power-supply-control-example) | Basic power supply control example. |
 | [Simple single capture example](#simple-single-capture-example) | Simple single capture example. |
@@ -697,7 +697,7 @@ Connection Methods:
     - USB: See psu_usb_connection.py
 
 For USB support:
-    pip install "Siglent-Oscilloscope[usb]"
+    pip install "SCPI-Instrument-Control[usb]"
 """
 
 from scpi_control import PowerSupply

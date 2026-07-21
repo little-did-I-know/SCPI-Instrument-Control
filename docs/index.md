@@ -68,6 +68,8 @@ This library provides comprehensive control for SCPI test equipment — oscillos
     - **FFT Analysis** - Frequency domain analysis of captured waveforms
     - **Protocol Decoding** - Decode I2C, SPI, and UART protocols
     - **Automation** - High-level automation classes for data collection
+    - **Data Provenance** - Every capture records the instrument, settings, and timestamp that produced it; read it back with `load_waveform()` or the `scpi-extract` CLI
+    - **Synthetic Signals** - Generate parameterized waveforms (sine, square, triangle, ramp, DC, noise) with no instrument required; mock scopes synthesize state-coupled captures by default
 
 === "GUI Application"
 
@@ -84,7 +86,7 @@ This library provides comprehensive control for SCPI test equipment — oscillos
     - **Multi-channel** - Simultaneous capture from all channels
     - **Thread-safe** - Background data acquisition without blocking
     - **Type hints** - Full type annotation for IDE support
-    - **Extensive tests** - 660+ automated tests
+    - **Extensive tests** - 1,100+ automated tests
     - **Documentation** - Comprehensive docstrings and guides
 
 ## Installation

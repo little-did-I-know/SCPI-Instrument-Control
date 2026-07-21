@@ -9,7 +9,7 @@ Advanced examples demonstrating signal analysis, FFT processing, and specialized
 | [Advanced waveform analysis and visualization](#advanced-waveform-analysis-and-visualization) | Advanced waveform analysis and visualization. |
 | [Probe Calibration Analysis Example](#probe-calibration-analysis-example) | Probe Calibration Analysis Example |
 | [Test the power supply GUI with a mock connection](#test-the-power-supply-gui-with-a-mock-connection) | Test the power supply GUI with a mock connection. |
-| [Example: Generating Professional Test Reports](#example:-generating-professional-test-reports) | Example: Generating Professional Test Reports |
+| [Example: Generating Professional Test Reports](#example-generating-professional-test-reports) | Example: Generating Professional Test Reports |
 | [Vector Graphics on Oscilloscope using XY Mode](#vector-graphics-on-oscilloscope-using-xy-mode) | Vector Graphics on Oscilloscope using XY Mode |
 
 ---
@@ -1128,6 +1128,42 @@ if __name__ == "__main__":
     main()
 ```
 
+### Related Report Generator Examples
+
+These companion scripts each build a synthetic report in-memory (no hardware,
+no saved waveform files needed) and exercise one report-generator feature in
+isolation:
+
+- **`examples/report_computed_analysis.py`** - Deterministic, LLM-free report
+  analysis: runs `ComputedAnalyzer` over a report to fill in the executive
+  summary, key findings, and recommendations straight from the waveform
+  statistics, with `summary_source` set to `"computed"`. No local model or
+  network needed.
+
+  ```bash
+  python examples/report_computed_analysis.py
+  ```
+
+- **`examples/report_branding.py`** - Applies a `BrandingTemplate` (company
+  name, header/footer text, brand colours) to a generated report, producing a
+  branded Markdown report and a colour-branded PDF (skipped with a message if
+  `reportlab` is not installed).
+
+  ```bash
+  python examples/report_branding.py
+  ```
+
+- **`examples/report_ai_qa.py`** - Local-LLM tool-calling Q&A over a report:
+  when a tool-capable Ollama model is available, `ReportAnalyzer` answers
+  questions by calling the report's analysis tools (`list_waveforms`,
+  `analyze_waveform`, ...) instead of guessing from a summary. Prints a clear
+  message and exits cleanly if no local model is available, so it is safe to
+  run anywhere.
+
+  ```bash
+  python examples/report_ai_qa.py
+  ```
+
 ---
 
 ## Vector Graphics on Oscilloscope using XY Mode
@@ -1158,7 +1194,7 @@ This example demonstrates how to use the oscilloscope as a vector display
 by generating waveforms for XY mode.
 
 REQUIREMENTS:
-    - Install fun extras: pip install "Siglent-Oscilloscope[fun]"
+    - Install fun extras: pip install "SCPI-Instrument-Control[fun]"
     - External AWG/DAC to feed signals into scope channels
       OR use scope's built-in AWG if available
     - Oscilloscope channels connected to AWG outputs
@@ -1375,7 +1411,7 @@ if __name__ == "__main__":
             print("Vector graphics features require additional packages.")
             print()
             print("Install with:")
-            print('  pip install "Siglent-Oscilloscope[fun]"')
+            print('  pip install "SCPI-Instrument-Control[fun]"')
             print()
             print("This will install:")
             print("  - shapely (geometric operations)")

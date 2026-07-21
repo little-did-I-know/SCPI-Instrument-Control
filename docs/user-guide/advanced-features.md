@@ -731,6 +731,8 @@ with DataCollector(SCOPE_IP) as collector:
 
 You've completed the User Guide! Here are some resources for further learning:
 
+- [Data Provenance](data-provenance.md) - What gets recorded with every capture
+- [Synthetic Signals](synthetic-signals.md) - Generate test waveforms without hardware
 - [API Reference](../api/oscilloscope.md) - Detailed API documentation
 - [Examples](../examples/beginner.md) - Real-world usage examples
 - [GUI Guide](../gui/overview.md) - Learn about the GUI application

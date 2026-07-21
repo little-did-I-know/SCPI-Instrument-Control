@@ -353,8 +353,6 @@ Full traceback here
 **Additional context**
 Any other relevant information
 
-````
-
 ## Suggesting Features
 
 ### Feature Request Template

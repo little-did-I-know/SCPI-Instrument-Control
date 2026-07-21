@@ -2,8 +2,6 @@
 
 The **Siglent Report Generator** is a powerful standalone application for creating professional test reports from oscilloscope waveform data. Generate beautiful PDF and Markdown reports with AI-powered insights, all running completely offline.
 
-![Report Generator Overview](../images/report-generator-main.png)
-
 ## Key Features
 
 ### 📊 Professional Reports
@@ -85,9 +83,9 @@ python -m scpi_control.report_generator.app
 ### Advanced Usage
 
 - [**Template System**](templates.md) - Save and reuse report configurations
-- [**Pass/Fail Criteria**](templates.md#pass-fail-criteria) - Define test criteria
+- [**Pass/Fail Criteria**](templates.md#passfail-criteria) - Define test criteria
 - [**Programmatic API**](api-reference.md) - Use Python API for automation
-- [**Building Executables**](building-executables.md) - Create standalone apps
+- [**Building Executables**](../development/BUILDING_EXECUTABLES.md) - Create standalone apps
 
 ## Example Use Cases
 

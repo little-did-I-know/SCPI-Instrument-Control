@@ -162,7 +162,7 @@ scope.disconnect()
 Expected output:
 
 ```
-2.0.0
+3.3.0
 Siglent Technologies,SDS824X HD,SDSMMDD1XXXXX,8.2.5.1.37R9
 ```
 

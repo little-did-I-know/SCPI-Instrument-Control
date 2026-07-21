@@ -472,7 +472,10 @@ with Oscilloscope(SCOPE_IP) as scope:
 
 ## Next Steps
 
+- [SCPI Dialects](scpi-dialects.md) - Command differences across vendors and models
 - [Waveform Capture](waveform-capture.md) - Advanced capture techniques and data formats
+- [Data Provenance](data-provenance.md) - What gets recorded with every capture
+- [Synthetic Signals](synthetic-signals.md) - Generate test waveforms without hardware
 - [Measurements](measurements.md) - Automated measurements and statistics
 - [Trigger Control](trigger-control.md) - Advanced trigger modes and conditions
 - [Advanced Features](advanced-features.md) - FFT, math channels, and automation

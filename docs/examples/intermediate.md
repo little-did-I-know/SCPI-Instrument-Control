@@ -8,12 +8,14 @@ Intermediate examples showing automation patterns, real-time data capture, and b
 |---------|-------------|
 | [Batch capture with different configurations](#batch-capture-with-different-configurations) | Batch capture with different configurations. |
 | [Continuous time-series data collection](#continuous-time-series-data-collection) | Continuous time-series data collection. |
-| [Drive the web gateway's REST API from Python — no browser needed](#drive-the-web-gateway's-rest-api-from-python-—-no-browser-needed) | Drive the web gateway's REST API from Python — no browser needed. |
+| [Drive the web gateway's REST API from Python — no browser needed](#drive-the-web-gateways-rest-api-from-python-no-browser-needed) | Drive the web gateway's REST API from Python — no browser needed. |
 | [Live plotting example for Siglent oscilloscope](#live-plotting-example-for-siglent-oscilloscope) | Live plotting example for Siglent oscilloscope. |
 | [Advanced PSU features demonstration](#advanced-psu-features-demonstration) | Advanced PSU features demonstration. |
 | [Power supply control via USB connection](#power-supply-control-via-usb-connection) | Power supply control via USB connection. |
 | [Record measurement trends in-process and export them as CSV](#record-measurement-trends-in-process-and-export-them-as-csv) | Record measurement trends in-process and export them as CSV. |
 | [Trigger-based event capture](#trigger-based-event-capture) | Trigger-based event capture. |
+| [Synthetic Signal Generation](#synthetic-signal-generation) | Parameterized synthetic waveforms and the mock's state-coupled synthesis. |
+| [Waveform Provenance and scpi-extract](#waveform-provenance-and-scpi-extract) | Read back a waveform's recorded instrument state with `load_waveform()` and `scpi-extract`. |
 
 ---
 
@@ -290,6 +292,18 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+```
+
+### Related Example: LAN Instrument Discovery
+
+**`examples/network_discovery.py`** - Scans a CIDR range for SCPI instruments
+by probing each address for an `*IDN?` response, printing whatever it finds.
+The example scans a safe, hostless TEST-NET-1 range by default so it returns
+quickly with no results; pass a real subnet (or `cidr=None` to auto-scan your
+local `/24`) to find real instruments. No hardware required to run it as-is.
+
+```bash
+python examples/network_discovery.py
 ```
 
 ---
@@ -835,7 +849,7 @@ This example demonstrates how to connect to a Siglent power supply via USB
 using the VISAConnection class.
 
 Requirements:
-    pip install "Siglent-Oscilloscope[usb]"
+    pip install "SCPI-Instrument-Control[usb]"
 
 Supports:
     - USB (USB-TMC protocol)
@@ -870,7 +884,7 @@ def discover_devices():
     except ImportError as e:
         print(f"  Error: {e}")
         print("\nInstall USB support with:")
-        print("  pip install 'Siglent-Oscilloscope[usb]'")
+        print("  pip install 'SCPI-Instrument-Control[usb]'")
         return None
 
     # Find Siglent devices specifically
@@ -1057,7 +1071,7 @@ def main():
         print("\nMake sure:")
         print("  1. Device is connected via USB")
         print("  2. USB drivers are installed")
-        print("  3. PyVISA is installed: pip install 'Siglent-Oscilloscope[usb]'")
+        print("  3. PyVISA is installed: pip install 'SCPI-Instrument-Control[usb]'")
         print("\nFor testing without hardware:")
         print("  - See examples below (commented out)")
         return
@@ -1091,7 +1105,7 @@ if __name__ == "__main__":
         print("=" * 60)
         print("\nUSB support requires PyVISA.")
         print("\nInstall with:")
-        print("  pip install 'Siglent-Oscilloscope[usb]'")
+        print("  pip install 'SCPI-Instrument-Control[usb]'")
         print("\nThis includes:")
         print("  - pyvisa: VISA library interface")
         print("  - pyvisa-py: Pure Python backend (no NI-VISA needed)")
@@ -1291,6 +1305,84 @@ def main():
 if __name__ == "__main__":
     main()
 ```
+
+---
+
+## Synthetic Signal Generation
+
+`SignalSpec` describes a waveform (kind, frequency, amplitude, offset, phase,
+duty, additive noise, and an optional seed for reproducibility);
+`synthesize()`/`make_waveform()` turn a spec into a numpy array or a full
+`WaveformData` ready for analysis, saving, or the report generator. The same
+engine powers `MockConnection`: a channel without an explicit
+`waveform_payloads` entry synthesizes live from the mock's current state, so
+SCPI commands that change the timebase or voltage scale visibly change the
+next capture, exactly like a real scope. This example generates a few signal
+kinds directly, opens a mock oscilloscope session and changes `TDIV`/`VDIV`
+over SCPI to show the capture respond, then saves a synthesized capture and
+reloads it with `load_waveform()` to show the pieces compose.
+
+### Requirements
+
+- scpi_control - Core library (no hardware — runs entirely against a mock connection)
+
+### Usage
+
+```bash
+python examples/synthetic_signals.py
+```
+
+### Key Snippet
+
+```python
+from scpi_control.signal_synth import SignalSpec, make_waveform
+
+spec = SignalSpec(kind="sine", frequency=1_000.0, amplitude=1.0, noise_rms=0.05, seed=7)
+waveform = make_waveform(spec, sample_rate=100_000.0, n_points=1_000)
+```
+
+See also: [Synthetic Signals](../user-guide/synthetic-signals.md) (user guide),
+[Signal Synthesis API](../api/signal_synth.md).
+
+---
+
+## Waveform Provenance and scpi-extract
+
+Every waveform saved by the library now embeds a snapshot of the instrument
+state that produced it: instrument IDN, per-channel settings (scale,
+coupling, probe ratio), trigger configuration, timebase, sample rate, and a
+UTC timestamp. This example acquires from a mock oscilloscope (no hardware
+required), saves NPZ and CSV, then reads both back with
+`scpi_control.waveform_io.load_waveform()` and prints the instrument model,
+channel scale, and first few samples — exactly what the `scpi-extract`
+command-line tool does.
+
+### Requirements
+
+- scpi_control - Core library (no hardware — runs entirely against a mock connection)
+
+### Usage
+
+```bash
+python examples/waveform_provenance_and_extract.py
+
+# Inspect the saved files directly from the command line:
+scpi-extract provenance_demo.npz
+scpi-extract provenance_demo.csv --json
+```
+
+### Key Snippet
+
+```python
+from scpi_control.waveform_io import load_waveform
+
+loaded = load_waveform("provenance_demo.npz")
+print(loaded.provenance.instrument.model, loaded.channel, loaded.voltage[:5])
+```
+
+See also: [Data Provenance](../user-guide/data-provenance.md) (user guide),
+[Waveform I/O API](../api/waveform_io.md), [Provenance API](../api/provenance.md),
+[SCPI Extract CLI API](../api/scpi_extract.md).
 
 ---
 

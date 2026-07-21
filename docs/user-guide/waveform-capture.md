@@ -587,6 +587,7 @@ with Oscilloscope(SCOPE_IP) as scope:
 
 ## Next Steps
 
+- [Data Provenance](data-provenance.md) - What gets recorded with every capture
 - [Measurements](measurements.md) - Automated measurements and statistics
 - [Trigger Control](trigger-control.md) - Advanced trigger configuration
 - [Advanced Features](advanced-features.md) - FFT analysis and math channels
