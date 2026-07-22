@@ -14,3 +14,10 @@ def test_plain_labelled_value():
 
 def test_no_number_returns_none():
     assert DAQAnalyzer._extract_number("no numbers here") is None
+
+
+def test_bare_leading_decimal_value_not_truncated():
+    # A line that leads with the value itself must not have its integer part
+    # eaten as a list ordinal (regression: "10.5" -> 5.0).
+    assert DAQAnalyzer._extract_number("10.5 is critical high") == 10.5
+    assert DAQAnalyzer._extract_number("5.2 is the warning high threshold") == 5.2

@@ -288,7 +288,7 @@ class DAQAnalyzer:
         """
         import re
 
-        text = re.sub(r"^\s*\d+\s*[.)]\s*", "", text)  # strip a leading list ordinal
+        text = re.sub(r"^\s*\d+\s*[.)]\s+", "", text)  # strip a leading list ordinal
         if ":" in text:
             text = text.split(":", 1)[1]  # value follows the label's colon
         numbers = re.findall(r"-?\d+\.?\d*", text)
