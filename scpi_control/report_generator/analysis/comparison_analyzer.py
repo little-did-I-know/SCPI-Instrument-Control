@@ -120,7 +120,7 @@ class ComparisonAnalyzer:
                 if criteria.channel is not None and criteria.channel != wf.label:
                     continue
                 value = stats.get(criteria.measurement_name)
-                if value is None:
+                if value is None or not isinstance(value, (int, float)) or isinstance(value, bool):
                     continue
                 outcome = criteria.validate(float(value))
                 run.measurements.append(

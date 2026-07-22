@@ -651,11 +651,15 @@ class MainWindow(QMainWindow):
         ComputedAnalyzer().analyze_report(report)
 
         # Sign-off / raw-data appendix (template-driven, overridden by the
-        # left-panel checkboxes)
-        if self.current_template is not None:
-            self.current_template.include_signoff = self.include_signoff_check.isChecked()
-            self.current_template.include_raw_data_appendix = self.include_appendix_check.isChecked()
-            append_signoff_and_appendix(report, self.current_template)
+        # left-panel checkboxes). Without a loaded template, fall back to an
+        # ad hoc one so the checkboxes still take effect on their own.
+        template = self.current_template
+        if template is None and (self.include_signoff_check.isChecked() or self.include_appendix_check.isChecked()):
+            template = ReportTemplate(name="Ad hoc")
+        if template is not None:
+            template.include_signoff = self.include_signoff_check.isChecked()
+            template.include_raw_data_appendix = self.include_appendix_check.isChecked()
+            append_signoff_and_appendix(report, template)
 
         # Update chat sidebar and AI panel with report
         self.current_report = report

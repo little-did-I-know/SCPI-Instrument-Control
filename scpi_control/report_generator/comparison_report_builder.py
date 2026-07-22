@@ -3,11 +3,11 @@ shared with the single-run report path."""
 
 import hashlib
 import logging
+from dataclasses import replace
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
-from scpi_control.report_generator.analysis.comparison_analyzer import STAT_UNITS
 from scpi_control.report_generator.models.comparison import MODE_COMPARISON, ComparisonResult, Run, RunSet
 from scpi_control.report_generator.models.report_data import SUMMARY_SOURCE_COMPUTED, ReportMetadata, TestReport, TestSection
 from scpi_control.report_generator.models.report_elements import (
@@ -177,7 +177,7 @@ def _key_stats(runset: RunSet, result: ComparisonResult) -> List[str]:
     return [s for s in _DEFAULT_KEY_STATS if s in computed]
 
 
-def _batch_section(result: ComparisonResult) -> TestSection:
+def _batch_section(result: ComparisonResult) -> Tuple[TestSection, TestSection]:
     runset = result.runset
     section = TestSection(title="Batch Summary", order=2)
     stats = _key_stats(runset, result)
@@ -221,14 +221,34 @@ def _batch_section(result: ComparisonResult) -> TestSection:
 
 
 def _full_stats_table(result: ComparisonResult) -> ComparisonTable:
-    """Appendix: every shared numeric statistic, per matched channel, per run."""
+    """Appendix: every numeric statistic, per channel present in any run, per run.
+
+    Unlike the matched-channels comparison table, this covers channels that
+    only appear in some runs (they render "—" for runs lacking them) so the
+    appendix stays a complete raw-data record."""
     runset = result.runset
     headers = ["Measurement"] + [run.label for run in runset.runs]
+
+    all_channels: List[str] = []
+    for run in runset.runs:
+        for wf in run.waveforms:
+            if wf.label not in all_channels:
+                all_channels.append(wf.label)
+
     rows = []
-    for channel in result.matched_channels:
-        stat_source = result.deltas.get(channel) or result.aggregates.get(channel) or {}
-        for stat in stat_source:
-            name = f"{stat} ({channel})" if len(result.matched_channels) > 1 else stat
+    for channel in all_channels:
+        stats: List[str] = []
+        for run in runset.runs:
+            wf = next((w for w in run.waveforms if w.label == channel), None)
+            if wf is None:
+                continue
+            for stat, value in (wf.statistics or {}).items():
+                if not isinstance(value, (int, float)) or isinstance(value, bool):
+                    continue
+                if stat not in stats:
+                    stats.append(stat)
+        for stat in stats:
+            name = f"{stat} ({channel})" if len(all_channels) > 1 else stat
             row = [TableCell(name)]
             for run in runset.runs:
                 wf = next((w for w in run.waveforms if w.label == channel), None)
@@ -294,7 +314,9 @@ def build_comparison_report(
         appendix.manifest = build_manifest(runset.runs)
         appendix.comparison_table = _full_stats_table(result)
         for run in runset.runs:
-            appendix.measurements.extend(run.measurements)
+            for m in run.measurements:
+                channel = f"{run.label} · {m.channel}" if m.channel else run.label
+                appendix.measurements.append(replace(m, channel=channel))
         report.add_section(appendix)
         next_order += 1
     if include_signoff:
@@ -317,9 +339,11 @@ def append_signoff_and_appendix(report: TestReport, template: ReportTemplate) ->
     next_order = max((s.order for s in report.sections), default=-1) + 1
     if template.include_raw_data_appendix:
         pseudo = Run(label=report.metadata.title, files=[])
+        seen_sources = set()
         for section in report.sections:
             for wf in section.waveforms:
-                if wf.source_file is not None:
+                if wf.source_file is not None and str(wf.source_file) not in seen_sources:
+                    seen_sources.add(str(wf.source_file))
                     pseudo.files.append(Path(wf.source_file))
                     pseudo.waveforms.append(wf)
         appendix = TestSection(title="Raw Data Appendix", order=next_order)

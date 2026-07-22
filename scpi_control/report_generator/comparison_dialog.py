@@ -278,7 +278,8 @@ if QT_AVAILABLE:
 
             mode = MODE_COMPARISON if self.comparison_radio.isChecked() else MODE_BATCH
             baseline_index = max(self.baseline_combo.currentIndex(), 0)
-            return self.model.to_runset(mode, baseline_index=baseline_index)
+            template = self._selected_template()
+            return self.model.to_runset(mode, baseline_index=baseline_index, criteria_set=template.criteria_set if template else None)
 
         def _selected_template(self) -> Optional[ReportTemplate]:
             name = self.template_combo.currentText()

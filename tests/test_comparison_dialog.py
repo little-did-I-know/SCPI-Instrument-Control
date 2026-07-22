@@ -1,11 +1,11 @@
 """Run-table model logic (headless) + dialog construction smoke test."""
 
-import sys
 from pathlib import Path
 
 import pytest
 
 from scpi_control.report_generator.comparison_dialog import ComparisonRunTableModel
+from scpi_control.report_generator.models.criteria import CriteriaSet
 
 
 def test_add_and_remove_runs():
@@ -36,21 +36,26 @@ def test_valid_model_has_no_errors():
     assert model.validate() == []
 
 
-pytest.importorskip("PyQt6")
-from PyQt6.QtWidgets import QApplication
+def test_to_runset_carries_criteria_set():
+    model = ComparisonRunTableModel()
+    model.add_run("a", [Path("a.csv")])
+    model.add_run("b", [Path("b.csv")])
+    criteria_set = CriteriaSet(name="limits")
+    runset = model.to_runset("comparison", baseline_index=0, criteria_set=criteria_set)
+    assert runset.criteria_set is criteria_set
 
 
-@pytest.fixture(scope="module")
-def qapp():
-    """Create QApplication instance for tests."""
+def test_comparison_dialog_construction():
+    """ComparisonReportDialog can be constructed without a parent MainWindow crash."""
+    import sys
+
+    pytest.importorskip("PyQt6")
+    from PyQt6.QtWidgets import QApplication
+
     app = QApplication.instance()
     if app is None:
         app = QApplication(sys.argv)
-    yield app
 
-
-def test_comparison_dialog_construction(qapp):
-    """ComparisonReportDialog can be constructed without a parent MainWindow crash."""
     from scpi_control.report_generator.comparison_dialog import ComparisonReportDialog
 
     dialog = ComparisonReportDialog()

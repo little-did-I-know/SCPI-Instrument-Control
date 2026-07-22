@@ -61,11 +61,14 @@ def _two_run_set(tmp_path, mode=MODE_COMPARISON, criteria=None, amp2=1.5):
 
 
 def test_analyze_loads_and_analyzes_each_run(tmp_path):
+    # amplitude 1.0 ("before") -> vpp ~2.0; amplitude 1.5 ("after") -> vpp ~3.0
     result = ComparisonAnalyzer.analyze(_two_run_set(tmp_path))
+    by_label = {run.label: run for run in result.runset.runs}
     for run in result.runset.runs:
         assert len(run.waveforms) == 1
         assert run.waveforms[0].statistics is not None
-        assert run.waveforms[0].statistics["vpp"] == pytest.approx(2.0, rel=0.3) or run.label == "after"
+    assert by_label["before"].waveforms[0].statistics["vpp"] == pytest.approx(2.0, rel=0.3)
+    assert by_label["after"].waveforms[0].statistics["vpp"] == pytest.approx(3.0, rel=0.3)
 
 
 def test_matched_channels_found_by_label(tmp_path):
@@ -174,3 +177,14 @@ def test_batch_aggregates_and_yield(tmp_path):
 def test_yield_none_without_criteria(tmp_path):
     result = ComparisonAnalyzer.analyze(_two_run_set(tmp_path, mode=MODE_BATCH))
     assert result.yield_passed is None and result.yield_total is None
+
+
+def test_non_numeric_criteria_value_is_skipped_not_raised(tmp_path):
+    # signal_type is a string statistic; criteria naming it must not raise on
+    # float(value) and must simply evaluate nothing for it.
+    cs = CriteriaSet(name="bad")
+    cs.add_criteria(MeasurementCriteria(measurement_name="signal_type", comparison_type=ComparisonType.RANGE, min_value=0.0, max_value=1.0))
+    result = ComparisonAnalyzer.analyze(_two_run_set(tmp_path, criteria=cs))
+    for run in result.runset.runs:
+        assert run.measurements == []
+        assert run.passed is None

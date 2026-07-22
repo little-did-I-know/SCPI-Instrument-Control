@@ -1,7 +1,5 @@
 """New renderable section elements: tables, overlays, manifest, sign-off."""
 
-from datetime import datetime
-
 from scpi_control.report_generator.models.report_data import ReportMetadata, TestSection
 from scpi_control.report_generator.models.report_elements import (
     STATUS_FAIL,
@@ -9,6 +7,8 @@ from scpi_control.report_generator.models.report_elements import (
     ComparisonTable,
     DataManifest,
     ManifestEntry,
+    OverlayPlotSpec,
+    OverlayTrace,
     SignoffBlock,
     SignoffRole,
     TableCell,
@@ -45,10 +45,12 @@ def test_test_section_serializes_new_elements_only_when_set():
     rich.comparison_table = ComparisonTable(title="t", headers=["h"], rows=[])
     rich.manifest = DataManifest(entries=[])
     rich.signoff = SignoffBlock(roles=[SignoffRole(title="Tested by")])
+    rich.overlay_plots = [OverlayPlotSpec(channel_label="1", traces=[OverlayTrace(run_label="before", waveform=None, color="#1f77b4")])]
     d = rich.to_dict()
     assert d["comparison_table"]["title"] == "t"
     assert d["manifest"] == {"entries": []}
     assert d["signoff"]["roles"][0]["title"] == "Tested by"
+    assert d["overlay_plots"] == [{"channel_label": "1", "runs": ["before"]}]
 
 
 def test_status_constants_are_pass_fail():

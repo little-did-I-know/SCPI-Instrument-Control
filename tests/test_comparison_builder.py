@@ -67,14 +67,14 @@ def _analyzed(tmp_path, mode=MODE_COMPARISON, criteria=None, n=2, amps=(1.0, 1.5
     return ComparisonAnalyzer.analyze(RunSet(runs=runs, mode=mode, criteria_set=criteria))
 
 
-def _capture_file(tmp_path, name, amplitude):
+def _capture_file(tmp_path, name, amplitude, channel=1):
     """Write one synthetic sine capture and return its path.
 
     Provenance is attached so the plain-CSV writer emits the channel header
     line -- see `_capture` in tests/test_comparison_analyzer.py for the same
     adaptation and its rationale.
     """
-    wf = make_waveform(SignalSpec(kind="sine", frequency=1_000.0, amplitude=amplitude, seed=7), 100_000.0, 2_000)
+    wf = make_waveform(SignalSpec(kind="sine", frequency=1_000.0, amplitude=amplitude, seed=7), 100_000.0, 2_000, channel=channel)
     wf.provenance = AcquisitionProvenance(instrument=InstrumentInfo(model="Mock"))
     path = tmp_path / name
     Waveform(Mock()).save_waveform(wf, str(path), format="CSV")
@@ -137,3 +137,64 @@ def test_append_signoff_and_appendix_on_single_run_report(tmp_path):
     titles = [s.title for s in report.sections]
     assert titles[-2:] == ["Raw Data Appendix", "Sign-Off"]
     assert report.sections[-2].manifest.entries[0].file_path == str(path)
+
+
+def test_append_signoff_and_appendix_dedupes_one_source_multiple_channels(tmp_path):
+    """A single multi-channel file loaded as several waveforms must still
+    produce exactly one manifest entry (one representative waveform per
+    source file, for provenance -- not one row per channel)."""
+    pytest.importorskip("scipy")
+    import numpy as np
+    from scipy.io import savemat
+
+    path = tmp_path / "multi.mat"
+    savemat(str(path), {"time": np.arange(200) / 1e5, "ch1": np.ones(200), "ch2": np.ones(200) * 2.0})
+    section = TestSection(title="Waveforms")
+    section.waveforms = WaveformLoader.load(path)
+    assert len(section.waveforms) == 2  # sanity: two channels from one file
+    report = TestReport(metadata=_metadata(), sections=[section])
+    template = ReportTemplate(name="t", include_signoff=True, include_raw_data_appendix=True)
+    append_signoff_and_appendix(report, template)
+    manifest = report.sections[-2].manifest
+    assert len(manifest.entries) == 1
+    assert manifest.entries[0].file_path == str(path)
+
+
+def test_appendix_includes_unmatched_channel_with_dash_for_missing_run(tmp_path):
+    """The appendix must cover channels present in only some runs (not just
+    result.matched_channels), with "—" for runs lacking that channel."""
+    run_a = Run(label="dut_a", files=[_capture_file(tmp_path, "a1.csv", 1.0, channel=1)])
+    run_b = Run(
+        label="dut_b",
+        files=[_capture_file(tmp_path, "b1.csv", 1.0, channel=1), _capture_file(tmp_path, "b2.csv", 1.0, channel=2)],
+    )
+    result = ComparisonAnalyzer.analyze(RunSet(runs=[run_a, run_b], mode=MODE_BATCH))
+    assert result.matched_channels == ["1"]  # channel "2" is unmatched
+
+    report = build_comparison_report(result, _metadata())
+    appendix = next(s for s in report.sections if s.title == "Raw Data Appendix")
+    table = appendix.comparison_table
+    assert table.headers == ["Measurement", "dut_a", "dut_b"]
+
+    channel_2_rows = [row for row in table.rows if row[0].text.endswith("(2)")]
+    assert channel_2_rows, "channel '2' rows must appear in the appendix even though it's unmatched"
+    for row in channel_2_rows:
+        assert row[1].text == "—"  # dut_a has no channel 2
+        assert row[2].text != "—"  # dut_b does
+
+
+def test_appendix_measurements_carry_run_label_in_channel(tmp_path):
+    cs = CriteriaSet(name="limits")
+    cs.add_criteria(MeasurementCriteria(measurement_name="vpp", comparison_type=ComparisonType.RANGE, min_value=0.0, max_value=10.0))
+    result = _analyzed(tmp_path, criteria=cs)
+    report = build_comparison_report(result, _metadata())
+    appendix = next(s for s in report.sections if s.title == "Raw Data Appendix")
+    assert appendix.measurements
+    for m in appendix.measurements:
+        assert " · " in m.channel
+        run_label = m.channel.split(" · ")[0]
+        assert run_label in ("run0", "run1")
+    # the source runs' own measurements must be untouched (no mutation)
+    for run in result.runset.runs:
+        for m in run.measurements:
+            assert " · " not in (m.channel or "")

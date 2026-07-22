@@ -646,7 +646,8 @@ class PDFReportGenerator(BaseReportGenerator):
             for spec in section.overlay_plots:
                 drawing = self._generate_overlay_plot(spec)
                 if drawing is not None:
-                    story.append(KeepTogether([Paragraph(f"Channel {spec.channel_label} — all runs", self.styles["SubsectionHeading"]), drawing]))
+                    channel_label = self._markdown_to_reportlab(spec.channel_label)
+                    story.append(KeepTogether([Paragraph(f"Channel {channel_label} — all runs", self.styles["SubsectionHeading"]), drawing]))
                     story.append(Spacer(1, 0.1 * inch))
 
         # Comparison table
@@ -1249,11 +1250,26 @@ class PDFReportGenerator(BaseReportGenerator):
         return element
 
     def _generate_manifest_table(self, manifest) -> Table:
-        """Render the raw-data manifest (one row per source file, hash truncated for width)."""
+        """Render the raw-data manifest (one row per source file). The file path
+        and SHA-256 are rendered in full via small, wrapping Paragraph cells so
+        provenance stays verifiable rather than truncated for width."""
+        small_style = ParagraphStyle("ManifestSmall", parent=self.styles["Normal"], fontSize=6.5, leading=8)
+
+        def _cell(text: str) -> Paragraph:
+            return Paragraph(self._markdown_to_reportlab(text) if text else "—", small_style)
+
         data = [["Run", "File", "Size", "SHA-256", "Captured", "Instrument"]]
         for entry in manifest.entries:
-            sha_short = entry.sha256[:16] + "…" if entry.sha256 else "—"
-            data.append([entry.run_label, Path(entry.file_path).name, str(entry.size_bytes), sha_short, entry.capture_timestamp or "—", entry.instrument or "—"])
+            data.append(
+                [
+                    entry.run_label,
+                    _cell(entry.file_path),
+                    str(entry.size_bytes),
+                    _cell(entry.sha256),
+                    entry.capture_timestamp or "—",
+                    entry.instrument or "—",
+                ]
+            )
         element = Table(data, repeatRows=1)
         element.setStyle(
             TableStyle(
@@ -1271,11 +1287,12 @@ class PDFReportGenerator(BaseReportGenerator):
 
     def _generate_signoff_block(self, signoff) -> KeepTogether:
         """Render the sign-off block (role/name plus blank signature+date lines), kept on one page."""
-        elements = [Paragraph("Sign-Off", self.styles["SectionHeading"])]
+        elements = []
         for role in signoff.roles:
-            name = f" {role.name}" if role.name else ""
+            title = self._markdown_to_reportlab(role.title)
+            name = f" {self._markdown_to_reportlab(role.name)}" if role.name else ""
             elements.append(Spacer(1, 0.25 * inch))
-            elements.append(Paragraph(f"<b>{role.title}:</b>{name}", self.styles["Normal"]))
+            elements.append(Paragraph(f"<b>{title}:</b>{name}", self.styles["Normal"]))
             elements.append(Spacer(1, 0.05 * inch))
             elements.append(Paragraph("Signature: ________________________&nbsp;&nbsp;&nbsp;&nbsp;Date: ____________", self.styles["Normal"]))
         return KeepTogether(elements)

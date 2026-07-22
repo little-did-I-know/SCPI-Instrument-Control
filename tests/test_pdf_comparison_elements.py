@@ -51,6 +51,17 @@ def test_pdf_generates_without_new_elements_unchanged(tmp_path):
     assert out.exists()
 
 
+def test_signoff_role_with_xml_special_chars_generates_successfully(tmp_path):
+    """Sign-off role title/name containing XML-special characters must be
+    escaped, not raw-interpolated into Paragraph markup."""
+    section = TestSection(title="Sign-Off")
+    section.signoff = SignoffBlock(roles=[SignoffRole(title="R&D Approver <QA>", name="A & B")])
+    report = TestReport(metadata=ReportMetadata(title="T", technician="R", test_date=datetime(2026, 7, 22)), sections=[section])
+    out = tmp_path / "signoff.pdf"
+    assert PDFReportGenerator().generate(report, out)
+    assert out.exists() and out.stat().st_size > 0
+
+
 def test_comparison_table_element_method_exists_and_returns_table():
     from reportlab.platypus import Table as RLTable
 
