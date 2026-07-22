@@ -10,6 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Dev tooling: `pytest-xdist` in the `dev` extra for parallel local test runs (`python -m pytest -n auto`); complements `--testmon` (use one or the other per invocation).
+- Report generator: before/after comparison and multi-DUT batch reports — load multiple capture-file runs, overlay their waveforms, and get delta tables (comparison) or per-DUT summary with aggregates and yield (batch). Available from the Python API and the GUI's new Report → Comparison / Batch Report dialog.
+- Report generator: optional raw-data appendix (source-file manifest with SHA-256 checksums, capture timestamps, and instrument identity from provenance) and a configurable sign-off block (template-defined roles with signature/date lines). Both also work on ordinary single-run reports.
+
+### Fixed
+
+- Report generator: the waveform loader no longer drops acquisition provenance when loading capture files.
 
 ## [3.3.1] - 2026-07-21
 
