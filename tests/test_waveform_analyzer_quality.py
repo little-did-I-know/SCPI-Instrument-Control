@@ -63,3 +63,15 @@ def test_single_cycle_capture_noise_is_none_not_zero():
     v = np.sin(2 * np.pi * (rate / n) * t) + 0.01 * rng.standard_normal(n)  # one period over the record
     q = WaveformAnalyzer.calculate_quality_stats(make_waveform(v, rate))
     assert q["noise_level"] is None  # cannot separate noise from a 1-cycle capture; must not fabricate 0.0
+
+
+def test_noise_estimate_boundary_five_vs_six_cycles():
+    rng = np.random.default_rng(3)
+    n, rate = 1000, 1e6
+    t = np.arange(n) / rate
+    # 5 cycles over the record (fund_bin=5): notches blanket ~all of the spectrum -> cannot estimate
+    five = np.sin(2 * np.pi * (5 * rate / n) * t) + 0.01 * rng.standard_normal(n)
+    assert WaveformAnalyzer.calculate_quality_stats(make_waveform(five, rate))["noise_level"] is None
+    # 6 cycles (fund_bin=6): enough signal-free spectrum survives -> a real (non-None) estimate
+    six = np.sin(2 * np.pi * (6 * rate / n) * t) + 0.01 * rng.standard_normal(n)
+    assert WaveformAnalyzer.calculate_quality_stats(make_waveform(six, rate))["noise_level"] is not None
