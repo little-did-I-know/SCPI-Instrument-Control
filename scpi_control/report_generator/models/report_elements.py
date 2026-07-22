@@ -11,6 +11,7 @@ from typing import Any, Dict, List, Optional
 
 STATUS_PASS = "pass"
 STATUS_FAIL = "fail"
+STATUS_INCOMPLETE = "incomplete"
 
 
 @dataclass

@@ -12,6 +12,7 @@ from scpi_control.report_generator.models.comparison import MODE_COMPARISON, Com
 from scpi_control.report_generator.models.report_data import SUMMARY_SOURCE_COMPUTED, ReportMetadata, TestReport, TestSection
 from scpi_control.report_generator.models.report_elements import (
     STATUS_FAIL,
+    STATUS_INCOMPLETE,
     STATUS_PASS,
     ComparisonTable,
     DataManifest,
@@ -104,10 +105,14 @@ def _run_color(index: int) -> str:
     return _RUN_COLORS[index % len(_RUN_COLORS)]
 
 
-def _status(passed: Optional[bool]) -> Optional[str]:
-    if passed is None:
-        return None
-    return STATUS_PASS if passed else STATUS_FAIL
+def _run_verdict(run) -> Tuple[str, Optional[str]]:
+    if run.incomplete:
+        return "INCOMPLETE", STATUS_INCOMPLETE
+    if run.passed is True:
+        return "PASS", STATUS_PASS
+    if run.passed is False:
+        return "FAIL", STATUS_FAIL
+    return "—", None
 
 
 def _overview_section(result: ComparisonResult) -> TestSection:
@@ -117,8 +122,8 @@ def _overview_section(result: ComparisonResult) -> TestSection:
     rows = []
     for i, run in enumerate(runset.runs):
         label = run.label + (" (baseline)" if runset.mode == MODE_COMPARISON and i == runset.baseline_index else "")
-        verdict = "PASS" if run.passed else "FAIL" if run.passed is False else "—"
-        rows.append([TableCell(label), TableCell(run.metadata.dut_id or "—"), TableCell(run.metadata.condition or "—"), TableCell(str(len(run.files))), TableCell(verdict, status=_status(run.passed))])
+        verdict, vstatus = _run_verdict(run)
+        rows.append([TableCell(label), TableCell(run.metadata.dut_id or "—"), TableCell(run.metadata.condition or "—"), TableCell(str(len(run.files))), TableCell(verdict, status=vstatus)])
     section.comparison_table = ComparisonTable(title="Runs", headers=headers, rows=rows)
     if result.warnings:
         section.content = "Warnings:\n" + "\n".join(f"- {w}" for w in result.warnings)
@@ -189,8 +194,8 @@ def _batch_section(result: ComparisonResult) -> Tuple[TestSection, TestSection]:
     headers = ["Run", "DUT ID", "Result"] + [col_name(s, c) for c in channels for s in stats]
     rows = []
     for run in runset.runs:
-        verdict = "PASS" if run.passed else "FAIL" if run.passed is False else "—"
-        row = [TableCell(run.label), TableCell(run.metadata.dut_id or "—"), TableCell(verdict, status=_status(run.passed))]
+        verdict, vstatus = _run_verdict(run)
+        row = [TableCell(run.label), TableCell(run.metadata.dut_id or "—"), TableCell(verdict, status=vstatus)]
         for channel in channels:
             wf = next((w for w in run.waveforms if w.label == channel), None)
             for stat in stats:
@@ -273,7 +278,12 @@ def _executive_summary(result: ComparisonResult) -> str:
     else:
         parts = [f"Batch of {len(runset.runs)} runs."]
         if result.yield_total:
-            parts.append(f"Yield: {result.yield_passed}/{result.yield_total} passed ({100.0 * result.yield_passed / result.yield_total:.0f}%).")
+            txt = f"Yield: {result.yield_passed}/{result.yield_total} passed ({100.0 * result.yield_passed / result.yield_total:.0f}%)."
+            if result.yield_incomplete:
+                txt += f" {result.yield_incomplete} incomplete."
+            parts.append(txt)
+        elif result.yield_incomplete:
+            parts.append(f"{result.yield_incomplete} run(s) incomplete — criteria could not be evaluated.")
     if result.warnings:
         parts.append(f"{len(result.warnings)} warning(s) — see Overview.")
     return " ".join(parts)
@@ -329,7 +339,14 @@ def build_comparison_report(
     report.executive_summary = _executive_summary(result)
     report.summary_source = SUMMARY_SOURCE_COMPUTED
     evaluated = [run.passed for run in runset.runs if run.passed is not None]
-    report.overall_result = "FAIL" if False in evaluated else ("PASS" if evaluated else "INCONCLUSIVE")
+    if False in evaluated:
+        report.overall_result = "FAIL"
+    elif any(run.incomplete for run in runset.runs):
+        report.overall_result = "INCONCLUSIVE"
+    elif evaluated:
+        report.overall_result = "PASS"
+    else:
+        report.overall_result = "INCONCLUSIVE"
     return report
 
 
