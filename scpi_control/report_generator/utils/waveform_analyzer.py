@@ -274,15 +274,15 @@ class WaveformAnalyzer:
 
             # Calculate pulse width and duty cycle
             if len(rising_edges) > 0 and len(falling_edges) > 0:
-                # Pulse width: time from rising edge to next falling edge
-                if falling_edges[0] > rising_edges[0]:
-                    pulse_width = (falling_edges[0] - rising_edges[0]) * dt
-
-                # Duty cycle: ratio of high time to period
-                if len(rising_edges) > 1:
-                    period_samples = rising_edges[1] - rising_edges[0]
-                    high_samples = falling_edges[0] - rising_edges[0] if falling_edges[0] > rising_edges[0] else 0
-                    duty_cycle = (high_samples / period_samples) * 100  # Percentage
+                # First falling edge after the first rising edge (ignore a leading
+                # falling edge when the capture starts on the high plateau).
+                fe_after = falling_edges[falling_edges > rising_edges[0]]
+                if len(fe_after) > 0:
+                    pulse_width = (fe_after[0] - rising_edges[0]) * dt
+                    if len(rising_edges) > 1:
+                        period_samples = rising_edges[1] - rising_edges[0]
+                        high_samples = fe_after[0] - rising_edges[0]
+                        duty_cycle = (high_samples / period_samples) * 100
 
             return {
                 "rise_time": rise_time,
