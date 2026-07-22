@@ -614,8 +614,6 @@ class TestDataLogging:
 
 
 def test_parse_float_raises_on_garbage():
-    import pytest
-
     from scpi_control import exceptions
     from scpi_control.power_supply_output import PowerSupplyOutput
 

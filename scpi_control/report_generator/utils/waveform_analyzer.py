@@ -136,7 +136,7 @@ class WaveformAnalyzer:
 
             # Find peak frequency (excluding DC component)
             if len(yf_pos) > 1:
-                # Skip first bin (DC)
+                # DC already removed above; first positive bin is a valid fundamental candidate
                 peak_idx = int(np.argmax(yf_pos))
                 frequency = xf_pos[peak_idx]
                 period = 1 / frequency if frequency > 0 else None
@@ -559,7 +559,7 @@ class WaveformAnalyzer:
         """Check if signal is DC (very low variation)."""
         # A real periodic component means the signal is not DC, regardless of how
         # large the DC offset is (the offset is what made the old std/mean test wrong).
-        if WaveformAnalyzer._has_dominant_tone(np.asarray(v, dtype=float)):
+        if WaveformAnalyzer._has_dominant_tone(v):
             return False
         std = np.std(v)
         mean = np.mean(np.abs(v))
