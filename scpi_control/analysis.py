@@ -353,49 +353,40 @@ class FFTAnalyzer:
 
     @staticmethod
     def calculate_thd(fft_result: FFTResult, fundamental_freq: float, num_harmonics: int = 5) -> Optional[float]:
-        """Calculate Total Harmonic Distortion (THD).
-
-        Args:
-            fft_result: FFT result
-            fundamental_freq: Fundamental frequency (Hz)
-            num_harmonics: Number of harmonics to include
-
-        Returns:
-            THD in percent or None if error
-        """
+        """Calculate Total Harmonic Distortion (THD) as a percentage."""
         try:
-            # Find fundamental frequency bin
             freq_resolution = fft_result.frequency[1] - fft_result.frequency[0]
-            fund_idx = int(round(fundamental_freq / freq_resolution))
-
-            if fund_idx >= len(fft_result.magnitude):
-                logger.error("Fundamental frequency out of range")
+            if freq_resolution <= 0:
                 return None
 
-            # Get fundamental magnitude (linear)
             if fft_result.magnitude_db:
-                fund_mag = 10 ** (fft_result.magnitude[fund_idx] / 20.0)
+                linear = 10 ** (fft_result.magnitude / 20.0)
             else:
-                fund_mag = fft_result.magnitude[fund_idx]
+                linear = np.asarray(fft_result.magnitude, dtype=float)
+            length = len(linear)
 
-            # Calculate harmonic magnitudes
+            def bin_energy(order: int) -> Optional[float]:
+                idx = int(round(order * fundamental_freq / freq_resolution))
+                if idx >= length:
+                    return None
+                lo = max(0, idx - 2)
+                hi = min(length, idx + 3)  # +/- 2 bins, RSS, captures off-bin leakage
+                seg = linear[lo:hi]
+                return float(np.sqrt(np.sum(seg**2)))
+
+            fund_mag = bin_energy(1)
+            if not fund_mag:
+                return None
+
             harmonic_power = 0.0
             for n in range(2, num_harmonics + 2):
-                harmonic_idx = n * fund_idx
-                if harmonic_idx < len(fft_result.magnitude):
-                    if fft_result.magnitude_db:
-                        harm_mag = 10 ** (fft_result.magnitude[harmonic_idx] / 20.0)
-                    else:
-                        harm_mag = fft_result.magnitude[harmonic_idx]
+                harm_mag = bin_energy(n)
+                if harm_mag is not None:
                     harmonic_power += harm_mag**2
 
-            # Calculate THD
             thd = 100.0 * np.sqrt(harmonic_power) / fund_mag
-
             logger.info(f"THD calculated: {thd:.2f}% (fundamental={fundamental_freq:.2f} Hz)")
-
             return thd
-
         except Exception as e:
             logger.error(f"THD calculation error: {e}")
             return None
