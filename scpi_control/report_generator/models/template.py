@@ -462,7 +462,7 @@ class ReportTemplate:
         """
         template = cls(
             name="Probe Calibration Template",
-            description=("Oscilloscope probe compensation check using the 1 kHz " "calibration square wave. Verifies a flat top with no " "overshoot, undershoot, or ringing."),
+            description=("Oscilloscope probe compensation check using the 1 kHz " "calibration square wave. Verifies a flat top with no " "overshoot or undershoot."),
             default_test_type="probe_calibration",
             default_test_procedure=(
                 "1. Connect the probe tip to the scope's ~1 kHz calibration "
