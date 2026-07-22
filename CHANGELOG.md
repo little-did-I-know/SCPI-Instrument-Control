@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Dev tooling: `pytest-xdist` in the `dev` extra for parallel local test runs (`python -m pytest -n auto`); complements `--testmon` (use one or the other per invocation).
 - Report generator: before/after comparison and multi-DUT batch reports — load multiple capture-file runs, overlay their waveforms, and get delta tables (comparison) or per-DUT summary with aggregates and yield (batch). Available from the Python API and the GUI's new Report → Comparison / Batch Report dialog.
 - Report generator: optional raw-data appendix (source-file manifest with SHA-256 checksums, capture timestamps, and instrument identity from provenance) and a configurable sign-off block (template-defined roles with signature/date lines). Both also work on ordinary single-run reports.
+- Report generator: `top_flatness` waveform statistic (top-plateau deviation as % of amplitude); the probe-calibration preset now evaluates overshoot/undershoot (pass/fail) and top flatness (warning).
 
 ### Fixed
 
@@ -33,6 +34,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   for the same capture. Report-path THD now sums the first 5 harmonics (previously 10).
 - DAQ AI threshold suggestions now bind each extracted number to its label instead of grabbing the
   first number in the sentence.
+- Comparison/batch reports: pass/fail criteria now match analyzer statistics (case-insensitive plus
+  display-name aliases) — previously the shipped criteria template produced empty verdicts. Criteria
+  that cannot be evaluated are surfaced as warnings (never silently dropped), half-open RANGE criteria
+  are enforced, verdicts are severity-aware (only `critical` criteria gate) with a distinct INCOMPLETE
+  state, and yield reports an incomplete count instead of inflating the pass rate.
 
 ## [3.3.1] - 2026-07-21
 
