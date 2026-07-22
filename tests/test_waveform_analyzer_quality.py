@@ -36,3 +36,21 @@ def test_square_overshoot_is_measured():
     q = WaveformAnalyzer.calculate_quality_stats(make_waveform(_square_with_overshoot(0.05)))
     assert q["overshoot"] is not None
     assert 3.0 < q["overshoot"] < 7.0
+
+
+def test_clean_sine_has_near_zero_noise_and_no_snr():
+    t = np.arange(8000) / 1e6
+    v = np.sin(2 * np.pi * 1000 * t)  # perfectly clean, integer number of periods
+    q = WaveformAnalyzer.calculate_quality_stats(make_waveform(v))
+    assert q["noise_level"] is not None and q["noise_level"] < 1e-3  # ~0, not 0.707
+    assert q["snr"] is None  # no measurable noise -> no fabricated dB
+
+
+def test_noisy_sine_noise_estimate_matches_injected():
+    rng = np.random.default_rng(0)
+    t = np.arange(8000) / 1e6
+    v = np.sin(2 * np.pi * 1000 * t) + 0.01 * rng.standard_normal(t.size)  # 10 mV RMS noise
+    q = WaveformAnalyzer.calculate_quality_stats(make_waveform(v))
+    assert q["noise_level"] is not None
+    assert 0.006 < q["noise_level"] < 0.014  # ~10 mV
+    assert q["snr"] is not None and 30 < q["snr"] < 50  # ~37 dB (0.707 / 0.01)

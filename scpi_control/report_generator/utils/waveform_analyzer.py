@@ -10,7 +10,7 @@ from typing import Dict, Optional, Tuple
 
 import numpy as np
 from scipy import signal as scipy_signal
-from scipy.fft import fft, fftfreq, rfft
+from scipy.fft import fft, fftfreq, irfft, rfft
 
 from scpi_control.report_generator.models.report_data import WaveformData, WaveformRegion
 
@@ -21,6 +21,16 @@ logger = logging.getLogger(__name__)
 # is less than this multiple of the median bin. Empirically, real periodic
 # signals sit >=~280x while white noise sits ~4x, so this is not sensitive.
 _NOISE_PEAK_TO_MEDIAN = 15.0
+
+# _estimate_noise's tone-subtraction residual is never exactly zero for a
+# synthetic, perfectly clean signal -- the FFT/IFFT round trip leaves a
+# floating-point residual around ~1e-15..1e-12 relative to the signal. That
+# residual is measurement precision, not real noise, so an SNR computed from
+# it (hundreds of dB) would still be a fabricated number. Gate SNR on the
+# noise floor being at least this fraction of the signal amplitude -- many
+# orders of magnitude above float round-off, comfortably below any real
+# instrument's noise floor.
+_MIN_MEASURABLE_NOISE_RATIO = 1e-9
 
 
 class SignalType:
@@ -296,16 +306,13 @@ class WaveformAnalyzer:
         try:
             v = waveform.voltage
 
-            # Estimate noise level (high-frequency component)
-            # Use standard deviation of detrended signal
-            v_detrended = v - np.mean(v)
-            noise_level = np.std(v_detrended)
+            vmax = float(np.max(v))
+            vmin = float(np.min(v))
+            signal_amplitude = (vmax - vmin) / 2.0
 
-            # Signal to Noise Ratio (SNR)
-            vmax = np.max(v)
-            vmin = np.min(v)
-            signal_amplitude = (vmax - vmin) / 2
-            snr = 20 * np.log10(signal_amplitude / noise_level) if noise_level > 0 else None
+            noise_level = WaveformAnalyzer._estimate_noise(waveform)
+            measurable_noise = noise_level and noise_level > 0 and signal_amplitude > 0 and noise_level > signal_amplitude * _MIN_MEASURABLE_NOISE_RATIO
+            snr = 20 * np.log10(signal_amplitude / noise_level) if measurable_noise else None
 
             # Overshoot/undershoot are meaningful only for flat-topped signals.
             if WaveformAnalyzer._is_two_level(v):
@@ -349,6 +356,40 @@ class WaveformAnalyzer:
                 "undershoot": None,
                 "jitter": None,
             }
+
+    @staticmethod
+    def _estimate_noise(waveform: WaveformData) -> Optional[float]:
+        """Estimate noise RMS from a signal-free residual, or None when not separable."""
+        v = np.asarray(waveform.voltage, dtype=float)
+        n = v.size
+        if n < 8:
+            return None
+        # Two-level signals: use the settled-plateau noise.
+        if WaveformAnalyzer._is_two_level(v):
+            stab = WaveformAnalyzer.calculate_plateau_stability(waveform, SignalType.SQUARE).get("plateau_stability")
+            return None if stab is None else float(stab)
+        # Otherwise require a dominant tone to subtract; without one we cannot
+        # separate signal from noise, so report None rather than guess.
+        if not WaveformAnalyzer._has_dominant_tone(v):
+            return None
+        x = v - np.mean(v)
+        spectrum = rfft(x)
+        mag = np.abs(spectrum)
+        if mag[1:].size == 0:
+            return None
+        fund_bin = 1 + int(np.argmax(mag[1:]))
+        noise_spec = spectrum.copy()
+        noise_spec[0] = 0.0
+        half = 2
+        h = 1
+        while h * fund_bin < len(spectrum):
+            center = h * fund_bin
+            lo = max(1, center - half)
+            hi = min(len(spectrum), center + half + 1)
+            noise_spec[lo:hi] = 0.0
+            h += 1
+        residual = irfft(noise_spec, n=n)
+        return float(np.sqrt(np.mean(residual**2)))
 
     @staticmethod
     def format_stat_value(name: str, value: Optional[float]) -> str:
