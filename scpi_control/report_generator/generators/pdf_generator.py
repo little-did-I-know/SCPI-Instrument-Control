@@ -641,6 +641,20 @@ class PDFReportGenerator(BaseReportGenerator):
             story.append(Paragraph(insights_text, self.styles["Normal"]))
             story.append(Spacer(1, 0.1 * inch))
 
+        # Overlay plots (comparison/batch)
+        if section.overlay_plots and self.include_plots:
+            for spec in section.overlay_plots:
+                drawing = self._generate_overlay_plot(spec)
+                if drawing is not None:
+                    story.append(KeepTogether([Paragraph(f"Channel {spec.channel_label} — all runs", self.styles["SubsectionHeading"]), drawing]))
+                    story.append(Spacer(1, 0.1 * inch))
+
+        # Comparison table
+        if section.comparison_table:
+            story.append(Paragraph(section.comparison_table.title, self.styles["SubsectionHeading"]))
+            story.append(self._generate_comparison_table_element(section.comparison_table))
+            story.append(Spacer(1, 0.1 * inch))
+
         # Waveforms
         if section.waveforms:
             story.append(Paragraph("Waveforms", self.styles["SubsectionHeading"]))
@@ -681,6 +695,16 @@ class PDFReportGenerator(BaseReportGenerator):
                         story.append(Spacer(1, 0.1 * inch))
                     except Exception:
                         pass
+
+        # Raw-data manifest
+        if section.manifest:
+            story.append(Paragraph("Source Data Manifest", self.styles["SubsectionHeading"]))
+            story.append(self._generate_manifest_table(section.manifest))
+            story.append(Spacer(1, 0.1 * inch))
+
+        # Sign-off block
+        if section.signoff:
+            story.append(self._generate_signoff_block(section.signoff))
 
         story.append(Spacer(1, 0.2 * inch))
 
@@ -1178,6 +1202,83 @@ class PDFReportGenerator(BaseReportGenerator):
         except Exception as e:
             logger.exception(f"Failed to generate waveform plot: {e}")
             return None
+
+    def _generate_overlay_plot(self, spec) -> Optional[Drawing]:
+        """Generate a multi-run overlay plot (one axes, one trace per run) as a scaled vector Drawing."""
+        try:
+            style = self.plot_style.matplotlib_style or "default"
+            buf = io.BytesIO()
+            with plt.style.context(style):
+                fig, ax = plt.subplots(figsize=(self.plot_width / inch, self.plot_height / inch))
+                for trace in spec.traces:
+                    wf = trace.waveform
+                    ax.plot(wf.time * 1e6, wf.voltage, color=trace.color, linewidth=self.plot_style.waveform_linewidth, label=trace.run_label)
+                self.plot_style.apply_to_axes(ax)
+                ax.set_xlabel("Time (µs)", fontsize=self.plot_style.label_fontsize)
+                ax.set_ylabel("Voltage (V)", fontsize=self.plot_style.label_fontsize)
+                ax.legend(fontsize=self.plot_style.label_fontsize)
+                fig.tight_layout()
+                fig.savefig(buf, format="svg")
+                plt.close(fig)
+            buf.seek(0)
+            return _svg_to_drawing(buf, self.plot_width, self.plot_height)
+        except Exception as e:
+            logger.exception(f"Failed to generate overlay plot: {e}")
+            return None
+
+    def _generate_comparison_table_element(self, table) -> Table:
+        """Render a ComparisonTable with brand-colored pass/fail cell text."""
+        data = [list(table.headers)] + [[cell.text for cell in row] for row in table.rows]
+        element = Table(data, repeatRows=1)
+        style_commands = [
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor(self.branding.primary_color)),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
+            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("FONTSIZE", (0, 0), (-1, -1), 8),
+            ("GRID", (0, 0), (-1, -1), 0.5, colors.black),
+            ("BACKGROUND", (0, 1), (-1, -1), colors.beige),
+            ("BOTTOMPADDING", (0, 0), (-1, 0), 6),
+        ]
+        for r, row in enumerate(table.rows, start=1):
+            for c, cell in enumerate(row):
+                if cell.status == "pass":
+                    style_commands.append(("TEXTCOLOR", (c, r), (c, r), colors.HexColor(self.branding.success_color)))
+                elif cell.status == "fail":
+                    style_commands.append(("TEXTCOLOR", (c, r), (c, r), colors.HexColor(self.branding.failure_color)))
+        element.setStyle(TableStyle(style_commands))
+        return element
+
+    def _generate_manifest_table(self, manifest) -> Table:
+        """Render the raw-data manifest (one row per source file, hash truncated for width)."""
+        data = [["Run", "File", "Size", "SHA-256", "Captured", "Instrument"]]
+        for entry in manifest.entries:
+            sha_short = entry.sha256[:16] + "…" if entry.sha256 else "—"
+            data.append([entry.run_label, Path(entry.file_path).name, str(entry.size_bytes), sha_short, entry.capture_timestamp or "—", entry.instrument or "—"])
+        element = Table(data, repeatRows=1)
+        element.setStyle(
+            TableStyle(
+                [
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor(self.branding.primary_color)),
+                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
+                    ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                    ("FONTSIZE", (0, 0), (-1, -1), 7),
+                    ("GRID", (0, 0), (-1, -1), 0.5, colors.black),
+                    ("BACKGROUND", (0, 1), (-1, -1), colors.beige),
+                ]
+            )
+        )
+        return element
+
+    def _generate_signoff_block(self, signoff) -> KeepTogether:
+        """Render the sign-off block (role/name plus blank signature+date lines), kept on one page."""
+        elements = [Paragraph("Sign-Off", self.styles["SectionHeading"])]
+        for role in signoff.roles:
+            name = f" {role.name}" if role.name else ""
+            elements.append(Spacer(1, 0.25 * inch))
+            elements.append(Paragraph(f"<b>{role.title}:</b>{name}", self.styles["Normal"]))
+            elements.append(Spacer(1, 0.05 * inch))
+            elements.append(Paragraph("Signature: ________________________&nbsp;&nbsp;&nbsp;&nbsp;Date: ____________", self.styles["Normal"]))
+        return KeepTogether(elements)
 
     def _generate_fft_plot(self, frequency: np.ndarray, magnitude: np.ndarray) -> Optional[Drawing]:
         """Generate an FFT plot as a scaled vector Drawing."""
