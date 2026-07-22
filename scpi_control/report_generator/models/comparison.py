@@ -40,6 +40,7 @@ class Run:
     waveforms: List[WaveformData] = field(default_factory=list)
     measurements: List[MeasurementResult] = field(default_factory=list)
     passed: Optional[bool] = None  # None when no criteria applied
+    incomplete: bool = False  # True when a critical criterion could not be evaluated
     load_errors: List[str] = field(default_factory=list)
 
 
@@ -102,4 +103,5 @@ class ComparisonResult:
     aggregates: Dict[str, Dict[str, AggregateStats]] = field(default_factory=dict)
     yield_passed: Optional[int] = None
     yield_total: Optional[int] = None
+    yield_incomplete: Optional[int] = None
     warnings: List[str] = field(default_factory=list)
