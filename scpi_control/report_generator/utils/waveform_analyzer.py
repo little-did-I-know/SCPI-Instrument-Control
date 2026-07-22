@@ -126,7 +126,7 @@ class WaveformAnalyzer:
 
             # Compute FFT
             n = len(v)
-            yf = fft(v)
+            yf = fft(v - np.mean(v))  # remove DC so the fundamental is not masked
             xf = fftfreq(n, 1 / sample_rate)
 
             # Get positive frequencies only
@@ -137,7 +137,7 @@ class WaveformAnalyzer:
             # Find peak frequency (excluding DC component)
             if len(yf_pos) > 1:
                 # Skip first bin (DC)
-                peak_idx = np.argmax(yf_pos[1:]) + 1
+                peak_idx = int(np.argmax(yf_pos))
                 frequency = xf_pos[peak_idx]
                 period = 1 / frequency if frequency > 0 else None
 
@@ -663,7 +663,7 @@ class WaveformAnalyzer:
                 return None
 
             # Find fundamental frequency (peak)
-            peak_idx = np.argmax(yf_pos[1:]) + 1  # Skip DC
+            peak_idx = int(np.argmax(yf_pos))  # DC already removed above
             fundamental_freq = xf_pos[peak_idx]
             fundamental_amp = yf_pos[peak_idx]
 
