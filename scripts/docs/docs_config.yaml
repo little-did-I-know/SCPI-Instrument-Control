@@ -30,6 +30,8 @@ examples:
       - "psu_usb_connection.py"
       - "synthetic_signals.py"
       - "waveform_provenance_and_extract.py"
+      - "comparison_report.py"
+      - "batch_report.py"
 
     advanced:
       - "advanced_analysis.py"
