@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Dev tooling: `pytest-xdist` in the `dev` extra for parallel local test runs (`python -m pytest -n auto`); complements `--testmon` (use one or the other per invocation).
+
 ## [3.3.1] - 2026-07-21
 
 ### Changed
