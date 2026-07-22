@@ -94,7 +94,8 @@ class WaveformAnalyzer:
         vpp = vmax - vmin
         vmean = np.mean(v)
         vrms = np.sqrt(np.mean(v**2))
-        vamp = (vmax + vmin) / 2  # Amplitude (middle of range)
+        vtop, vbase = WaveformAnalyzer._estimate_top_base(v)
+        vamp = vtop - vbase  # Amplitude (Vtop - Vbase), offset-independent
 
         return {
             "vmax": vmax,
@@ -503,6 +504,29 @@ class WaveformAnalyzer:
         if mean == 0:
             return std < threshold
         return (std / mean) < threshold
+
+    @staticmethod
+    def _estimate_top_base(v: np.ndarray) -> Tuple[float, float]:
+        """Estimate the settled high (Vtop) and low (Vbase) levels via a histogram.
+
+        For flat-topped signals this returns the modal plateau levels (excluding
+        overshoot spikes); for signals without flat tops it collapses to
+        (vmax, vmin). Offset-independent.
+        """
+        v = np.asarray(v, dtype=float)
+        vmin = float(np.min(v))
+        vmax = float(np.max(v))
+        if vmax <= vmin:
+            return vmax, vmin
+        nbins = max(10, min(256, v.size // 20))
+        hist, edges = np.histogram(v, bins=nbins, range=(vmin, vmax))
+        centers = (edges[:-1] + edges[1:]) / 2.0
+        mid = (vmin + vmax) / 2.0
+        lower = centers < mid
+        upper = ~lower
+        vbase = float(centers[lower][int(np.argmax(hist[lower]))]) if hist[lower].any() else vmin
+        vtop = float(centers[upper][int(np.argmax(hist[upper]))]) if hist[upper].any() else vmax
+        return vtop, vbase
 
     @staticmethod
     def _is_two_level(v: np.ndarray, band: float = 0.15, min_fraction: float = 0.8) -> bool:
