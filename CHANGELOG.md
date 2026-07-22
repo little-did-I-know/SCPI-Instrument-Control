@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### ⚠️ Breaking Changes
+
+- Power supply and function-generator readback (`measure_voltage`/`measure_current`/`measure_power`,
+  setpoint/OVP/OCP getters, and AWG `frequency`/`amplitude`/`offset`/`phase`) now raise
+  `CommandError` when the instrument returns an unparseable response, instead of silently returning
+  `0.0`. Callers that relied on the silent zero must handle the exception.
+
 ### Added
 
 - Dev tooling: `pytest-xdist` in the `dev` extra for parallel local test runs (`python -m pytest -n auto`); complements `--testmon` (use one or the other per invocation).
@@ -16,6 +23,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Report generator: the waveform loader no longer drops acquisition provenance when loading capture files.
+- Analysis: corrected THD (each harmonic is read at its own bin, robust to an off-bin fundamental),
+  noise/SNR (estimated from a signal-free residual instead of the whole-signal RMS), `vamp`
+  (Vtop − Vbase amplitude, not the vertical midpoint), overshoot/undershoot (only reported for
+  flat-topped signals), duty cycle (correct when the capture starts on the high level), DC
+  classification (no longer fooled by a large offset over real ripple), FFT peak detection (finds
+  peaks below 0 dB), and SciPy window handling for the power spectrum / spectrogram.
+- Reports and the live webapp spectrum now use a single THD engine, so they report the same number
+  for the same capture. Report-path THD now sums the first 5 harmonics (previously 10).
+- DAQ AI threshold suggestions now bind each extracted number to its label instead of grabbing the
+  first number in the sentence.
 
 ## [3.3.1] - 2026-07-21
 
