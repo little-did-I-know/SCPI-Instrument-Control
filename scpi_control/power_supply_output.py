@@ -370,9 +370,8 @@ class PowerSupplyOutput:
 
         try:
             return float(response)
-        except ValueError:
-            logger.error(f"Failed to parse float from response: {response}")
-            return 0.0
+        except ValueError as exc:
+            raise exceptions.CommandError(f"Unparseable PSU response: {response!r}") from exc
 
     def get_configuration(self) -> Dict[str, any]:
         """Get all output configuration parameters.
