@@ -503,6 +503,10 @@ class WaveformAnalyzer:
     @staticmethod
     def _is_dc_signal(v: np.ndarray, threshold: float = 0.01) -> bool:
         """Check if signal is DC (very low variation)."""
+        # A real periodic component means the signal is not DC, regardless of how
+        # large the DC offset is (the offset is what made the old std/mean test wrong).
+        if WaveformAnalyzer._has_dominant_tone(np.asarray(v, dtype=float)):
+            return False
         std = np.std(v)
         mean = np.mean(np.abs(v))
         if mean == 0:
@@ -570,6 +574,27 @@ class WaveformAnalyzer:
         if median == 0.0:
             return False  # isolated tones on a zero floor: not noise
         return bool((float(np.max(mag)) / median) < _NOISE_PEAK_TO_MEDIAN)
+
+    @staticmethod
+    def _has_dominant_tone(v: np.ndarray) -> bool:
+        """True if a single spectral bin clearly dominates (a real periodic component).
+
+        Unlike _is_noise, a constant signal (no spectral content) returns False here,
+        so it is still classified DC upstream.
+        """
+        v = np.asarray(v, dtype=float)
+        if v.size < 4:
+            return False
+        mag = np.abs(rfft(v - np.mean(v)))[1:]  # drop DC bin
+        if mag.size == 0:
+            return False
+        mx = float(np.max(mag))
+        if mx == 0.0:
+            return False  # constant / no spectral content
+        median = float(np.median(mag))
+        if median == 0.0:
+            return True  # isolated tone(s) on a zero floor
+        return (mx / median) >= _NOISE_PEAK_TO_MEDIAN
 
     @staticmethod
     def _get_harmonic_ratios(waveform: WaveformData, num_harmonics: int = 5) -> Optional[np.ndarray]:
