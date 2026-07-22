@@ -3294,6 +3294,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#breaking-changes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ⚠️ Breaking Changes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#added" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3489,7 +3500,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#breaking-changes" class="md-nav__link">
+  <a href="#breaking-changes_1" class="md-nav__link">
     <span class="md-ellipsis">
       
         ⚠️ Breaking Changes
@@ -3539,7 +3550,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#breaking-changes_1" class="md-nav__link">
+  <a href="#breaking-changes_2" class="md-nav__link">
     <span class="md-ellipsis">
       
         ⚠️ Breaking Changes
@@ -3650,7 +3661,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#breaking-changes_2" class="md-nav__link">
+  <a href="#breaking-changes_3" class="md-nav__link">
     <span class="md-ellipsis">
       
         Breaking Changes
@@ -4005,7 +4016,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#breaking-changes_3" class="md-nav__link">
+  <a href="#breaking-changes_4" class="md-nav__link">
     <span class="md-ellipsis">
       
         ⚠️ BREAKING CHANGES
@@ -4553,6 +4564,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#breaking-changes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ⚠️ Breaking Changes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#added" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4748,7 +4770,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#breaking-changes" class="md-nav__link">
+  <a href="#breaking-changes_1" class="md-nav__link">
     <span class="md-ellipsis">
       
         ⚠️ Breaking Changes
@@ -4798,7 +4820,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#breaking-changes_1" class="md-nav__link">
+  <a href="#breaking-changes_2" class="md-nav__link">
     <span class="md-ellipsis">
       
         ⚠️ Breaking Changes
@@ -4909,7 +4931,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#breaking-changes_2" class="md-nav__link">
+  <a href="#breaking-changes_3" class="md-nav__link">
     <span class="md-ellipsis">
       
         Breaking Changes
@@ -5264,7 +5286,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#breaking-changes_3" class="md-nav__link">
+  <a href="#breaking-changes_4" class="md-nav__link">
     <span class="md-ellipsis">
       
         ⚠️ BREAKING CHANGES
@@ -5726,6 +5748,13 @@
 <p>The format is based on <a href="https://keepachangelog.com/en/1.0.0/">Keep a Changelog</a>,
 and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semantic Versioning</a>.</p>
 <h2 id="unreleased">[Unreleased]<a class="headerlink" href="#unreleased" title="Permanent link">&para;</a></h2>
+<h3 id="breaking-changes">⚠️ Breaking Changes<a class="headerlink" href="#breaking-changes" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Power supply and function-generator readback (<code>measure_voltage</code>/<code>measure_current</code>/<code>measure_power</code>,
+  setpoint/OVP/OCP getters, and AWG <code>frequency</code>/<code>amplitude</code>/<code>offset</code>/<code>phase</code>) now raise
+  <code>CommandError</code> when the instrument returns an unparseable response, instead of silently returning
+  <code>0.0</code>. Callers that relied on the silent zero must handle the exception.</li>
+</ul>
 <h3 id="added">Added<a class="headerlink" href="#added" title="Permanent link">&para;</a></h3>
 <ul>
 <li>Dev tooling: <code>pytest-xdist</code> in the <code>dev</code> extra for parallel local test runs (<code>python -m pytest -n auto</code>); complements <code>--testmon</code> (use one or the other per invocation).</li>
@@ -5735,6 +5764,16 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 <h3 id="fixed">Fixed<a class="headerlink" href="#fixed" title="Permanent link">&para;</a></h3>
 <ul>
 <li>Report generator: the waveform loader no longer drops acquisition provenance when loading capture files.</li>
+<li>Analysis: corrected THD (each harmonic is read at its own bin, robust to an off-bin fundamental),
+  noise/SNR (estimated from a signal-free residual instead of the whole-signal RMS), <code>vamp</code>
+  (Vtop − Vbase amplitude, not the vertical midpoint), overshoot/undershoot (only reported for
+  flat-topped signals), duty cycle (correct when the capture starts on the high level), DC
+  classification (no longer fooled by a large offset over real ripple), FFT peak detection (finds
+  peaks below 0 dB), and SciPy window handling for the power spectrum / spectrogram.</li>
+<li>Reports and the live webapp spectrum now use a single THD engine, so they report the same number
+  for the same capture. Report-path THD now sums the first 5 harmonics (previously 10).</li>
+<li>DAQ AI threshold suggestions now bind each extracted number to its label instead of grabbing the
+  first number in the sentence.</li>
 </ul>
 <h2 id="331-2026-07-21">[3.3.1] - 2026-07-21<a class="headerlink" href="#331-2026-07-21" title="Permanent link">&para;</a></h2>
 <h3 id="changed">Changed<a class="headerlink" href="#changed" title="Permanent link">&para;</a></h3>
@@ -5793,7 +5832,7 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 <li>Report generator PDF: characters outside the built-in font's range (⚠, ✓/✗, σ, Ω, …) no longer render as blank boxes — they are normalized to readable text, with a catch-all so any unexpected glyph can never box out.</li>
 </ul>
 <h2 id="300-2026-07-17">[3.0.0] - 2026-07-17<a class="headerlink" href="#300-2026-07-17" title="Permanent link">&para;</a></h2>
-<h3 id="breaking-changes">⚠️ Breaking Changes<a class="headerlink" href="#breaking-changes" title="Permanent link">&para;</a></h3>
+<h3 id="breaking-changes_1">⚠️ Breaking Changes<a class="headerlink" href="#breaking-changes_1" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>The report generator's <code>WaveformData</code> fields are renamed, and <code>channel</code>
   moved from the first constructor argument to the third.</strong> <code>channel_name</code>,
@@ -5881,7 +5920,7 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   MAT/HDF5 boundary.</li>
 </ul>
 <h2 id="200-2026-07-15">[2.0.0] - 2026-07-15<a class="headerlink" href="#200-2026-07-15" title="Permanent link">&para;</a></h2>
-<h3 id="breaking-changes_1">⚠️ Breaking Changes<a class="headerlink" href="#breaking-changes_1" title="Permanent link">&para;</a></h3>
+<h3 id="breaking-changes_2">⚠️ Breaking Changes<a class="headerlink" href="#breaking-changes_2" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>Removed the <code>siglent</code> compatibility shim.</strong> <code>import siglent</code> now raises
   <code>ModuleNotFoundError</code>; use <code>import scpi_control</code> (identical API). The shim
@@ -5946,7 +5985,7 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 <h2 id="100-2026-01-06">[1.0.0] - 2026-01-06<a class="headerlink" href="#100-2026-01-06" title="Permanent link">&para;</a></h2>
 <h3 id="major-release-package-renamed">⚠️ MAJOR RELEASE - Package Renamed<a class="headerlink" href="#major-release-package-renamed" title="Permanent link">&para;</a></h3>
 <p><strong>This is a major release with a package rename.</strong> The project has been renamed from <code>Siglent-Oscilloscope</code> to <code>SCPI-Instrument-Control</code> to better reflect its expanded capabilities beyond just Siglent oscilloscopes.</p>
-<h3 id="breaking-changes_2">Breaking Changes<a class="headerlink" href="#breaking-changes_2" title="Permanent link">&para;</a></h3>
+<h3 id="breaking-changes_3">Breaking Changes<a class="headerlink" href="#breaking-changes_3" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>PyPI Package Name</strong>: <code>siglent</code> → <code>SCPI-Instrument-Control</code></li>
 <li><strong>Python Import Name</strong>: <code>import siglent</code> → <code>import scpi_control</code> (recommended)</li>
@@ -6561,7 +6600,7 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 <li>Resolved workflow exit code 1 error during archive creation</li>
 </ul>
 <h2 id="030-unreleased">[0.3.0] - Unreleased<a class="headerlink" href="#030-unreleased" title="Permanent link">&para;</a></h2>
-<h3 id="breaking-changes_3">⚠️ BREAKING CHANGES<a class="headerlink" href="#breaking-changes_3" title="Permanent link">&para;</a></h3>
+<h3 id="breaking-changes_4">⚠️ BREAKING CHANGES<a class="headerlink" href="#breaking-changes_4" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>Exception Class Renaming</strong> (Issue #3 from Code Review)</li>
 <li><code>ConnectionError</code> renamed to <code>SiglentConnectionError</code> to avoid shadowing Python's built-in <code>ConnectionError</code></li>
