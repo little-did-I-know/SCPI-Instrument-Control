@@ -29,6 +29,20 @@ def _capture(tmp_path, name, amplitude=1.0, frequency=1_000.0, channel=1):
     return path
 
 
+def _dc_capture(tmp_path, name, level, channel=1):
+    """Write one synthetic DC capture and return its path.
+
+    Provenance is attached so the plain-CSV writer emits the channel header
+    line; without it every plain CSV round-trips as channel "CH1" regardless
+    of the `channel` argument.
+    """
+    wf = make_waveform(SignalSpec(kind="dc", offset=level, seed=42), 100_000.0, 2_000, channel=channel)
+    wf.provenance = AcquisitionProvenance(instrument=InstrumentInfo(model="Mock"))
+    path = tmp_path / name
+    Waveform(Mock()).save_waveform(wf, str(path), format="CSV")
+    return path
+
+
 def _vpp_criteria(vmin, vmax):
     cs = CriteriaSet(name="limits")
     cs.add_criteria(MeasurementCriteria(measurement_name="vpp", comparison_type=ComparisonType.RANGE, min_value=vmin, max_value=vmax))
@@ -117,3 +131,46 @@ def test_dropping_baseline_in_comparison_mode_errors(tmp_path):
     runset.runs.append(Run(label="third", files=[_capture(tmp_path, "third.csv")]))
     with pytest.raises(ComparisonAnalysisError, match="[Bb]aseline"):
         ComparisonAnalyzer.analyze(runset, skip_bad_runs=True)
+
+
+def test_comparison_deltas_vs_baseline(tmp_path):
+    # amplitude 1.0 -> vpp ~2.0; amplitude 1.5 -> vpp ~3.0; delta ~= +1.0, pct ~= +50%
+    result = ComparisonAnalyzer.analyze(_two_run_set(tmp_path, amp2=1.5))
+    entries = result.deltas["1"]["vpp"]
+    assert len(entries) == 1 and entries[0].run_label == "after"
+    assert entries[0].delta == pytest.approx(1.0, rel=0.1)
+    assert entries[0].pct == pytest.approx(50.0, rel=0.1)
+
+
+def test_zero_baseline_gives_none_pct(tmp_path):
+    # vmean of an offset-free sine is ~0 but not exactly 0; use a dc waveform at 0 V.
+    runset = RunSet(
+        runs=[
+            Run(label="base", files=[_dc_capture(tmp_path, "b.csv", level=0.0)]),
+            Run(label="other", files=[_dc_capture(tmp_path, "o.csv", level=1.0)]),
+        ],
+        mode=MODE_COMPARISON,
+    )
+    result = ComparisonAnalyzer.analyze(runset)
+    vmean_entries = result.deltas["1"]["vmean"]
+    assert vmean_entries[0].delta == pytest.approx(1.0, abs=1e-6)
+    assert vmean_entries[0].pct is None
+
+
+def test_batch_aggregates_and_yield(tmp_path):
+    runset = RunSet(
+        runs=[Run(label=f"dut{i}", files=[_capture(tmp_path, f"d{i}.csv", amplitude=a)]) for i, a in enumerate([1.0, 1.0, 1.5])],
+        mode=MODE_BATCH,
+        criteria_set=_vpp_criteria(1.5, 2.5),
+    )
+    result = ComparisonAnalyzer.analyze(runset)
+    agg = result.aggregates["1"]["vpp"]
+    assert agg.n == 3
+    assert agg.min == pytest.approx(2.0, rel=0.1) and agg.max == pytest.approx(3.0, rel=0.1)
+    assert agg.std is not None and agg.std > 0
+    assert (result.yield_passed, result.yield_total) == (2, 3)
+
+
+def test_yield_none_without_criteria(tmp_path):
+    result = ComparisonAnalyzer.analyze(_two_run_set(tmp_path, mode=MODE_BATCH))
+    assert result.yield_passed is None and result.yield_total is None
