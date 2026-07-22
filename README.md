@@ -88,6 +88,7 @@ PDFReportGenerator().generate(report, Path("calibration_report.pdf"))
 - ✅ **Region Extraction** - Zoom into plateaus, edges, and transients with calibration guidance
 - ✅ **Multiple Formats** - Generate PDF and Markdown reports with embedded plots
 - ✅ **Professional Layout** - Publication-ready reports with metadata, statistics tables, and visualizations
+- ✅ **Comparison & Batch Reports** - Compare before/after captures or aggregate multi-DUT batches with delta/yield tables, a sign-off block, and a SHA-256 raw-data manifest; available via `Report → Comparison / Batch Report…` in the GUI
 
 **Report Sections Include:**
 

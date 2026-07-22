@@ -149,6 +149,12 @@ class ReportTemplate:
     include_waveform_plots: bool = True
     include_fft_analysis: bool = True
 
+    # Sign-off & raw-data appendix (applies to single-run and comparison reports)
+    include_signoff: bool = False
+    signoff_roles: List[str] = field(default_factory=lambda: ["Tested by", "Reviewed by", "Approved by"])
+    signoff_names: Dict[str, str] = field(default_factory=dict)
+    include_raw_data_appendix: bool = False
+
     # AI/LLM settings
     llm_provider: Optional[str] = None  # "ollama", "lm_studio", "openai", "custom"
     llm_endpoint: Optional[str] = None
@@ -238,6 +244,10 @@ class ReportTemplate:
             "include_recommendations": self.include_recommendations,
             "include_waveform_plots": self.include_waveform_plots,
             "include_fft_analysis": self.include_fft_analysis,
+            "include_signoff": self.include_signoff,
+            "signoff_roles": list(self.signoff_roles),
+            "signoff_names": dict(self.signoff_names),
+            "include_raw_data_appendix": self.include_raw_data_appendix,
             # AI/LLM settings
             "auto_generate_summary": self.auto_generate_summary,
             "auto_generate_findings": self.auto_generate_findings,
@@ -331,6 +341,10 @@ class ReportTemplate:
             "include_recommendations",
             "include_waveform_plots",
             "include_fft_analysis",
+            "include_signoff",
+            "signoff_roles",
+            "signoff_names",
+            "include_raw_data_appendix",
             "llm_provider",
             "llm_endpoint",
             "llm_model",

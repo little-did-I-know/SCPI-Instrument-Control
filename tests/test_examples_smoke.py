@@ -42,6 +42,8 @@ EXECUTE = [
     ("report_ai_qa.py", "requests"),
     ("waveform_provenance_and_extract.py", None),
     ("synthetic_signals.py", None),
+    ("comparison_report.py", None),
+    ("batch_report.py", None),
 ]
 
 _TIMEOUTS = {"report_ai_qa.py": 240}

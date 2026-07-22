@@ -13,6 +13,7 @@ from typing import Any, Dict, List, Optional, Tuple
 import numpy as np
 
 from scpi_control.waveform import WaveformData as CaptureWaveform
+from scpi_control.report_generator.models.report_elements import ComparisonTable, DataManifest, OverlayPlotSpec, SignoffBlock
 
 SUMMARY_SOURCE_MANUAL = "manual"
 SUMMARY_SOURCE_AI = "ai"
@@ -460,6 +461,12 @@ class TestSection:
     ai_summary: Optional[str] = None
     ai_insights: Optional[str] = None
 
+    # Comparison/batch elements (rendered by both generators when set)
+    comparison_table: Optional[ComparisonTable] = None
+    overlay_plots: List[OverlayPlotSpec] = field(default_factory=list)
+    manifest: Optional[DataManifest] = None
+    signoff: Optional[SignoffBlock] = None
+
     order: int = 0  # For sorting sections
 
     def to_dict(self) -> Dict[str, Any]:
@@ -480,6 +487,15 @@ class TestSection:
             data["ai_summary"] = self.ai_summary
         if self.ai_insights:
             data["ai_insights"] = self.ai_insights
+
+        if self.comparison_table:
+            data["comparison_table"] = self.comparison_table.to_dict()
+        if self.overlay_plots:
+            data["overlay_plots"] = [p.to_dict() for p in self.overlay_plots]
+        if self.manifest:
+            data["manifest"] = self.manifest.to_dict()
+        if self.signoff:
+            data["signoff"] = self.signoff.to_dict()
 
         return data
 

@@ -18,6 +18,7 @@ from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QAction
 from PyQt6.QtWidgets import (
     QApplication,
+    QCheckBox,
     QFileDialog,
     QGroupBox,
     QHBoxLayout,
@@ -36,6 +37,7 @@ from PyQt6.QtWidgets import (
 )
 
 from scpi_control.report_generator.analysis.computed_analyzer import ComputedAnalyzer
+from scpi_control.report_generator.comparison_report_builder import append_signoff_and_appendix
 from scpi_control.report_generator.generators.markdown_generator import MarkdownReportGenerator
 from scpi_control.report_generator.models.app_settings import AppSettings
 from scpi_control.report_generator.models.plot_style import PlotStyle
@@ -94,6 +96,12 @@ class MainWindow(QMainWindow):
 
         self._setup_ui()
         self._setup_menu()
+
+        # Re-default the sign-off/appendix checkboxes if a template was restored
+        # from the previous session.
+        if self.current_template is not None:
+            self.include_signoff_check.setChecked(self.current_template.include_signoff)
+            self.include_appendix_check.setChecked(self.current_template.include_raw_data_appendix)
 
     def _safe_delete_temp_file(self, temp_path: Path, max_retries: int = 10):
         """
@@ -205,6 +213,14 @@ class MainWindow(QMainWindow):
         layout.addWidget(QLabel("Report Metadata:"))
         layout.addWidget(metadata_scroll)
 
+        # Sign-off / appendix options (overriding a loaded template's defaults)
+        signoff_layout = QHBoxLayout()
+        self.include_signoff_check = QCheckBox("Include sign-off block")
+        signoff_layout.addWidget(self.include_signoff_check)
+        self.include_appendix_check = QCheckBox("Include raw-data appendix")
+        signoff_layout.addWidget(self.include_appendix_check)
+        layout.addLayout(signoff_layout)
+
         # Report generation buttons
         generate_layout = QHBoxLayout()
 
@@ -266,6 +282,12 @@ class MainWindow(QMainWindow):
         llm_action = QAction("&LLM Configuration...", self)
         llm_action.triggered.connect(self._configure_llm)
         settings_menu.addAction(llm_action)
+
+        # Report menu
+        report_menu = menubar.addMenu("&Report")
+        comparison_action = QAction("&Comparison / Batch Report...", self)
+        comparison_action.triggered.connect(self._open_comparison_dialog)
+        report_menu.addAction(comparison_action)
 
         # Help menu
         help_menu = menubar.addMenu("&Help")
@@ -628,6 +650,17 @@ class MainWindow(QMainWindow):
         # report-level summary/findings/recommendations only if the LLM did not.
         ComputedAnalyzer().analyze_report(report)
 
+        # Sign-off / raw-data appendix (template-driven, overridden by the
+        # left-panel checkboxes). Without a loaded template, fall back to an
+        # ad hoc one so the checkboxes still take effect on their own.
+        template = self.current_template
+        if template is None and (self.include_signoff_check.isChecked() or self.include_appendix_check.isChecked()):
+            template = ReportTemplate(name="Ad hoc")
+        if template is not None:
+            template.include_signoff = self.include_signoff_check.isChecked()
+            template.include_raw_data_appendix = self.include_appendix_check.isChecked()
+            append_signoff_and_appendix(report, template)
+
         # Update chat sidebar and AI panel with report
         self.current_report = report
         self.chat_sidebar.set_report(report)
@@ -748,6 +781,10 @@ class MainWindow(QMainWindow):
         self.current_options.plot_height_inches = template.plot_height_inches
         self.current_options.plot_dpi = template.plot_dpi
 
+        # Re-default the sign-off/appendix checkboxes from the loaded template
+        self.include_signoff_check.setChecked(template.include_signoff)
+        self.include_appendix_check.setChecked(template.include_raw_data_appendix)
+
         # Apply the template's branding (logo/company/header/footer + colors)
         metadata = self.metadata_panel.get_metadata()
         template.branding.apply_to_metadata(metadata)
@@ -841,6 +878,13 @@ class MainWindow(QMainWindow):
         """Open template management dialog."""
         dialog = TemplateManagerDialog(self)
         dialog.template_selected.connect(self._on_template_loaded)
+        dialog.exec()
+
+    def _open_comparison_dialog(self):
+        """Open the comparison/batch report dialog."""
+        from scpi_control.report_generator.comparison_dialog import ComparisonReportDialog
+
+        dialog = ComparisonReportDialog(self)
         dialog.exec()
 
     def closeEvent(self, event):

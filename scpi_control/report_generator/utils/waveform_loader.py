@@ -13,7 +13,7 @@ import numpy as np
 
 from scpi_control import waveform_schema as ws
 from scpi_control.report_generator.models.report_data import WaveformData
-from scpi_control.waveform_io import load_waveform as _load_native
+from scpi_control.waveform_io import load_waveform as _load_native, _parse_provenance
 
 logger = logging.getLogger(__name__)
 
@@ -60,6 +60,7 @@ def _from_loaded(loaded) -> WaveformData:
         sample_rate=sample_rate,
         record_length=len(voltage),
         source_file=loaded.source_path,
+        provenance=loaded.provenance,
     )
 
 
@@ -185,6 +186,10 @@ class WaveformLoader:
 
         time_data = data[:, 0]
         derived_rate = WaveformLoader._rate_from_time(time_data)
+
+        # Reconstruct provenance from header if present
+        provenance = _parse_provenance(header.get(ws.CSV_HEADER_PROVENANCE))
+
         waveforms = []
         for i in range(1, data.shape[1]):
             voltage = data[:, i]
@@ -202,6 +207,7 @@ class WaveformLoader:
                     sample_rate=WaveformLoader._rate_from_header(header, derived_rate),
                     record_length=len(voltage),
                     source_file=filepath,
+                    provenance=provenance,
                 )
             )
         return waveforms
