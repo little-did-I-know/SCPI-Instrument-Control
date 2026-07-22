@@ -1,4 +1,5 @@
 """Quality metrics: overshoot/undershoot and noise/SNR are honest (no fabrication)."""
+
 import numpy as np
 
 from scpi_control.report_generator.models.report_data import WaveformData
@@ -17,9 +18,9 @@ def _square_with_overshoot(overshoot_frac=0.05):
     rising = np.where((v[:-1] < 0) & (v[1:] >= 0))[0]
     falling = np.where((v[:-1] > 0) & (v[1:] <= 0))[0]
     for idx in rising:
-        v[idx + 1: idx + 4] = 1.0 + spike
+        v[idx + 1 : idx + 4] = 1.0 + spike
     for idx in falling:
-        v[idx + 1: idx + 4] = -1.0 - spike
+        v[idx + 1 : idx + 4] = -1.0 - spike
     return v
 
 

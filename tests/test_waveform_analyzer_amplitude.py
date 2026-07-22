@@ -1,4 +1,5 @@
 """vamp is the scope-standard amplitude (Vtop - Vbase), offset-independent."""
+
 import numpy as np
 
 from scpi_control.report_generator.models.report_data import WaveformData
