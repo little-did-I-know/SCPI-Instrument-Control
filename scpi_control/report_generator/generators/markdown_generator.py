@@ -185,6 +185,19 @@ class MarkdownReportGenerator(BaseReportGenerator):
             lines.append(section.ai_insights)
             lines.append("")
 
+        # Overlay plots (comparison/batch)
+        if section.overlay_plots and self.include_plots:
+            for spec in section.overlay_plots:
+                plot_path = self._generate_overlay_plot(spec, base_path, f"{section.title}_overlay_{spec.channel_label}")
+                if plot_path:
+                    lines.append(f"![Overlay: {spec.channel_label}]({plot_path})")
+                    lines.append("")
+
+        # Comparison table
+        if section.comparison_table:
+            lines.append(self._generate_comparison_table(section.comparison_table))
+            lines.append("")
+
         # Waveforms
         if section.waveforms:
             lines.append("### Waveforms")
@@ -216,6 +229,16 @@ class MarkdownReportGenerator(BaseReportGenerator):
             for img_path in section.images:
                 lines.append(f"![Image]({img_path})")
                 lines.append("")
+
+        # Raw-data manifest
+        if section.manifest:
+            lines.append(self._generate_manifest(section.manifest))
+            lines.append("")
+
+        # Sign-off block
+        if section.signoff:
+            lines.append(self._generate_signoff(section.signoff))
+            lines.append("")
 
         return "\n".join(lines)
 
@@ -548,3 +571,63 @@ class MarkdownReportGenerator(BaseReportGenerator):
         plt.close(fig)
 
         return f"{self.plots_dir}/{filename}"
+
+    def _generate_comparison_table(self, table) -> str:
+        lines = [f"### {table.title}", ""]
+        lines.append("| " + " | ".join(table.headers) + " |")
+        lines.append("|" + "|".join("---" for _ in table.headers) + "|")
+        for row in table.rows:
+            cells = []
+            for cell in row:
+                text = cell.text
+                if cell.status == "pass":
+                    text += " ✅"
+                elif cell.status == "fail":
+                    text += " ❌"
+                cells.append(text)
+            lines.append("| " + " | ".join(cells) + " |")
+        return "\n".join(lines)
+
+    def _generate_manifest(self, manifest) -> str:
+        lines = ["### Source Data Manifest", ""]
+        lines.append("| Run | File | Size (bytes) | SHA-256 | Captured | Instrument |")
+        lines.append("|---|---|---|---|---|---|")
+        for entry in manifest.entries:
+            lines.append(f"| {entry.run_label} | {entry.file_path} | {entry.size_bytes} | `{entry.sha256}` | {entry.capture_timestamp or '—'} | {entry.instrument or '—'} |")
+        return "\n".join(lines)
+
+    def _generate_signoff(self, signoff) -> str:
+        lines = []
+        for role in signoff.roles:
+            name = f" {role.name}" if role.name else ""
+            lines.append(f"**{role.title}:**{name}")
+            lines.append("")
+            lines.append("Signature: ________________________    Date: ____________")
+            lines.append("")
+        return "\n".join(lines)
+
+    def _generate_overlay_plot(self, spec, base_path: Path, name: str) -> Optional[str]:
+        try:
+            plots_path = base_path / self.plots_dir
+            plots_path.mkdir(parents=True, exist_ok=True)
+            filename = f"{name.replace(' ', '_')}.png"
+            filepath = plots_path / filename
+
+            if self.plot_style.matplotlib_style != "default":
+                plt.style.use(self.plot_style.matplotlib_style)
+            fig, ax = plt.subplots(figsize=(10, 4))
+            for trace in spec.traces:
+                wf = trace.waveform
+                ax.plot(wf.time * 1e6, wf.voltage, color=trace.color, linewidth=self.plot_style.waveform_linewidth, label=trace.run_label)
+            self.plot_style.apply_to_axes(ax)
+            ax.set_xlabel("Time (µs)", fontsize=self.plot_style.label_fontsize)
+            ax.set_ylabel("Voltage (V)", fontsize=self.plot_style.label_fontsize)
+            ax.set_title(f"Channel {spec.channel_label} — all runs", fontsize=self.plot_style.title_fontsize)
+            ax.legend()
+            plt.tight_layout()
+            plt.savefig(filepath, dpi=150, bbox_inches="tight")
+            plt.close(fig)
+            return f"{self.plots_dir}/{filename}"
+        except Exception as e:
+            logger.exception(f"Error generating overlay plot: {e}")
+            return None
