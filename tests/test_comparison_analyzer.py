@@ -188,3 +188,13 @@ def test_non_numeric_criteria_value_is_skipped_not_raised(tmp_path):
     for run in result.runset.runs:
         assert run.measurements == []
         assert run.passed is None
+
+
+def test_resolve_stat_key_matches_display_names():
+    from scpi_control.report_generator.analysis.comparison_analyzer import ComparisonAnalyzer
+
+    stats = {"overshoot": 1.0, "top_flatness": 0.5, "vpp": 2.0}
+    assert ComparisonAnalyzer._resolve_stat_key("Overshoot", stats) == "overshoot"
+    assert ComparisonAnalyzer._resolve_stat_key("Top Flatness", stats) == "top_flatness"
+    assert ComparisonAnalyzer._resolve_stat_key("Peak-to-Peak", stats) == "vpp"
+    assert ComparisonAnalyzer._resolve_stat_key("Nonexistent", stats) is None

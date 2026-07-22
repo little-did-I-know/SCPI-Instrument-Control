@@ -26,6 +26,13 @@ from scpi_control.report_generator.utils.waveform_loader import WaveformLoader
 
 logger = logging.getLogger(__name__)
 
+# Display-name -> WaveformAnalyzer stat key, for names that don't normalize directly.
+_CRITERIA_ALIASES: Dict[str, str] = {
+    "peak_to_peak": "vpp",
+    "peaktopeak": "vpp",
+    "amplitude": "vamp",
+}
+
 # Units for MeasurementResult rows, keyed by WaveformAnalyzer statistic name.
 STAT_UNITS: Dict[str, str] = {
     "vmax": "V",
@@ -46,6 +53,7 @@ STAT_UNITS: Dict[str, str] = {
     "overshoot": "%",
     "undershoot": "%",
     "thd": "%",
+    "top_flatness": "%",
     "snr": "dB",
 }
 
@@ -104,6 +112,20 @@ class ComparisonAnalyzer:
             except (FileNotFoundError, ValueError, OSError) as e:
                 return f"Run '{run.label}': {filepath}: {e}"
         run.waveforms = waveforms
+        return None
+
+    @staticmethod
+    def _resolve_stat_key(name: str, stats: Dict) -> Optional[str]:
+        """Resolve a criterion's measurement_name to a stat key: exact, then
+        normalized (lower + spaces/hyphens -> underscores), then an alias map."""
+        if name in stats:
+            return name
+        norm = name.strip().lower().replace(" ", "_").replace("-", "_")
+        if norm in stats:
+            return norm
+        alias = _CRITERIA_ALIASES.get(norm)
+        if alias is not None and alias in stats:
+            return alias
         return None
 
     @staticmethod
