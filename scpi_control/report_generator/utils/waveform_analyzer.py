@@ -307,15 +307,19 @@ class WaveformAnalyzer:
             signal_amplitude = (vmax - vmin) / 2
             snr = 20 * np.log10(signal_amplitude / noise_level) if noise_level > 0 else None
 
-            # Overshoot and undershoot (percentage above/below steady-state levels)
-            # This is approximate - we'll use top 10% and bottom 10% as steady state
-            v_sorted = np.sort(v)
-            n = len(v_sorted)
-            v_high_steady = np.mean(v_sorted[int(0.85 * n) : int(0.95 * n)])  # High steady state
-            v_low_steady = np.mean(v_sorted[int(0.05 * n) : int(0.15 * n)])  # Low steady state
-
-            overshoot = ((vmax - v_high_steady) / (v_high_steady - v_low_steady)) * 100 if v_high_steady != v_low_steady else 0
-            undershoot = ((v_low_steady - vmin) / (v_high_steady - v_low_steady)) * 100 if v_high_steady != v_low_steady else 0
+            # Overshoot/undershoot are meaningful only for flat-topped signals.
+            if WaveformAnalyzer._is_two_level(v):
+                vtop, vbase = WaveformAnalyzer._estimate_top_base(v)
+                span = vtop - vbase
+                if span > 0:
+                    overshoot = max(0.0, (float(np.max(v)) - vtop) / span * 100)
+                    undershoot = max(0.0, (vbase - float(np.min(v))) / span * 100)
+                else:
+                    overshoot = None
+                    undershoot = None
+            else:
+                overshoot = None
+                undershoot = None
 
             # Jitter (standard deviation of edge timing)
             # Find all rising edges
@@ -331,8 +335,8 @@ class WaveformAnalyzer:
             return {
                 "noise_level": noise_level,
                 "snr": snr,
-                "overshoot": max(0, overshoot),  # Don't show negative overshoot
-                "undershoot": max(0, undershoot),  # Don't show negative undershoot
+                "overshoot": overshoot,
+                "undershoot": undershoot,
                 "jitter": jitter,
             }
 
