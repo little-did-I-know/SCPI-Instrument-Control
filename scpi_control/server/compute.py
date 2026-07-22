@@ -46,10 +46,8 @@ def spectrum_frame(config: Dict[str, Any], acquired: Dict[str, Any]) -> Optional
     if result is None:
         return None
     peaks = [[float(f), float(m)] for f, m in result.get_peak_frequency(5)]
-    thd = None
-    if peaks:
-        thd_value = FFTAnalyzer.calculate_thd(result, peaks[0][0])
-        thd = float(thd_value) if thd_value is not None else None
+    thd_value = FFTAnalyzer.thd_of_waveform(data)
+    thd = float(thd_value) if thd_value is not None else None
     df = float(result.frequency[1] - result.frequency[0]) if len(result.frequency) > 1 else 1.0
     pooled, pool = _max_pool(result.magnitude, MAX_SPECTRUM_BINS)
     return {

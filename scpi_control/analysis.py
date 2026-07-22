@@ -411,3 +411,19 @@ class FFTAnalyzer:
         except Exception as e:
             logger.error(f"THD calculation error: {e}")
             return None
+
+    @staticmethod
+    def thd_of_waveform(waveform, window: str = "hanning", num_harmonics: int = 5) -> Optional[float]:
+        """Canonical THD for a waveform: the single entry both reports and the webapp use."""
+        analyzer = FFTAnalyzer()
+        result = analyzer.compute_fft(waveform, window=window, output_db=False, detrend=True)
+        if result is None:
+            return None
+        mag = result.magnitude
+        if len(mag) < 2:
+            return None
+        fund_idx = 1 + int(np.argmax(mag[1:]))  # skip DC bin of the rfft magnitude
+        fundamental_freq = float(result.frequency[fund_idx])
+        if fundamental_freq <= 0:
+            return None
+        return FFTAnalyzer.calculate_thd(result, fundamental_freq, num_harmonics)

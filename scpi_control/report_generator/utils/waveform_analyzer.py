@@ -791,35 +791,13 @@ class WaveformAnalyzer:
             return None
 
     @staticmethod
-    def calculate_thd(waveform: WaveformData, num_harmonics: int = 10) -> Optional[float]:
-        """
-        Calculate Total Harmonic Distortion (THD) as a percentage.
+    def calculate_thd(waveform: WaveformData, num_harmonics: int = 5) -> Optional[float]:
+        """Total Harmonic Distortion (%). Delegates to the canonical FFTAnalyzer engine
+        so reports and the live webapp spectrum report the same number."""
+        from scpi_control.analysis import FFTAnalyzer
 
-        THD = sqrt(sum(harmonics[2:]^2)) / fundamental * 100
-
-        Args:
-            waveform: Waveform data
-            num_harmonics: Number of harmonics to include
-
-        Returns:
-            THD percentage, or None if calculation fails
-        """
         try:
-            harmonics = WaveformAnalyzer._get_harmonic_ratios(waveform, num_harmonics)
-
-            if harmonics is None or len(harmonics) < 2:
-                return None
-
-            # THD = sqrt(sum of squares of harmonics) / fundamental
-            fundamental = harmonics[0]
-            if fundamental == 0:
-                return None
-
-            harmonic_power = np.sum(harmonics[1:] ** 2)
-            thd = np.sqrt(harmonic_power) / fundamental * 100
-
-            return thd
-
+            return FFTAnalyzer.thd_of_waveform(waveform, num_harmonics=num_harmonics)
         except Exception as e:
             logger.exception(f"Error calculating THD: {e}")
             return None
