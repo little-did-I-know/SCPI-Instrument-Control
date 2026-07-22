@@ -2,13 +2,14 @@
 
 import pytest
 
-from scpi_control import FunctionGenerator
+from scpi_control import FunctionGenerator, exceptions
 from scpi_control.awg_models import (
     AWGCapability,
     ChannelSpec,
     create_generic_awg_capability,
     detect_awg_from_idn,
 )
+from scpi_control.awg_output import AWGOutput
 from scpi_control.awg_scpi_commands import AWGSCPICommandSet
 from scpi_control.connection.mock import MockConnection
 
@@ -437,6 +438,17 @@ class TestWaveformTypes:
 
         mock_awg.channel1.ramp_symmetry = 50.0  # Triangle
         assert mock_awg.channel1.ramp_symmetry == 50.0
+
+
+class TestAWGParseFloat:
+    """Test AWGOutput._parse_float method."""
+
+    def test_awg_parse_float_raises_on_garbage(self):
+        """Test that _parse_float raises CommandError on unparseable response."""
+        obj = AWGOutput.__new__(AWGOutput)  # _parse_float uses no instance state
+        assert obj._parse_float("C1:BSWV FRQ,1000HZ") == 1000.0  # driver echo form -> 1000.0
+        with pytest.raises(exceptions.CommandError):
+            obj._parse_float("NONE")
 
 
 if __name__ == "__main__":
