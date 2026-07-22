@@ -1,5 +1,15 @@
 """Data models for report generation."""
 
+from scpi_control.report_generator.models.comparison import (
+    MODE_BATCH,
+    MODE_COMPARISON,
+    AggregateStats,
+    ComparisonResult,
+    DeltaEntry,
+    Run,
+    RunMetadata,
+    RunSet,
+)
 from scpi_control.report_generator.models.criteria import CriteriaResult, MeasurementCriteria
 from scpi_control.report_generator.models.report_data import MeasurementResult, ReportMetadata, TestReport, TestSection, WaveformData
 from scpi_control.report_generator.models.report_elements import ComparisonTable, DataManifest, ManifestEntry, OverlayPlotSpec, OverlayTrace, SignoffBlock, SignoffRole, TableCell
@@ -22,4 +32,12 @@ __all__ = [
     "SignoffBlock",
     "SignoffRole",
     "TableCell",
+    "MODE_BATCH",
+    "MODE_COMPARISON",
+    "AggregateStats",
+    "ComparisonResult",
+    "DeltaEntry",
+    "Run",
+    "RunMetadata",
+    "RunSet",
 ]
