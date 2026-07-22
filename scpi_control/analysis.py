@@ -71,9 +71,30 @@ class FFTAnalyzer:
         "flattop": signal.windows.flattop,
     }
 
+    _SCIPY_WINDOW_NAMES = {
+        "hanning": "hann",
+        "rectangular": "boxcar",
+        "hamming": "hamming",
+        "blackman": "blackman",
+        "bartlett": "bartlett",
+        "flattop": "flattop",
+    }
+
     def __init__(self):
         """Initialize FFT analyzer."""
         logger.info("FFT analyzer initialized")
+
+    @staticmethod
+    def _scipy_window_name(window: str) -> str:
+        """Map public window names to SciPy window names.
+
+        Args:
+            window: Public window name (e.g., 'hanning')
+
+        Returns:
+            SciPy window name (e.g., 'hann')
+        """
+        return FFTAnalyzer._SCIPY_WINDOW_NAMES.get(window.lower(), window)
 
     def compute_fft(self, waveform, window: str = "hanning", output_db: bool = True, detrend: bool = True) -> Optional[FFTResult]:
         """Compute FFT of a waveform.
@@ -173,7 +194,7 @@ class FFTAnalyzer:
                 nperseg = min(256, len(voltage) // 4)
 
             # Compute power spectral density using Welch's method
-            frequencies, psd = signal.welch(voltage, fs=sample_rate, window=window, nperseg=nperseg, scaling="density")
+            frequencies, psd = signal.welch(voltage, fs=sample_rate, window=FFTAnalyzer._scipy_window_name(window), nperseg=nperseg, scaling="density")
 
             logger.info(f"Power spectrum computed using Welch's method")
 
@@ -207,7 +228,7 @@ class FFTAnalyzer:
                 nperseg = min(256, len(voltage) // 4)
 
             # Compute spectrogram
-            frequencies, times, Sxx = signal.spectrogram(voltage, fs=sample_rate, window=window, nperseg=nperseg)
+            frequencies, times, Sxx = signal.spectrogram(voltage, fs=sample_rate, window=FFTAnalyzer._scipy_window_name(window), nperseg=nperseg)
 
             logger.info(f"Spectrogram computed: {len(frequencies)}x{len(times)} matrix")
 
