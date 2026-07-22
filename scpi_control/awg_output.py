@@ -442,9 +442,8 @@ class AWGOutput:
 
         try:
             return float(response)
-        except ValueError:
-            logger.error(f"Failed to parse float from response: {response}")
-            return 0.0
+        except ValueError as exc:
+            raise exceptions.CommandError(f"Unparseable AWG response: {response!r}") from exc
 
     def _parse_string(self, response: str) -> str:
         """Parse string value from SCPI response.

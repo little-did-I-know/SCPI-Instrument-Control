@@ -281,10 +281,16 @@ class DAQAnalyzer:
 
     @staticmethod
     def _extract_number(text: str) -> Optional[float]:
-        """Extract a number from a line of text."""
+        """Extract the value bound to a label in a line of LLM text.
+
+        Drops a leading list enumerator ("1.", "2)") so the ordinal is not read as
+        the value, and prefers the number after a colon when the label uses one.
+        """
         import re
 
-        # Find numbers (including negative and decimal)
+        text = re.sub(r"^\s*\d+\s*[.)]\s+", "", text)  # strip a leading list ordinal
+        if ":" in text:
+            text = text.split(":", 1)[1]  # value follows the label's colon
         numbers = re.findall(r"-?\d+\.?\d*", text)
         if numbers:
             try:

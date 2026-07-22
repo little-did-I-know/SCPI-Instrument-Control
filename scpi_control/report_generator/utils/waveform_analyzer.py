@@ -10,7 +10,7 @@ from typing import Dict, Optional, Tuple
 
 import numpy as np
 from scipy import signal as scipy_signal
-from scipy.fft import fft, fftfreq, rfft
+from scipy.fft import fft, fftfreq, irfft, rfft
 
 from scpi_control.report_generator.models.report_data import WaveformData, WaveformRegion
 
@@ -21,6 +21,21 @@ logger = logging.getLogger(__name__)
 # is less than this multiple of the median bin. Empirically, real periodic
 # signals sit >=~280x while white noise sits ~4x, so this is not sensitive.
 _NOISE_PEAK_TO_MEDIAN = 15.0
+
+# _estimate_noise's tone-subtraction residual is never exactly zero for a
+# synthetic, perfectly clean signal -- the FFT/IFFT round trip leaves a
+# floating-point residual around ~1e-15..1e-12 relative to the signal. That
+# residual is measurement precision, not real noise, so an SNR computed from
+# it (hundreds of dB) would still be a fabricated number. Gate SNR on the
+# noise floor being at least this fraction of the signal amplitude -- many
+# orders of magnitude above float round-off, comfortably below any real
+# instrument's noise floor.
+_MIN_MEASURABLE_NOISE_RATIO = 1e-9
+
+# When the harmonic notches used for noise estimation cover more than this
+# fraction of the spectrum, too little signal-free spectrum remains to estimate
+# noise, so _estimate_noise returns None rather than a fabricated near-zero value.
+_MAX_NOTCHED_FRACTION = 0.9
 
 
 class SignalType:
@@ -94,7 +109,8 @@ class WaveformAnalyzer:
         vpp = vmax - vmin
         vmean = np.mean(v)
         vrms = np.sqrt(np.mean(v**2))
-        vamp = (vmax + vmin) / 2  # Amplitude (middle of range)
+        vtop, vbase = WaveformAnalyzer._estimate_top_base(v)
+        vamp = vtop - vbase  # Amplitude (Vtop - Vbase), offset-independent
 
         return {
             "vmax": vmax,
@@ -115,7 +131,7 @@ class WaveformAnalyzer:
 
             # Compute FFT
             n = len(v)
-            yf = fft(v)
+            yf = fft(v - np.mean(v))  # remove DC so the fundamental is not masked
             xf = fftfreq(n, 1 / sample_rate)
 
             # Get positive frequencies only
@@ -125,8 +141,8 @@ class WaveformAnalyzer:
 
             # Find peak frequency (excluding DC component)
             if len(yf_pos) > 1:
-                # Skip first bin (DC)
-                peak_idx = np.argmax(yf_pos[1:]) + 1
+                # DC already removed above; first positive bin is a valid fundamental candidate
+                peak_idx = int(np.argmax(yf_pos))
                 frequency = xf_pos[peak_idx]
                 period = 1 / frequency if frequency > 0 else None
 
@@ -263,15 +279,15 @@ class WaveformAnalyzer:
 
             # Calculate pulse width and duty cycle
             if len(rising_edges) > 0 and len(falling_edges) > 0:
-                # Pulse width: time from rising edge to next falling edge
-                if falling_edges[0] > rising_edges[0]:
-                    pulse_width = (falling_edges[0] - rising_edges[0]) * dt
-
-                # Duty cycle: ratio of high time to period
-                if len(rising_edges) > 1:
-                    period_samples = rising_edges[1] - rising_edges[0]
-                    high_samples = falling_edges[0] - rising_edges[0] if falling_edges[0] > rising_edges[0] else 0
-                    duty_cycle = (high_samples / period_samples) * 100  # Percentage
+                # First falling edge after the first rising edge (ignore a leading
+                # falling edge when the capture starts on the high plateau).
+                fe_after = falling_edges[falling_edges > rising_edges[0]]
+                if len(fe_after) > 0:
+                    pulse_width = (fe_after[0] - rising_edges[0]) * dt
+                    if len(rising_edges) > 1:
+                        period_samples = rising_edges[1] - rising_edges[0]
+                        high_samples = fe_after[0] - rising_edges[0]
+                        duty_cycle = (high_samples / period_samples) * 100
 
             return {
                 "rise_time": rise_time,
@@ -295,26 +311,27 @@ class WaveformAnalyzer:
         try:
             v = waveform.voltage
 
-            # Estimate noise level (high-frequency component)
-            # Use standard deviation of detrended signal
-            v_detrended = v - np.mean(v)
-            noise_level = np.std(v_detrended)
+            vmax = float(np.max(v))
+            vmin = float(np.min(v))
+            signal_amplitude = (vmax - vmin) / 2.0
 
-            # Signal to Noise Ratio (SNR)
-            vmax = np.max(v)
-            vmin = np.min(v)
-            signal_amplitude = (vmax - vmin) / 2
-            snr = 20 * np.log10(signal_amplitude / noise_level) if noise_level > 0 else None
+            noise_level = WaveformAnalyzer._estimate_noise(waveform)
+            measurable_noise = noise_level and noise_level > 0 and signal_amplitude > 0 and noise_level > signal_amplitude * _MIN_MEASURABLE_NOISE_RATIO
+            snr = 20 * np.log10(signal_amplitude / noise_level) if measurable_noise else None
 
-            # Overshoot and undershoot (percentage above/below steady-state levels)
-            # This is approximate - we'll use top 10% and bottom 10% as steady state
-            v_sorted = np.sort(v)
-            n = len(v_sorted)
-            v_high_steady = np.mean(v_sorted[int(0.85 * n) : int(0.95 * n)])  # High steady state
-            v_low_steady = np.mean(v_sorted[int(0.05 * n) : int(0.15 * n)])  # Low steady state
-
-            overshoot = ((vmax - v_high_steady) / (v_high_steady - v_low_steady)) * 100 if v_high_steady != v_low_steady else 0
-            undershoot = ((v_low_steady - vmin) / (v_high_steady - v_low_steady)) * 100 if v_high_steady != v_low_steady else 0
+            # Overshoot/undershoot are meaningful only for flat-topped signals.
+            if WaveformAnalyzer._is_two_level(v):
+                vtop, vbase = WaveformAnalyzer._estimate_top_base(v)
+                span = vtop - vbase
+                if span > 0:
+                    overshoot = max(0.0, (float(np.max(v)) - vtop) / span * 100)
+                    undershoot = max(0.0, (vbase - float(np.min(v))) / span * 100)
+                else:
+                    overshoot = None
+                    undershoot = None
+            else:
+                overshoot = None
+                undershoot = None
 
             # Jitter (standard deviation of edge timing)
             # Find all rising edges
@@ -330,8 +347,8 @@ class WaveformAnalyzer:
             return {
                 "noise_level": noise_level,
                 "snr": snr,
-                "overshoot": max(0, overshoot),  # Don't show negative overshoot
-                "undershoot": max(0, undershoot),  # Don't show negative undershoot
+                "overshoot": overshoot,
+                "undershoot": undershoot,
                 "jitter": jitter,
             }
 
@@ -344,6 +361,45 @@ class WaveformAnalyzer:
                 "undershoot": None,
                 "jitter": None,
             }
+
+    @staticmethod
+    def _estimate_noise(waveform: WaveformData) -> Optional[float]:
+        """Estimate noise RMS from a signal-free residual, or None when not separable."""
+        v = np.asarray(waveform.voltage, dtype=float)
+        n = v.size
+        if n < 8:
+            return None
+        # Two-level signals: use the settled-plateau noise.
+        if WaveformAnalyzer._is_two_level(v):
+            stab = WaveformAnalyzer.calculate_plateau_stability(waveform, SignalType.SQUARE).get("plateau_stability")
+            return None if stab is None else float(stab)
+        # Otherwise require a dominant tone to subtract; without one we cannot
+        # separate signal from noise, so report None rather than guess.
+        if not WaveformAnalyzer._has_dominant_tone(v):
+            return None
+        x = v - np.mean(v)
+        spectrum = rfft(x)
+        mag = np.abs(spectrum)
+        if mag[1:].size == 0:
+            return None
+        fund_bin = 1 + int(np.argmax(mag[1:]))
+        noise_spec = spectrum.copy()
+        noise_spec[0] = 0.0
+        notched = np.zeros(len(spectrum), dtype=bool)
+        notched[0] = True  # DC bin zeroed above
+        half = 2
+        h = 1
+        while h * fund_bin < len(spectrum):
+            center = h * fund_bin
+            lo = max(1, center - half)
+            hi = min(len(spectrum), center + half + 1)
+            noise_spec[lo:hi] = 0.0
+            notched[lo:hi] = True
+            h += 1
+        if notched.sum() > _MAX_NOTCHED_FRACTION * len(spectrum):
+            return None  # too little signal-free spectrum remains to estimate noise
+        residual = irfft(noise_spec, n=n)
+        return float(np.sqrt(np.mean(residual**2)))
 
     @staticmethod
     def format_stat_value(name: str, value: Optional[float]) -> str:
@@ -498,11 +554,38 @@ class WaveformAnalyzer:
     @staticmethod
     def _is_dc_signal(v: np.ndarray, threshold: float = 0.01) -> bool:
         """Check if signal is DC (very low variation)."""
+        # A real periodic component means the signal is not DC, regardless of how
+        # large the DC offset is (the offset is what made the old std/mean test wrong).
+        if WaveformAnalyzer._has_dominant_tone(v):
+            return False
         std = np.std(v)
         mean = np.mean(np.abs(v))
         if mean == 0:
             return std < threshold
         return (std / mean) < threshold
+
+    @staticmethod
+    def _estimate_top_base(v: np.ndarray) -> Tuple[float, float]:
+        """Estimate the settled high (Vtop) and low (Vbase) levels via a histogram.
+
+        For flat-topped signals this returns the modal plateau levels (excluding
+        overshoot spikes); for signals without flat tops it collapses to
+        (vmax, vmin). Offset-independent.
+        """
+        v = np.asarray(v, dtype=float)
+        vmin = float(np.min(v))
+        vmax = float(np.max(v))
+        if vmax <= vmin:
+            return vmax, vmin
+        nbins = max(10, min(256, v.size // 20))
+        hist, edges = np.histogram(v, bins=nbins, range=(vmin, vmax))
+        centers = (edges[:-1] + edges[1:]) / 2.0
+        mid = (vmin + vmax) / 2.0
+        lower = centers < mid
+        upper = ~lower
+        vbase = float(centers[lower][int(np.argmax(hist[lower]))]) if hist[lower].any() else vmin
+        vtop = float(centers[upper][int(np.argmax(hist[upper]))]) if hist[upper].any() else vmax
+        return vtop, vbase
 
     @staticmethod
     def _is_two_level(v: np.ndarray, band: float = 0.15, min_fraction: float = 0.8) -> bool:
@@ -544,6 +627,27 @@ class WaveformAnalyzer:
         return bool((float(np.max(mag)) / median) < _NOISE_PEAK_TO_MEDIAN)
 
     @staticmethod
+    def _has_dominant_tone(v: np.ndarray) -> bool:
+        """True if a single spectral bin clearly dominates (a real periodic component).
+
+        Unlike _is_noise, a constant signal (no spectral content) returns False here,
+        so it is still classified DC upstream.
+        """
+        v = np.asarray(v, dtype=float)
+        if v.size < 4:
+            return False
+        mag = np.abs(rfft(v - np.mean(v)))[1:]  # drop DC bin
+        if mag.size == 0:
+            return False
+        mx = float(np.max(mag))
+        if mx == 0.0:
+            return False  # constant / no spectral content
+        median = float(np.median(mag))
+        if median == 0.0:
+            return True  # isolated tone(s) on a zero floor
+        return (mx / median) >= _NOISE_PEAK_TO_MEDIAN
+
+    @staticmethod
     def _get_harmonic_ratios(waveform: WaveformData, num_harmonics: int = 5) -> Optional[np.ndarray]:
         """
         Get the relative amplitudes of harmonics.
@@ -569,7 +673,7 @@ class WaveformAnalyzer:
                 return None
 
             # Find fundamental frequency (peak)
-            peak_idx = np.argmax(yf_pos[1:]) + 1  # Skip DC
+            peak_idx = int(np.argmax(yf_pos))  # DC already removed above
             fundamental_freq = xf_pos[peak_idx]
             fundamental_amp = yf_pos[peak_idx]
 
@@ -697,35 +801,13 @@ class WaveformAnalyzer:
             return None
 
     @staticmethod
-    def calculate_thd(waveform: WaveformData, num_harmonics: int = 10) -> Optional[float]:
-        """
-        Calculate Total Harmonic Distortion (THD) as a percentage.
+    def calculate_thd(waveform: WaveformData, num_harmonics: int = 5) -> Optional[float]:
+        """Total Harmonic Distortion (%). Delegates to the canonical FFTAnalyzer engine
+        so reports and the live webapp spectrum report the same number."""
+        from scpi_control.analysis import FFTAnalyzer
 
-        THD = sqrt(sum(harmonics[2:]^2)) / fundamental * 100
-
-        Args:
-            waveform: Waveform data
-            num_harmonics: Number of harmonics to include
-
-        Returns:
-            THD percentage, or None if calculation fails
-        """
         try:
-            harmonics = WaveformAnalyzer._get_harmonic_ratios(waveform, num_harmonics)
-
-            if harmonics is None or len(harmonics) < 2:
-                return None
-
-            # THD = sqrt(sum of squares of harmonics) / fundamental
-            fundamental = harmonics[0]
-            if fundamental == 0:
-                return None
-
-            harmonic_power = np.sum(harmonics[1:] ** 2)
-            thd = np.sqrt(harmonic_power) / fundamental * 100
-
-            return thd
-
+            return FFTAnalyzer.thd_of_waveform(waveform, num_harmonics=num_harmonics)
         except Exception as e:
             logger.exception(f"Error calculating THD: {e}")
             return None

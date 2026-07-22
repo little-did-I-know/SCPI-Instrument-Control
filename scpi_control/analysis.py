@@ -9,6 +9,12 @@ from scipy import signal
 
 logger = logging.getLogger(__name__)
 
+# thd_of_waveform's dominant-tone gate: mirrors _NOISE_PEAK_TO_MEDIAN in
+# waveform_analyzer.py's _has_dominant_tone. Without a clearly dominant
+# spectral peak, there is no fundamental to measure harmonics against, so
+# THD is undefined rather than a number computed from noise.
+_THD_MIN_PEAK_TO_MEDIAN = 15.0
+
 
 @dataclass
 class FFTResult:
@@ -40,7 +46,7 @@ class FFTResult:
             List of (frequency, magnitude) tuples
         """
         # Find peaks
-        peaks, _ = signal.find_peaks(self.magnitude, height=0)
+        peaks, _ = signal.find_peaks(self.magnitude)
 
         # Sort by magnitude (descending)
         if len(peaks) > 0:
@@ -71,9 +77,30 @@ class FFTAnalyzer:
         "flattop": signal.windows.flattop,
     }
 
+    _SCIPY_WINDOW_NAMES = {
+        "hanning": "hann",
+        "rectangular": "boxcar",
+        "hamming": "hamming",
+        "blackman": "blackman",
+        "bartlett": "bartlett",
+        "flattop": "flattop",
+    }
+
     def __init__(self):
         """Initialize FFT analyzer."""
         logger.info("FFT analyzer initialized")
+
+    @staticmethod
+    def _scipy_window_name(window: str) -> str:
+        """Map public window names to SciPy window names.
+
+        Args:
+            window: Public window name (e.g., 'hanning')
+
+        Returns:
+            SciPy window name (e.g., 'hann')
+        """
+        return FFTAnalyzer._SCIPY_WINDOW_NAMES.get(window.lower(), window)
 
     def compute_fft(self, waveform, window: str = "hanning", output_db: bool = True, detrend: bool = True) -> Optional[FFTResult]:
         """Compute FFT of a waveform.
@@ -173,7 +200,7 @@ class FFTAnalyzer:
                 nperseg = min(256, len(voltage) // 4)
 
             # Compute power spectral density using Welch's method
-            frequencies, psd = signal.welch(voltage, fs=sample_rate, window=window, nperseg=nperseg, scaling="density")
+            frequencies, psd = signal.welch(voltage, fs=sample_rate, window=FFTAnalyzer._scipy_window_name(window), nperseg=nperseg, scaling="density")
 
             logger.info(f"Power spectrum computed using Welch's method")
 
@@ -207,7 +234,7 @@ class FFTAnalyzer:
                 nperseg = min(256, len(voltage) // 4)
 
             # Compute spectrogram
-            frequencies, times, Sxx = signal.spectrogram(voltage, fs=sample_rate, window=window, nperseg=nperseg)
+            frequencies, times, Sxx = signal.spectrogram(voltage, fs=sample_rate, window=FFTAnalyzer._scipy_window_name(window), nperseg=nperseg)
 
             logger.info(f"Spectrogram computed: {len(frequencies)}x{len(times)} matrix")
 
@@ -353,49 +380,65 @@ class FFTAnalyzer:
 
     @staticmethod
     def calculate_thd(fft_result: FFTResult, fundamental_freq: float, num_harmonics: int = 5) -> Optional[float]:
-        """Calculate Total Harmonic Distortion (THD).
-
-        Args:
-            fft_result: FFT result
-            fundamental_freq: Fundamental frequency (Hz)
-            num_harmonics: Number of harmonics to include
-
-        Returns:
-            THD in percent or None if error
-        """
+        """Calculate Total Harmonic Distortion (THD) as a percentage."""
         try:
-            # Find fundamental frequency bin
             freq_resolution = fft_result.frequency[1] - fft_result.frequency[0]
-            fund_idx = int(round(fundamental_freq / freq_resolution))
-
-            if fund_idx >= len(fft_result.magnitude):
-                logger.error("Fundamental frequency out of range")
+            if freq_resolution <= 0:
                 return None
 
-            # Get fundamental magnitude (linear)
             if fft_result.magnitude_db:
-                fund_mag = 10 ** (fft_result.magnitude[fund_idx] / 20.0)
+                linear = 10 ** (fft_result.magnitude / 20.0)
             else:
-                fund_mag = fft_result.magnitude[fund_idx]
+                linear = np.asarray(fft_result.magnitude, dtype=float)
+            length = len(linear)
 
-            # Calculate harmonic magnitudes
+            def bin_energy(order: int) -> Optional[float]:
+                idx = int(round(order * fundamental_freq / freq_resolution))
+                if idx >= length:
+                    return None
+                lo = max(0, idx - 2)
+                hi = min(length, idx + 3)  # +/- 2 bins, RSS, captures off-bin leakage
+                seg = linear[lo:hi]
+                return float(np.sqrt(np.sum(seg**2)))
+
+            fund_mag = bin_energy(1)
+            if not fund_mag:
+                return None
+
             harmonic_power = 0.0
             for n in range(2, num_harmonics + 2):
-                harmonic_idx = n * fund_idx
-                if harmonic_idx < len(fft_result.magnitude):
-                    if fft_result.magnitude_db:
-                        harm_mag = 10 ** (fft_result.magnitude[harmonic_idx] / 20.0)
-                    else:
-                        harm_mag = fft_result.magnitude[harmonic_idx]
+                harm_mag = bin_energy(n)
+                if harm_mag is not None:
                     harmonic_power += harm_mag**2
 
-            # Calculate THD
             thd = 100.0 * np.sqrt(harmonic_power) / fund_mag
-
             logger.info(f"THD calculated: {thd:.2f}% (fundamental={fundamental_freq:.2f} Hz)")
-
             return thd
-
         except Exception as e:
             logger.error(f"THD calculation error: {e}")
             return None
+
+    @staticmethod
+    def thd_of_waveform(waveform, window: str = "hanning", num_harmonics: int = 5) -> Optional[float]:
+        """Canonical THD for a waveform: the single entry both reports and the webapp use."""
+        analyzer = FFTAnalyzer()
+        result = analyzer.compute_fft(waveform, window=window, output_db=False, detrend=True)
+        if result is None:
+            return None
+        mag = result.magnitude
+        if len(mag) < 2:
+            return None
+        pos = mag[1:]  # skip DC bin of the rfft magnitude
+        if pos.size == 0:
+            return None
+        mx = float(np.max(pos))
+        if mx == 0.0:
+            return None
+        med = float(np.median(pos))
+        if med > 0.0 and mx / med < _THD_MIN_PEAK_TO_MEDIAN:
+            return None  # no dominant tone -> not a periodic signal, THD is undefined
+        fund_idx = 1 + int(np.argmax(pos))
+        fundamental_freq = float(result.frequency[fund_idx])
+        if fundamental_freq <= 0:
+            return None
+        return FFTAnalyzer.calculate_thd(result, fundamental_freq, num_harmonics)

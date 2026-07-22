@@ -613,5 +613,15 @@ class TestDataLogging:
         assert log_file.exists()
 
 
+def test_parse_float_raises_on_garbage():
+    from scpi_control import exceptions
+    from scpi_control.power_supply_output import PowerSupplyOutput
+
+    obj = PowerSupplyOutput.__new__(PowerSupplyOutput)  # _parse_float uses no instance state
+    assert obj._parse_float("5.000V") == 5.0
+    with pytest.raises(exceptions.CommandError):
+        obj._parse_float("OVERLOAD")
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
