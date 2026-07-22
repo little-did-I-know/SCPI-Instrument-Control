@@ -85,6 +85,9 @@ class WaveformAnalyzer:
         # Signal quality metrics
         stats.update(WaveformAnalyzer.calculate_quality_stats(waveform))
 
+        # Calculate top flatness for flat-topped signals
+        stats["top_flatness"] = WaveformAnalyzer.calculate_top_flatness(waveform)
+
         # Calculate THD for periodic signals
         if signal_type in [SignalType.SINE, SignalType.SQUARE, SignalType.TRIANGLE, SignalType.SAWTOOTH]:
             thd = WaveformAnalyzer.calculate_thd(waveform)
@@ -446,7 +449,7 @@ class WaveformAnalyzer:
                 return f"{value*1e9:.2f} ns"
 
         # Percentage
-        elif name in ["duty_cycle", "overshoot", "undershoot"]:
+        elif name in ["duty_cycle", "overshoot", "undershoot", "top_flatness"]:
             return f"{value:.2f} %"
 
         # SNR (dB)
@@ -811,6 +814,41 @@ class WaveformAnalyzer:
         except Exception as e:
             logger.exception(f"Error calculating THD: {e}")
             return None
+
+    @staticmethod
+    def calculate_top_flatness(waveform: WaveformData) -> Optional[float]:
+        """Deviation across the settled high plateau of a two-level signal, as % of
+        amplitude (Vtop - Vbase). Peak-to-peak of the middle 60% of each high run
+        (excludes edges and overshoot). None for signals without a flat top."""
+        v = np.asarray(waveform.voltage, dtype=float)
+        if not WaveformAnalyzer._is_two_level(v):
+            return None
+        vtop, vbase = WaveformAnalyzer._estimate_top_base(v)
+        amp = vtop - vbase
+        if amp <= 0:
+            return None
+        mid = (vtop + vbase) / 2.0
+        high = v > mid
+        samples: list = []
+        start = None
+        for i, is_high in enumerate(high):
+            if is_high and start is None:
+                start = i
+            elif not is_high and start is not None:
+                run = list(range(start, i))
+                if len(run) >= 5:
+                    a, b = int(len(run) * 0.2), int(len(run) * 0.8)
+                    samples.extend(v[run[a:b]])
+                start = None
+        if start is not None:
+            run = list(range(start, len(high)))
+            if len(run) >= 5:
+                a, b = int(len(run) * 0.2), int(len(run) * 0.8)
+                samples.extend(v[run[a:b]])
+        if not samples:
+            return None
+        arr = np.asarray(samples, dtype=float)
+        return float((arr.max() - arr.min()) / amp * 100.0)
 
     @staticmethod
     def calculate_plateau_stability(waveform: WaveformData, signal_type: str) -> Dict[str, Optional[float]]:
