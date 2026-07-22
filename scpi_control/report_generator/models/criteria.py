@@ -50,49 +50,55 @@ class MeasurementCriteria:
         Returns:
             CriteriaResult with pass/fail status and details
         """
-        passed = False
+        passed: Optional[bool] = None
         message = ""
 
         if self.comparison_type == ComparisonType.RANGE:
             if self.min_value is not None and self.max_value is not None:
                 passed = self.min_value <= value <= self.max_value
-                message = f"Value {value:.6g} is {'within' if passed else 'outside'} " f"range [{self.min_value:.6g}, {self.max_value:.6g}]"
+                message = f"Value {value:.6g} is {'within' if passed else 'outside'} range [{self.min_value:.6g}, {self.max_value:.6g}]"
+            elif self.min_value is not None:
+                passed = value >= self.min_value
+                message = f"Value {value:.6g} is {'at/above' if passed else 'below'} minimum {self.min_value:.6g}"
+            elif self.max_value is not None:
+                passed = value <= self.max_value
+                message = f"Value {value:.6g} is {'at/below' if passed else 'above'} maximum {self.max_value:.6g}"
             else:
-                passed = True
-                message = "Range criteria not fully specified"
+                passed = None
+                message = "Range criteria not specified"
 
         elif self.comparison_type == ComparisonType.MIN_ONLY:
             if self.min_value is not None:
                 passed = value >= self.min_value
-                message = f"Value {value:.6g} is {'above' if passed else 'below'} " f"minimum {self.min_value:.6g}"
+                message = f"Value {value:.6g} is {'above' if passed else 'below'} minimum {self.min_value:.6g}"
             else:
-                passed = True
+                passed = None
                 message = "Minimum value not specified"
 
         elif self.comparison_type == ComparisonType.MAX_ONLY:
             if self.max_value is not None:
                 passed = value <= self.max_value
-                message = f"Value {value:.6g} is {'below' if passed else 'above'} " f"maximum {self.max_value:.6g}"
+                message = f"Value {value:.6g} is {'below' if passed else 'above'} maximum {self.max_value:.6g}"
             else:
-                passed = True
+                passed = None
                 message = "Maximum value not specified"
 
         elif self.comparison_type == ComparisonType.EQUALS:
             if self.target_value is not None:
                 tolerance = self.tolerance if self.tolerance is not None else 0
                 passed = abs(value - self.target_value) <= tolerance
-                message = f"Value {value:.6g} is {'equal to' if passed else 'not equal to'} " f"target {self.target_value:.6g} (tolerance: ±{tolerance:.6g})"
+                message = f"Value {value:.6g} is {'equal to' if passed else 'not equal to'} target {self.target_value:.6g} (tolerance: ±{tolerance:.6g})"
             else:
-                passed = True
+                passed = None
                 message = "Target value not specified"
 
         elif self.comparison_type == ComparisonType.NOT_EQUALS:
             if self.target_value is not None:
                 tolerance = self.tolerance if self.tolerance is not None else 0
                 passed = abs(value - self.target_value) > tolerance
-                message = f"Value {value:.6g} is {'different from' if passed else 'equal to'} " f"target {self.target_value:.6g} (tolerance: ±{tolerance:.6g})"
+                message = f"Value {value:.6g} is {'different from' if passed else 'equal to'} target {self.target_value:.6g} (tolerance: ±{tolerance:.6g})"
             else:
-                passed = True
+                passed = None
                 message = "Target value not specified"
 
         return CriteriaResult(
@@ -140,12 +146,12 @@ class CriteriaResult:
 
     criteria: MeasurementCriteria
     value: float
-    passed: bool
+    passed: Optional[bool]
     message: str
 
     def __str__(self) -> str:
         """String representation."""
-        status = "PASS" if self.passed else "FAIL"
+        status = "PASS" if self.passed is True else "FAIL" if self.passed is False else "N/A"
         return f"[{status}] {self.criteria.measurement_name}: {self.message}"
 
 
