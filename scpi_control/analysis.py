@@ -40,7 +40,7 @@ class FFTResult:
             List of (frequency, magnitude) tuples
         """
         # Find peaks
-        peaks, _ = signal.find_peaks(self.magnitude, height=0)
+        peaks, _ = signal.find_peaks(self.magnitude)
 
         # Sort by magnitude (descending)
         if len(peaks) > 0:
