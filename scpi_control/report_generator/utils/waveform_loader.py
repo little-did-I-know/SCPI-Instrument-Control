@@ -60,6 +60,7 @@ def _from_loaded(loaded) -> WaveformData:
         sample_rate=sample_rate,
         record_length=len(voltage),
         source_file=loaded.source_path,
+        provenance=loaded.provenance,
     )
 
 

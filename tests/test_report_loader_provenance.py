@@ -35,3 +35,11 @@ def test_loader_reads_provenance_bearing_files(tmp_path, filename, format):
     assert len(loaded[0].voltage) == 80
     assert loaded[0].sample_rate == pytest.approx(80_000.0)
     assert loaded[0].channel == "1"
+
+
+def test_loader_preserves_provenance_object(tmp_path):
+    out = tmp_path / "wf.npz"
+    Waveform(Mock()).save_waveform(_waveform(), str(out))
+    loaded = WaveformLoader.load(out)
+    assert loaded[0].provenance is not None
+    assert loaded[0].provenance.instrument.model == "SDS824X HD"
