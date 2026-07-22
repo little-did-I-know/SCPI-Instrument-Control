@@ -5,6 +5,7 @@ Supports loading waveform data from NPZ, CSV, MAT, and HDF5 files
 created by scpi_control.
 """
 
+import json
 import logging
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional
@@ -12,6 +13,7 @@ from typing import Dict, Iterable, List, Optional
 import numpy as np
 
 from scpi_control import waveform_schema as ws
+from scpi_control.provenance import AcquisitionProvenance
 from scpi_control.report_generator.models.report_data import WaveformData
 from scpi_control.waveform_io import load_waveform as _load_native
 
@@ -186,6 +188,15 @@ class WaveformLoader:
 
         time_data = data[:, 0]
         derived_rate = WaveformLoader._rate_from_time(time_data)
+
+        # Reconstruct provenance from header if present
+        provenance = None
+        if ws.CSV_HEADER_PROVENANCE in header:
+            try:
+                provenance = AcquisitionProvenance.from_json(header[ws.CSV_HEADER_PROVENANCE])
+            except Exception as e:
+                logger.warning(f"Failed to parse provenance from {filepath}: {e}")
+
         waveforms = []
         for i in range(1, data.shape[1]):
             voltage = data[:, i]
@@ -203,6 +214,7 @@ class WaveformLoader:
                     sample_rate=WaveformLoader._rate_from_header(header, derived_rate),
                     record_length=len(voltage),
                     source_file=filepath,
+                    provenance=provenance,
                 )
             )
         return waveforms
