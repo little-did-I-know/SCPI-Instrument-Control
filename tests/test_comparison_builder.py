@@ -198,3 +198,16 @@ def test_appendix_measurements_carry_run_label_in_channel(tmp_path):
     for run in result.runset.runs:
         for m in run.measurements:
             assert " · " not in (m.channel or "")
+
+
+def test_incomplete_run_renders_incomplete_verdict():
+    from scpi_control.report_generator.comparison_report_builder import _run_verdict
+    from scpi_control.report_generator.models.report_elements import STATUS_INCOMPLETE
+    from scpi_control.report_generator.models.comparison import Run
+
+    r = Run(label="DUT1", files=[])
+    r.incomplete = True
+    assert _run_verdict(r) == ("INCOMPLETE", STATUS_INCOMPLETE)
+    r2 = Run(label="DUT2", files=[])
+    r2.passed = True
+    assert _run_verdict(r2)[0] == "PASS"

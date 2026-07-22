@@ -26,6 +26,13 @@ from scpi_control.report_generator.utils.waveform_loader import WaveformLoader
 
 logger = logging.getLogger(__name__)
 
+# Display-name -> WaveformAnalyzer stat key, for names that don't normalize directly.
+_CRITERIA_ALIASES: Dict[str, str] = {
+    "peak_to_peak": "vpp",
+    "peaktopeak": "vpp",
+    "amplitude": "vamp",
+}
+
 # Units for MeasurementResult rows, keyed by WaveformAnalyzer statistic name.
 STAT_UNITS: Dict[str, str] = {
     "vmax": "V",
@@ -46,6 +53,7 @@ STAT_UNITS: Dict[str, str] = {
     "overshoot": "%",
     "undershoot": "%",
     "thd": "%",
+    "top_flatness": "%",
     "snr": "dB",
 }
 
@@ -85,7 +93,7 @@ class ComparisonAnalyzer:
         for run in runset.runs:
             for wf in run.waveforms:
                 wf.analyze()
-            ComparisonAnalyzer._apply_criteria(run, runset.criteria_set)
+            ComparisonAnalyzer._apply_criteria(run, runset.criteria_set, warnings)
 
         matched, match_warnings = ComparisonAnalyzer._match_channels(runset.runs)
         warnings.extend(match_warnings)
@@ -107,35 +115,71 @@ class ComparisonAnalyzer:
         return None
 
     @staticmethod
-    def _apply_criteria(run: Run, criteria_set: Optional[CriteriaSet]) -> None:
-        """Build run.measurements from criteria (matched by statistic key) and set run.passed."""
+    def _resolve_stat_key(name: str, stats: Dict) -> Optional[str]:
+        """Resolve a criterion's measurement_name to a stat key: exact, then
+        normalized (lower + spaces/hyphens -> underscores), then an alias map."""
+        if name in stats:
+            return name
+        norm = name.strip().lower().replace(" ", "_").replace("-", "_")
+        if norm in stats:
+            return norm
+        alias = _CRITERIA_ALIASES.get(norm)
+        if alias is not None and alias in stats:
+            return alias
+        return None
+
+    @staticmethod
+    def _apply_criteria(run: Run, criteria_set: Optional[CriteriaSet], warnings: List[str]) -> None:
+        """Build run.measurements from criteria (resolved to stat keys) and set
+        run.passed / run.incomplete. Only `critical` criteria gate the verdict;
+        un-evaluable criteria are surfaced as warnings, never silently dropped."""
         run.measurements = []
+        run.incomplete = False
         if criteria_set is None:
             run.passed = None
             return
-        evaluated: List[bool] = []
+        critical_pass: List[bool] = []
+        critical_unevaluable = False
         for wf in run.waveforms:
             stats = wf.statistics or {}
             for criteria in criteria_set.criteria_list:
                 if criteria.channel is not None and criteria.channel != wf.label:
                     continue
-                value = stats.get(criteria.measurement_name)
+                is_critical = (criteria.severity or "").lower() == "critical"
+                key = ComparisonAnalyzer._resolve_stat_key(criteria.measurement_name, stats)
+                value = stats.get(key) if key is not None else None
                 if value is None or not isinstance(value, (int, float)) or isinstance(value, bool):
+                    warnings.append(f"Run '{run.label}': criterion '{criteria.measurement_name}' on '{wf.label}' could not be evaluated (no numeric statistic)")
+                    if is_critical:
+                        critical_unevaluable = True
                     continue
                 outcome = criteria.validate(float(value))
                 run.measurements.append(
                     MeasurementResult(
                         name=criteria.measurement_name,
                         value=float(value),
-                        unit=STAT_UNITS.get(criteria.measurement_name, ""),
+                        unit=STAT_UNITS.get(key, ""),
                         channel=wf.label,
                         passed=outcome.passed,
                         criteria_min=criteria.min_value,
                         criteria_max=criteria.max_value,
                     )
                 )
-                evaluated.append(outcome.passed)
-        run.passed = all(evaluated) if evaluated else None
+                if outcome.passed is None:
+                    warnings.append(f"Run '{run.label}': criterion '{criteria.measurement_name}' on '{wf.label}' is not fully specified; not evaluated")
+                    if is_critical:
+                        critical_unevaluable = True
+                elif is_critical:
+                    critical_pass.append(outcome.passed)
+        if any(p is False for p in critical_pass):
+            run.passed = False
+        elif critical_unevaluable:
+            run.passed = None
+            run.incomplete = True
+        elif critical_pass:
+            run.passed = True
+        else:
+            run.passed = None
 
     @staticmethod
     def _match_channels(runs: List[Run]):
@@ -218,3 +262,4 @@ class ComparisonAnalyzer:
         if evaluated:
             result.yield_passed = sum(1 for run in evaluated if run.passed)
             result.yield_total = len(evaluated)
+        result.yield_incomplete = sum(1 for run in runset.runs if run.incomplete)

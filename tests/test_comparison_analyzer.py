@@ -188,3 +188,55 @@ def test_non_numeric_criteria_value_is_skipped_not_raised(tmp_path):
     for run in result.runset.runs:
         assert run.measurements == []
         assert run.passed is None
+        # This criterion defaults to severity="critical" and can't be evaluated
+        # (no numeric statistic) -> the run is INCOMPLETE, not silently passed/dropped.
+        assert run.incomplete
+    assert any("could not be evaluated" in w for w in result.warnings)
+
+
+def test_resolve_stat_key_matches_display_names():
+    from scpi_control.report_generator.analysis.comparison_analyzer import ComparisonAnalyzer
+
+    stats = {"overshoot": 1.0, "top_flatness": 0.5, "vpp": 2.0}
+    assert ComparisonAnalyzer._resolve_stat_key("Overshoot", stats) == "overshoot"
+    assert ComparisonAnalyzer._resolve_stat_key("Top Flatness", stats) == "top_flatness"
+    assert ComparisonAnalyzer._resolve_stat_key("Peak-to-Peak", stats) == "vpp"
+    assert ComparisonAnalyzer._resolve_stat_key("Nonexistent", stats) is None
+
+
+def _square_capture(tmp_path, name, channel=1):
+    """Write one clean 1 kHz cal-square capture (flat top -> overshoot/top_flatness ~0)."""
+    wf = make_waveform(SignalSpec(kind="square", frequency=1_000.0, amplitude=1.0, seed=42), 100_000.0, 2_000, channel=channel)
+    wf.provenance = AcquisitionProvenance(instrument=InstrumentInfo(model="Mock"))
+    path = tmp_path / name
+    Waveform(Mock()).save_waveform(wf, str(path), format="CSV")
+    return path
+
+
+def _square_batch(tmp_path, n_runs=2):
+    runs = [Run(label=f"DUT{i}", files=[_square_capture(tmp_path, f"dut{i}.csv")]) for i in range(n_runs)]
+    return RunSet(runs=runs, mode=MODE_BATCH)
+
+
+def test_probe_cal_preset_yields_real_verdict(tmp_path):
+    """The audit's dead scenario: probe-cal preset over clean cal squares -> real PASS."""
+    from scpi_control.report_generator.models.template import ReportTemplate
+
+    runset = _square_batch(tmp_path, n_runs=2)
+    runset.criteria_set = ReportTemplate.create_probe_calibration_template().criteria_set
+    result = ComparisonAnalyzer.analyze(runset)
+    assert all(r.passed is True for r in result.runset.runs)  # clean squares pass overshoot/undershoot (critical)
+    assert result.yield_total == 2 and result.yield_passed == 2
+    assert not any(r.incomplete for r in result.runset.runs)
+
+
+def test_unevaluable_critical_criterion_is_incomplete_not_pass(tmp_path):
+    runset = _square_batch(tmp_path, n_runs=2)
+    cs = CriteriaSet(name="x")
+    cs.add_criteria(MeasurementCriteria(measurement_name="nonexistent_stat", comparison_type=ComparisonType.MAX_ONLY, max_value=1.0, severity="critical"))
+    runset.criteria_set = cs
+    result = ComparisonAnalyzer.analyze(runset)
+    assert all(r.incomplete for r in result.runset.runs)
+    assert all(r.passed is None for r in result.runset.runs)
+    assert result.yield_incomplete == 2
+    assert any("could not be evaluated" in w for w in result.warnings)

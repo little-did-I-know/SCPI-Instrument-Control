@@ -584,6 +584,8 @@ class MarkdownReportGenerator(BaseReportGenerator):
                     text += " ✅"
                 elif cell.status == "fail":
                     text += " ❌"
+                elif cell.status == "incomplete":
+                    text += " ⚠️"
                 cells.append(text)
             lines.append("| " + " | ".join(cells) + " |")
         return "\n".join(lines)

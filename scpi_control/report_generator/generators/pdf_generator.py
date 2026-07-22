@@ -1246,6 +1246,8 @@ class PDFReportGenerator(BaseReportGenerator):
                     style_commands.append(("TEXTCOLOR", (c, r), (c, r), colors.HexColor(self.branding.success_color)))
                 elif cell.status == "fail":
                     style_commands.append(("TEXTCOLOR", (c, r), (c, r), colors.HexColor(self.branding.failure_color)))
+                elif cell.status == "incomplete":
+                    style_commands.append(("TEXTCOLOR", (c, r), (c, r), colors.HexColor("#b58900")))
         element.setStyle(TableStyle(style_commands))
         return element
 

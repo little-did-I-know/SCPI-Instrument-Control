@@ -456,13 +456,13 @@ class ReportTemplate:
 
         Configured for the 1 kHz calibration square wave: links to the
         ``probe_calibration`` test type, ships a probe-comp procedure and
-        percentage-based pass/fail limits (overshoot, undershoot, ringing,
+        percentage-based pass/fail limits (overshoot, undershoot, and
         top flatness), and omits FFT (irrelevant to a comp check). No
         measurement data is baked in -- apply it to any capture.
         """
         template = cls(
             name="Probe Calibration Template",
-            description=("Oscilloscope probe compensation check using the 1 kHz " "calibration square wave. Verifies a flat top with no " "overshoot, undershoot, or ringing."),
+            description=("Oscilloscope probe compensation check using the 1 kHz " "calibration square wave. Verifies a flat top with no " "overshoot or undershoot."),
             default_test_type="probe_calibration",
             default_test_procedure=(
                 "1. Connect the probe tip to the scope's ~1 kHz calibration "
@@ -499,7 +499,7 @@ class ReportTemplate:
         template.add_section(
             SectionTemplate(
                 title="Flatness & Edge Analysis",
-                content=("Overshoot, undershoot, ringing, and top flatness against " "the compensation limits."),
+                content=("Overshoot, undershoot, and top flatness against " "the compensation limits."),
                 include_waveforms=True,
                 include_measurements=True,
                 order=2,
@@ -536,15 +536,6 @@ class ReportTemplate:
                 max_value=5.0,
                 severity="critical",
                 description="Dip below the flat base, as % of amplitude.",
-            )
-        )
-        criteria.add_criteria(
-            MeasurementCriteria(
-                measurement_name="Ringing",
-                comparison_type=ComparisonType.MAX_ONLY,
-                max_value=5.0,
-                severity="warning",
-                description="Post-transition oscillation, as % of amplitude.",
             )
         )
         criteria.add_criteria(
