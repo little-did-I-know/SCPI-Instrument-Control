@@ -19,3 +19,13 @@ def test_thd_off_bin_fundamental():
     # true THD = sqrt(0.2^2 + 0.1^2) = 22.36 %
     assert thd is not None
     assert 18.0 < thd < 27.0
+
+
+def test_thd_of_waveform_is_none_for_pure_noise():
+    rng = np.random.default_rng(2)
+    fs, n = 1e6, 4000
+    t = np.arange(n) / fs
+    noise = SimpleNamespace(voltage=rng.standard_normal(n), time=t)
+    assert FFTAnalyzer.thd_of_waveform(noise) is None
+    tone = SimpleNamespace(voltage=np.sin(2 * np.pi * 5000 * t) + 0.2 * np.sin(2 * np.pi * 15000 * t), time=t)
+    assert FFTAnalyzer.thd_of_waveform(tone) is not None

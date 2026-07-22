@@ -382,12 +382,25 @@ class WaveformAnalyzer:
         noise_spec[0] = 0.0
         half = 2
         h = 1
+        notched_count = 0
         while h * fund_bin < len(spectrum):
             center = h * fund_bin
             lo = max(1, center - half)
             hi = min(len(spectrum), center + half + 1)
             noise_spec[lo:hi] = 0.0
+            notched_count += hi - lo
             h += 1
+        # A very low fundamental bin (near-1-cycle capture) makes the ±2-bin
+        # harmonic notches overlap and blank out essentially the whole
+        # spectrum, so the residual RMS collapses toward 0 -- a fabricated
+        # "perfectly clean" reading, not a real noise measurement. A normal
+        # multi-cycle capture (e.g. fund_bin=8 over a 4001-bin spectrum)
+        # legitimately notches ~60% of bins and still leaves a representative
+        # noise residual; fund_bin<=5 leaves 2 bins or fewer -- essentially
+        # nothing to estimate noise from. 0.9 sits well above the former and
+        # well below the latter, so only near-total blanking trips this guard.
+        if notched_count > 0.9 * len(spectrum):
+            return None
         residual = irfft(noise_spec, n=n)
         return float(np.sqrt(np.mean(residual**2)))
 

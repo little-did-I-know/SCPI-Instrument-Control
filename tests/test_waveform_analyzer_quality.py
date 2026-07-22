@@ -54,3 +54,12 @@ def test_noisy_sine_noise_estimate_matches_injected():
     assert q["noise_level"] is not None
     assert 0.006 < q["noise_level"] < 0.014  # ~10 mV
     assert q["snr"] is not None and 30 < q["snr"] < 50  # ~37 dB (0.707 / 0.01)
+
+
+def test_single_cycle_capture_noise_is_none_not_zero():
+    rng = np.random.default_rng(1)
+    n, rate = 1000, 1e6
+    t = np.arange(n) / rate
+    v = np.sin(2 * np.pi * (rate / n) * t) + 0.01 * rng.standard_normal(n)  # one period over the record
+    q = WaveformAnalyzer.calculate_quality_stats(make_waveform(v, rate))
+    assert q["noise_level"] is None  # cannot separate noise from a 1-cycle capture; must not fabricate 0.0

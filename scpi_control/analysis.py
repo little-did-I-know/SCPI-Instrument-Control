@@ -9,6 +9,12 @@ from scipy import signal
 
 logger = logging.getLogger(__name__)
 
+# thd_of_waveform's dominant-tone gate: mirrors _NOISE_PEAK_TO_MEDIAN in
+# waveform_analyzer.py's _has_dominant_tone. Without a clearly dominant
+# spectral peak, there is no fundamental to measure harmonics against, so
+# THD is undefined rather than a number computed from noise.
+_THD_MIN_PEAK_TO_MEDIAN = 15.0
+
 
 @dataclass
 class FFTResult:
@@ -422,7 +428,16 @@ class FFTAnalyzer:
         mag = result.magnitude
         if len(mag) < 2:
             return None
-        fund_idx = 1 + int(np.argmax(mag[1:]))  # skip DC bin of the rfft magnitude
+        pos = mag[1:]  # skip DC bin of the rfft magnitude
+        if pos.size == 0:
+            return None
+        mx = float(np.max(pos))
+        if mx == 0.0:
+            return None
+        med = float(np.median(pos))
+        if med > 0.0 and mx / med < _THD_MIN_PEAK_TO_MEDIAN:
+            return None  # no dominant tone -> not a periodic signal, THD is undefined
+        fund_idx = 1 + int(np.argmax(pos))
         fundamental_freq = float(result.frequency[fund_idx])
         if fundamental_freq <= 0:
             return None
