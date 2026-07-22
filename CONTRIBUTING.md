@@ -177,6 +177,24 @@ python -m pytest tests/
 
 CI and pre-merge checks always run the full suite.
 
+### Parallel Local Runs with xdist
+
+`pytest-xdist` (installed with the `dev` extra) spreads the suite across
+multiple worker processes:
+
+```bash
+python -m pytest -n auto
+```
+
+`-n auto` spawns one worker per CPU core; on a multi-core machine this cuts
+full-suite wall time substantially. Prefer `--testmon` for tight edit loops
+where only a handful of tests need to rerun, and `-n auto` when you want the
+whole suite fast (e.g. before committing) — run one or the other per
+invocation rather than combining them. (In local testing with pytest-testmon
+2.2.0 and pytest-xdist 3.8.0, `--testmon -n auto` together did not error and
+testmon's change detection still worked correctly across workers, but this
+combination isn't a primary supported workflow, so keep them separate.)
+
 ### Writing Tests
 
 - Place tests in the `tests/` directory
