@@ -41,12 +41,51 @@ def test_comparison_table_rendered_with_status_marks(tmp_path):
 
 
 def test_manifest_rendered(tmp_path):
+    """Test that manifest renders with exact header, full-hash rows, and proper null handling."""
+    # Test case 1: Full entry with all fields populated
     section = TestSection(title="Raw Data Appendix")
-    section.manifest = DataManifest(entries=[ManifestEntry(run_label="before", file_path="a.csv", size_bytes=1234, sha256="ab" * 32, capture_timestamp="2026-07-22T10:00:00+00:00", instrument="Siglent SDS824X HD (SN1)")])
+    full_hash = "ab" * 32  # 64-char SHA-256 hash
+    entry = ManifestEntry(
+        run_label="before",
+        file_path="a.csv",
+        size_bytes=1234,
+        sha256=full_hash,
+        capture_timestamp="2026-07-22T10:00:00+00:00",
+        instrument="Siglent SDS824X HD (SN1)",
+    )
+    section.manifest = DataManifest(entries=[entry])
     text = _generate(tmp_path, section)
-    assert "SHA-256" in text
-    assert ("ab" * 32)[:16] in text  # hash shown (possibly truncated to >=16 chars)
-    assert "Siglent SDS824X HD (SN1)" in text
+
+    # Assert exact header line
+    expected_header = "| Run | File | Size (bytes) | SHA-256 | Captured | Instrument |"
+    assert expected_header in text, f"Expected header not found. Got:\n{text}"
+
+    # Assert exact data row with backtick-wrapped full hash
+    expected_row = f"| before | a.csv | 1234 | `{full_hash}` | 2026-07-22T10:00:00+00:00 | Siglent SDS824X HD (SN1) |"
+    assert expected_row in text, f"Expected data row not found. Got:\n{text}"
+
+
+def test_manifest_rendered_with_null_fields(tmp_path):
+    """Test that manifest renders null fields as em-dashes."""
+    section = TestSection(title="Raw Data Appendix")
+    entry = ManifestEntry(
+        run_label="after",
+        file_path="b.csv",
+        size_bytes=5678,
+        sha256="cd" * 32,
+        capture_timestamp=None,
+        instrument=None,
+    )
+    section.manifest = DataManifest(entries=[entry])
+    text = _generate(tmp_path, section)
+
+    # Assert exact header line (should be same as other test)
+    expected_header = "| Run | File | Size (bytes) | SHA-256 | Captured | Instrument |"
+    assert expected_header in text, f"Expected header not found. Got:\n{text}"
+
+    # Assert data row with em-dashes for null fields
+    expected_row = f"| after | b.csv | 5678 | `{'cd' * 32}` | — | — |"
+    assert expected_row in text, f"Expected data row with null fields not found. Got:\n{text}"
 
 
 def test_signoff_rendered_with_lines(tmp_path):
