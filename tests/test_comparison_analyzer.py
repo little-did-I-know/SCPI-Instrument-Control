@@ -188,6 +188,10 @@ def test_non_numeric_criteria_value_is_skipped_not_raised(tmp_path):
     for run in result.runset.runs:
         assert run.measurements == []
         assert run.passed is None
+        # This criterion defaults to severity="critical" and can't be evaluated
+        # (no numeric statistic) -> the run is INCOMPLETE, not silently passed/dropped.
+        assert run.incomplete
+    assert any("could not be evaluated" in w for w in result.warnings)
 
 
 def test_resolve_stat_key_matches_display_names():
