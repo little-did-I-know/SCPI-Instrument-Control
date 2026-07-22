@@ -5760,6 +5760,7 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 <li>Dev tooling: <code>pytest-xdist</code> in the <code>dev</code> extra for parallel local test runs (<code>python -m pytest -n auto</code>); complements <code>--testmon</code> (use one or the other per invocation).</li>
 <li>Report generator: before/after comparison and multi-DUT batch reports — load multiple capture-file runs, overlay their waveforms, and get delta tables (comparison) or per-DUT summary with aggregates and yield (batch). Available from the Python API and the GUI's new Report → Comparison / Batch Report dialog.</li>
 <li>Report generator: optional raw-data appendix (source-file manifest with SHA-256 checksums, capture timestamps, and instrument identity from provenance) and a configurable sign-off block (template-defined roles with signature/date lines). Both also work on ordinary single-run reports.</li>
+<li>Report generator: <code>top_flatness</code> waveform statistic (top-plateau deviation as % of amplitude); the probe-calibration preset now evaluates overshoot/undershoot (pass/fail) and top flatness (warning).</li>
 </ul>
 <h3 id="fixed">Fixed<a class="headerlink" href="#fixed" title="Permanent link">&para;</a></h3>
 <ul>
@@ -5774,6 +5775,11 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   for the same capture. Report-path THD now sums the first 5 harmonics (previously 10).</li>
 <li>DAQ AI threshold suggestions now bind each extracted number to its label instead of grabbing the
   first number in the sentence.</li>
+<li>Comparison/batch reports: pass/fail criteria now match analyzer statistics (case-insensitive plus
+  display-name aliases) — previously the shipped criteria template produced empty verdicts. Criteria
+  that cannot be evaluated are surfaced as warnings (never silently dropped), half-open RANGE criteria
+  are enforced, verdicts are severity-aware (only <code>critical</code> criteria gate) with a distinct INCOMPLETE
+  state, and yield reports an incomplete count instead of inflating the pass rate.</li>
 </ul>
 <h2 id="331-2026-07-21">[3.3.1] - 2026-07-21<a class="headerlink" href="#331-2026-07-21" title="Permanent link">&para;</a></h2>
 <h3 id="changed">Changed<a class="headerlink" href="#changed" title="Permanent link">&para;</a></h3>
