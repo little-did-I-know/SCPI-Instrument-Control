@@ -218,13 +218,15 @@ def handle_query(conn, command: str) -> Optional[str]:
         if upper == "TRIG_SELECT?":
             return f"{conn.trigger_type},SR,{conn.trigger_source}"
 
-        if match := re.match(r"PAVA\?\s*(\w+)\s*,\s*C?(\d+)", command, re.IGNORECASE):
-            mtype = match.group(1).upper()
-            channel = match.group(2)
+        # RC01020-E01C p.88: request "C<n>:PAVA? <param>",
+        # response "<trace>:PAVA <parameter>,<value>" -- two comma fields.
+        if match := re.match(r"C(\d+):PAVA\?\s*(\w+)", command, re.IGNORECASE):
+            channel = match.group(1)
+            mtype = match.group(2).upper()
             entry = _MOCK_PAVA_VALUES.get(mtype)
             if entry is not None:
                 value, unit = entry
-                return f"PAVA {mtype},C{channel},{value}{unit}"
+                return f"C{channel}:PAVA {mtype},{value}{unit}"
 
     return None
 

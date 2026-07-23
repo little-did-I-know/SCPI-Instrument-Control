@@ -182,12 +182,9 @@ from scpi_control.scpi_commands import measurement_to_wire
 class TestMeasurementRouting:
     def test_legacy_measurement_table_entries(self):
         cmds = SCPICommandSet("legacy")
-        # NOTE: get_parameter_value's wire form is "PAVA? {param},C{ch}", not
-        # "C{ch}:PAVA? {param}" -- this matches the wire string measurement.py
-        # actually sent pre-refactor (and what the legacy mock's PAVA? regex
-        # parses); the table previously held an unreachable, never-exercised
-        # value here.
-        assert cmds.get_command("get_parameter_value", ch=1, param="PKPK") == "PAVA? PKPK,C1"
+        # RC01020-E01C p.88: QUERY SYNTAX <trace>:PArameter_VAlue? <parameter>,
+        # <trace> = {C1..C4}. The trace prefix is mandatory.
+        assert cmds.get_command("get_parameter_value", ch=1, param="PKPK") == "C1:PAVA? PKPK"
         assert cmds.get_command("add_measurement", mtype="FREQ", ch=2) == "PACU FREQ,C2"
         assert cmds.get_command("set_statistics", state="ON") == "PAST ON"
         assert cmds.get_command("clear_measurements") == "PACL"

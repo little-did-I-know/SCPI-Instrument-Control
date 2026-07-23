@@ -105,11 +105,12 @@ class SCPICommandSet:
         "get_waveform": "C{ch}:WF? DAT2",
         "get_waveform_preamble": "C{ch}:WF? DESC",
         # Measurements
-        # NOTE: get_parameter_value's wire form is "PAVA? {param},C{ch}" (mtype
-        # first, then a C-prefixed channel) -- this is what measurement.py
-        # actually sent pre-refactor and what the legacy mock's PAVA? regex
-        # parses; do not "correct" it to "C{ch}:PAVA? {param}".
-        "get_parameter_value": "PAVA? {param},C{ch}",
+        # RC01020-E01C p.88: QUERY SYNTAX <trace>:PArameter_VAlue? <parameter>,
+        # <trace> = {C1..C4}. The trace prefix is mandatory. A previous NOTE here
+        # pinned the headerless "PAVA? {param},C{ch}" form on the grounds that it
+        # was "what the legacy mock's PAVA? regex parses" -- the mock was wrong,
+        # and the comment made the defect load-bearing (audit H7/H30).
+        "get_parameter_value": "C{ch}:PAVA? {param}",
         "add_measurement": "PACU {mtype},C{ch}",
         "set_statistics": "PAST {state}",
         "clear_measurements": "PACL",

@@ -91,4 +91,21 @@ WIRE_FORMS: List[WireForm] = [
             "additive scaffolding only and may not edit MockConnection."
         ),
     ),
+    # RC01020-E01C p.88:
+    #   QUERY SYNTAX    <trace>:PArameter_VAlue? [<parameter>, ...]
+    #   RESPONSE FORMAT <trace>: PArameter_VAlue <parameter>, <value>
+    #   EXAMPLE         C2: PAVA? RISE   ->   C2: PAVA RISE, 3.6E-9S
+    # We normalise the manual's cosmetic spaces after ':' -- real instruments
+    # emit "C2:PAVA RISE,3.6E-9S". The field STRUCTURE is what is being pinned.
+    WireForm(
+        table="scope",
+        dialect="legacy",
+        op="get_parameter_value",
+        params={"ch": 2, "param": "RISE"},
+        request="C2:PAVA? RISE",
+        response="C2:PAVA RISE,3.500E-05S",
+        parsed=3.5e-05,
+        source=f"{LEGACY_GUIDE} p.88",
+        mock_kwargs={"idn": LEGACY_IDN},
+    ),
 ]
