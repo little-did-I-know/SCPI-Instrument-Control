@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Deprecated
+
+- Power supply: setting `ovp_level`/`ocp_level` on an SPD3303X/-E now emits a `FutureWarning`. The
+  SPD3303X command set contains no protection subsystem, so these calls have never armed anything on
+  real hardware. In v5.0.0 the model's `has_ovp`/`has_ocp` capabilities become `False` and the calls
+  raise `NotImplementedError`.
+
 ## [4.0.0] - 2026-07-22
 
 ### ⚠️ Breaking Changes
