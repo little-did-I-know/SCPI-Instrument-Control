@@ -698,7 +698,9 @@ class MockConnection(BaseConnection):
         if self.writes and self.writes[-1].upper() == "SCDP?":
             # Bare IEEE 488.2 block (no "DESC," prefix), matching how a real
             # scope's SCDP? reply is parsed in screen_capture.py.
-            return _build_ieee_block(MOCK_SCREENSHOT_BMP)
+            payload = _build_ieee_block(MOCK_SCREENSHOT_BMP)
+            return payload[:size] if size is not None else payload
 
         personality = _PERSONALITIES.get(self.scope_vendor, siglent)
-        return personality.build_waveform_response(self)
+        payload = personality.build_waveform_response(self)
+        return payload[:size] if size is not None else payload
