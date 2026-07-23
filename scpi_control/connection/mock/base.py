@@ -68,6 +68,10 @@ class MockConnection(BaseConnection):
         daq_idn: str = "Keysight Technologies,34970A,MY12345678,A.01.02",
         daq_readings: str = "1.234,2.345,3.456",
         tek_badges: Optional[Dict[int, Dict[str, str]]] = None,
+        # strict: When True, unmatched PSU/AWG/DAQ queries raise TimeoutError
+        # instead of returning "", matching real instruments. Default False
+        # in 4.1.0 for compatibility; becomes the default in v5.0.0.
+        strict: bool = False,
     ):
         super().__init__(host, port, timeout)
         channels = channel_states.keys() if channel_states else range(1, 3)
@@ -175,6 +179,8 @@ class MockConnection(BaseConnection):
         self.daq_idn = daq_idn
         self.daq_readings = daq_readings
         self.daq_scan_list = []
+
+        self.strict = strict
 
     def connect(self) -> None:
         """Mark the connection as established."""
@@ -640,6 +646,8 @@ class MockConnection(BaseConnection):
             return response
 
         if self.psu_mode or self.awg_mode or self.daq_mode:
+            if self.strict:
+                raise exceptions.TimeoutError(f"MockConnection (strict) has no response for query: {command!r}")
             return ""
 
         # Real scopes produce no response at all for unknown or wrong-dialect

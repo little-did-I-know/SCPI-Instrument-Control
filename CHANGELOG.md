@@ -13,6 +13,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   SPD3303X command set contains no protection subsystem, so these calls have never armed anything on
   real hardware. In v5.0.0 the model's `has_ovp`/`has_ocp` capabilities become `False` and the calls
   raise `NotImplementedError`.
+- Testing: `MockConnection` gained `strict=True`, which makes unmatched PSU/AWG/DAQ queries raise
+  `TimeoutError` like real instruments instead of returning `""`. Strict becomes the default in v5.0.0 —
+  pass `strict=False` explicitly to keep the old behavior past that release.
 
 ## [4.0.0] - 2026-07-22
 
