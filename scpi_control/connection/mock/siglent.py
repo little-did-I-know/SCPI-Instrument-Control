@@ -110,6 +110,17 @@ def handle_write(conn, command: str) -> bool:
     elif match := re.match(r"C(\d+):CPL\s+(\w+)", command, re.IGNORECASE):
         conn._channel_coupling[int(match.group(1))] = match.group(2).upper()
         return True
+    elif match := re.match(r"C(\d+):ATTN\s+(.+)", command, re.IGNORECASE):
+        # ATTENUATION (ATTN) -- RC01020-E01C p.22 (task 14, audit L3).
+        conn.probe_ratios[int(match.group(1))] = float(match.group(2))
+        return True
+    elif match := re.match(r"BWL\s+(C\d+,(?:ON|OFF)(?:,C\d+,(?:ON|OFF))*)", command, re.IGNORECASE):
+        # BANDWIDTH_LIMIT (BWL) -- global, comma-separated channel/mode pairs,
+        # not a per-channel colon-prefixed command (RC01020-E01C p.27; task 14).
+        pairs = match.group(1).split(",")
+        for i in range(0, len(pairs), 2):
+            conn.bandwidth_limits[int(pairs[i][1:])] = pairs[i + 1].upper()
+        return True
     elif command.upper().startswith("TRIG_MODE "):
         conn.trigger_mode = command.split(" ", 1)[1].upper()
         return True
@@ -190,6 +201,22 @@ def handle_query(conn, command: str) -> Optional[str]:
 
         if match := re.match(r"C(\d+):CPL\?", command, re.IGNORECASE):
             return conn._channel_coupling.get(int(match.group(1)), "D1M")
+
+        if match := re.match(r"C(\d+):ATTN\?", command, re.IGNORECASE):
+            # RC01020-E01C p.22: RESPONSE FORMAT "<channel>:ATTeNuation
+            # <attenuation>" -- header-echoed, collapsed to the short form.
+            channel = int(match.group(1))
+            value = conn.probe_ratios.get(channel, 1.0)
+            return f"C{channel}:ATTN {value:g}"
+
+        if upper == "BWL?":
+            # RC01020-E01C p.27: bare query; RESPONSE FORMAT echoes the "BWL"
+            # header followed by ALL-channel <channel>,<mode> pairs (task 14,
+            # audit L3 -- replaces the invented per-channel "C{ch}:BWL?" form
+            # this mock never actually answered). channel.py's bandwidth_limit
+            # getter strips the header before parsing the pairs.
+            pairs = ",".join(f"C{ch},{conn.bandwidth_limits.get(ch, 'OFF')}" for ch in sorted(conn._channel_enabled))
+            return f"BWL {pairs}"
 
         if match := re.match(r"C(\d+):TRLV\?", command, re.IGNORECASE):
             channel = int(match.group(1))

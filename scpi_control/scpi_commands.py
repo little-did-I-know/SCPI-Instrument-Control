@@ -83,8 +83,13 @@ class SCPICommandSet:
         "get_coupling": "C{ch}:CPL?",
         "set_probe_ratio": "C{ch}:ATTN {ratio}",
         "get_probe_ratio": "C{ch}:ATTN?",
-        "set_bandwidth_limit": "C{ch}:BWL {limit}",  # limit: ON, OFF
-        "get_bandwidth_limit": "C{ch}:BWL?",
+        # BWL is global -- BWL keyword first, comma-separated channel/mode
+        # pairs, not a colon-prefixed per-channel command like VDIV/OFST/CPL
+        # above (RC01020-E01C p.27; task 14, audit L3 -- the previous
+        # "C{ch}:BWL {limit}"/"C{ch}:BWL?" forms were invented, never
+        # documented anywhere in this manual).
+        "set_bandwidth_limit": "BWL C{ch},{limit}",  # limit: ON, OFF
+        "get_bandwidth_limit": "BWL?",  # returns "BWL C1,OFF,C2,ON,..." pairs for ALL channels
         # Timebase control
         "set_time_div": "TDIV {tdiv}",
         "get_time_div": "TDIV?",

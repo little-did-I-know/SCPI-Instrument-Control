@@ -266,9 +266,29 @@ WIRE_FORMS: List[WireForm] = [
     ),
     # p.22 EXAMPLE: "C1:ATTN 100" (no cosmetic space in this one).
     WireForm(table="scope", dialect="legacy", op="set_probe_ratio", params={"ch": 1, "ratio": 100}, request="C1:ATTN 100", source=f"{LEGACY_GUIDE} p.22", mock_kwargs={"idn": LEGACY_IDN}),
-    # get_probe_ratio is not mocked (no ATTN? handler in connection/mock/siglent.py) --
-    # request-only citation. QUERY SYNTAX "<channel>:ATTeNuation?".
-    WireForm(table="scope", dialect="legacy", op="get_probe_ratio", params={"ch": 1}, request="C1:ATTN?", source=f"{LEGACY_GUIDE} p.22", mock_kwargs={"idn": LEGACY_IDN}),
+    # p.22 RESPONSE FORMAT: "<channel>: ATTeNuation <attenuation>" (header-echoed,
+    # collapsed to the short form "C1:ATTN <value>"). Task 14 (audit L3): the mock
+    # gained an ATTN?/ATTN-write handler (connection/mock/siglent.py) backed by new
+    # `probe_ratios` state (connection/mock/base.py), defaulting every channel to
+    # 1.0 -- so a fresh mock's "C1:ATTN?" answers "C1:ATTN 1", matched below.
+    WireForm(
+        table="scope",
+        dialect="legacy",
+        op="get_probe_ratio",
+        params={"ch": 1},
+        request="C1:ATTN?",
+        response="C1:ATTN 1",
+        parsed=1.0,
+        source=f"{LEGACY_GUIDE} p.22",
+        mock_kwargs={"idn": LEGACY_IDN},
+    ),
+    # p.27 EXAMPLE: "BWL C1, ON" (cosmetic space after comma normalised away).
+    # Task 14 (audit L3) fix: the driver used to send the invented, colon-prefixed
+    # "C{ch}:BWL {limit}" -- this manual documents no such form anywhere. The BWL
+    # keyword comes first; channel and mode are its comma-separated arguments,
+    # identical in shape to the LeCroy MAUI form (MAUI p.7-18) this dialect is
+    # descended from. scpi_commands.py's legacy set_bandwidth_limit template now
+    # renders exactly this.
     WireForm(
         table="scope",
         dialect="legacy",
@@ -276,39 +296,30 @@ WIRE_FORMS: List[WireForm] = [
         params={"ch": 1, "limit": "ON"},
         request="BWL C1,ON",
         source=f"{LEGACY_GUIDE} p.27",
-        status=MISMATCH_DEFERRED,
         mock_kwargs={"idn": LEGACY_IDN},
-        note=(
-            "[medium severity] p.27 COMMAND SYNTAX is 'BandWidth_Limit <channel>, "
-            "<mode> [, <channel>, <mode>...]', EXAMPLE 'BWL C1, ON' -- the BWL "
-            "keyword comes first, channel and mode are comma-separated arguments to "
-            "it. Code (scpi_control/scpi_commands.py LEGACY_COMMANDS) sends "
-            "'C{ch}:BWL {limit}' (colon-prefixed channel, like VDIV/OFST/CPL), a "
-            "different structure this manual does not document. Not mocked "
-            "(no BWL handler in connection/mock/siglent.py), so no test currently "
-            "exercises this. No wrong number reaches a user today only because "
-            "nothing reads the result; on real hardware the malformed write would "
-            "likely be silently ignored (writes don't raise). Not on a default path "
-            "(channel.py's bandwidth_limit is opt-in). Queued for a code fix, not "
-            "just a mock fix."
-        ),
     ),
+    # p.27 QUERY SYNTAX is bare "BandWidth_Limit?" (no channel argument);
+    # RESPONSE FORMAT returns ALL channels as "<channel>,<mode>" pairs, header-
+    # echoed as "BandWidth_Limit <channel>,<mode>[,...]" (collapsed short form
+    # "BWL C1,OFF,C2,OFF,..."). Task 14 fix: scpi_commands.py's legacy
+    # get_bandwidth_limit template now sends bare "BWL?" (was the invented
+    # per-channel "C{ch}:BWL?"); the mock gained a BWL?/BWL-write handler backed
+    # by new `bandwidth_limits` state, defaulting every channel to OFF -- a fresh
+    # mock's "BWL?" answers "BWL C1,OFF,C2,OFF" (2 default channels), matched
+    # below. channel.py's bandwidth_limit getter now reuses the same pairs-
+    # parsing branch as the LeCroy dialect, extended to also strip legacy's
+    # "BWL " header echo before splitting (LeCroy's own CHDR OFF setup already
+    # suppresses that header on the wire, so it needs no stripping).
     WireForm(
         table="scope",
         dialect="legacy",
         op="get_bandwidth_limit",
         params={"ch": 1},
         request="BWL?",
+        response="BWL C1,OFF,C2,OFF",
+        parsed="OFF",
         source=f"{LEGACY_GUIDE} p.27",
-        status=MISMATCH_DEFERRED,
         mock_kwargs={"idn": LEGACY_IDN},
-        note=(
-            "[medium severity] p.27 QUERY SYNTAX is bare 'BandWidth_Limit?' (no "
-            "channel argument) with RESPONSE FORMAT returning ALL channels as "
-            "'<channel>,<mode>' pairs. Code sends 'C{ch}:BWL?' (per-channel), a form "
-            "this manual does not document. Not mocked. Same root cause as "
-            "set_bandwidth_limit above; queued together."
-        ),
     ),
     # -- Timebase control --
     # p.122 EXAMPLE: "TDIV 500US" (get_time_div is the already-catalogued MISMATCH_DEFERRED above; this is the SET side, which the manual does example directly).

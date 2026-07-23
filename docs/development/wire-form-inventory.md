@@ -52,7 +52,7 @@ Checked against the Siglent Digital Oscilloscopes Programming Guide
 | `clear_measurements` | `PACL` | `PACL` | VERIFIED | RC01020-E01C p.86 |
 | `force_trigger` | `FRTR` | `FRTR` | VERIFIED | RC01020-E01C p.56 |
 | `get_acq_status` | `SAST?` | request matches; response is `SAST <status>` (mock answers bare, no header) | MISMATCH_DEFERRED | RC01020-E01C p.116 |
-| `get_bandwidth_limit` | `C{ch}:BWL?` | `BWL?` (bare, no channel — returns all channels) | MISMATCH_DEFERRED | RC01020-E01C p.27 |
+| `get_bandwidth_limit` | `BWL?` | `BandWidth_Limit?` (bare, no channel — returns ALL channels as header-echoed `<channel>,<mode>` pairs); mock now answers `BWL C1,OFF,C2,OFF,...` | VERIFIED | RC01020-E01C p.27 |
 | `get_channel_display` | `C{ch}:TRA?` | request matches; response is `<trace>:TRAce <mode>` (mock answers bare) | MISMATCH_DEFERRED | RC01020-E01C p.124 |
 | `get_channel_unit` | `C{ch}:UNIT?` | `<channel>:UNIT?` | VERIFIED | RC01020-E01C p.137 |
 | `get_coupling` | `C{ch}:CPL?` | request matches; response is `<channel>:CouPLing <coupling>` (mock answers bare) | MISMATCH_DEFERRED | RC01020-E01C p.35 |
@@ -60,7 +60,7 @@ Checked against the Siglent Digital Oscilloscopes Programming Guide
 | `get_cursor_value` | `CRVA?` | `<trace>:CuRsor_Value? [<mode>,...]` (trace prefix + mode required); response shape driver expects also disagrees with the manual's worked example | MISMATCH_DEFERRED | RC01020-E01C p.40 |
 | `get_math_display` | `MATH{n}:TRA?` | `MATH{n}:TRA` does not exist in this manual; dead code (no caller) | MISMATCH_DEFERRED | RC01020-E01C p.124 |
 | `get_parameter_value` | `C{ch}:PAVA? {param}` | `<trace>:PArameter_VAlue? <parameter>` | VERIFIED | RC01020-E01C p.88 |
-| `get_probe_ratio` | `C{ch}:ATTN?` | `<channel>:ATTeNuation?` | VERIFIED | RC01020-E01C p.22 |
+| `get_probe_ratio` | `C{ch}:ATTN?` | `<channel>:ATTeNuation?`; response `<channel>:ATTeNuation <attenuation>` — mock now answers exactly, e.g. `C1:ATTN 1` | VERIFIED | RC01020-E01C p.22 |
 | `get_sample_rate` | `SARA?` | `SARA?` | VERIFIED | RC01020-E01C p.117 |
 | `get_time_div` | `TDIV?` | request matches; response is `Time_DIV <value>` (mock answers bare) | MISMATCH_DEFERRED | RC01020-E01C p.122 |
 | `get_time_offset` | `TRDL?` | `TRig_DeLay?` | VERIFIED | RC01020-E01C p.127 |
@@ -78,7 +78,7 @@ Checked against the Siglent Digital Oscilloscopes Programming Guide
 | `reset_statistics` | `PASTAT RESET` | absent from manual entirely (zero hits for PASTAT anywhere) | MISMATCH_DEFERRED | RC01020-E01C p.16 |
 | `run` | `TRIG_MODE AUTO` | `TRig_MoDe AUTO` | VERIFIED | RC01020-E01C p.130 |
 | `screen_dump` | `SCDP` | `SCDP` | VERIFIED | RC01020-E01C p.106 |
-| `set_bandwidth_limit` | `C{ch}:BWL {limit}` | `BWL <channel>,<mode>` (BWL keyword first, comma-separated, not colon-prefixed channel) | MISMATCH_DEFERRED | RC01020-E01C p.27 |
+| `set_bandwidth_limit` | `BWL C{ch},{limit}` | `BandWidth_Limit <channel>,<mode>` (BWL keyword first, comma-separated, not colon-prefixed channel) | VERIFIED | RC01020-E01C p.27 |
 | `set_channel_display` | `C{ch}:TRA {state}` | `<trace>:TRAce <mode>` | VERIFIED | RC01020-E01C p.124 |
 | `set_channel_unit` | `C{ch}:UNIT {unit}` | `<channel>:UNIT <type>` | VERIFIED | RC01020-E01C p.137 |
 | `set_coupling` | `C{ch}:CPL {coupling}` | `<channel>:CouPLing <coupling>` | VERIFIED | RC01020-E01C p.35 |
@@ -99,11 +99,21 @@ Checked against the Siglent Digital Oscilloscopes Programming Guide
 | `set_voltage_offset` | `C{ch}:OFST {offset}` | `<channel>:OFfSeT <offset>` | VERIFIED | RC01020-E01C p.83 |
 | `stop` | `STOP` | `STOP` | VERIFIED | RC01020-E01C p.111 |
 
-**Tally: 28 VERIFIED, 24 MISMATCH_DEFERRED, 0 UNCITED (52 total).**
+**Tally: 30 VERIFIED, 22 MISMATCH_DEFERRED, 0 UNCITED (52 total).**
 
 Full detail — exact current vs. documented wire form, severity against the
 pull-in bar, and why each is deferred rather than fixed — is in each entry's
 `note` field in `tests/wire_forms.py`.
+
+Task 14 (audit L3) flipped three rows from the counts above: `get_probe_ratio`
+gained a mock `ATTN?`/`ATTN`-write handler (it was already request-verified,
+now response-verified too); `set_bandwidth_limit`/`get_bandwidth_limit` were
+fixed from the invented, colon-prefixed `C{ch}:BWL {limit}`/`C{ch}:BWL?` forms
+to the documented global `BWL C{ch},{limit}`/`BWL?` forms (identical in shape
+to the LeCroy dialect's own BWL, which this dialect descends from) — reusing
+the LeCroy pairs-parsing branch in `channel.py`'s `bandwidth_limit` getter,
+extended to also strip legacy's header-echoed `"BWL "` prefix before splitting
+(LeCroy's own CHDR OFF connect-time setup already suppresses that header).
 
 ## Modern Siglent scope (`SCPICommandSet.MODERN_COMMANDS`)
 

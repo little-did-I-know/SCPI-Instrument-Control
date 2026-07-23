@@ -90,6 +90,10 @@ class MockConnection(BaseConnection):
         self._signals: Dict[int, "SignalSpec"] = dict(signals) if signals else {}
         self._acquisition_counts: Dict[int, int] = {}
         self._channel_coupling: Dict[int, str] = {ch: "D1M" for ch in channels}
+        # Legacy scope probe attenuation / bandwidth-limit state (Task 14,
+        # audit L3): the GUI's channel refresh reads both on every poll.
+        self.probe_ratios: Dict[int, float] = {ch: 1.0 for ch in channels}
+        self.bandwidth_limits: Dict[int, str] = {ch: "OFF" for ch in channels}
 
         self.sample_rate = sample_rate
         self.timebase = timebase
