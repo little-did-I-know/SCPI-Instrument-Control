@@ -23,8 +23,10 @@ def handle_write(conn, command: str) -> bool:
         conn.trigger_mode = "STOP"  # TRMD? reports STOP after a STOP command
         return True
     if upper.startswith("BWL "):
-        # Legacy chain has no BWL handler; record as a no-op write explicitly
-        # so the fidelity contract (write returns True => consumed) holds.
+        # LeCroy models this as a no-op write: unlike the legacy Siglent chain
+        # (which stores BWL state so its BWL? returns real pairs), LeCroy's mock
+        # only needs the fidelity contract (write returns True => consumed) to
+        # hold. Intercept here so it does not fall through to the legacy handler.
         return True
     # The legacy chain understands TDIV/VDIV/TRA/CPL/TRIG_* — LeCroy originals.
     # Its modern branch gates on scope_dialect == "modern", which is False here.

@@ -84,13 +84,6 @@ def test_every_command_has_a_corpus_entry(key):
     a new wire form to justify itself.
     """
     table, variant_or_dialect = key
-    documented = {
-        wf.op
-        for wf in WIRE_FORMS
-        if wf.table == table and (wf.dialect == variant_or_dialect or wf.variant == variant_or_dialect)
-    }
+    documented = {wf.op for wf in WIRE_FORMS if wf.table == table and (wf.dialect == variant_or_dialect or wf.variant == variant_or_dialect)}
     missing = sorted(set(COVERED_TABLES[key]) - documented)
-    assert not missing, (
-        f"{table}/{variant_or_dialect}: no corpus entry for {missing}. "
-        f"Add one citing the manual, or mark it UNCITED with a reason."
-    )
+    assert not missing, f"{table}/{variant_or_dialect}: no corpus entry for {missing}. " f"Add one citing the manual, or mark it UNCITED with a reason."
