@@ -112,4 +112,20 @@ WIRE_FORMS: List[WireForm] = [
         source=f"{LEGACY_GUIDE} p.88",
         mock_kwargs={"idn": LEGACY_IDN},
     ),
+    # RC01020-E01C p.117:
+    #   RESPONSE FORMAT SARA< value >
+    #   EXAMPLE         SARA?   ->   SARA  500.0kSa
+    # Note the SI magnitude letter and the unit "Sa" (NOT "Sa/s"). AUDIT.md H8
+    # predicted "1.00GSa/s"; the guide's own example disagrees.
+    WireForm(
+        table="scope",
+        dialect="legacy",
+        op="get_sample_rate",
+        params={},
+        request="SARA?",
+        response="SARA 1.00kSa",
+        parsed=1000.0,
+        source=f"{LEGACY_GUIDE} p.117",
+        mock_kwargs={"idn": LEGACY_IDN},
+    ),
 ]

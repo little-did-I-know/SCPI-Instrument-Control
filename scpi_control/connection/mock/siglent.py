@@ -6,7 +6,7 @@ from __future__ import annotations
 import re
 from typing import Dict, Optional, Tuple
 
-from scpi_control.connection.mock.helpers import _build_ieee_block, _format_nr3, _format_scientific
+from scpi_control.connection.mock.helpers import _build_ieee_block, _format_nr3, _format_scientific, _format_si_sample_rate
 from scpi_control.connection.mock import synth as mock_synth
 
 # Canonical PAVA? measurement values for the legacy dialect (mirrors real
@@ -205,7 +205,8 @@ def handle_query(conn, command: str) -> Optional[str]:
             return _format_scientific(conn.timebase, "S")
 
         if upper == "SARA?":
-            return _format_scientific(conn.sample_rate, "Sa/s")
+            # RC01020-E01C p.117: "SARA <value>" with an SI magnitude letter.
+            return _format_si_sample_rate(conn.sample_rate)
 
         if upper == "SAST?":
             if len(conn.trigger_status) > 1:

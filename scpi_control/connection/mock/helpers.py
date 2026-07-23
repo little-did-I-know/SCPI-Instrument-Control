@@ -15,6 +15,17 @@ def _format_nr3(value: float) -> str:
     return f"{value:.2E}"
 
 
+def _format_si_sample_rate(value: float) -> str:
+    """Format a sample rate the way legacy Siglent scopes do (RC01020-E01C p.117).
+
+    1e9 -> "SARA 1.00GSa", 500e3 -> "SARA 500.00kSa", 1000 -> "SARA 1.00kSa".
+    """
+    for threshold, letter in ((1e9, "G"), (1e6, "M"), (1e3, "k")):
+        if value >= threshold:
+            return f"SARA {value / threshold:.2f}{letter}Sa"
+    return f"SARA {value:.2f}Sa"
+
+
 def _build_ieee_block(payload: bytes) -> bytes:
     """Wrap payload in an IEEE-488.2 definite-length block: #<ndigits><length><payload>."""
     length_str = str(len(payload)).encode()

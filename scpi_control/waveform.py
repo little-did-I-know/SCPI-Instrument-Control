@@ -24,6 +24,35 @@ WAVEFORM_CODE_PER_DIV_8BIT = 25.0  # Codes per vertical division for 8-bit ADC
 WAVEFORM_CODE_PER_DIV_16BIT = 6400.0  # Codes per vertical division for 16-bit ADC
 WAVEFORM_CODE_CENTER = 0  # Center code value for signed integer ADC data
 
+# Legacy Siglent responses carry an SI magnitude letter (RC01020-E01C p.117:
+# "SARA  500.0kSa"). float() cannot consume it, so expand before parsing.
+#
+# Only the multiplying prefixes are listed. `_parse_value_with_units` upper-cases
+# its input before reaching here, which makes milli ("m") and mega ("M")
+# indistinguishable -- adding milli would silently turn 1 mV into 1 MV. The
+# sample-rate responses this exists for only ever use G/M/k. If a sub-milli
+# quantity ever needs this, case must be preserved upstream first.
+_SI_MAGNITUDES = {"G": 1e9, "M": 1e6, "K": 1e3}
+
+
+def _to_float_with_magnitude(numeric_part: str) -> float:
+    """Parse an NR3 value that may carry a trailing SI magnitude letter.
+
+    "500.0K" -> 500000.0, "1.00G" -> 1e9, "1.00E+03" -> 1000.0.
+    Raises ValueError for anything else, so callers keep their error path.
+    """
+    text = numeric_part.strip().upper()
+    if not text:
+        raise ValueError("empty numeric part")
+    # A trailing E is exponent syntax, never a magnitude letter.
+    for suffix, factor in _SI_MAGNITUDES.items():
+        if text.endswith(suffix) and len(text) > len(suffix):
+            head = text[: -len(suffix)]
+            # Guard against consuming the exponent marker of "1.0E+03".
+            if head and not head.endswith("E"):
+                return float(head) * factor
+    return float(text)
+
 
 @dataclass
 class WaveformData:
@@ -179,7 +208,8 @@ class Waveform:
         response = self._scope.query(command)
         logger.debug(f"Sample rate response: '{response}'")
 
-        return self._parse_value_with_units(response, ("SA/S", "SPS"), "sample rate", command=command)
+        # RC01020-E01C p.117 documents the unit as "Sa", not "Sa/s".
+        return self._parse_value_with_units(response, ("SA/S", "SPS", "SA"), "sample rate", command=command)
 
     def _format_scope_error(self, message: str, command: Optional[str] = None) -> str:
         """Append host/command context to error messages for clarity."""
@@ -256,7 +286,7 @@ class Waveform:
             if cleaned_upper.endswith(unit_upper):
                 numeric_part = cleaned_upper[: -len(unit_upper)].strip()
                 try:
-                    value = float(numeric_part)
+                    value = _to_float_with_magnitude(numeric_part)
                     logger.debug(f"Parsed {quantity}: {value} {unit}")
                     return value
                 except ValueError as exc:
