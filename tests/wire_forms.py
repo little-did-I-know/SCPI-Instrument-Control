@@ -720,4 +720,437 @@ WIRE_FORMS: List[WireForm] = [
             "caller anywhere in the repo invokes hardcopy_print. Queued."
         ),
     ),
+
+    # --- Modern Siglent scope: sweep 2026-07-23 (task 5b) ------------------
+    # Every command in SCPICommandSet.MODERN_COMMANDS (40 total), checked
+    # against MODERN_GUIDE (SDS800XHD_Series_ProgrammingGuide_EN11G.pdf, 855
+    # pages). The PDF's internal page sequence is offset by +1 from the
+    # printed page numbers baked into each page's header/footer (confirmed by
+    # cross-referencing the guide's own table of contents on pp.2-11 against a
+    # page-by-page scan of pp.30-65 and pp.468-500) -- every "p.N" citation
+    # below is the *printed* page number, already corrected for that offset.
+    # Unlike the legacy dialect (which is abbreviations-only), the modern
+    # table renders the long-form header spelled out in COMMAND/QUERY SYNTAX
+    # (e.g. ":CHANnel1:SWITch?"), so driver output matches the manual's own
+    # syntax line directly rather than its abbreviated worked EXAMPLE
+    # ("CHAN1:SWIT?") -- both are the same documented header per SCPI's
+    # upper/lowercase short-form convention (see p.10, same rule as legacy).
+
+    # -- Root / acquisition control --
+    # p.33 COMMAND SYNTAX/EXAMPLE: bare ":AUToset" (abbreviated "AUT").
+    WireForm(table="scope", dialect="modern", op="auto_setup", params={}, request=":AUToset", source=f"{MODERN_GUIDE} p.33", mock_kwargs={"idn": MODERN_IDN}),
+    # p.482 <mode>:={SINGle|NORMal|AUTO|FTRIG} -- FTRIG is a documented mode
+    # value ("Force to acquire a frame regardless of..."), so force_trigger
+    # sending it through :TRIGger:MODE (rather than a standalone FORCE
+    # command, which this manual does not have) is the documented mechanism.
+    WireForm(table="scope", dialect="modern", op="force_trigger", params={}, request=":TRIGger:MODE FTRIG", source=f"{MODERN_GUIDE} p.482", mock_kwargs={"idn": MODERN_IDN}),
+    # p.483: RESPONSE FORMAT <status>:={Arm|Ready|Auto|Trig'd|Stop|Roll}, bare
+    # (unprefixed) -- EXAMPLE "TRIG:STAT?" -> "Stop". normalize_status()
+    # upper-cases before matching _STATUS_MAP, whose keys already cover this
+    # exact vocabulary (scpi_commands.py) -- unlike the legacy SAST? finding,
+    # this one is not prefixed and needs no header-stripping tolerance.
+    WireForm(
+        table="scope",
+        dialect="modern",
+        op="get_acq_status",
+        params={},
+        request=":TRIGger:STATus?",
+        response="Stop",
+        parsed="STOP",
+        source=f"{MODERN_GUIDE} p.483",
+        mock_kwargs={"idn": MODERN_IDN},
+    ),
+    WireForm(table="scope", dialect="modern", op="run", params={}, request=":TRIGger:RUN", source=f"{MODERN_GUIDE} p.483", mock_kwargs={"idn": MODERN_IDN}),
+    WireForm(table="scope", dialect="modern", op="stop", params={}, request=":TRIGger:STOP", source=f"{MODERN_GUIDE} p.484", mock_kwargs={"idn": MODERN_IDN}),
+
+    # -- Channel control --
+    # p.60 EXAMPLE: "CHAN1:SWIT ON" -> "CHANnel1:SWITch ON"; query response
+    # bare "ON". Mock's modern SWITch? handler returns bare ON/OFF -- matches.
+    WireForm(table="scope", dialect="modern", op="set_channel_display", params={"ch": 1, "state": "ON"}, request=":CHANnel1:SWITch ON", source=f"{MODERN_GUIDE} p.60", mock_kwargs={"idn": MODERN_IDN}),
+    WireForm(
+        table="scope",
+        dialect="modern",
+        op="get_channel_display",
+        params={"ch": 1},
+        request=":CHANnel1:SWITch?",
+        response="ON",
+        source=f"{MODERN_GUIDE} p.60",
+        mock_kwargs={"idn": MODERN_IDN},
+    ),
+    # p.58 EXAMPLE: "CHAN1:SCAL 5.00E-02" -> "CHANnel1:SCALe 5.00E-02"; query
+    # response bare NR3 (manual shows the probe-adjusted alternate too, e.g.
+    # "5.00E-01 (when the probe attenuation ratio is 10:1)").
+    WireForm(table="scope", dialect="modern", op="set_voltage_div", params={"ch": 1, "vdiv": "5.00E-02"}, request=":CHANnel1:SCALe 5.00E-02", source=f"{MODERN_GUIDE} p.58", mock_kwargs={"idn": MODERN_IDN}),
+    WireForm(
+        table="scope",
+        dialect="modern",
+        op="get_voltage_div",
+        params={"ch": 1},
+        request=":CHANnel1:SCALe?",
+        response="1.00E+00",
+        parsed=1.0,
+        source=f"{MODERN_GUIDE} p.58",
+        mock_kwargs={"idn": MODERN_IDN},
+        note=(
+            "Mock's default scale (1.00E+00) differs from the manual's worked "
+            "example value (5.00E-02) -- same divergence-is-fine rule as the "
+            "legacy SARA?/get_sample_rate entry above; only the bare-NR3 "
+            "structure is pinned."
+        ),
+    ),
+    # p.56 EXAMPLE: "CHAN2:OFFS -3.8E+00" -> "CHANnel2:OFFSet -3.8E+00".
+    WireForm(table="scope", dialect="modern", op="set_voltage_offset", params={"ch": 2, "offset": "-3.8E+00"}, request=":CHANnel2:OFFSet -3.8E+00", source=f"{MODERN_GUIDE} p.56", mock_kwargs={"idn": MODERN_IDN}),
+    WireForm(
+        table="scope",
+        dialect="modern",
+        op="get_voltage_offset",
+        params={"ch": 2},
+        request=":CHANnel2:OFFSet?",
+        response="0.00E+00",
+        parsed=0.0,
+        source=f"{MODERN_GUIDE} p.56",
+        mock_kwargs={"idn": MODERN_IDN},
+    ),
+    # p.51 EXAMPLE: "CHAN1:COUP AC" -> "CHANnel1:COUPling AC";
+    # <coupling_mode>:={DC|AC|GND}.
+    WireForm(table="scope", dialect="modern", op="set_coupling", params={"ch": 1, "coupling": "AC"}, request=":CHANnel1:COUPling AC", source=f"{MODERN_GUIDE} p.51", mock_kwargs={"idn": MODERN_IDN}),
+    WireForm(
+        table="scope",
+        dialect="modern",
+        op="get_coupling",
+        params={"ch": 1},
+        request=":CHANnel1:COUPling?",
+        response="D1M",
+        source=f"{MODERN_GUIDE} p.51",
+        status=MISMATCH_DEFERRED,
+        mock_kwargs={"idn": MODERN_IDN},
+        note=(
+            "[medium severity] Request matches exactly ('<channel>:COUPling?'). "
+            "The wire template and coupling_to_wire/coupling_from_wire mappings "
+            "(scpi_commands.py) are both correct for modern -- {'DC':'DC', "
+            "'AC':'AC', 'GND':'GND'}, matching p.51's <coupling_mode>:={DC|AC|GND} "
+            "exactly. The bug is in the mock fixture only: MockConnection seeds "
+            "'_channel_coupling' with the LEGACY wire token 'D1M' unconditionally "
+            "for every dialect (connection/mock/base.py, ~line 82: \"{ch: 'D1M' "
+            "for ch in channels}\", no scope_dialect branch, unlike trigger_mode/ "
+            "trigger_slope a few lines below which do branch on dialect). 'D1M' "
+            "is not a member of the modern enum, so Channel.coupling on a freshly "
+            "constructed modern MockConnection (before any set_coupling call) "
+            "raises 'ValueError: Unrecognized modern coupling mode response: "
+            "'D1M'' via coupling_from_wire() -- a real, reachable crash against "
+            "this test fixture, though it cannot happen against real hardware "
+            "(this is a mock-state defect, not a driver or table defect). Queued "
+            "for a mock fix (seed _channel_coupling per-dialect), not a code-table "
+            "change."
+        ),
+    ),
+    # p.57 EXAMPLE: "CHAN1:PROB VAL,1.00E+02" -> "CHANnel1:PROBe VALue,1.00E+02";
+    # <attenuation>:={DEFault|VALue}. Not mocked (no PROBe handler in the
+    # modern branch of connection/mock/siglent.py) -- request-only citation,
+    # same pattern as the legacy get_probe_ratio/set_bandwidth_limit entries.
+    WireForm(table="scope", dialect="modern", op="set_probe_ratio", params={"ch": 1, "ratio": "1.00E+02"}, request=":CHANnel1:PROBe VALue,1.00E+02", source=f"{MODERN_GUIDE} p.57", mock_kwargs={"idn": MODERN_IDN}),
+    WireForm(table="scope", dialect="modern", op="get_probe_ratio", params={"ch": 1}, request=":CHANnel1:PROBe?", source=f"{MODERN_GUIDE} p.57", mock_kwargs={"idn": MODERN_IDN}),
+    # p.50 EXAMPLE: "CHAN1:BWL 20M" -> "CHANnel1:BWLimit 20M";
+    # <bwlimit>:={FULL|20M|200M} -- matches channel.py's modern wire vocabulary
+    # (FULL/20M) exactly. Not mocked (no BWLimit handler in the modern branch).
+    WireForm(table="scope", dialect="modern", op="set_bandwidth_limit", params={"ch": 1, "limit": "20M"}, request=":CHANnel1:BWLimit 20M", source=f"{MODERN_GUIDE} p.50", mock_kwargs={"idn": MODERN_IDN}),
+    WireForm(table="scope", dialect="modern", op="get_bandwidth_limit", params={"ch": 1}, request=":CHANnel1:BWLimit?", source=f"{MODERN_GUIDE} p.50", mock_kwargs={"idn": MODERN_IDN}),
+
+    # -- Timebase control --
+    # p.476 EXAMPLE: "TIM:SCAL 1.00E-07" -> "TIMebase:SCALe 1.00E-07".
+    WireForm(table="scope", dialect="modern", op="set_time_div", params={"tdiv": "1.00E-07"}, request=":TIMebase:SCALe 1.00E-07", source=f"{MODERN_GUIDE} p.476", mock_kwargs={"idn": MODERN_IDN}),
+    WireForm(
+        table="scope",
+        dialect="modern",
+        op="get_time_div",
+        params={},
+        request=":TIMebase:SCALe?",
+        response="1.00E-03",
+        parsed=0.001,
+        source=f"{MODERN_GUIDE} p.476",
+        mock_kwargs={"idn": MODERN_IDN},
+    ),
+    # p.473 EXAMPLE: "TIM:DEL 1.00E-05" -> "TIMebase:DELay 1.00E-05".
+    WireForm(table="scope", dialect="modern", op="set_time_offset", params={"offset": "1.00E-05"}, request=":TIMebase:DELay 1.00E-05", source=f"{MODERN_GUIDE} p.473", mock_kwargs={"idn": MODERN_IDN}),
+    # get_time_offset is not mocked (no TIMebase:DELay? handler in the modern
+    # branch of connection/mock/siglent.py -- only TIMebase:SCALe? is
+    # implemented there) -- request-only citation.
+    WireForm(table="scope", dialect="modern", op="get_time_offset", params={}, request=":TIMebase:DELay?", source=f"{MODERN_GUIDE} p.473", mock_kwargs={"idn": MODERN_IDN}),
+    # p.46 EXAMPLE: "ACQ:SRAT?" -> "5.00E+09" -> ":ACQuire:SRATe?", bare NR3.
+    WireForm(
+        table="scope",
+        dialect="modern",
+        op="get_sample_rate",
+        params={},
+        request=":ACQuire:SRATe?",
+        response="1.00E+03",
+        parsed=1000.0,
+        source=f"{MODERN_GUIDE} p.46",
+        mock_kwargs={"idn": MODERN_IDN},
+        note="Mock default (1000.0) differs from the manual's example value (5.00E9); structure (bare NR3) is what's pinned.",
+    ),
+
+    # -- Trigger settings --
+    # p.482 <mode>:={SINGle|NORMal|AUTO|FTRIG}; EXAMPLE "TRIG:MODE SING" ->
+    # ":TRIGger:MODE SINGle", response bare "SINGle". mode_to_wire('modern',
+    # 'SINGLE') already renders this exact wire spelling (scpi_commands.py).
+    WireForm(table="scope", dialect="modern", op="set_trigger_mode", params={"mode": "SINGle"}, request=":TRIGger:MODE SINGle", source=f"{MODERN_GUIDE} p.482", mock_kwargs={"idn": MODERN_IDN}),
+    WireForm(
+        table="scope",
+        dialect="modern",
+        op="get_trigger_mode",
+        params={},
+        request=":TRIGger:MODE?",
+        response="AUTO",
+        parsed="AUTO",
+        source=f"{MODERN_GUIDE} p.482",
+        mock_kwargs={"idn": MODERN_IDN},
+    ),
+    # p.484 <type>:={EDGE|PULSE|SLOPe|INTerval|PATTern|RUNT|WINDow|DROPout|
+    # VIDeo|QUALified|NEDGe|DELay|SHOLd|IIC|SPI|UART|LIN|CAN|FLEXray|CANFd|
+    # IIS|M1553|SENT|A429} -- EXAMPLE "TRIG:TYPE EDGE" -> "EDGE" bare. EDGE is
+    # both a valid manual enum member and a valid trigger.py public value
+    # (trigger.py's valid_types = ["EDGE","SLEW","GLIT","INTV","RUNT",
+    # "PATTERN"], sent as-is with no type_to_wire/type_from_wire translation
+    # table anywhere in scpi_commands.py) -- this pins the EDGE case, which is
+    # correct. NOTE (not a wire-form defect, no entry recorded: the {type}
+    # placeholder is a free parameter, not part of the table template): three
+    # of trigger.py's six public values have no modern equivalent at all --
+    # "SLEW"/"GLIT"/"INTV" are not members of the manual's <type> enum (the
+    # nearest concepts are spelled "SLOPe"/"PULSE"/"INTerval"). Sending
+    # set_trigger_type(type="SLEW") on modern would write ":TRIGger:TYPE SLEW",
+    # which this manual does not document at all -- likely rejected on real
+    # hardware. Flagged here for visibility; not a MODERN_COMMANDS table
+    # mismatch (the template ":TRIGger:TYPE {type}" is exactly right) so no
+    # WireForm entry is recorded for it.
+    WireForm(table="scope", dialect="modern", op="set_trigger_type", params={"type": "EDGE"}, request=":TRIGger:TYPE EDGE", source=f"{MODERN_GUIDE} p.484", mock_kwargs={"idn": MODERN_IDN}),
+    WireForm(
+        table="scope",
+        dialect="modern",
+        op="get_trigger_type",
+        params={},
+        request=":TRIGger:TYPE?",
+        response="EDGE",
+        source=f"{MODERN_GUIDE} p.484",
+        mock_kwargs={"idn": MODERN_IDN},
+    ),
+    # p.495 <source>:={C<n>|D<d>|EX|EX5|LINE}; EXAMPLE "TRIG:EDGE:SOUR C1" ->
+    # ":TRIGger:EDGE:SOURce C1", response bare "C1".
+    WireForm(table="scope", dialect="modern", op="set_trigger_source", params={"src": "C1"}, request=":TRIGger:EDGE:SOURce C1", source=f"{MODERN_GUIDE} p.495", mock_kwargs={"idn": MODERN_IDN}),
+    WireForm(
+        table="scope",
+        dialect="modern",
+        op="get_trigger_source",
+        params={},
+        request=":TRIGger:EDGE:SOURce?",
+        response="C1",
+        parsed="C1",
+        source=f"{MODERN_GUIDE} p.495",
+        mock_kwargs={"idn": MODERN_IDN},
+    ),
+    # p.492 <level_value> in NR3; EXAMPLE "TRIG:EDGE:LEV 5.00E-01" ->
+    # ":TRIGger:EDGE:LEVel 5.00E-01", response bare "5.00E-01".
+    WireForm(table="scope", dialect="modern", op="set_trigger_level", params={"level": "5.00E-01"}, request=":TRIGger:EDGE:LEVel 5.00E-01", source=f"{MODERN_GUIDE} p.492", mock_kwargs={"idn": MODERN_IDN}),
+    WireForm(
+        table="scope",
+        dialect="modern",
+        op="get_trigger_level",
+        params={},
+        request=":TRIGger:EDGE:LEVel?",
+        response="0.00E+00",
+        parsed=0.0,
+        source=f"{MODERN_GUIDE} p.492",
+        mock_kwargs={"idn": MODERN_IDN},
+    ),
+    # p.494 <slope_type>:={RISing|FALLing|ALTernate}; EXAMPLE "TRIG:EDGE:SLOP
+    # RIS" -> ":TRIGger:EDGE:SLOPe RISing", response bare "RISing".
+    WireForm(table="scope", dialect="modern", op="set_trigger_slope", params={"slope": "RISing"}, request=":TRIGger:EDGE:SLOPe RISing", source=f"{MODERN_GUIDE} p.494", mock_kwargs={"idn": MODERN_IDN}),
+    WireForm(
+        table="scope",
+        dialect="modern",
+        op="get_trigger_slope",
+        params={},
+        request=":TRIGger:EDGE:SLOPe?",
+        response="RISing",
+        parsed="POS",
+        source=f"{MODERN_GUIDE} p.494",
+        mock_kwargs={"idn": MODERN_IDN},
+    ),
+    # p.486 <mode>:={DC|AC|LFREJect|HFREJect}; EXAMPLE "TRIG:EDGE:COUP DC" ->
+    # ":TRIGger:EDGE:COUPling DC", response bare "DC". trigger.py's coupling
+    # setter has its own {"HFREJ":"HFREJect","LFREJ":"LFREJect"} wire mapping
+    # (distinct from channel coupling_to_wire), matching this enum exactly --
+    # unlike get_coupling above, there is no mock-fixture bug here (mock's
+    # default trigger_coupling is seeded "DC", a valid modern token).
+    WireForm(table="scope", dialect="modern", op="set_trigger_coupling", params={"coupling": "DC"}, request=":TRIGger:EDGE:COUPling DC", source=f"{MODERN_GUIDE} p.486", mock_kwargs={"idn": MODERN_IDN}),
+    WireForm(
+        table="scope",
+        dialect="modern",
+        op="get_trigger_coupling",
+        params={},
+        request=":TRIGger:EDGE:COUPling?",
+        response="DC",
+        source=f"{MODERN_GUIDE} p.486",
+        mock_kwargs={"idn": MODERN_IDN},
+    ),
+
+    # -- Measurements --
+    # PAVA appears ZERO times anywhere in this 855-page guide (exhaustive
+    # full-text search, every page) -- the legacy PARAMETER_VALUE command has
+    # no modern equivalent under any header; modern measurements are a
+    # different, badge/CONFigure/MEASure-subsystem concept (guide p.774-855)
+    # this table does not touch.
+    WireForm(
+        table="scope",
+        dialect="modern",
+        op="get_parameter_value",
+        params={"ch": 2, "param": "RISE"},
+        request="C2:PAVA? RISE",
+        source=f"{MODERN_GUIDE} p.784",
+        status=MISMATCH_DEFERRED,
+        mock_kwargs={"idn": MODERN_IDN},
+        note=(
+            "[HIGH severity -- pull-in candidate] No manual basis: PAVA is "
+            "absent from the modern guide entirely (zero hits, full-text "
+            "search); modern measurement path (MEASure subsystem, p.784ff) is a "
+            "separate concern this table does not implement. This is not dead "
+            "code: measurement.py's measure() is dialect-agnostic and "
+            "unconditionally calls get_parameter_value regardless of dialect "
+            "(no modern-specific branch, unlike the LeCroy branch a few lines "
+            "below it in the same function) -- and measure() is itself called "
+            "from server/sessions.py (the webapp gateway) and from "
+            "examples/basic_usage.py and examples/measurements.py, all on a "
+            "default/documented-usage path. Against real modern-dialect "
+            "hardware this sends a command that does not exist; the response "
+            "parser (measurement.py, 'response.split(\",\")', expects the "
+            "legacy 2-field '<param>,<value>' shape) would then either raise "
+            "CommandError on the instrument's error response, or -- worse, if "
+            "the instrument echoes anything comma-shaped -- silently return a "
+            "wrong number (pull-in bar #1). Not fixed here per the read-only "
+            "constraint on scpi_control/; flagged for a follow-up task (the "
+            "modern MEASure/CONFigure subsystem is a substantial separate "
+            "wire-form project, not a one-line table fix)."
+        ),
+    ),
+
+    # -- Waveform acquisition --
+    # WF? appears ZERO times anywhere in this guide -- the legacy C{ch}:WF?
+    # transfer command has no modern equivalent under any header. The
+    # documented modern transfer is the :WAVeform: subsystem (guide p.746-763:
+    # SOURce/STARt/INTerval/POINt/MAXPoint/WIDTh/PREamble/DATA/SEQuence).
+    WireForm(
+        table="scope",
+        dialect="modern",
+        op="get_waveform",
+        params={"ch": 1},
+        request="C1:WF? DAT2",
+        source=f"{MODERN_GUIDE} p.757",
+        status=MISMATCH_DEFERRED,
+        mock_kwargs={"idn": MODERN_IDN},
+        note=(
+            "[HIGH severity -- already scheduled, audit finding H9 / Task 17] "
+            "Modern uses :WAVeform:PREamble?/:WAVeform:DATA? (guide p.746ff, "
+            "DATA specifically p.757); 'C{ch}:WF? DAT2' is absent from the "
+            "modern guide entirely (zero hits for 'WF?', full-text search). "
+            "get_waveform is on the default waveform-capture path (waveform.py, "
+            "waveform_transfer.py, the GUI capture worker, the webapp scope "
+            "API) -- scheduled fix Task 17 per the task-5 plan; not fixed here."
+        ),
+    ),
+    WireForm(
+        table="scope",
+        dialect="modern",
+        op="get_waveform_preamble",
+        params={"ch": 1},
+        request="C1:WF? DESC",
+        source=f"{MODERN_GUIDE} p.754",
+        status=MISMATCH_DEFERRED,
+        mock_kwargs={"idn": MODERN_IDN},
+        note=(
+            "[HIGH severity -- already scheduled, audit finding H9 / Task 17] "
+            "Same absence as get_waveform above. Modern uses "
+            ":WAVeform:PREamble? (guide p.754); 'C{ch}:WF? DESC' does not exist "
+            "in this manual. Scheduled fix Task 17; not fixed here."
+        ),
+    ),
+
+    # -- Screen capture --
+    # SCDP appears exactly once in this 855-page guide -- as a literal
+    # Windows filename ("F:\\SCDP.bmp") inside the "Screen Dump (PRINt)
+    # Example" appendix code sample (p.853), never as a command. The Root(:)
+    # command actually documented for screen capture is ":PRINt? <type>
+    # [,<format>]" (p.33; <type>:={BMP|PNG}, <format>:={NORMal|INVerted}),
+    # confirmed by that same appendix example, which sends "PRIN? BMP" (not
+    # "SCDP"). screen_capture.py bypasses this command table entirely for
+    # BOTH dialects (hardcodes literal "SCDP"/"SCDP?" strings rather than
+    # calling get_command("screen_dump", ...) -- same pre-existing observation
+    # as the legacy sweep's screen_dump entry), so this MISMATCH_DEFERRED
+    # covers both the (dead) table entry and the live runtime path, which
+    # sends the same undocumented "SCDP" literal for real modern hardware.
+    WireForm(
+        table="scope",
+        dialect="modern",
+        op="screen_dump",
+        params={},
+        request="SCDP",
+        source=f"{MODERN_GUIDE} p.33",
+        status=MISMATCH_DEFERRED,
+        mock_kwargs={"idn": MODERN_IDN},
+        note=(
+            "[medium-high severity] 'SCDP' does not exist as a command "
+            "anywhere in the modern guide (see module comment above); the "
+            "documented command is ':PRINt? <type>[,<format>]' (p.33). The "
+            "MODERN_COMMANDS table entry itself is dead (screen_capture.py "
+            "never calls get_command('screen_dump', ...)), but the runtime "
+            "path it mirrors -- screen_capture.py's _capture_with_scdp(), "
+            "which hardcodes 'SCDP' (no '?') for dialect=='modern' -- sends the "
+            "identical undocumented literal to real hardware. Already flagged "
+            "in code as a known gap (scpi_commands.py comment: 'legacy strings "
+            "accepted on modern scopes today; revisit with screen-capture "
+            "overhaul'). User-invoked (GUI screenshot button / "
+            "ScreenCapture.capture_screenshot()), not an automatic default "
+            "path, so not pulled in here; queued for the screen-capture "
+            "overhaul this comment already anticipates."
+        ),
+    ),
+    # HCSU appears ZERO times anywhere in this guide -- the legacy
+    # HARDCOPY_SETUP command has no modern equivalent under any header. The
+    # closest documented concept is :PRINt?'s own <format>:={NORMal|INVerted}
+    # (color inversion), a different axis than set_hardcopy_format's
+    # LANDSCAPE/PORTRAIT paper orientation -- there is no modern orientation
+    # setting at all.
+    WireForm(
+        table="scope",
+        dialect="modern",
+        op="set_hardcopy_format",
+        params={"format": "LANDSCAPE"},
+        request="HCSU DEV,FORMAT,LANDSCAPE",
+        source=f"{MODERN_GUIDE} p.33",
+        status=MISMATCH_DEFERRED,
+        mock_kwargs={"idn": MODERN_IDN},
+        note=(
+            "[low severity] 'HCSU' is absent from the modern guide entirely "
+            "(see module comment above). Request left as the current form. "
+            "Dead code: no caller anywhere in the repo invokes "
+            "set_hardcopy_format. Queued."
+        ),
+    ),
+    WireForm(
+        table="scope",
+        dialect="modern",
+        op="hardcopy_print",
+        params={},
+        request="HCSU PRINT",
+        source=f"{MODERN_GUIDE} p.33",
+        status=MISMATCH_DEFERRED,
+        mock_kwargs={"idn": MODERN_IDN},
+        note=(
+            "[low severity] Same absence as set_hardcopy_format above. The "
+            "modern guide's actual print action is folded into ':PRINt?' "
+            "itself (a query that both configures and captures in one call) -- "
+            "there is no separate 'print'/'save' trigger command as a distinct "
+            "step. Dead code: no caller anywhere in the repo invokes "
+            "hardcopy_print. Queued."
+        ),
+    ),
 ]

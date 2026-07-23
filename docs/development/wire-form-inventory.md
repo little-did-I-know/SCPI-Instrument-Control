@@ -95,3 +95,82 @@ Checked against the Siglent Digital Oscilloscopes Programming Guide
 Full detail — exact current vs. documented wire form, severity against the
 pull-in bar, and why each is deferred rather than fixed — is in each entry's
 `note` field in `tests/wire_forms.py`.
+
+## Modern Siglent scope (`SCPICommandSet.MODERN_COMMANDS`)
+
+Checked against the SDS800X HD Series Programming Guide
+(`SDS800XHD_Series_ProgrammingGuide_EN11G.pdf`, cited below as "EN11G") on
+2026-07-23. All 40 commands in the table are covered. The PDF's internal page
+sequence is offset by +1 from the printed page numbers baked into each page's
+header/footer; every "p.N" citation below is the printed page number
+(confirmed against the guide's own table of contents, pp.2-11).
+
+| Command | We send | Documented | Status | Source |
+|---|---|---|---|---|
+| `auto_setup` | `:AUToset` | `:AUToset` | VERIFIED | EN11G p.33 |
+| `force_trigger` | `:TRIGger:MODE FTRIG` | `:TRIGger:MODE <mode>`, FTRIG is a documented mode value | VERIFIED | EN11G p.482 |
+| `get_acq_status` | `:TRIGger:STATus?` | same; response `<status>` bare, matches | VERIFIED | EN11G p.483 |
+| `get_bandwidth_limit` | `:CHANnel{ch}:BWLimit?` | `:CHANnel<n>:BWLimit?` (not mocked) | VERIFIED | EN11G p.50 |
+| `get_channel_display` | `:CHANnel{ch}:SWITch?` | same; response `<state>` bare, matches | VERIFIED | EN11G p.60 |
+| `get_coupling` | `:CHANnel{ch}:COUPling?` | request matches; mock fixture answers the LEGACY token `D1M` (invalid modern enum member) | MISMATCH_DEFERRED | EN11G p.51 |
+| `get_parameter_value` | `C{ch}:PAVA? {param}` | absent from manual entirely (zero hits for PAVA); modern measurement path is a separate concern | MISMATCH_DEFERRED | EN11G p.784 |
+| `get_probe_ratio` | `:CHANnel{ch}:PROBe?` | `:CHANnel<n>:PROBe?` (not mocked) | VERIFIED | EN11G p.57 |
+| `get_sample_rate` | `:ACQuire:SRATe?` | same; response bare NR3, matches | VERIFIED | EN11G p.46 |
+| `get_time_div` | `:TIMebase:SCALe?` | same; response bare NR3, matches | VERIFIED | EN11G p.476 |
+| `get_time_offset` | `:TIMebase:DELay?` | `:TIMebase:DELay?` (not mocked) | VERIFIED | EN11G p.473 |
+| `get_trigger_coupling` | `:TRIGger:EDGE:COUPling?` | same; response bare, matches | VERIFIED | EN11G p.486 |
+| `get_trigger_level` | `:TRIGger:EDGE:LEVel?` | same; response bare NR3, matches | VERIFIED | EN11G p.492 |
+| `get_trigger_mode` | `:TRIGger:MODE?` | same; response bare, matches | VERIFIED | EN11G p.482 |
+| `get_trigger_slope` | `:TRIGger:EDGE:SLOPe?` | same; response bare, matches | VERIFIED | EN11G p.494 |
+| `get_trigger_source` | `:TRIGger:EDGE:SOURce?` | same; response bare, matches | VERIFIED | EN11G p.495 |
+| `get_trigger_type` | `:TRIGger:TYPE?` | same; response bare, matches | VERIFIED | EN11G p.484 |
+| `get_voltage_div` | `:CHANnel{ch}:SCALe?` | same; response bare NR3, matches | VERIFIED | EN11G p.58 |
+| `get_voltage_offset` | `:CHANnel{ch}:OFFSet?` | same; response bare NR3, matches | VERIFIED | EN11G p.56 |
+| `get_waveform` | `C{ch}:WF? DAT2` | absent from manual entirely (zero hits for `WF?`); documented transfer is `:WAVeform:DATA?` (H9, scheduled Task 17) | MISMATCH_DEFERRED | EN11G p.757 |
+| `get_waveform_preamble` | `C{ch}:WF? DESC` | absent from manual entirely; documented transfer is `:WAVeform:PREamble?` (H9, scheduled Task 17) | MISMATCH_DEFERRED | EN11G p.754 |
+| `hardcopy_print` | `HCSU PRINT` | `HCSU` absent from manual entirely; capture+print folded into `:PRINt?`; dead code (no caller) | MISMATCH_DEFERRED | EN11G p.33 |
+| `run` | `:TRIGger:RUN` | `:TRIGger:RUN` | VERIFIED | EN11G p.483 |
+| `screen_dump` | `SCDP` | `SCDP` absent (only appears as a filename in an example); documented command is `:PRINt? <type>[,<format>]` | MISMATCH_DEFERRED | EN11G p.33 |
+| `set_bandwidth_limit` | `:CHANnel{ch}:BWLimit {limit}` | `:CHANnel<n>:BWLimit <bwlimit>`, `{FULL\|20M\|200M}` (not mocked) | VERIFIED | EN11G p.50 |
+| `set_channel_display` | `:CHANnel{ch}:SWITch {state}` | `:CHANnel<n>:SWITch <state>` | VERIFIED | EN11G p.60 |
+| `set_coupling` | `:CHANnel{ch}:COUPling {coupling}` | `:CHANnel<n>:COUPling <coupling_mode>` | VERIFIED | EN11G p.51 |
+| `set_hardcopy_format` | `HCSU DEV,FORMAT,{format}` | `HCSU` absent from manual entirely; closest concept is `:PRINt?`'s `<format>:={NORMal\|INVerted}` (different axis); dead code (no caller) | MISMATCH_DEFERRED | EN11G p.33 |
+| `set_probe_ratio` | `:CHANnel{ch}:PROBe VALue,{ratio}` | `:CHANnel<n>:PROBe <attenuation>[,<value>]` (not mocked) | VERIFIED | EN11G p.57 |
+| `set_time_div` | `:TIMebase:SCALe {tdiv}` | `:TIMebase:SCALe <value>` | VERIFIED | EN11G p.476 |
+| `set_time_offset` | `:TIMebase:DELay {offset}` | `:TIMebase:DELay <delay_value>` | VERIFIED | EN11G p.473 |
+| `set_trigger_coupling` | `:TRIGger:EDGE:COUPling {coupling}` | `:TRIGger:EDGE:COUPling <mode>`, `{DC\|AC\|LFREJect\|HFREJect}` | VERIFIED | EN11G p.486 |
+| `set_trigger_level` | `:TRIGger:EDGE:LEVel {level}` | `:TRIGger:EDGE:LEVel <level_value>` | VERIFIED | EN11G p.492 |
+| `set_trigger_mode` | `:TRIGger:MODE {mode}` | `:TRIGger:MODE <mode>`, `{SINGle\|NORMal\|AUTO\|FTRIG}` | VERIFIED | EN11G p.482 |
+| `set_trigger_slope` | `:TRIGger:EDGE:SLOPe {slope}` | `:TRIGger:EDGE:SLOPe <slope_type>`, `{RISing\|FALLing\|ALTernate}` | VERIFIED | EN11G p.494 |
+| `set_trigger_source` | `:TRIGger:EDGE:SOURce {src}` | `:TRIGger:EDGE:SOURce <source>`, `{C<n>\|D<d>\|EX\|EX5\|LINE}` | VERIFIED | EN11G p.495 |
+| `set_trigger_type` | `:TRIGger:TYPE {type}` | `:TRIGger:TYPE <type>` (see note below the table) | VERIFIED | EN11G p.484 |
+| `set_voltage_div` | `:CHANnel{ch}:SCALe {vdiv}` | `:CHANnel<n>:SCALe <scale>` | VERIFIED | EN11G p.58 |
+| `set_voltage_offset` | `:CHANnel{ch}:OFFSet {offset}` | `:CHANnel<n>:OFFSet <offset_value>` | VERIFIED | EN11G p.56 |
+| `stop` | `:TRIGger:STOP` | `:TRIGger:STOP` | VERIFIED | EN11G p.484 |
+
+**Tally: 34 VERIFIED, 6 MISMATCH_DEFERRED, 0 UNCITED (40 total).**
+
+Full detail — exact current vs. documented wire form, severity against the
+pull-in bar, and why each is deferred rather than fixed — is in each entry's
+`note` field in `tests/wire_forms.py`.
+
+Two observations found during this sweep are recorded as comments in
+`tests/wire_forms.py` rather than as corpus rows, because they are not
+`MODERN_COMMANDS` template mismatches (the table's `{placeholder}` strings are
+exactly right); they are parameter-*value* translation gaps one layer up, in
+`trigger.py`/`scpi_commands.py`:
+
+- **`set_trigger_type`/`get_trigger_type`** is VERIFIED for `type="EDGE"` (both
+  a valid manual enum member and a valid driver public value). But three of
+  `trigger.py`'s six public trigger types — `SLEW`, `GLIT`, `INTV` — have no
+  `type_to_wire`/`type_from_wire` mapping anywhere and are sent to the wire
+  as-is; none of the three is a member of the modern `<type>` enum
+  (`{EDGE|PULSE|SLOPe|INTerval|PATTern|RUNT|WINDow|DROPout|VIDeo|QUALified|
+  NEDGe|DELay|SHOLd|IIC|SPI|UART|LIN|CAN|FLEXray|CANFd|IIS|M1553|SENT|A429}`,
+  p.484) — the nearest documented concepts are spelled `SLOPe`/`PULSE`/
+  `INTerval`. `set_trigger_type(type="SLEW")` on modern would send
+  `:TRIGger:TYPE SLEW`, undocumented and likely rejected by real hardware.
+- **`get_coupling`**'s mock-fixture bug (see the table row above) is a
+  `MockConnection` state-seeding defect, not a driver or table defect: the
+  wire template and the `coupling_to_wire`/`coupling_from_wire` mappings are
+  both correct for modern.
