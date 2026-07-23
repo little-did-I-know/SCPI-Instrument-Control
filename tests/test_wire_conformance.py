@@ -67,6 +67,14 @@ def test_deferred_entries_explain_themselves():
             assert wf.note, f"{_ident(wf)}: deferred entries must record the audit ID and why"
 
 
+# The four dialect/override tables this corpus enforces. Note the boundary:
+# a rendered command can also come from the IEEE-488.2 base (*IDN?/*RST/...),
+# the PSU/AWG GENERIC_COMMANDS fallbacks (e.g. siglent_spd's SOUR{ch}:VOLT:PROT),
+# or the Tektronix/LeCroy scope dialects and the DAQ table -- none of which are
+# enforced here yet. So "a new command must be cited" holds WITHIN these four
+# tables, not across the whole renderable surface. Extending the net (or the
+# highest-risk generic fallbacks) is a tracked follow-up; see
+# docs/development/wire-form-inventory.md.
 COVERED_TABLES = {
     ("scope", "legacy"): SCPICommandSet("legacy").LEGACY_COMMANDS,
     ("scope", "modern"): SCPICommandSet("modern").MODERN_COMMANDS,

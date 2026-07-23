@@ -1,7 +1,8 @@
 """Documented SCPI request/response pairs, transcribed from vendor programming guides.
 
 Every entry is a verbatim transcription of an EXAMPLE block in a vendor manual.
-The manuals are NOT committed (see docs/development/vendor-manuals.md for sources
+Most manuals are NOT committed (the two modern SDS guides are tracked in docs/;
+the rest are kept local -- see docs/development/vendor-manuals.md for sources
 and .git/info/exclude for why), so `source` must always name document and page.
 A `source` page number is the PDF file page position ("go to page N"), which for
 these front-matter-bearing guides runs a few pages ahead of the printed footer --
@@ -22,7 +23,8 @@ from typing import Any, Dict, List, Optional
 
 #: Transcribed from a manual example; all three conformance assertions run.
 VERIFIED = "VERIFIED"
-#: Known to disagree with the manual; fix queued. Assertions xfail.
+#: Known to disagree with the manual; fix queued. Filtered out of the
+#: parametrized request/response assertions (not collected as xfail).
 MISMATCH_DEFERRED = "MISMATCH_DEFERRED"
 #: No manual obtainable (LeCroy, TBS1102C). Recorded as unverified; asserts nothing.
 UNCITED = "UNCITED"
@@ -730,14 +732,13 @@ WIRE_FORMS: List[WireForm] = [
             "caller anywhere in the repo invokes hardcopy_print. Queued."
         ),
     ),
-    # --- Modern Siglent scope: sweep 2026-07-23 (task 5b) ------------------
-    # Every command in SCPICommandSet.MODERN_COMMANDS (40 total), checked
+    # --- Modern Siglent scope: sweep 2026-07-23 (task 5b; extended tasks 17-19)
+    # Every command in SCPICommandSet.MODERN_COMMANDS (52 total), checked
     # against MODERN_GUIDE (SDS800XHD_Series_ProgrammingGuide_EN11G.pdf, 855
-    # pages). The PDF's internal page sequence is offset by +1 from the
-    # printed page numbers baked into each page's header/footer (confirmed by
-    # cross-referencing the guide's own table of contents on pp.2-11 against a
-    # page-by-page scan of pp.30-65 and pp.468-500) -- every "p.N" citation
-    # below is the *printed* page number, already corrected for that offset.
+    # pages). Every "p.N" citation below is a PDF file page position ("go to
+    # page N"), matching the convention in the module docstring and
+    # docs/development/vendor-manuals.md -- for this guide the printed footer
+    # runs one behind the file position (file page 749 = printed footer 748).
     # Unlike the legacy dialect (which is abbreviations-only), the modern
     # table renders the long-form header spelled out in COMMAND/QUERY SYNTAX
     # (e.g. ":CHANnel1:SWITch?"), so driver output matches the manual's own

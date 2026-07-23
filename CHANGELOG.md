@@ -11,12 +11,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Testing: a vendor-example conformance corpus (`tests/wire_forms.py`) pins every supported SCPI
-  command to a request/response pair transcribed from the vendor's programming guide, with document
-  and page citations. A coverage test (`tests/test_wire_conformance.py`) fails the suite if any
-  command in the covered tables (legacy/modern scope, SPD power supply, SDG function generator —
-  147 commands) has no cited corpus entry, so an invented command can no longer be added silently.
-  `docs/development/wire-form-inventory.md` records the full audit.
+- Testing: a vendor-example conformance corpus (`tests/wire_forms.py`) pins every command in the
+  covered SCPI tables to a request/response pair transcribed from the vendor's programming guide,
+  with document and page citations. A coverage test (`tests/test_wire_conformance.py`) fails the
+  suite if any command in those tables (the legacy and modern scope dialects, the SPD power-supply
+  overrides, and the SDG function-generator overrides — 159 commands) has no cited corpus entry, so
+  an invented command can no longer be added silently to a covered table. (The IEEE-488.2 base, the
+  generic fallbacks, and the Tektronix/LeCroy/DAQ tables are not yet enforced — see
+  `docs/development/wire-form-inventory.md`, which records the full audit.)
 - Oscilloscope: modern-dialect deep-memory waveform capture is chunked over `:WAVeform:MAXPoint`
   windows using `:WAVeform:STARt`, so records larger than a single transfer are reassembled correctly.
 - Oscilloscope: modern-dialect (SDS800X HD / SDS5000X) waveform capture now goes over the documented
