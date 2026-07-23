@@ -1139,6 +1139,25 @@ WIRE_FORMS: List[WireForm] = [
         mock_kwargs={"idn": MODERN_IDN},
         note="Mock's default width is 'BYTE' (COMM_TYPE=0), matching the guide's own 'Default value is 0' note on COMM_TYPE (p.755).",
     ),
+    WireForm(
+        table="scope",
+        dialect="modern",
+        op="get_waveform_maxpoint",
+        params={},
+        request=":WAVeform:MAXPoint?",
+        response="10000000",
+        parsed=10000000,
+        source=f"{MODERN_GUIDE} p.753",
+        mock_kwargs={"idn": MODERN_IDN},
+        note=(
+            "Task 19: query-only leaf (the guide's own entry for MAXPoint has no "
+            "COMMAND SYNTAX section, unlike WIDTh/POINt/etc. above -- there is no "
+            "set form). Mock's default max_points (10000000) is the guide's own "
+            "EXAMPLE response verbatim ('the following return the maximum points "
+            "of one piece in SDS2000X Plus series' -> '10000000'), not an "
+            "arbitrary mock value."
+        ),
+    ),
     # -- Waveform transfer-parameter scalars (Task 17, audit H9) --
     # :WAVeform:SOURce/STARt/INTerval/POINt (guide pp.749-752): the documented
     # modern scalar transfer-parameter commands that configure the

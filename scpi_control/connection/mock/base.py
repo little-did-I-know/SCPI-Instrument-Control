@@ -13,6 +13,8 @@ from scpi_control.connection.mock import lecroy, siglent, tektronix
 from scpi_control.models import detect_model_from_idn
 
 if TYPE_CHECKING:
+    import numpy as np
+
     from scpi_control.signal_synth import SignalSpec
 
 _PERSONALITIES = {
@@ -107,6 +109,27 @@ class MockConnection(BaseConnection):
         # documented default (COMM_TYPE=0). Drives the PREamble?/DATA?
         # binary responses built in connection/mock/siglent.py.
         self.waveform_width: str = "BYTE"
+        # Deep-memory chunking (Task 19, guide p.753 ":WAVeform:MAXPoint?",
+        # query-only): max_points is the per-:WAVeform:DATA?-transfer cap a
+        # real scope reports. Default is the guide's own worked EXAMPLE value
+        # for SDS2000X Plus (10,000,000) -- far larger than any single-shot
+        # test's synthesized record (connection/mock/synth.py's MAX_POINTS is
+        # 14,000), so unmodified single-shot captures are unaffected.
+        # record_length is the FULL logical record backing a capture; None
+        # (default) defers to the existing single-shot point-count formula.
+        # Tests set it explicitly, larger than max_points, to model a
+        # deep-memory record that forces ModernTransfer.acquire to loop
+        # :WAVeform:STARt across multiple windows.
+        self.max_points: int = 10_000_000
+        self.record_length: Optional[int] = None
+        # Per-channel cache of the FULL synthesized/explicit code array for a
+        # modern-dialect capture (Task 19). Populated once by
+        # siglent.build_waveform_preamble so that repeated windowed
+        # :WAVeform:DATA? reads slice ONE consistent waveform instead of each
+        # independently re-synthesizing -- which would also each advance the
+        # acquisition count (free-run drift / RNG reseed) and desync the
+        # windows from each other.
+        self._modern_waveform_codes: Dict[int, "np.ndarray"] = {}
 
         self.sample_rate = sample_rate
         self.timebase = timebase

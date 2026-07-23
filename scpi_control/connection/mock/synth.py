@@ -73,16 +73,25 @@ def point_count(conn: "MockConnection", channel: int) -> int:
     return max(2, min(MAX_POINTS, int(round(conn.sample_rate * window))))
 
 
-def raw_volts(conn: "MockConnection", channel: int) -> np.ndarray:
+def raw_volts(conn: "MockConnection", channel: int, n_override: Optional[int] = None) -> np.ndarray:
     """Synthesize one channel's sample volts, advancing its acquisition count.
 
     Shared by the legacy int8 encoder (payload_for) and the modern-dialect
-    encoder (connection/mock/siglent.py's build_waveform_data), so both
-    dialects see the same signal for the same mock state -- only the
-    code-per-division scaling that turns volts into codes differs.
+    encoder (connection/mock/siglent.py's build_waveform_preamble/
+    build_waveform_data), so both dialects see the same signal for the same
+    mock state -- only the code-per-division scaling that turns volts into
+    codes differs.
+
+    Args:
+        n_override: Sample count to synthesize instead of `point_count`'s
+            single-shot formula. Task 19 (deep-memory chunking): the modern
+            dialect's `conn.record_length`, when set, can exceed
+            `conn.max_points` (the per-:WAVeform:DATA?-transfer cap) -- the
+            FULL record must still be synthesized as one call so a caller can
+            slice consistent windows out of it afterwards.
     """
     spec = spec_for(conn, channel)
-    n = point_count(conn, channel)
+    n = point_count(conn, channel) if n_override is None else n_override
     count = conn._acquisition_counts.get(channel, 0)
     conn._acquisition_counts[channel] = count + 1
     window = DIVISIONS * conn.timebase

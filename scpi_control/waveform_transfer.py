@@ -405,13 +405,18 @@ def parse_modern_wavedesc(payload: bytes, *, error_context: str = "") -> dict:
 
 
 class ModernTransfer:
-    """:WAVeform: SOURce/PREamble/DATA transfer for modern-dialect Siglent scopes.
+    """:WAVeform: SOURce/PREamble/DATA/MAXPoint transfer for modern-dialect Siglent scopes.
 
     SDS Series Programming Guide EN11G pp.748-758 (audit H9, Task 18): the
     legacy "C{ch}:WF? DAT2" transfer has ZERO occurrences anywhere in this
     855-page guide (full-text search). This class replaces it for
     dialect="modern" scopes; SiglentTransfer above is unchanged and keeps
     serving dialect="legacy" scopes.
+
+    Task 19 (deep-memory chunking, p.753): a single :WAVeform:DATA? transfer
+    is capped at :WAVeform:MAXPoint points; acquire() below reads the
+    PREamble's wave_array_count (the FULL record length) and loops
+    :WAVeform:STARt in MAXPoint-sized windows until the whole record is read.
     """
 
     def __init__(self, scope: "Oscilloscope"):
@@ -429,7 +434,10 @@ class ModernTransfer:
         Returns:
             WaveformData scaled by the PREamble's vertical_gain/
             vertical_offset/code_per_div (volts) and horiz_offset/
-            horiz_interval (time).
+            horiz_interval (time). For a record longer than
+            :WAVeform:MAXPoint, the codes from every window are concatenated
+            in STARt order before scaling, so the returned arrays cover the
+            entire record_length, not just the first window.
 
         Raises:
             InvalidParameterError: If a non-BYTE/WORD format is requested.
@@ -453,15 +461,49 @@ class ModernTransfer:
         preamble_payload = parse_ieee_block(preamble_raw, np.uint8, error_context=preamble_context).tobytes()
         meta = parse_modern_wavedesc(preamble_payload, error_context=preamble_context)
 
-        with scope._connection.lock:
-            scope.write(scope._get_command("get_waveform_data"))
-            data_raw = scope.read_raw()
-        data_context = f"host {scope.host}:{scope.port}, command ':WAVeform:DATA?'"
-        dtype = np.int16 if meta["comm_type"] == 1 else np.int8
-        codes = parse_ieee_block(data_raw, dtype, error_context=data_context)
-
         if meta["code_per_div"] == 0:
-            raise exceptions.CommandError(f"Modern WAVEDESC code_per_div is 0 ({data_context})")
+            raise exceptions.CommandError(f"Modern WAVEDESC code_per_div is 0 ({preamble_context})")
+
+        dtype = np.int16 if meta["comm_type"] == 1 else np.int8
+        # wave_array_count (WAVEDESC address 116-119, p.756) is "Number of
+        # data points in the data array" -- the FULL record, even when a
+        # single :WAVeform:DATA? transfer cannot carry all of it at once.
+        record_length = meta["wave_array_count"]
+
+        # :WAVeform:MAXPoint? (p.753) is Query-only: the scope reports its own
+        # per-transfer cap, there is no setter. int(float(...)) matches this
+        # module's existing NR1/NR3-tolerant parsing (see TektronixTransfer's
+        # get_wfm_nr_pt above).
+        max_points = int(float(scope.query(scope._get_command("get_waveform_maxpoint"))))
+        if max_points <= 0:
+            # A malformed/zero response must not spin the loop forever --
+            # fall back to reading the whole record in one window.
+            max_points = max(record_length, 1)
+
+        data_context = f"host {scope.host}:{scope.port}, command ':WAVeform:DATA?'"
+        chunks = []
+        start = 0
+        while start < record_length:
+            # STARt and DATA? are coupled (DATA? answers "using the source
+            # specified by :WAVeform:SOURce" AND the current STARt window),
+            # so both live under one lock acquisition -- same reasoning as
+            # the preamble read above, extended to cover the write that picks
+            # which window DATA? answers with.
+            with scope._connection.lock:
+                scope.write(scope._get_command("set_waveform_start", value=start))
+                scope.write(scope._get_command("get_waveform_data"))
+                data_raw = scope.read_raw()
+            chunk = parse_ieee_block(data_raw, dtype, error_context=data_context)
+            if chunk.size == 0:
+                # A well-behaved instrument only returns an empty window at
+                # end-of-record, which the `while` condition above already
+                # excludes -- this guards against a non-conformant one
+                # instead of looping forever.
+                break
+            chunks.append(chunk)
+            start += chunk.size
+
+        codes = np.concatenate(chunks) if chunks else np.array([], dtype=dtype)
 
         # SDS Series Programming Guide EN11G p.758 ("Read Waveform Data",
         # analog example, Step 3): "voltage value (V) = code value

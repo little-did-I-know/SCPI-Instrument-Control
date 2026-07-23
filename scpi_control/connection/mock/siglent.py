@@ -217,6 +217,8 @@ def handle_query(conn, command: str) -> Optional[str]:
             return str(conn.waveform_point)
         if upper == ":WAVEFORM:WIDTH?":  # BYTE|WORD, p.754
             return conn.waveform_width
+        if upper == ":WAVEFORM:MAXPOINT?":  # bare NR1, p.753 (query-only, no setter)
+            return str(conn.max_points)
 
     if conn.scope_dialect == "legacy":
         if match := re.match(r"C(\d+):VDIV\?", command, re.IGNORECASE):
@@ -343,6 +345,43 @@ def _modern_source_channel(conn) -> int:
     return int(match.group(1))
 
 
+def _effective_record_length(conn, channel: int) -> int:
+    """Total logical record length behind a modern-dialect capture.
+
+    Task 19 (deep-memory chunking, guide p.753): `conn.record_length` is None
+    by default, which defers to the existing single-shot formula
+    (mock_synth.point_count -- an explicit payload's length, or the
+    timebase/sample-rate window). Tests set `conn.record_length` explicitly,
+    larger than `conn.max_points`, to model a record that does not fit in one
+    :WAVeform:DATA? transfer.
+    """
+    if conn.record_length is not None:
+        return conn.record_length
+    return mock_synth.point_count(conn, channel)
+
+
+def _synthesize_modern_codes(conn, channel: int, record_length: int, word: bool) -> np.ndarray:
+    """Build the FULL record's code array once per acquisition.
+
+    Cached by build_waveform_preamble (below) so that repeated windowed
+    :WAVeform:DATA? reads (Task 19 chunking) slice ONE consistent waveform
+    instead of each independently re-synthesizing -- which would also each
+    advance mock_synth's acquisition count (free-run drift / RNG reseed) and
+    desync the windows from one another.
+    """
+    explicit = conn._waveform_payloads.get(channel)
+    if explicit is not None:
+        return np.frombuffer(explicit, dtype="<i2" if word else np.int8)
+    code_per_div = _MODERN_CODE_PER_DIV_WORD if word else _MODERN_CODE_PER_DIV_BYTE
+    vdiv = conn._voltage_scales.get(channel, 1.0)
+    voffset = conn._voltage_offsets.get(channel, 0.0)
+    volts = mock_synth.raw_volts(conn, channel, n_override=record_length)
+    codes = np.rint((volts + voffset) * code_per_div / vdiv)
+    if word:
+        return np.clip(codes, -32768, 32767).astype("<i2")
+    return np.clip(codes, -128, 127).astype(np.int8)
+
+
 def build_waveform_preamble(conn) -> bytes:
     """Build the modern :WAVeform:PREamble? response: "#9<9-digits>" + a 346-byte WAVEDESC.
 
@@ -350,12 +389,21 @@ def build_waveform_preamble(conn) -> bytes:
     (vertical_gain/vertical_offset/code_per_div/horizontal_interval) are
     exactly what build_waveform_data below encodes samples with, so the
     driver's parser recovers the mock's true volts (audit H9, Task 18).
+
+    Task 19: wave_array_count is the FULL record length (guide p.756:
+    "Number of data points in the data array"), even when that record exceeds
+    max_points and will need several :WAVeform:DATA? windows to read -- on
+    real hardware the preamble describes the whole record, only DATA?
+    transfers are capped. This also (re)populates the per-channel code cache
+    that build_waveform_data slices from, since PREamble? is read exactly
+    once per capture, before the STARt-driven DATA? loop begins.
     """
     channel = _modern_source_channel(conn)
-    n_points = mock_synth.point_count(conn, channel)
     word = conn.waveform_width == "WORD"
     bytes_per_point = 2 if word else 1
     code_per_div = _MODERN_CODE_PER_DIV_WORD if word else _MODERN_CODE_PER_DIV_BYTE
+    record_length = _effective_record_length(conn, channel)
+    conn._modern_waveform_codes[channel] = _synthesize_modern_codes(conn, channel, record_length, word)
 
     desc = bytearray(_MODERN_WAVEDESC_LEN)
     desc[0:8] = b"WAVEDESC"
@@ -363,8 +411,8 @@ def build_waveform_preamble(conn) -> bytes:
     struct.pack_into("<h", desc, _MODERN_COMM_TYPE, 1 if word else 0)
     struct.pack_into("<h", desc, _MODERN_COMM_ORDER, 0)
     struct.pack_into("<i", desc, _MODERN_WAVE_DESC_LENGTH, _MODERN_WAVEDESC_LEN)
-    struct.pack_into("<i", desc, _MODERN_WAVE_ARRAY_1, n_points * bytes_per_point)
-    struct.pack_into("<i", desc, _MODERN_WAVE_ARRAY_COUNT, n_points)
+    struct.pack_into("<i", desc, _MODERN_WAVE_ARRAY_1, record_length * bytes_per_point)
+    struct.pack_into("<i", desc, _MODERN_WAVE_ARRAY_COUNT, record_length)
     struct.pack_into("<i", desc, _MODERN_FIRST_POINT, conn.waveform_start)
     struct.pack_into("<i", desc, _MODERN_DATA_INTERVAL, conn.waveform_interval)
     struct.pack_into("<f", desc, _MODERN_VERTICAL_GAIN, conn._voltage_scales.get(channel, 1.0))
@@ -383,20 +431,26 @@ def build_waveform_data(conn) -> bytes:
     * code_per_div / vdiv), so waveform_transfer.ModernTransfer's forward
     formula recovers the original volts (the round-trip this sub-project
     exists to make trustworthy -- see wavedesc-reference.md).
+
+    Task 19 (deep-memory chunking, guide p.753): window-aware. Returns only
+    codes[start : start + window], where window is capped by BOTH
+    :WAVeform:POINt (when set) and :WAVeform:MAXPoint, and never reads past
+    the record's end -- exactly the "read the waveform data in pieces" the
+    guide's own MAXPoint description names. A single-shot capture (record
+    length <= max_points, the common case and every Task 18 test) still
+    returns the whole record in one call, unchanged.
     """
     channel = _modern_source_channel(conn)
-    explicit = conn._waveform_payloads.get(channel)
     word = conn.waveform_width == "WORD"
-    if explicit is not None:
-        payload = explicit
-    else:
-        code_per_div = _MODERN_CODE_PER_DIV_WORD if word else _MODERN_CODE_PER_DIV_BYTE
-        vdiv = conn._voltage_scales.get(channel, 1.0)
-        voffset = conn._voltage_offsets.get(channel, 0.0)
-        volts = mock_synth.raw_volts(conn, channel)
-        codes = np.rint((volts + voffset) * code_per_div / vdiv)
-        if word:
-            payload = np.clip(codes, -32768, 32767).astype("<i2").tobytes()
-        else:
-            payload = np.clip(codes, -128, 127).astype(np.int8).tobytes()
-    return _build_ieee_block_9digit(payload)
+    codes = conn._modern_waveform_codes.get(channel)
+    if codes is None:
+        # DATA? without a preceding PREamble? read is not the order the
+        # driver uses, but tolerate it (one-shot synthesis, not cached)
+        # rather than raising, matching this mock's general leniency.
+        codes = _synthesize_modern_codes(conn, channel, _effective_record_length(conn, channel), word)
+    record_length = len(codes)
+    start = max(0, conn.waveform_start)
+    remaining = max(0, record_length - start)
+    requested = conn.waveform_point if conn.waveform_point else conn.max_points
+    window = max(0, min(requested, conn.max_points, remaining))
+    return _build_ieee_block_9digit(codes[start : start + window].tobytes())

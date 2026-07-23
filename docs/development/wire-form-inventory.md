@@ -120,8 +120,9 @@ extended to also strip legacy's header-echoed `"BWL "` prefix before splitting
 Checked against the SDS800X HD Series Programming Guide
 (`SDS800XHD_Series_ProgrammingGuide_EN11G.pdf`, cited below as "EN11G") on
 2026-07-23, plus the `:WAVeform:` transfer-parameter scalars added in Task 17
-(audit H9) and the binary preamble/data transfer wired up in Task 18 (audit
-H9), both on 2026-07-23. All 51 commands in the table are covered.
+(audit H9), the binary preamble/data transfer wired up in Task 18 (audit H9),
+and the `:WAVeform:MAXPoint?` deep-memory-chunking query added in Task 19, all
+on 2026-07-23. All 52 commands in the table are covered.
 
 Every "p.N" citation below is the **PDF file page position** ("go to page N"
 in a viewer), NOT the printed footer -- this guide's footer runs one page
@@ -153,6 +154,7 @@ printed footer number -- which was never true of how the entries below, or
 | `get_voltage_div` | `:CHANnel{ch}:SCALe?` | same; response bare NR3, matches | VERIFIED | EN11G p.58 |
 | `get_voltage_offset` | `:CHANnel{ch}:OFFSet?` | same; response bare NR3, matches | VERIFIED | EN11G p.56 |
 | `get_waveform` | `:WAVeform:DATA?` | `:WAVeform:DATA?`; binary IEEE block (request-verified only, see note below) | VERIFIED | EN11G p.757 |
+| `get_waveform_maxpoint` | `:WAVeform:MAXPoint?` | `:WAVeform:MAXPoint?`; response bare NR1, matches (mock default `10000000` -- the guide's own EXAMPLE response for SDS2000X Plus, transcribed verbatim, not an arbitrary mock value) | VERIFIED | EN11G p.753 |
 | `get_waveform_data` | `:WAVeform:DATA?` | same as `get_waveform` -- documented name, used by `ModernTransfer` | VERIFIED | EN11G p.757 |
 | `get_waveform_interval` | `:WAVeform:INTerval?` | `:WAVeform:INTerval?`; response bare NR1, matches (mock default `1`; manual's own EXAMPLE sets `200` first) | VERIFIED | EN11G p.751 |
 | `get_waveform_point` | `:WAVeform:POINt?` | `:WAVeform:POINt?`; response bare NR1, matches (mock default `0`; manual's own EXAMPLE sets `20000` first) | VERIFIED | EN11G p.752 |
@@ -185,7 +187,7 @@ printed footer number -- which was never true of how the entries below, or
 | `set_waveform_width` | `:WAVeform:WIDTh {value}` | `:WAVeform:WIDTh <type>`, `{BYTE\|WORD}` | VERIFIED | EN11G p.754 |
 | `stop` | `:TRIGger:STOP` | `:TRIGger:STOP` | VERIFIED | EN11G p.484 |
 
-**Tally: 46 VERIFIED, 5 MISMATCH_DEFERRED, 0 UNCITED (51 total).**
+**Tally: 47 VERIFIED, 5 MISMATCH_DEFERRED, 0 UNCITED (52 total).**
 
 Task 17 (audit H9) added eight rows with a `get_waveform_`/`set_waveform_`
 prefix: the documented `:WAVeform:SOURce`/`STARt`/`INTerval`/`POINt`
@@ -210,7 +212,27 @@ Task 18 also added `get_waveform_data` (the `:WAVeform:DATA?` leaf under its
 own name, since `ModernTransfer` calls that instead of the generic
 `get_waveform` alias) and `set_waveform_width`/`get_waveform_width`
 (`:WAVeform:WIDTh`, EN11G p.754 — selects the WAVEDESC's COMM_TYPE field, byte
-vs. word samples). Deep-memory chunking (`:WAVeform:MAXPoint`) remains Task 19.
+vs. word samples).
+
+Task 19 added `get_waveform_maxpoint` (`:WAVeform:MAXPoint?`, EN11G p.753).
+Unlike every other `:WAVeform:` leaf in this table, p.753 has no COMMAND
+SYNTAX section at all — it is Query-only, so there is deliberately no
+`set_waveform_maxpoint`: a real scope reports its own per-transfer cap, the
+controller does not set it. `ModernTransfer.acquire` reads the PREamble's
+wave_array_count (address 116-119, "Number of data points in the data
+array" — the FULL record) once, then loops `:WAVeform:STARt` in
+`:WAVeform:MAXPoint`-sized windows, concatenating each `:WAVeform:DATA?`
+window until the whole record is read; for a record that already fits in one
+window (record_length <= max_points, the common case and every Task 18 test)
+the loop runs exactly once, byte-for-byte the same single transfer as before.
+`MockConnection` gained matching `max_points` (default `10000000`, the
+guide's own worked EXAMPLE value) and `record_length` (default `None`, which
+defers to the pre-existing single-shot point-count formula) state, and its
+modern `:WAVeform:DATA?` handler is now window-aware: it slices
+`[waveform_start : waveform_start + window]` out of a per-channel full-record
+code array that `:WAVeform:PREamble?` synthesizes once per capture (so
+repeated windowed reads see one consistent waveform instead of each
+independently re-synthesizing and desyncing).
 
 Full detail — exact current vs. documented wire form, severity against the
 pull-in bar, and why each is deferred rather than fixed — is in each entry's

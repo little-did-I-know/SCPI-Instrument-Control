@@ -212,6 +212,15 @@ class SCPICommandSet:
         # which the WAVEDESC's COMM_TYPE field (offset 32-33) then echoes.
         "set_waveform_width": ":WAVeform:WIDTh {value}",  # p.754
         "get_waveform_width": ":WAVeform:WIDTh?",  # p.754
+        # Deep-memory chunking (Task 19, audit H9 follow-up): p.753 documents
+        # :WAVeform:MAXPoint as "Query" ONLY -- unlike WIDTh/POINt/etc. above,
+        # its own DESCRIPTION/COMMAND-SYNTAX/QUERY-SYNTAX layout has no
+        # COMMAND SYNTAX section at all, so there is no set_waveform_maxpoint;
+        # a scope tells the controller its own per-transfer cap, the
+        # controller does not set it. ModernTransfer.acquire reads this once
+        # to learn how many :WAVeform:STARt-driven DATA? windows a full
+        # record needs.
+        "get_waveform_maxpoint": ":WAVeform:MAXPoint?",  # p.753
         # Measurements — get_parameter_value stays available (measure() keeps
         # working on modern, a documented gap); statistics/cursors/holdoff/unit
         # are legacy-only and intentionally absent so they gate cleanly.
