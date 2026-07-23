@@ -273,21 +273,29 @@ or parser exists anywhere for them — so only the request was fixed; they are
 VERIFIED with no response (request-only) rather than inventing code nothing
 exercises.
 
+Fix wave 1 follow-up: `BSWV?`'s RESPONSE FORMAT is **function-conditional**
+(p.31: `<parameter> := {All the parameters of the current basic waveform}`).
+The mock used to always answer `DUTY,SYM` and never `HLEV,LLEV` — a shape the
+guide never shows for any waveform type. It now builds the reply from the
+channel's current `WVTP`: `HLEV`/`LLEV` are always present (computed from
+amplitude/offset, matching the p.31 worked SINE example exactly), `DUTY` is
+appended only for SQUARE/PULSE, `SYM` only for RAMP (p.29-30 parameter table).
+
 | Command | We send | Documented | Status | Source |
 |---|---|---|---|---|
-| `get_amplitude` | `C{ch}:BSWV?` | `<channel>:BaSic_WaVe?` returns every BSWV parameter as one comma-joined reply; `AMP` read out of it | VERIFIED | PG02-E05B p.27-28, p.29-30 |
+| `get_amplitude` | `C{ch}:BSWV?` | `<channel>:BaSic_WaVe?` returns every BSWV parameter as one comma-joined reply; `AMP` read out of it | VERIFIED | PG02-E05B p.31 |
 | `get_arb_waveform` | `C{ch}:ARWV?` | bare `<channel>:ARbWaVe?` returns `INDEX` and `NAME` together; dead code (no caller), verified at command-table/mock level only | VERIFIED | PG02-E05B p.62 |
 | `get_burst_state` | `C{ch}:BTWV?` | bare `<channel>:BTWV(BursTWaVe)?`; future-expansion command, no getter/mock/parser wired, request-only | VERIFIED | PG02-E05B p.60 |
-| `get_frequency` | `C{ch}:BSWV?` | `<channel>:BaSic_WaVe?` returns every BSWV parameter as one comma-joined reply; `FRQ` read out of it | VERIFIED | PG02-E05B p.27-28, p.29-30 |
-| `get_function` | `C{ch}:BSWV?` | `<channel>:BaSic_WaVe?` returns every BSWV parameter as one comma-joined reply; `WVTP` read out of it | VERIFIED | PG02-E05B p.27-28, p.29-30 |
+| `get_frequency` | `C{ch}:BSWV?` | `<channel>:BaSic_WaVe?` returns every BSWV parameter as one comma-joined reply; `FRQ` read out of it | VERIFIED | PG02-E05B p.31 |
+| `get_function` | `C{ch}:BSWV?` | `<channel>:BaSic_WaVe?` returns every BSWV parameter as one comma-joined reply; `WVTP` read out of it | VERIFIED | PG02-E05B p.31 |
 | `get_modulation` | `C{ch}:MDWV?` | bare `<channel>:MoDulateWaVe?`; future-expansion command, no getter/mock/parser wired, request-only | VERIFIED | PG02-E05B p.36 |
-| `get_offset` | `C{ch}:BSWV?` | `<channel>:BaSic_WaVe?` returns every BSWV parameter as one comma-joined reply; `OFST` read out of it | VERIFIED | PG02-E05B p.27-28, p.29-30 |
+| `get_offset` | `C{ch}:BSWV?` | `<channel>:BaSic_WaVe?` returns every BSWV parameter as one comma-joined reply; `OFST` read out of it | VERIFIED | PG02-E05B p.31 |
 | `get_output` | `C{ch}:OUTP?` | `<channel>:OUTPut?` returns `ON\|OFF,LOAD,<load>,PLRT,<polarity>` together; `STATE` read out of it | VERIFIED | PG02-E05B p.27-28 |
 | `get_output_load` | `C{ch}:OUTP?` | same whole-list `<channel>:OUTPut?` reply as `get_output`; dead code (no caller), verified at command-table/mock level only | VERIFIED | PG02-E05B p.27-28 |
 | `get_output_polarity` | `C{ch}:OUTP?` | same whole-list `<channel>:OUTPut?` reply as `get_output`; dead code (no caller), verified at command-table/mock level only | VERIFIED | PG02-E05B p.27-28 |
-| `get_phase` | `C{ch}:BSWV?` | `<channel>:BaSic_WaVe?` returns every BSWV parameter as one comma-joined reply; `PHSE` read out of it | VERIFIED | PG02-E05B p.27-28, p.29-30 |
-| `get_pulse_duty` | `C{ch}:BSWV?` | `<channel>:BaSic_WaVe?` returns every BSWV parameter as one comma-joined reply; `DUTY` read out of it | VERIFIED | PG02-E05B p.27-28, p.29-30 |
-| `get_ramp_symmetry` | `C{ch}:BSWV?` | `<channel>:BaSic_WaVe?` returns every BSWV parameter as one comma-joined reply; `SYM` read out of it | VERIFIED | PG02-E05B p.27-28, p.29-30 |
+| `get_phase` | `C{ch}:BSWV?` | `<channel>:BaSic_WaVe?` returns every BSWV parameter as one comma-joined reply; `PHSE` read out of it | VERIFIED | PG02-E05B p.31 |
+| `get_pulse_duty` | `C{ch}:BSWV?` | `<channel>:BaSic_WaVe?` returns every BSWV parameter as one comma-joined reply; `DUTY` only present when WVTP is SQUARE/PULSE, read out of it | VERIFIED | PG02-E05B p.31, p.29 |
+| `get_ramp_symmetry` | `C{ch}:BSWV?` | `<channel>:BaSic_WaVe?` returns every BSWV parameter as one comma-joined reply; `SYM` only present when WVTP is RAMP, read out of it | VERIFIED | PG02-E05B p.31, p.30 |
 | `get_sweep_state` | `C{ch}:SWWV?` | bare `<channel>:SWeepWaVe?`; future-expansion command, no getter/mock/parser wired, request-only | VERIFIED | PG02-E05B p.38 |
 | `set_amplitude` | `C{ch}:BSWV AMP,{amplitude}` | `<channel>:BaSic_WaVe AMP,<amplitude>` | VERIFIED | PG02-E05B p.31 |
 | `set_arb_waveform` | `C{ch}:ARWV NAME,{name}` | `<channel>:ArbWaVe NAME,<name>` (Format2); not mocked, dead code (no caller) | VERIFIED | PG02-E05B p.62, p.188 |

@@ -437,28 +437,40 @@ class MockConnection(BaseConnection):
         # Function generator (AWG) queries
         if self.awg_mode:
             # Basic-wave query: C1:BSWV? (SDG_ProgrammingGuide PG02-E05B
-            # p.27-28). QUERY SYNTAX is bare -- there is no per-field
-            # selector -- and RESPONSE FORMAT always returns the whole
-            # parameter list as one comma-joined "KEY,value,KEY,value,..."
-            # reply (H5, fixed Task 10). DUTY/SYM are independently documented
-            # BSWV parameters (p.29-30) folded into the same reply so
-            # get_pulse_duty/get_ramp_symmetry can round-trip through this
-            # single bare query too.
+            # p.31). QUERY SYNTAX is bare -- there is no per-field selector --
+            # and RESPONSE FORMAT is function-conditional: "<parameter> :=
+            # {All the parameters of the current basic waveform}". The p.31
+            # worked SINE example is WVTP,FRQ,PERI,AMP,OFST,HLEV,LLEV,PHSE
+            # with no DUTY/SYM; DUTY is only settable for SQUARE/PULSE and SYM
+            # only for RAMP (p.29-30 parameter table), so this handler only
+            # appends them when the channel's current function calls for them
+            # (H5 follow-up: the mock used to always emit DUTY,SYM and never
+            # HLEV,LLEV, a shape the manual never shows for any waveform type).
             if match := re.match(r"C(\d+):BSWV\?$", upper):
                 ch = int(match.group(1))
                 c = self.awg_channels.get(ch, {})
+                function = c.get("function", "SINE")
                 frequency = c.get("frequency", 1000.0)
                 period = 1.0 / frequency if frequency else 0.0
-                return (
-                    f"C{ch}:BSWV WVTP,{c.get('function', 'SINE')},"
+                amplitude = c.get("amplitude", 1.0)
+                offset = c.get("offset", 0.0)
+                hlev = offset + amplitude / 2
+                llev = offset - amplitude / 2
+                response = (
+                    f"C{ch}:BSWV WVTP,{function},"
                     f"FRQ,{frequency:.10g}HZ,"
                     f"PERI,{period:.10g}S,"
-                    f"AMP,{c.get('amplitude', 1.0):.10g}V,"
-                    f"OFST,{c.get('offset', 0.0):.10g}V,"
-                    f"PHSE,{c.get('phase', 0.0):.10g},"
-                    f"DUTY,{c.get('pulse_duty', 50.0):.10g},"
-                    f"SYM,{c.get('ramp_symmetry', 50.0):.10g}"
+                    f"AMP,{amplitude:.10g}V,"
+                    f"OFST,{offset:.10g}V,"
+                    f"HLEV,{hlev:.10g}V,"
+                    f"LLEV,{llev:.10g}V,"
+                    f"PHSE,{c.get('phase', 0.0):.10g}"
                 )
+                if function in ("SQUARE", "PULSE"):
+                    response += f",DUTY,{c.get('pulse_duty', 50.0):.10g}"
+                elif function == "RAMP":
+                    response += f",SYM,{c.get('ramp_symmetry', 50.0):.10g}"
+                return response
 
             # Generic SCPI-99 per-field fallbacks (unaffected by H5, which is
             # a Siglent-selector-grammar defect only): SOUR1:FUNC?, SOUR1:FREQ?, etc.

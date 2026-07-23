@@ -244,7 +244,11 @@ class AWGOutput:
         # PG02-E05B p.27-28: QUERY SYNTAX "<channel>:OUTPut?" is bare and its
         # RESPONSE FORMAT always returns "ON|OFF,LOAD,<load>,PLRT,<polarity>"
         # together -- not just the bare state (H5, fixed Task 10).
-        return parse_key_value_response(response)["STATE"] == "ON"
+        fields = parse_key_value_response(response)
+        state = fields.get("STATE")
+        if state is None:
+            raise exceptions.CommandError(f"SDG response has no STATE field: {fields!r}")
+        return state == "ON"
 
     @enabled.setter
     def enabled(self, state: bool) -> None:

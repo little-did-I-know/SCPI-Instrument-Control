@@ -1567,20 +1567,22 @@ WIRE_FORMS: List[WireForm] = [
         op="get_function",
         params={"ch": 1},
         request="C1:BSWV?",
-        response="C1:BSWV WVTP,SINE,FRQ,1000HZ,PERI,0.001S,AMP,1V,OFST,0V,PHSE,0,DUTY,50,SYM,50",
+        response="C1:BSWV WVTP,SINE,FRQ,1000HZ,PERI,0.001S,AMP,1V,OFST,0V,HLEV,0.5V,LLEV,-0.5V,PHSE,0",
         parsed="SINE",
-        source=f"{SDG_GUIDE} p.27-28, p.29-30",
+        source=f"{SDG_GUIDE} p.31",
         mock_kwargs={"awg_mode": True},
         note=(
             "H5 fixed (Task 10). QUERY SYNTAX '<channel>:BSWV?' is bare "
-            "(p.27-28) -- the 'C1:BSWV? WVTP' selector this entry used to "
-            "record was invented. RESPONSE FORMAT always returns every "
-            "basic-wave parameter as one comma-joined list; DUTY/SYM are "
-            "independently documented BSWV parameters (p.29-30) folded into "
-            "the same reply so get_pulse_duty/get_ramp_symmetry can "
-            "round-trip through this identical bare query too -- the "
-            "manual's own abbreviated worked example (p.27-28, p.31) omits "
-            "them. The driver now parses this via "
+            "(p.31) -- the 'C1:BSWV? WVTP' selector this entry used to "
+            "record was invented. RESPONSE FORMAT is function-conditional "
+            "('<parameter> := {All the parameters of the current basic "
+            "waveform}') -- the p.31 worked SINE example is "
+            "WVTP,FRQ,PERI,AMP,OFST,HLEV,LLEV,PHSE with no DUTY/SYM (those "
+            "are only settable for SQUARE/PULSE and RAMP respectively, "
+            "p.29-30), transcribed above verbatim for the default SINE "
+            "channel. Fix wave 1 follow-up: the mock used to always emit "
+            "DUTY,SYM and never HLEV,LLEV -- a shape the manual never shows "
+            "for a SINE. The driver now parses this via "
             "'parse_key_value_response' and pulls out its own field "
             "(awg_output.py's '_read_basic_wave'). (Root pattern for every "
             "'get_*' BSWV/OUTP/ARWV entry below.)"
@@ -1594,9 +1596,9 @@ WIRE_FORMS: List[WireForm] = [
         op="get_frequency",
         params={"ch": 1},
         request="C1:BSWV?",
-        response="C1:BSWV WVTP,SINE,FRQ,1000HZ,PERI,0.001S,AMP,1V,OFST,0V,PHSE,0,DUTY,50,SYM,50",
+        response="C1:BSWV WVTP,SINE,FRQ,1000HZ,PERI,0.001S,AMP,1V,OFST,0V,HLEV,0.5V,LLEV,-0.5V,PHSE,0",
         parsed=1000.0,
-        source=f"{SDG_GUIDE} p.27-28, p.29-30",
+        source=f"{SDG_GUIDE} p.31",
         mock_kwargs={"awg_mode": True},
         note=("H5 fixed (Task 10). Same bare-query fix as get_function above ('C1:BSWV? FRQ' -> 'C1:BSWV?'); FRQ pulled out of the same whole-list response."),
     ),
@@ -1608,9 +1610,9 @@ WIRE_FORMS: List[WireForm] = [
         op="get_amplitude",
         params={"ch": 1},
         request="C1:BSWV?",
-        response="C1:BSWV WVTP,SINE,FRQ,1000HZ,PERI,0.001S,AMP,1V,OFST,0V,PHSE,0,DUTY,50,SYM,50",
+        response="C1:BSWV WVTP,SINE,FRQ,1000HZ,PERI,0.001S,AMP,1V,OFST,0V,HLEV,0.5V,LLEV,-0.5V,PHSE,0",
         parsed=1.0,
-        source=f"{SDG_GUIDE} p.27-28, p.29-30",
+        source=f"{SDG_GUIDE} p.31",
         mock_kwargs={"awg_mode": True},
         note=("H5 fixed (Task 10). Same bare-query fix as get_function above ('C1:BSWV? AMP' -> 'C1:BSWV?'); AMP pulled out of the same whole-list response."),
     ),
@@ -1625,9 +1627,9 @@ WIRE_FORMS: List[WireForm] = [
         op="get_offset",
         params={"ch": 1},
         request="C1:BSWV?",
-        response="C1:BSWV WVTP,SINE,FRQ,1000HZ,PERI,0.001S,AMP,1V,OFST,0V,PHSE,0,DUTY,50,SYM,50",
+        response="C1:BSWV WVTP,SINE,FRQ,1000HZ,PERI,0.001S,AMP,1V,OFST,0V,HLEV,0.5V,LLEV,-0.5V,PHSE,0",
         parsed=0.0,
-        source=f"{SDG_GUIDE} p.27-28, p.29-30",
+        source=f"{SDG_GUIDE} p.31",
         mock_kwargs={"awg_mode": True},
         note=("H5 fixed (Task 10). Same bare-query fix as get_function above ('C1:BSWV? OFST' -> 'C1:BSWV?'); OFST pulled out of the same whole-list response."),
     ),
@@ -1641,9 +1643,9 @@ WIRE_FORMS: List[WireForm] = [
         op="get_phase",
         params={"ch": 1},
         request="C1:BSWV?",
-        response="C1:BSWV WVTP,SINE,FRQ,1000HZ,PERI,0.001S,AMP,1V,OFST,0V,PHSE,0,DUTY,50,SYM,50",
+        response="C1:BSWV WVTP,SINE,FRQ,1000HZ,PERI,0.001S,AMP,1V,OFST,0V,HLEV,0.5V,LLEV,-0.5V,PHSE,0",
         parsed=0.0,
-        source=f"{SDG_GUIDE} p.27-28, p.29-30",
+        source=f"{SDG_GUIDE} p.31",
         mock_kwargs={"awg_mode": True},
         note=("H5 fixed (Task 10). Same bare-query fix as get_function above ('C1:BSWV? PHSE' -> 'C1:BSWV?'); PHSE pulled out of the same whole-list response."),
     ),
@@ -1656,18 +1658,22 @@ WIRE_FORMS: List[WireForm] = [
         op="get_pulse_duty",
         params={"ch": 1},
         request="C1:BSWV?",
-        response="C1:BSWV WVTP,SINE,FRQ,1000HZ,PERI,0.001S,AMP,1V,OFST,0V,PHSE,0,DUTY,50,SYM,50",
+        response="C1:BSWV WVTP,PULSE,FRQ,1000HZ,PERI,0.001S,AMP,1V,OFST,0V,HLEV,0.5V,LLEV,-0.5V,PHSE,0,DUTY,50",
         parsed=50.0,
-        source=f"{SDG_GUIDE} p.27-28, p.29-30",
-        mock_kwargs={"awg_mode": True},
+        source=f"{SDG_GUIDE} p.31, p.29",
+        mock_kwargs={
+            "awg_mode": True,
+            "awg_channels": {1: {"function": "PULSE", "frequency": 1000.0, "amplitude": 1.0, "offset": 0.0, "phase": 0.0, "enabled": False, "pulse_duty": 50.0, "ramp_symmetry": 50.0}},
+        },
         note=(
-            "H5 fixed (Task 10). Same bare-query fix as get_function above "
-            "('C1:BSWV? DUTY' -> 'C1:BSWV?'). DUTY is not shown in the "
-            "manual's own abbreviated BSWV response example (p.27-28, p.31) "
-            "but is an independently documented BSWV parameter (p.29-30, "
-            "settable only when WVTP is SQUARE/PULSE); folded into the same "
-            "comma-joined reply so this getter can round-trip through the "
-            "identical bare query as the others above."
+            "H5 fixed (Task 10); fix wave 1 follow-up. Same bare-query fix "
+            "as get_function above ('C1:BSWV? DUTY' -> 'C1:BSWV?'). DUTY is "
+            "'Only settable when WVTP is SQUARE or PULSE' (p.29 parameter "
+            "table) -- it does NOT appear in the p.31 SINE example, so the "
+            "channel is configured PULSE via mock_kwargs to get a response "
+            "shape the manual actually documents as containing DUTY. On the "
+            "default SINE channel this getter now honestly raises "
+            "CommandError (no DUTY field), matching real hardware."
         ),
     ),
     # p.29-30 parameter table: "SYM <symmetry> := {0 to 100}. Symmetry of "
@@ -1680,18 +1686,23 @@ WIRE_FORMS: List[WireForm] = [
         op="get_ramp_symmetry",
         params={"ch": 1},
         request="C1:BSWV?",
-        response="C1:BSWV WVTP,SINE,FRQ,1000HZ,PERI,0.001S,AMP,1V,OFST,0V,PHSE,0,DUTY,50,SYM,50",
+        response="C1:BSWV WVTP,RAMP,FRQ,1000HZ,PERI,0.001S,AMP,1V,OFST,0V,HLEV,0.5V,LLEV,-0.5V,PHSE,0,SYM,50",
         parsed=50.0,
-        source=f"{SDG_GUIDE} p.27-28, p.29-30",
-        mock_kwargs={"awg_mode": True},
+        source=f"{SDG_GUIDE} p.31, p.30",
+        mock_kwargs={
+            "awg_mode": True,
+            "awg_channels": {1: {"function": "RAMP", "frequency": 1000.0, "amplitude": 1.0, "offset": 0.0, "phase": 0.0, "enabled": False, "pulse_duty": 50.0, "ramp_symmetry": 50.0}},
+        },
         note=(
-            "H5 fixed (Task 10). Same bare-query fix as get_function above "
-            "('C1:BSWV? SYM' -> 'C1:BSWV?'). SYM is not shown in the "
-            "manual's own abbreviated BSWV response example (p.27-28, p.31) "
-            "but is an independently documented BSWV parameter (p.29-30, "
-            "settable only when WVTP is RAMP); folded into the same "
-            "comma-joined reply so this getter can round-trip through the "
-            "identical bare query as the others above."
+            "H5 fixed (Task 10); fix wave 1 follow-up. Same bare-query fix "
+            "as get_function above ('C1:BSWV? SYM' -> 'C1:BSWV?'). SYM is "
+            "'Symmetry of RAMP ... Only settable when WVTP is RAMP' (p.30 "
+            "parameter table) -- it does NOT appear in the p.31 SINE "
+            "example, so the channel is configured RAMP via mock_kwargs to "
+            "get a response shape the manual actually documents as "
+            "containing SYM. On the default SINE channel this getter now "
+            "honestly raises CommandError (no SYM field), matching real "
+            "hardware."
         ),
     ),
     # p.27 COMMAND SYNTAX: "<channel>:OUTPut ON|OFF,LOAD,<load>,PLRT,
