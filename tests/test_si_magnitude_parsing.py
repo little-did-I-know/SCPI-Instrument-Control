@@ -1,4 +1,4 @@
-﻿"""SI magnitude letters in legacy Siglent responses (RC01020-E01C p.117)."""
+"""SI magnitude letters in legacy Siglent responses (RC01020-E01C p.117)."""
 
 import pytest
 
