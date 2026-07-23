@@ -179,6 +179,7 @@ class MockConnection(BaseConnection):
         self.daq_idn = daq_idn
         self.daq_readings = daq_readings
         self.daq_scan_list = []
+        self.daq_trigger_source = "IMM"
 
         self.strict = strict
 
@@ -374,6 +375,22 @@ class MockConnection(BaseConnection):
                     self.awg_channels[ch]["enabled"] = enabled
                 return
 
+        # Data acquisition (DAQ) commands
+        if self.daq_mode:
+            # Scan list: ROUT:SCAN (@101,102). Previously dropped entirely
+            # (audit M8), so get_scan_list()/ROUT:SCAN? never reflected a
+            # write and round-trip verification of a healthy instrument
+            # reported failure.
+            if match := re.match(r"ROUT:SCAN\s+\(@([\d,]*)\)", command, re.IGNORECASE):
+                raw = match.group(1)
+                self.daq_scan_list = [int(ch) for ch in raw.split(",") if ch]
+                return
+
+            # Trigger source: TRIG:SOUR IMM/BUS/EXT/TIM.
+            if match := re.match(r"TRIG:SOUR\s+(\w+)", command, re.IGNORECASE):
+                self.daq_trigger_source = match.group(1).upper()
+                return
+
         # Oscilloscope commands: C{n}:WF? channel recording is shared across every
         # scope dialect/vendor (Tek's CURVe? uses data_source instead - Task 9), so
         # it is recorded here before personality dispatch rather than inside a
@@ -422,9 +439,14 @@ class MockConnection(BaseConnection):
 
         # Data acquisition (DAQ) queries
         if self.daq_mode:
-            # Return configured readings for any measurement/read/fetch query
-            if any(kw in upper for kw in ["READ?", "FETC?", "MEAS:", "R?"]):
-                return self.daq_readings
+            # Specific queries first -- the old readings matcher used
+            # `"R?" in upper`, which is a substring test and swallowed
+            # SYST:ERR? and TRIG:SOUR? (both end in "R?") before they ever
+            # reached their own handlers (audit M7).
+
+            # Error query
+            if "SYST:ERR?" in upper:
+                return '+0,"No error"'
 
             # Scan list query
             if "ROUT:SCAN?" in upper:
@@ -436,9 +458,19 @@ class MockConnection(BaseConnection):
             if "DATA:POIN?" in upper:
                 return str(len(self.daq_readings.split(",")))
 
-            # Error query
-            if "SYST:ERR?" in upper:
-                return '+0,"No error"'
+            # Trigger source query
+            if "TRIG:SOUR?" in upper:
+                return self.daq_trigger_source
+
+            # Return configured readings for any measurement/read/fetch query.
+            # Anchored to the START of the command (not a bare substring
+            # test), so "R?" only matches a command that begins with it --
+            # not the tail of SYST:ERR?/TRIG:SOUR? (M7). Deliberately NOT
+            # anchored at the end: MEAS:*? and read_remove's "R?" commands
+            # carry trailing arguments (e.g. "MEAS:VOLT:DC? AUTO,AUTO,(@101)"
+            # or "R? 10"), which a full-string anchor would reject.
+            if re.match(r"^(READ\?|FETC\??|MEAS:[\w:]*\?|R\?)", upper):
+                return self.daq_readings
 
         # Function generator (AWG) queries
         if self.awg_mode:
