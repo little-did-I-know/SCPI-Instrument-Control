@@ -148,7 +148,7 @@ header/footer; every "p.N" citation below is the printed page number
 | `set_voltage_offset` | `:CHANnel{ch}:OFFSet {offset}` | `:CHANnel<n>:OFFSet <offset_value>` | VERIFIED | EN11G p.56 |
 | `stop` | `:TRIGger:STOP` | `:TRIGger:STOP` | VERIFIED | EN11G p.484 |
 
-**Tally: 34 VERIFIED, 6 MISMATCH_DEFERRED, 0 UNCITED (40 total).**
+**Tally: 33 VERIFIED, 7 MISMATCH_DEFERRED, 0 UNCITED (40 total).**
 
 Full detail — exact current vs. documented wire form, severity against the
 pull-in bar, and why each is deferred rather than fixed — is in each entry's
