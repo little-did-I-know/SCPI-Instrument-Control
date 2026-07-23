@@ -4,6 +4,27 @@
 redistribution terms are unclear, so `.git/info/exclude` keeps them local. Download
 them into `docs/` with these exact filenames to check a citation.
 
+## Citation convention — read this before checking a page number
+
+A citation like `p.749` is the **PDF file page position** — i.e. "go to page 749" in
+your PDF viewer (equivalently, `fitz`/pypdf 0-based index 748). It is **not** the number
+printed in the page footer. These manuals carry front matter (title, contents, install
+notes), so the footer number runs *behind* the file position by a fixed per-document
+amount:
+
+| Guide | footer = file position + | e.g. cited `p.N` shows footer |
+|---|---|---|
+| Legacy `RC01020-E01C` | 0 (they coincide) | `p.88` → footer `88` |
+| Modern `SDS800XHD` / `SDS5000X` | −1 | `p.749` → footer `748` |
+| SPD3303X `QS0503X-E01B` | −8 | `p.38` → footer `30` |
+| SDG `PG02-E05B` | −12 | `p.27` → footer `15` |
+
+So if you open a cited page and the footer shows a slightly lower number, that is
+expected — you are on the right page (the content is what matters, and it will match).
+File position is used because it is the one number a reader can jump to deterministically
+in any viewer without knowing the offset. The offsets above let you cross-check against
+the footer if you prefer.
+
 | Filename | Document | Source |
 |---|---|---|
 | `SDS_DigitalOscilloscopes_ProgrammingGuide_RC01020-E01C.pdf` | Siglent Digital Oscilloscopes Programming Guide (legacy dialect) | siglentna.com/wp-content/uploads/dlm_uploads/2017/10/ProgrammingGuide_forSDS-1-1.pdf |

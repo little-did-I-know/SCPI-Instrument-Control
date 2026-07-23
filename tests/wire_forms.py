@@ -3,6 +3,9 @@
 Every entry is a verbatim transcription of an EXAMPLE block in a vendor manual.
 The manuals are NOT committed (see docs/development/vendor-manuals.md for sources
 and .git/info/exclude for why), so `source` must always name document and page.
+A `source` page number is the PDF file page position ("go to page N"), which for
+these front-matter-bearing guides runs a few pages ahead of the printed footer --
+see the citation-convention table in docs/development/vendor-manuals.md.
 What is pinned verbatim is the documented request/response *structure*; where a
 manual's example value differs from the fixture value already in use elsewhere,
 the structure is what is transcribed and the divergence is called out in the
