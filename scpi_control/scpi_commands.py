@@ -186,6 +186,21 @@ class SCPICommandSet:
         # Waveform acquisition — unchanged until the waveform sub-project
         "get_waveform": "C{ch}:WF? DAT2",
         "get_waveform_preamble": "C{ch}:WF? DESC",
+        # Waveform transfer-parameter scalars (Task 17, audit H9): the
+        # documented :WAVeform: subsystem's SOURce/STARt/INTerval/POINt
+        # commands, verified against the SDS800XHD guide. These are net-new
+        # keys, added ahead of the binary preamble/data transfer (Task 18)
+        # and deep-memory chunking (Task 19) -- get_waveform/
+        # get_waveform_preamble above still send the legacy C{ch}:WF? forms
+        # until Task 18 rewires the capture path.
+        "set_waveform_source": ":WAVeform:SOURce C{ch}",  # p.749
+        "get_waveform_source": ":WAVeform:SOURce?",  # p.749
+        "set_waveform_start": ":WAVeform:STARt {value}",  # p.750
+        "get_waveform_start": ":WAVeform:STARt?",  # p.750
+        "set_waveform_interval": ":WAVeform:INTerval {value}",  # p.751
+        "get_waveform_interval": ":WAVeform:INTerval?",  # p.751
+        "set_waveform_point": ":WAVeform:POINt {value}",  # p.752
+        "get_waveform_point": ":WAVeform:POINt?",  # p.752
         # Measurements — get_parameter_value stays available (measure() keeps
         # working on modern, a documented gap); statistics/cursors/holdoff/unit
         # are legacy-only and intentionally absent so they gate cleanly.

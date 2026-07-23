@@ -119,10 +119,12 @@ extended to also strip legacy's header-echoed `"BWL "` prefix before splitting
 
 Checked against the SDS800X HD Series Programming Guide
 (`SDS800XHD_Series_ProgrammingGuide_EN11G.pdf`, cited below as "EN11G") on
-2026-07-23. All 40 commands in the table are covered. The PDF's internal page
-sequence is offset by +1 from the printed page numbers baked into each page's
-header/footer; every "p.N" citation below is the printed page number
-(confirmed against the guide's own table of contents, pp.2-11).
+2026-07-23, plus the eight `:WAVeform:` transfer-parameter scalars added in
+Task 17 (audit H9) on 2026-07-23. All 48 commands in the table are covered.
+The PDF's internal page sequence is offset by +1 from the printed page
+numbers baked into each page's header/footer; every "p.N" citation below is
+the printed page number (confirmed against the guide's own table of
+contents, pp.2-11).
 
 | Command | We send | Documented | Status | Source |
 |---|---|---|---|---|
@@ -145,8 +147,12 @@ header/footer; every "p.N" citation below is the printed page number
 | `get_trigger_type` | `:TRIGger:TYPE?` | same; response bare, matches | VERIFIED | EN11G p.484 |
 | `get_voltage_div` | `:CHANnel{ch}:SCALe?` | same; response bare NR3, matches | VERIFIED | EN11G p.58 |
 | `get_voltage_offset` | `:CHANnel{ch}:OFFSet?` | same; response bare NR3, matches | VERIFIED | EN11G p.56 |
-| `get_waveform` | `C{ch}:WF? DAT2` | absent from manual entirely (zero hits for `WF?`); documented transfer is `:WAVeform:DATA?` (H9, scheduled Task 17) | MISMATCH_DEFERRED | EN11G p.757 |
-| `get_waveform_preamble` | `C{ch}:WF? DESC` | absent from manual entirely; documented transfer is `:WAVeform:PREamble?` (H9, scheduled Task 17) | MISMATCH_DEFERRED | EN11G p.754 |
+| `get_waveform` | `C{ch}:WF? DAT2` | absent from manual entirely (zero hits for `WF?`); documented transfer is `:WAVeform:DATA?` (H9, scheduled Task 18) | MISMATCH_DEFERRED | EN11G p.757 |
+| `get_waveform_interval` | `:WAVeform:INTerval?` | `:WAVeform:INTerval?`; response bare NR1, matches (mock default `1`; manual's own EXAMPLE sets `200` first) | VERIFIED | EN11G p.751 |
+| `get_waveform_point` | `:WAVeform:POINt?` | `:WAVeform:POINt?`; response bare NR1, matches (mock default `0`; manual's own EXAMPLE sets `20000` first) | VERIFIED | EN11G p.752 |
+| `get_waveform_preamble` | `C{ch}:WF? DESC` | absent from manual entirely; documented transfer is `:WAVeform:PREamble?` (H9, scheduled Task 18) | MISMATCH_DEFERRED | EN11G p.754 |
+| `get_waveform_source` | `:WAVeform:SOURce?` | `:WAVeform:SOURce?`; response bare source token, matches (mock default `C1`; manual's own EXAMPLE sets `C2` first) | VERIFIED | EN11G p.749 |
+| `get_waveform_start` | `:WAVeform:STARt?` | `:WAVeform:STARt?`; response bare NR1, matches (mock default `0`; manual's own EXAMPLE sets `1000` first) | VERIFIED | EN11G p.750 |
 | `hardcopy_print` | `HCSU PRINT` | `HCSU` absent from manual entirely; capture+print folded into `:PRINt?`; dead code (no caller) | MISMATCH_DEFERRED | EN11G p.33 |
 | `run` | `:TRIGger:RUN` | `:TRIGger:RUN` | VERIFIED | EN11G p.483 |
 | `screen_dump` | `SCDP` | `SCDP` absent (only appears as a filename in an example); documented command is `:PRINt? <type>[,<format>]` | MISMATCH_DEFERRED | EN11G p.33 |
@@ -165,9 +171,26 @@ header/footer; every "p.N" citation below is the printed page number
 | `set_trigger_type` | `:TRIGger:TYPE {type}` | `:TRIGger:TYPE <type>` (see note below the table) | VERIFIED | EN11G p.484 |
 | `set_voltage_div` | `:CHANnel{ch}:SCALe {vdiv}` | `:CHANnel<n>:SCALe <scale>` | VERIFIED | EN11G p.58 |
 | `set_voltage_offset` | `:CHANnel{ch}:OFFSet {offset}` | `:CHANnel<n>:OFFSet <offset_value>` | VERIFIED | EN11G p.56 |
+| `set_waveform_interval` | `:WAVeform:INTerval {value}` | `:WAVeform:INTerval <value>` | VERIFIED | EN11G p.751 |
+| `set_waveform_point` | `:WAVeform:POINt {value}` | `:WAVeform:POINt <value>` | VERIFIED | EN11G p.752 |
+| `set_waveform_source` | `:WAVeform:SOURce C{ch}` | `:WAVeform:SOURce <source>` | VERIFIED | EN11G p.749 |
+| `set_waveform_start` | `:WAVeform:STARt {value}` | `:WAVeform:STARt <value>` | VERIFIED | EN11G p.750 |
 | `stop` | `:TRIGger:STOP` | `:TRIGger:STOP` | VERIFIED | EN11G p.484 |
 
-**Tally: 33 VERIFIED, 7 MISMATCH_DEFERRED, 0 UNCITED (40 total).**
+**Tally: 41 VERIFIED, 7 MISMATCH_DEFERRED, 0 UNCITED (48 total).**
+
+Task 17 (audit H9) added the eight rows above with a `get_waveform_`/
+`set_waveform_` prefix: the documented `:WAVeform:SOURce`/`STARt`/
+`INTerval`/`POINt` transfer-parameter scalars (EN11G p.749-752), verified
+against a fresh reading of those four pages (page citations in earlier plan
+drafts for this subsystem had been wrong; re-verified directly from the PDF).
+These configure a subsequent `:WAVeform:DATA?`/`:WAVeform:PREamble?`
+transfer — the binary preamble/data path itself, and rewiring `get_waveform`/
+`get_waveform_preamble` off the legacy `C{ch}:WF?` forms onto it, is Task 18;
+deep-memory chunking (`:WAVeform:MAXPoint`) is Task 19. `MockConnection` now
+carries `waveform_source`/`waveform_start`/`waveform_interval`/
+`waveform_point` state (defaults `"C1"`/`0`/`1`/`0`) so the four getters are
+response-VERIFIED, not request-only.
 
 Full detail — exact current vs. documented wire form, severity against the
 pull-in bar, and why each is deferred rather than fixed — is in each entry's

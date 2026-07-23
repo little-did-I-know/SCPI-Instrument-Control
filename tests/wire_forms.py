@@ -1074,13 +1074,17 @@ WIRE_FORMS: List[WireForm] = [
         status=MISMATCH_DEFERRED,
         mock_kwargs={"idn": MODERN_IDN},
         note=(
-            "[HIGH severity -- already scheduled, audit finding H9 / Task 17] "
+            "[HIGH severity -- already scheduled, audit finding H9 / Task 18] "
             "Modern uses :WAVeform:PREamble?/:WAVeform:DATA? (guide p.746ff, "
             "DATA specifically p.757); 'C{ch}:WF? DAT2' is absent from the "
             "modern guide entirely (zero hits for 'WF?', full-text search). "
             "get_waveform is on the default waveform-capture path (waveform.py, "
             "waveform_transfer.py, the GUI capture worker, the webapp scope "
-            "API) -- scheduled fix Task 17 per the task-5 plan; not fixed here."
+            "API) -- Task 17 added the :WAVeform: SOURce/STARt/INTerval/POINt "
+            "transfer-parameter scalars (see the corpus block below) as prep; "
+            "the binary preamble/data transfer itself, and rewiring this "
+            "get_waveform op onto it, is Task 18 per the task-5 plan. Not "
+            "fixed here."
         ),
     ),
     WireForm(
@@ -1093,11 +1097,113 @@ WIRE_FORMS: List[WireForm] = [
         status=MISMATCH_DEFERRED,
         mock_kwargs={"idn": MODERN_IDN},
         note=(
-            "[HIGH severity -- already scheduled, audit finding H9 / Task 17] "
+            "[HIGH severity -- already scheduled, audit finding H9 / Task 18] "
             "Same absence as get_waveform above. Modern uses "
             ":WAVeform:PREamble? (guide p.754); 'C{ch}:WF? DESC' does not exist "
-            "in this manual. Scheduled fix Task 17; not fixed here."
+            "in this manual. Task 17 added the transfer-parameter scalars "
+            "(SOURce/STARt/INTerval/POINt, see below) that PREamble?/DATA? "
+            "will read back against; the PREamble? binary descriptor block "
+            "and its parser are Task 18. Not fixed here."
         ),
+    ),
+    # -- Waveform transfer-parameter scalars (Task 17, audit H9) --
+    # :WAVeform:SOURce/STARt/INTerval/POINt (guide pp.749-752): the documented
+    # modern scalar transfer-parameter commands that configure a subsequent
+    # :WAVeform:DATA?/:WAVeform:PREamble? transfer (Task 18; not implemented
+    # here -- see the two MISMATCH_DEFERRED entries directly above). Response
+    # values below are the mock's fresh-connection defaults (no prior write),
+    # matching how test_mock_answers_documented_response exercises every
+    # RESPONSE_FORMS entry: it queries a brand-new MockConnection built from
+    # `mock_kwargs` alone, never issuing the paired setter first. Each
+    # manual EXAMPLE uses a non-default value (C2/1000/200/20000) to
+    # demonstrate the round trip; the "divergence is fine, structure is what's
+    # pinned" rule already used throughout this sweep (see get_voltage_div,
+    # get_sample_rate above) applies identically here. Round-trip fidelity
+    # (write the manual's example value, then query it back) was confirmed
+    # by hand against MockConnection(idn=MODERN_IDN) for all four ops.
+    WireForm(
+        table="scope",
+        dialect="modern",
+        op="set_waveform_source",
+        params={"ch": 2},
+        request=":WAVeform:SOURce C2",
+        source=f"{MODERN_GUIDE} p.749",
+        mock_kwargs={"idn": MODERN_IDN},
+    ),
+    WireForm(
+        table="scope",
+        dialect="modern",
+        op="get_waveform_source",
+        params={},
+        request=":WAVeform:SOURce?",
+        response="C1",
+        parsed="C1",
+        source=f"{MODERN_GUIDE} p.749",
+        mock_kwargs={"idn": MODERN_IDN},
+        note="Mock's default source is 'C1' (manual's own EXAMPLE sets 'C2' first); confirmed the round trip separately -- writing ':WAVeform:SOURce C2' then querying ':WAVeform:SOURce?' returns 'C2' verbatim.",
+    ),
+    WireForm(
+        table="scope",
+        dialect="modern",
+        op="set_waveform_start",
+        params={"value": 1000},
+        request=":WAVeform:STARt 1000",
+        source=f"{MODERN_GUIDE} p.750",
+        mock_kwargs={"idn": MODERN_IDN},
+    ),
+    WireForm(
+        table="scope",
+        dialect="modern",
+        op="get_waveform_start",
+        params={},
+        request=":WAVeform:STARt?",
+        response="0",
+        parsed=0,
+        source=f"{MODERN_GUIDE} p.750",
+        mock_kwargs={"idn": MODERN_IDN},
+        note="Mock's default start point is 0 (manual's own EXAMPLE sets 1000 first); round trip confirmed separately -- write ':WAVeform:STARt 1000' then query ':WAVeform:STARt?' returns '1000'.",
+    ),
+    WireForm(
+        table="scope",
+        dialect="modern",
+        op="set_waveform_interval",
+        params={"value": 200},
+        request=":WAVeform:INTerval 200",
+        source=f"{MODERN_GUIDE} p.751",
+        mock_kwargs={"idn": MODERN_IDN},
+    ),
+    WireForm(
+        table="scope",
+        dialect="modern",
+        op="get_waveform_interval",
+        params={},
+        request=":WAVeform:INTerval?",
+        response="1",
+        parsed=1,
+        source=f"{MODERN_GUIDE} p.751",
+        mock_kwargs={"idn": MODERN_IDN},
+        note="Mock's default interval is 1 (manual's own EXAMPLE sets 200 first); round trip confirmed separately -- write ':WAVeform:INTerval 200' then query ':WAVeform:INTerval?' returns '200'.",
+    ),
+    WireForm(
+        table="scope",
+        dialect="modern",
+        op="set_waveform_point",
+        params={"value": 20000},
+        request=":WAVeform:POINt 20000",
+        source=f"{MODERN_GUIDE} p.752",
+        mock_kwargs={"idn": MODERN_IDN},
+    ),
+    WireForm(
+        table="scope",
+        dialect="modern",
+        op="get_waveform_point",
+        params={},
+        request=":WAVeform:POINt?",
+        response="0",
+        parsed=0,
+        source=f"{MODERN_GUIDE} p.752",
+        mock_kwargs={"idn": MODERN_IDN},
+        note="Mock's default point count is 0 (manual's own EXAMPLE sets 20000 first); round trip confirmed separately -- write ':WAVeform:POINt 20000' then query ':WAVeform:POINt?' returns '20000'.",
     ),
     # -- Screen capture --
     # SCDP appears exactly once in this 855-page guide -- as a literal

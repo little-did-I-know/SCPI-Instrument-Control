@@ -81,6 +81,21 @@ def handle_write(conn, command: str) -> bool:
         if match := re.match(r":TRIGger:EDGE:COUPling\s+(\w+)", command, re.IGNORECASE):
             conn.trigger_coupling = match.group(1)
             return True
+        # Waveform transfer-parameter scalars (Task 17, audit H9; guide
+        # pp.749-752). SOURce stores the bare source token verbatim (e.g.
+        # "C2"); STARt/INTerval/POINt are NR1 integers.
+        if match := re.match(r":WAVeform:SOURce\s+(\S+)", command, re.IGNORECASE):
+            conn.waveform_source = match.group(1).upper()
+            return True
+        if match := re.match(r":WAVeform:STARt\s+(-?\d+)", command, re.IGNORECASE):
+            conn.waveform_start = int(match.group(1))
+            return True
+        if match := re.match(r":WAVeform:INTerval\s+(-?\d+)", command, re.IGNORECASE):
+            conn.waveform_interval = int(match.group(1))
+            return True
+        if match := re.match(r":WAVeform:POINt\s+(-?\d+)", command, re.IGNORECASE):
+            conn.waveform_point = int(match.group(1))
+            return True
         # Unknown modern writes fall through and are merely recorded,
         # mirroring real scopes which silently drop unknown commands
 
@@ -183,6 +198,14 @@ def handle_query(conn, command: str) -> Optional[str]:
             return _format_nr3(conn.timebase)
         if upper == ":ACQUIRE:SRATE?":  # bare NR3, p.46
             return _format_nr3(conn.sample_rate)
+        if upper == ":WAVEFORM:SOURCE?":  # bare source token, e.g. "C2", p.749
+            return conn.waveform_source
+        if upper == ":WAVEFORM:START?":  # bare NR1, p.750
+            return str(conn.waveform_start)
+        if upper == ":WAVEFORM:INTERVAL?":  # bare NR1, p.751
+            return str(conn.waveform_interval)
+        if upper == ":WAVEFORM:POINT?":  # bare NR1, p.752
+            return str(conn.waveform_point)
 
     if conn.scope_dialect == "legacy":
         if match := re.match(r"C(\d+):VDIV\?", command, re.IGNORECASE):

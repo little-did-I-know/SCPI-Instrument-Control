@@ -94,6 +94,15 @@ class MockConnection(BaseConnection):
         # audit L3): the GUI's channel refresh reads both on every poll.
         self.probe_ratios: Dict[int, float] = {ch: 1.0 for ch in channels}
         self.bandwidth_limits: Dict[int, str] = {ch: "OFF" for ch in channels}
+        # Modern :WAVeform: transfer-parameter state (Task 17, audit H9): the
+        # SOURce/STARt/INTerval/POINt scalars set ahead of a
+        # :WAVeform:DATA?/:WAVeform:PREamble? transfer (not implemented until
+        # Task 18). Defaults match the guide's own enum ("C1" is a valid
+        # <source> token) and NR1-zero starting points.
+        self.waveform_source: str = "C1"
+        self.waveform_start: int = 0
+        self.waveform_interval: int = 1
+        self.waveform_point: int = 0
 
         self.sample_rate = sample_rate
         self.timebase = timebase
