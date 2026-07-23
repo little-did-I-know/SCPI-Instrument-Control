@@ -548,8 +548,9 @@ class MockConnection(BaseConnection):
                 return "OFF"
 
             # Measurements - simulate with slight noise
-            # MEAS1:VOLT? (generic) or MEASure1:VOLTage? (Siglent)
-            if match := re.match(r"MEAS(?:URE)?(\d+):VOLT(?:AGE)?\?", upper):
+            # MEASure:VOLTage? CH1 (Siglent, QS0503X-E01B p.38; channel is an
+            # argument, not fused to the keyword -- audit H6)
+            if match := re.match(r"MEAS(?:URE)?:VOLT(?:AGE)?\?\s*CH(\d+)", upper):
                 ch = int(match.group(1))
                 if ch in self.psu_outputs:
                     v = self.psu_outputs[ch]["voltage"]
@@ -558,7 +559,7 @@ class MockConnection(BaseConnection):
                     return f"{v + noise:.3f}"
                 return "0.000"
 
-            if match := re.match(r"MEAS(?:URE)?(\d+):CURR(?:ENT)?\?", upper):
+            if match := re.match(r"MEAS(?:URE)?:CURR(?:ENT)?\?\s*CH(\d+)", upper):
                 ch = int(match.group(1))
                 if ch in self.psu_outputs:
                     i = self.psu_outputs[ch]["current"]
@@ -567,7 +568,7 @@ class MockConnection(BaseConnection):
                     return f"{i + noise:.3f}"
                 return "0.000"
 
-            if match := re.match(r"MEAS(?:URE)?(\d+):POW(?:ER)?\?", upper):
+            if match := re.match(r"MEAS(?:URE)?:POW(?:ER)?\?\s*CH(\d+)", upper):
                 ch = int(match.group(1))
                 if ch in self.psu_outputs:
                     v = self.psu_outputs[ch]["voltage"]

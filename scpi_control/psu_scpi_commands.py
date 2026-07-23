@@ -53,10 +53,12 @@ class PSUSCPICommandSet:
         "get_voltage": "CH{ch}:VOLT?",
         "set_current": "CH{ch}:CURR {current}",
         "get_current": "CH{ch}:CURR?",
-        # Measurements use MEASure subsystem
-        "measure_voltage": "MEASure{ch}:VOLTage?",
-        "measure_current": "MEASure{ch}:CURRent?",
-        "measure_power": "MEASure{ch}:POWer?",
+        # Measurements use the MEASure subsystem with the channel as an ARGUMENT
+        # (QS0503X-E01B p.38). "MEASure{ch}:VOLTage?" was invented and is not in
+        # the SPD3303X command list (p.36) -- audit H6.
+        "measure_voltage": "MEASure:VOLTage? CH{ch}",
+        "measure_current": "MEASure:CURRent? CH{ch}",
+        "measure_power": "MEASure:POWEr? CH{ch}",
         # Output control uses specific format
         "set_output": "OUTPut CH{ch},{state}",
         "get_output": "OUTPut? CH{ch}",

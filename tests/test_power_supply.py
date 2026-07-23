@@ -80,7 +80,9 @@ class TestPSUSCPICommandSet:
         assert cmd_set.get_command("set_voltage", ch=1, voltage=5.0) == "CH1:VOLT 5.0"
         assert cmd_set.get_command("get_voltage", ch=1) == "CH1:VOLT?"
         assert cmd_set.get_command("set_output", ch=1, state="ON") == "OUTPut CH1,ON"
-        assert cmd_set.get_command("measure_voltage", ch=1) == "MEASure1:VOLTage?"
+        # SPD3303X_QuickStart QS0503X-E01B p.38: channel is a query ARGUMENT
+        # ("MEASure:VOLTage? CH1"), not fused to the MEASure keyword -- H6.
+        assert cmd_set.get_command("measure_voltage", ch=1) == "MEASure:VOLTage? CH1"
 
     def test_fallback_to_generic(self):
         """Test that Siglent variant falls back to generic for unknown commands."""

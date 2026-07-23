@@ -1204,32 +1204,23 @@ WIRE_FORMS: List[WireForm] = [
 
     # p.38: MEASure:VOLTage?/CURRent?/POWEr? all take the channel as an
     # ARGUMENT after the query mark ("MEASure:VOLTage? CH1"), not fused to
-    # the MEASure keyword. Code (psu_scpi_commands.py SIGLENT_SPD_OVERRIDES)
-    # sends 'MEASure{ch}:VOLTage?' etc -- channel digit spliced directly onto
-    # 'MEASure', no space/argument.
+    # the MEASure keyword. Fixed under Task 6 (audit H6): psu_scpi_commands.py
+    # SIGLENT_SPD_OVERRIDES now renders the documented form, and the mock's
+    # measurement regexes (connection/mock/base.py) now match the channel as
+    # a trailing "CH{n}" argument instead of fused to "MEASure{ch}". Mock's
+    # default (no output configured) answer is "0.000" for all three --
+    # the manual's Typical Return values (30.000/3.000/90.000) are for a
+    # specific setpoint, not the mock's default state.
     WireForm(
         table="psu",
         variant="siglent_spd",
         op="measure_voltage",
         params={"ch": 1},
         request="MEASure:VOLTage? CH1",
-        response="30.000",
+        response="0.000",
+        parsed=0.0,
         source=f"{SPD_GUIDE} p.38",
-        status=MISMATCH_DEFERRED,
         mock_kwargs={"psu_mode": True},
-        note=(
-            "[HIGH severity -- pull-in candidate] Code sends "
-            "'MEASure1:VOLTage?'; manual's Command format is "
-            "'MEASure: CURRent?/VOLTage?/POWEr? [{CH1|CH2}]', EXAMPLE "
-            "'MEASure: VOLTage? CH1' -> Typical Return '30.000' (channel is "
-            "a query argument, not fused to the keyword). On the default "
-            "polling path: gui/widgets/psu_control.py's _update_measurements "
-            "(1s QTimer, started unconditionally in __init__) calls "
-            "output.measure_voltage() every tick inside a broad try/except, "
-            "so a malformed request against real hardware would silently "
-            "freeze the live voltage reading rather than crash -- still "
-            "breaks the GUI's default display path. H6, fix Task 6."
-        ),
     ),
     WireForm(
         table="psu",
@@ -1237,17 +1228,10 @@ WIRE_FORMS: List[WireForm] = [
         op="measure_current",
         params={"ch": 1},
         request="MEASure:CURRent? CH1",
-        response="3.000",
+        response="0.000",
+        parsed=0.0,
         source=f"{SPD_GUIDE} p.38",
-        status=MISMATCH_DEFERRED,
         mock_kwargs={"psu_mode": True},
-        note=(
-            "[HIGH severity -- pull-in candidate] Same MEASure keyword/"
-            "channel-argument mismatch as measure_voltage above "
-            "('MEASure:CURRent? CH1' documented vs 'MEASure1:CURRent?' "
-            "sent). Same GUI default-path exposure (psu_control.py "
-            "_update_measurements). H6, fix Task 6."
-        ),
     ),
     WireForm(
         table="psu",
@@ -1255,17 +1239,10 @@ WIRE_FORMS: List[WireForm] = [
         op="measure_power",
         params={"ch": 1},
         request="MEASure:POWEr? CH1",
-        response="90.000",
+        response="0.000",
+        parsed=0.0,
         source=f"{SPD_GUIDE} p.38",
-        status=MISMATCH_DEFERRED,
         mock_kwargs={"psu_mode": True},
-        note=(
-            "[HIGH severity -- pull-in candidate] Same MEASure keyword/"
-            "channel-argument mismatch as measure_voltage above "
-            "('MEASure:POWEr? CH1' documented vs code's 'MEASure1:POWer?', "
-            "which also misspells POWEr as POWer). Same GUI default-path "
-            "exposure. H6, fix Task 6."
-        ),
     ),
 
     # p.40 EXAMPLE: "OUTPut CH1,ON" -- matches exactly.
