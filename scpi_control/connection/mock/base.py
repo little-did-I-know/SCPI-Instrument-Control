@@ -436,83 +436,61 @@ class MockConnection(BaseConnection):
 
         # Function generator (AWG) queries
         if self.awg_mode:
-            # Function queries: C1:BSWV? WVTP (Siglent) or SOUR1:FUNC? (generic)
-            if match := re.match(r"C(\d+):BSWV\?\s*WVTP", upper):
+            # Basic-wave query: C1:BSWV? (SDG_ProgrammingGuide PG02-E05B
+            # p.27-28). QUERY SYNTAX is bare -- there is no per-field
+            # selector -- and RESPONSE FORMAT always returns the whole
+            # parameter list as one comma-joined "KEY,value,KEY,value,..."
+            # reply (H5, fixed Task 10). DUTY/SYM are independently documented
+            # BSWV parameters (p.29-30) folded into the same reply so
+            # get_pulse_duty/get_ramp_symmetry can round-trip through this
+            # single bare query too.
+            if match := re.match(r"C(\d+):BSWV\?$", upper):
                 ch = int(match.group(1))
-                if ch in self.awg_channels:
-                    return self.awg_channels[ch]["function"]
-                return "SINE"
+                c = self.awg_channels.get(ch, {})
+                frequency = c.get("frequency", 1000.0)
+                period = 1.0 / frequency if frequency else 0.0
+                return (
+                    f"C{ch}:BSWV WVTP,{c.get('function', 'SINE')},"
+                    f"FRQ,{frequency:.10g}HZ,"
+                    f"PERI,{period:.10g}S,"
+                    f"AMP,{c.get('amplitude', 1.0):.10g}V,"
+                    f"OFST,{c.get('offset', 0.0):.10g}V,"
+                    f"PHSE,{c.get('phase', 0.0):.10g},"
+                    f"DUTY,{c.get('pulse_duty', 50.0):.10g},"
+                    f"SYM,{c.get('ramp_symmetry', 50.0):.10g}"
+                )
+
+            # Generic SCPI-99 per-field fallbacks (unaffected by H5, which is
+            # a Siglent-selector-grammar defect only): SOUR1:FUNC?, SOUR1:FREQ?, etc.
             if match := re.match(r"SOUR(\d+):FUNC\?", upper):
                 ch = int(match.group(1))
                 if ch in self.awg_channels:
                     return self.awg_channels[ch]["function"]
                 return "SINE"
-
-            # Frequency queries: C1:BSWV? FRQ (Siglent) or SOUR1:FREQ? (generic)
-            if match := re.match(r"C(\d+):BSWV\?\s*FRQ", upper):
-                ch = int(match.group(1))
-                if ch in self.awg_channels:
-                    return f"{self.awg_channels[ch]['frequency']:.6f}"
-                return "1000.0"
             if match := re.match(r"SOUR(\d+):FREQ\?", upper):
                 ch = int(match.group(1))
                 if ch in self.awg_channels:
                     return f"{self.awg_channels[ch]['frequency']:.6f}"
                 return "1000.0"
-
-            # Amplitude queries: C1:BSWV? AMP (Siglent) or SOUR1:VOLT? (generic)
-            if match := re.match(r"C(\d+):BSWV\?\s*AMP", upper):
-                ch = int(match.group(1))
-                if ch in self.awg_channels:
-                    return f"{self.awg_channels[ch]['amplitude']:.3f}"
-                return "1.0"
             if match := re.match(r"SOUR(\d+):VOLT\?", upper):
                 ch = int(match.group(1))
                 if ch in self.awg_channels:
                     return f"{self.awg_channels[ch]['amplitude']:.3f}"
                 return "1.0"
-
-            # Offset queries: C1:BSWV? OFST (Siglent) or SOUR1:VOLT:OFFS? (generic)
-            if match := re.match(r"C(\d+):BSWV\?\s*OFST", upper):
-                ch = int(match.group(1))
-                if ch in self.awg_channels:
-                    return f"{self.awg_channels[ch]['offset']:.3f}"
-                return "0.0"
             if match := re.match(r"SOUR(\d+):VOLT:OFFS\?", upper):
                 ch = int(match.group(1))
                 if ch in self.awg_channels:
                     return f"{self.awg_channels[ch]['offset']:.3f}"
-                return "0.0"
-
-            # Phase queries: C1:BSWV? PHSE (Siglent) or SOUR1:PHAS? (generic)
-            if match := re.match(r"C(\d+):BSWV\?\s*PHSE", upper):
-                ch = int(match.group(1))
-                if ch in self.awg_channels:
-                    return f"{self.awg_channels[ch]['phase']:.1f}"
                 return "0.0"
             if match := re.match(r"SOUR(\d+):PHAS\?", upper):
                 ch = int(match.group(1))
                 if ch in self.awg_channels:
                     return f"{self.awg_channels[ch]['phase']:.1f}"
                 return "0.0"
-
-            # Pulse duty cycle queries
-            if match := re.match(r"C(\d+):BSWV\?\s*DUTY", upper):
-                ch = int(match.group(1))
-                if ch in self.awg_channels:
-                    return f"{self.awg_channels[ch]['pulse_duty']:.1f}"
-                return "50.0"
             if match := re.match(r"SOUR(\d+):FUNC:PULS:DCYC\?", upper):
                 ch = int(match.group(1))
                 if ch in self.awg_channels:
                     return f"{self.awg_channels[ch]['pulse_duty']:.1f}"
-                return "50.0"
-
-            # Ramp symmetry queries
-            if match := re.match(r"C(\d+):BSWV\?\s*SYM", upper):
-                ch = int(match.group(1))
-                if ch in self.awg_channels:
-                    return f"{self.awg_channels[ch]['ramp_symmetry']:.1f}"
                 return "50.0"
             if match := re.match(r"SOUR(\d+):FUNC:RAMP:SYMM\?", upper):
                 ch = int(match.group(1))
@@ -520,12 +498,23 @@ class MockConnection(BaseConnection):
                     return f"{self.awg_channels[ch]['ramp_symmetry']:.1f}"
                 return "50.0"
 
-            # Output state queries: C1:OUTP? (Siglent) or OUTP1? (generic)
-            if match := re.match(r"C(\d+):OUTP\?", upper):
+            # Arbitrary waveform query: C1:ARWV? (PG02-E05B p.62). Bare query;
+            # RESPONSE FORMAT always returns INDEX and NAME together. Static --
+            # arb waveform selection isn't tracked in awg_channels state
+            # (get_arb_waveform has no caller anywhere in this repo).
+            if match := re.match(r"C(\d+):ARWV\?$", upper):
                 ch = int(match.group(1))
-                if ch in self.awg_channels:
-                    return "ON" if self.awg_channels[ch]["enabled"] else "OFF"
-                return "OFF"
+                return f"C{ch}:ARWV INDEX,2,NAME,StairUp"
+
+            # Output state query: C1:OUTP? (PG02-E05B p.27-28, worked EXAMPLE).
+            # RESPONSE FORMAT is the state PLUS LOAD/PLRT -- not just "ON"/
+            # "OFF" (H5, fixed Task 10). LOAD/PLRT aren't tracked in
+            # awg_channels state, so they are reported as the manual's own
+            # worked-example values.
+            if match := re.match(r"C(\d+):OUTP\?$", upper):
+                ch = int(match.group(1))
+                state = "ON" if self.awg_channels.get(ch, {}).get("enabled") else "OFF"
+                return f"C{ch}:OUTP {state},LOAD,HZ,PLRT,NOR"
             if match := re.match(r"OUTP(\d+)\?", upper):
                 ch = int(match.group(1))
                 if ch in self.awg_channels:

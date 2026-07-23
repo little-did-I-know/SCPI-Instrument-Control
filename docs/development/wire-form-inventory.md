@@ -259,30 +259,36 @@ the PDF's own page index, not the printed footer number (which runs 12 lower
 on every page).
 
 Every setter in this table renders exactly what the manual documents — the SET
-side of `SIGLENT_SDG_OVERRIDES` has no defects. The recurring problem is
-entirely on the GET side: every parameterized subsystem (`BSWV`/`OUTP`/`ARWV`/
-`MDWV`/`BTWV`/`SWWV`) documents a **bare** query (e.g. `<channel>:BaSic_WaVe?`)
-whose response always returns *every* parameter of that subsystem in one
-comma-joined reply — there is no selector syntax to ask for just one field.
-The driver invents one anyway (e.g. `C1:BSWV? FRQ`), a pattern that recurs
-across eleven of the fourteen getters below.
+side of `SIGLENT_SDG_OVERRIDES` has no defects. The GET side used to invent a
+per-field selector query (e.g. `C1:BSWV? FRQ`) for every parameterized
+subsystem (`BSWV`/`OUTP`/`ARWV`/`MDWV`/`BTWV`/`SWWV`), none of which the guide
+documents — each one's QUERY SYNTAX is **bare** (e.g. `<channel>:BaSic_WaVe?`)
+and its response always returns *every* parameter of that subsystem in one
+comma-joined reply. H5, fixed Task 10: every getter template below now renders
+the bare query; `BSWV`/`OUTP`/`ARWV` also gained a real parser
+(`parse_key_value_response`, `awg_scpi_commands.py`) and, where an
+`awg_output.py` property exists, a field-read out of the whole-list response.
+`MDWV`/`BTWV`/`SWWV` are "future expansion" — no Python getter, mock handler,
+or parser exists anywhere for them — so only the request was fixed; they are
+VERIFIED with no response (request-only) rather than inventing code nothing
+exercises.
 
 | Command | We send | Documented | Status | Source |
 |---|---|---|---|---|
-| `get_amplitude` | `C{ch}:BSWV? AMP` | bare `<channel>:BaSic_WaVe?` returns every BSWV parameter; no `AMP` selector | MISMATCH_DEFERRED | PG02-E05B p.31 |
-| `get_arb_waveform` | `C{ch}:ARWV? NAME` | bare `<channel>:ARbWaVe?` returns `INDEX` and `NAME` together; no selector; dead code (no caller) | MISMATCH_DEFERRED | PG02-E05B p.62 |
-| `get_burst_state` | `C{ch}:BTWV? STATE` | bare `<channel>:BTWV(BursTWaVe)?` returns every BTWV parameter; no selector; dead code (no caller) | MISMATCH_DEFERRED | PG02-E05B p.60 |
-| `get_frequency` | `C{ch}:BSWV? FRQ` | bare `<channel>:BaSic_WaVe?` returns every BSWV parameter; no `FRQ` selector | MISMATCH_DEFERRED | PG02-E05B p.31 |
-| `get_function` | `C{ch}:BSWV? WVTP` | bare `<channel>:BaSic_WaVe?` returns every BSWV parameter; no `WVTP` selector | MISMATCH_DEFERRED | PG02-E05B p.31 |
-| `get_modulation` | `C{ch}:MDWV? STATE` | bare `<channel>:MoDulateWaVe?` returns every MDWV parameter; no selector; dead code (no caller) | MISMATCH_DEFERRED | PG02-E05B p.36 |
-| `get_offset` | `C{ch}:BSWV? OFST` | bare `<channel>:BaSic_WaVe?` returns every BSWV parameter; no `OFST` selector | MISMATCH_DEFERRED | PG02-E05B p.31 |
-| `get_output` | `C{ch}:OUTP?` | request matches exactly; response is `<channel>:OUTP ON\|OFF,LOAD,<load>,PLRT,<polarity>` (mock answers bare `ON`/`OFF`) | MISMATCH_DEFERRED | PG02-E05B p.27-28 |
-| `get_output_load` | `C{ch}:OUTP? LOAD` | bare `<channel>:OUTPut?` returns every field; no `LOAD` selector; dead code (no caller) | MISMATCH_DEFERRED | PG02-E05B p.27-28 |
-| `get_output_polarity` | `C{ch}:OUTP? PLRT` | bare `<channel>:OUTPut?` returns every field; no `PLRT` selector; dead code (no caller) | MISMATCH_DEFERRED | PG02-E05B p.27-28 |
-| `get_phase` | `C{ch}:BSWV? PHSE` | bare `<channel>:BaSic_WaVe?` returns every BSWV parameter; no `PHSE` selector | MISMATCH_DEFERRED | PG02-E05B p.31 |
-| `get_pulse_duty` | `C{ch}:BSWV? DUTY` | bare `<channel>:BaSic_WaVe?` returns every BSWV parameter; no `DUTY` selector | MISMATCH_DEFERRED | PG02-E05B p.31 |
-| `get_ramp_symmetry` | `C{ch}:BSWV? SYM` | bare `<channel>:BaSic_WaVe?` returns every BSWV parameter; no `SYM` selector | MISMATCH_DEFERRED | PG02-E05B p.31 |
-| `get_sweep_state` | `C{ch}:SWWV? STATE` | bare `<channel>:SWeepWaVe?` returns every SWWV parameter; no selector; dead code (no caller) | MISMATCH_DEFERRED | PG02-E05B p.38 |
+| `get_amplitude` | `C{ch}:BSWV?` | `<channel>:BaSic_WaVe?` returns every BSWV parameter as one comma-joined reply; `AMP` read out of it | VERIFIED | PG02-E05B p.27-28, p.29-30 |
+| `get_arb_waveform` | `C{ch}:ARWV?` | bare `<channel>:ARbWaVe?` returns `INDEX` and `NAME` together; dead code (no caller), verified at command-table/mock level only | VERIFIED | PG02-E05B p.62 |
+| `get_burst_state` | `C{ch}:BTWV?` | bare `<channel>:BTWV(BursTWaVe)?`; future-expansion command, no getter/mock/parser wired, request-only | VERIFIED | PG02-E05B p.60 |
+| `get_frequency` | `C{ch}:BSWV?` | `<channel>:BaSic_WaVe?` returns every BSWV parameter as one comma-joined reply; `FRQ` read out of it | VERIFIED | PG02-E05B p.27-28, p.29-30 |
+| `get_function` | `C{ch}:BSWV?` | `<channel>:BaSic_WaVe?` returns every BSWV parameter as one comma-joined reply; `WVTP` read out of it | VERIFIED | PG02-E05B p.27-28, p.29-30 |
+| `get_modulation` | `C{ch}:MDWV?` | bare `<channel>:MoDulateWaVe?`; future-expansion command, no getter/mock/parser wired, request-only | VERIFIED | PG02-E05B p.36 |
+| `get_offset` | `C{ch}:BSWV?` | `<channel>:BaSic_WaVe?` returns every BSWV parameter as one comma-joined reply; `OFST` read out of it | VERIFIED | PG02-E05B p.27-28, p.29-30 |
+| `get_output` | `C{ch}:OUTP?` | `<channel>:OUTPut?` returns `ON\|OFF,LOAD,<load>,PLRT,<polarity>` together; `STATE` read out of it | VERIFIED | PG02-E05B p.27-28 |
+| `get_output_load` | `C{ch}:OUTP?` | same whole-list `<channel>:OUTPut?` reply as `get_output`; dead code (no caller), verified at command-table/mock level only | VERIFIED | PG02-E05B p.27-28 |
+| `get_output_polarity` | `C{ch}:OUTP?` | same whole-list `<channel>:OUTPut?` reply as `get_output`; dead code (no caller), verified at command-table/mock level only | VERIFIED | PG02-E05B p.27-28 |
+| `get_phase` | `C{ch}:BSWV?` | `<channel>:BaSic_WaVe?` returns every BSWV parameter as one comma-joined reply; `PHSE` read out of it | VERIFIED | PG02-E05B p.27-28, p.29-30 |
+| `get_pulse_duty` | `C{ch}:BSWV?` | `<channel>:BaSic_WaVe?` returns every BSWV parameter as one comma-joined reply; `DUTY` read out of it | VERIFIED | PG02-E05B p.27-28, p.29-30 |
+| `get_ramp_symmetry` | `C{ch}:BSWV?` | `<channel>:BaSic_WaVe?` returns every BSWV parameter as one comma-joined reply; `SYM` read out of it | VERIFIED | PG02-E05B p.27-28, p.29-30 |
+| `get_sweep_state` | `C{ch}:SWWV?` | bare `<channel>:SWeepWaVe?`; future-expansion command, no getter/mock/parser wired, request-only | VERIFIED | PG02-E05B p.38 |
 | `set_amplitude` | `C{ch}:BSWV AMP,{amplitude}` | `<channel>:BaSic_WaVe AMP,<amplitude>` | VERIFIED | PG02-E05B p.31 |
 | `set_arb_waveform` | `C{ch}:ARWV NAME,{name}` | `<channel>:ArbWaVe NAME,<name>` (Format2); not mocked, dead code (no caller) | VERIFIED | PG02-E05B p.62, p.188 |
 | `set_burst_state` | `C{ch}:BTWV STATE,{state}` | `<channel>:BursTWaVe STATE,<state>`; not mocked, dead code (no caller) | VERIFIED | PG02-E05B p.59-60 |
@@ -298,21 +304,19 @@ across eleven of the fourteen getters below.
 | `set_ramp_symmetry` | `C{ch}:BSWV SYM,{symmetry}` | `<channel>:BaSic_WaVe SYM,<symmetry>` | VERIFIED | PG02-E05B p.29-30 |
 | `set_sweep_state` | `C{ch}:SWWV STATE,{state}` | `<channel>:SweepWaVe STATE,<state>`; not mocked, dead code (no caller) | VERIFIED | PG02-E05B p.37, p.39 |
 
-**Tally: 14 VERIFIED, 14 MISMATCH_DEFERRED, 0 UNCITED (28 total).**
+**Tally: 28 VERIFIED, 0 MISMATCH_DEFERRED, 0 UNCITED (28 total).**
 
-Full detail — exact current vs. documented wire form, severity against the
-pull-in bar, and why each is deferred rather than fixed — is in each entry's
-`note` field in `tests/wire_forms.py`. All fourteen deferred getters share one
-audit ID (H5, fix Task 10), but severity varies sharply by reachability:
-`get_function`/`get_frequency`/`get_amplitude`/`get_offset`/`get_phase` are
-HIGH (each is read unguarded, with no try/except, on `awg_output.py`'s
-`get_configuration()` path, which `examples/function_generator_basic.py`
-calls by default); `get_pulse_duty`/`get_ramp_symmetry` are medium (same path,
-but conditional and wrapped in a try/except there); `get_output` is low —
-unlike the rest, its *request* already matches the manual exactly, and the
-only real defect is the mock's answer shape, which the driver's own tolerant
-parsing (`"ON" in response.upper()`) would likely absorb against real
-hardware anyway; and the remaining seven getters (`get_output_load`,
-`get_output_polarity`, `get_arb_waveform`, `get_modulation`,
-`get_burst_state`, `get_sweep_state`) are low because none has a caller
-anywhere in the repo outside the command table itself.
+Full detail — the parser, which fields each property reads, and why the three
+future-expansion getters stay request-only — is in each entry's `note` field
+in `tests/wire_forms.py`. All fourteen getters shared one audit ID (H5, fixed
+Task 10): `get_function`/`get_frequency`/`get_amplitude`/`get_offset`/
+`get_phase`/`get_pulse_duty`/`get_ramp_symmetry`/`get_output` now read their
+own field out of a single real `C{ch}:BSWV?`/`C{ch}:OUTP?` query via
+`parse_key_value_response` (`awg_scpi_commands.py`); `get_output_load`/
+`get_output_polarity`/`get_arb_waveform` got the same template+mock treatment
+but have no `awg_output.py` property to update (dead code, no caller), so
+they are verified at the command-table/mock level only; `get_modulation`/
+`get_burst_state`/`get_sweep_state` are "future expansion" — no getter, mock
+handler, or parser exists anywhere for them — so only the request template
+was fixed and they are VERIFIED with no response (request-only) rather than
+inventing code nothing exercises.
