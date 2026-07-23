@@ -10,6 +10,50 @@ from typing import Dict
 logger = logging.getLogger(__name__)
 
 
+def decode_spd_status(word: str) -> Dict[str, bool]:
+    """Decode an SPD3303X ``SYSTem:STATus?`` response into named flags.
+
+    QS0503X-E01B p.41-42: the SPD3303X has no dedicated output-state query
+    (audit H20) -- output (and other) state is instead packed into a single
+    hexadecimal status word (e.g. ``"0x0224"``), decoded bit-by-bit per the
+    state-correspondence table on p.42:
+
+        Bit  | Meaning
+        -----|--------------------------------------------
+        0    | CH1 mode: 0 = CV (constant voltage), 1 = CC (constant current)
+        1    | CH2 mode: 0 = CV, 1 = CC
+        2,3  | Output tracking: 01 = Independent, 10 = Parallel
+        4    | CH1 output: 0 = OFF, 1 = ON
+        5    | CH2 output: 0 = OFF, 1 = ON
+        6    | TIMER1: 0 = OFF, 1 = ON
+        7    | TIMER2: 0 = OFF, 1 = ON
+        8    | CH1 display: 0 = digital, 1 = waveform
+        9    | CH2 display: 0 = digital, 1 = waveform
+
+    Only the two bits this driver currently has a caller for (CH1/CH2 output
+    state) are decoded into named flags; extend this mapping if a caller for
+    the other documented bits appears.
+
+    Args:
+        word: The raw response, e.g. ``"0x0224"``.
+
+    Returns:
+        Mapping of flag name to bool. Currently: ``ch1_output``, ``ch2_output``.
+
+    Raises:
+        ValueError: If `word` is not a hexadecimal status word.
+    """
+    try:
+        bits = int(word.strip(), 16)
+    except (AttributeError, ValueError) as exc:
+        raise ValueError(f"Not a hexadecimal SPD3303X status word: {word!r}") from exc
+
+    return {
+        "ch1_output": bool(bits & (1 << 4)),
+        "ch2_output": bool(bits & (1 << 5)),
+    }
+
+
 class PSUSCPICommandSet:
     """SCPI command abstraction for power supplies.
 
@@ -61,7 +105,13 @@ class PSUSCPICommandSet:
         "measure_power": "MEASure:POWEr? CH{ch}",
         # Output control uses specific format
         "set_output": "OUTPut CH{ch},{state}",
-        "get_output": "OUTPut? CH{ch}",
+        # QS0503X-E01B p.36 (Chapter 3.2 command list), p.40 (OUTPut Subsystem):
+        # there is NO output-state query on this instrument -- "OUTPut? CH{ch}"
+        # was invented and does not exist in the SPD3303X command set (audit
+        # H20, Task 8). The only documented way to read output state is to
+        # decode the bit-encoded "SYSTem:STATus?" response (p.41-42) via
+        # decode_spd_status() below.
+        "get_status": "SYSTem:STATus?",
         # Advanced Siglent-specific features
         # Timer functionality
         "set_timer_enable": "TIMEr CH{ch},{state}",

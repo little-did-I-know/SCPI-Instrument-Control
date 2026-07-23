@@ -1250,26 +1250,26 @@ WIRE_FORMS: List[WireForm] = [
     WireForm(
         table="psu",
         variant="siglent_spd",
-        op="get_output",
-        params={"ch": 1},
-        request="OUTPut? CH1",
-        source=f"{SPD_GUIDE} p.36, p.41",
-        status=MISMATCH_DEFERRED,
-        mock_kwargs={"psu_mode": True},
+        op="get_status",
+        params={},
+        request="SYSTem:STATus?",
+        response="0x0224",
+        parsed={"ch1_output": False, "ch2_output": True},
+        source=f"{SPD_GUIDE} p.41-42",
+        status=VERIFIED,
+        mock_kwargs={"psu_mode": True, "psu_outputs": {2: {"voltage": 0.0, "current": 0.0, "enabled": True}}},
         note=(
-            "[HIGH severity -- pull-in candidate] The SPD3303X command list "
-            "(p.36, Chapter 3.2) has no output-state QUERY at all -- the "
-            "OUTPut Subsystem section (p.40) documents only the setter "
-            "'OUTPut {CH1|CH2|CH3},{ON|OFF}'. Output/channel state is instead "
-            "read from the bit-encoded 'SYSTem:STATus?' (p.41, Typical "
-            "Return '0x0224', decoded via the bit table on p.42), a wholly "
-            "different command this table does not use. "
-            "power_supply_output.py's 'enabled' property (get_output) is "
-            "called directly, unguarded by a try/except, from "
-            "get_configuration() -- unlike the measurement fields a few "
-            "lines below it in the same method, which ARE wrapped -- and "
-            "examples/psu_basic_control.py calls get_configuration() on its "
-            "default/documented-usage path. H20, fix Task 8."
+            "Fixed Task 8 (H20): the SPD3303X command list (p.36, Chapter "
+            "3.2) has no output-state QUERY at all -- the invented "
+            "'OUTPut? CH{ch}' this table used to send does not exist on this "
+            "instrument; the OUTPut Subsystem section (p.40) documents only "
+            "the setter 'OUTPut {CH1|CH2|CH3},{ON|OFF}'. Output state is "
+            "instead read from this bit-encoded 'SYSTem:STATus?' response "
+            "('0x0224' is the manual's own Typical Return, p.41), decoded via "
+            "the p.42 state-correspondence table: bit 4 = CH1 output, bit 5 "
+            "= CH2 output (decode_spd_status() in psu_scpi_commands.py). "
+            "power_supply_output.py's 'enabled' property now queries this "
+            "instead of the old fictitious per-channel query."
         ),
     ),
 

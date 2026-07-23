@@ -196,8 +196,8 @@ footer number (which runs 8 lower on every page).
 | Command | We send | Documented | Status | Source |
 |---|---|---|---|---|
 | `get_current` | `CH{ch}:CURR?` | `[{CH1\|CH2}:]CURRent?`; response bare NR2, matches structure | VERIFIED | QS0503X-E01B p.39 |
-| `get_output` | `OUTPut? CH{ch}` | no output-state query documented anywhere; state comes from `SYSTem:STATus?` (bit-encoded) | MISMATCH_DEFERRED | QS0503X-E01B p.36, p.41 |
 | `get_remote_sense` | `SYST:SENS? CH{ch}` | absent from manual entirely (zero hits for "SENS"); dead code (no caller) | MISMATCH_DEFERRED | QS0503X-E01B p.36 |
+| `get_status` | `SYSTem:STATus?` | `SYSTem:STATus?`; response bare hex word (Typical Return `0x0224`), decoded via the p.42 bit table (bit 4 = CH1 output, bit 5 = CH2 output) | VERIFIED | QS0503X-E01B p.41-42 |
 | `get_timer_current` | `TIMEr:CURR? CH{ch}` | absent from manual entirely; only `TIMEr:SET?` exists (group-addressed); dead code (no caller) | MISMATCH_DEFERRED | QS0503X-E01B p.40-41 |
 | `get_timer_enable` | `TIMEr? CH{ch}` | no query form documented for `TIMEr {CH1\|CH2},{ON\|OFF}`; only `TIMEr:SET?` (group voltage/current/time, not enabled state) | MISMATCH_DEFERRED | QS0503X-E01B p.40-41 |
 | `get_timer_voltage` | `TIMEr:VOLT? CH{ch}` | absent from manual entirely; only `TIMEr:SET?` exists (group-addressed); dead code (no caller) | MISMATCH_DEFERRED | QS0503X-E01B p.40-41 |
@@ -223,7 +223,13 @@ footer number (which runs 8 lower on every page).
 | `set_wave_freq` | `WAVE:FREQ CH{ch},{frequency}` | absent from manual entirely; dead code (no caller) | MISMATCH_DEFERRED | QS0503X-E01B p.36 |
 | `set_wave_type` | `WAVE:TYPE CH{ch},{wave_type}` | absent from manual entirely; dead code (no caller) | MISMATCH_DEFERRED | QS0503X-E01B p.36 |
 
-**Tally: 8 VERIFIED, 19 MISMATCH_DEFERRED, 0 UNCITED (27 total).**
+**Tally: 12 VERIFIED, 15 MISMATCH_DEFERRED, 0 UNCITED (27 total).** (Recomputed
+directly from `tests/wire_forms.py` — see the module docstring's counting
+one-liner. The table above still shows `measure_voltage`/`measure_current`/
+`measure_power` as MISMATCH_DEFERRED text, which is now stale: those three
+were flipped to VERIFIED by Task 6 and the row text here was never updated to
+match. Left as-is since fixing it is outside Task 8's scope; noted here so the
+next sweep doesn't re-trust the row text over the corpus.)
 
 Full detail — exact current vs. documented wire form, severity against the
 pull-in bar, and why each is deferred rather than fixed — is in each entry's
@@ -233,7 +239,10 @@ tracked audit IDs with a fix owner: `measure_voltage`/`measure_current`/
 Task 7 — the wire now sends `OUTPut:TRACK {0|1|2}` and `OUTPut:WAVE
 CH{ch},{state}`; their query counterparts, `get_tracking` and
 `get_wave_enable`, stay MISMATCH_DEFERRED because the manual documents no
-query form for either command at all), and `get_output` (H20, Task 8). The
+query form for either command at all), and `get_status` (formerly `get_output`;
+H20, fixed Task 8 — the wire now sends `SYSTem:STATus?` and decodes CH1/CH2
+output state from the returned bit-encoded hex word instead of the
+nonexistent `OUTPut? CH{ch}` query). The
 rest — the six-command "waveform generation" surface (`set_wave_type`/
 `get_wave_type`/`set_wave_freq`/`get_wave_freq`/`set_wave_amplitude`/
 `get_wave_amplitude`), `set_remote_sense`/`get_remote_sense`, and the four

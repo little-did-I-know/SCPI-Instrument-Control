@@ -8,6 +8,7 @@ import re
 from typing import TYPE_CHECKING, Dict
 
 from scpi_control import exceptions
+from scpi_control.psu_scpi_commands import decode_spd_status
 
 if TYPE_CHECKING:
     from scpi_control.power_supply import PowerSupply
@@ -122,6 +123,22 @@ class PowerSupplyOutput:
         Returns:
             True if output is enabled, False otherwise
         """
+        scpi_commands = self._psu._scpi_commands
+        if scpi_commands is not None and scpi_commands.supports_command("get_status"):
+            # QS0503X-E01B p.36/p.40-41: the SPD3303X has no output-state
+            # query at all -- state is decoded from the bit-encoded
+            # SYSTem:STATus? response instead (audit H20, Task 8).
+            cmd = self._psu._get_command("get_status")
+            response = self._psu.query(cmd)
+            state = decode_spd_status(response)
+            key = f"ch{self._output_num}_output"
+            if key in state:
+                return state[key]
+            # No documented status bit covers this channel (e.g. SPD3303X's
+            # fixed CH3 -- p.42's bit table only defines CH1/CH2). Fall
+            # through to the generic query below for lack of anything better
+            # documented for it.
+
         cmd = self._psu._get_command("get_output", ch=self._output_num)
         response = self._psu.query(cmd)
         # Response may be "ON", "OFF", or include echo like "OUTPUT CH1,ON"

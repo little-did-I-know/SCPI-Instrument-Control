@@ -548,6 +548,21 @@ class MockConnection(BaseConnection):
                     return f"{self.psu_outputs[ch]['current']:.3f}"
                 return "0.000"
 
+            # Status word query: SYSTem:STATus? (QS0503X-E01B p.41-42). This is
+            # the ONLY documented way to read CH1/CH2 output state on the
+            # SPD3303X (audit H20, Task 8) -- bit 4 = CH1 on, bit 5 = CH2 on.
+            # The 0x0204 baseline reproduces the manual's own bits {2, 9}
+            # (independent tracking mode, CH2 waveform display) so that with
+            # ch1=off/ch2=on this handler answers the manual's own Typical
+            # Return "0x0224" verbatim.
+            if match := re.match(r"SYST(?:EM)?:STAT(?:US)?\?", upper):
+                bits = 0x0204
+                if self.psu_outputs.get(1, {}).get("enabled"):
+                    bits |= 1 << 4
+                if self.psu_outputs.get(2, {}).get("enabled"):
+                    bits |= 1 << 5
+                return f"0x{bits:04X}"
+
             # Output state queries: OUTPut? CH1 (Siglent) or OUTP1? (generic)
             # Matches: OUTP1?, OUTPUT1?, OUTP? CH1, OUTPUT? CH1
             if match := re.match(r"OUTP(?:UT)?(\d+)\?|OUTP(?:UT)?\?\s*(?:CH\s*)?(\d+)", upper):
