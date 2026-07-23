@@ -103,6 +103,10 @@ class MockConnection(BaseConnection):
         self.waveform_start: int = 0
         self.waveform_interval: int = 1
         self.waveform_point: int = 0
+        # :WAVeform:WIDTh state (Task 18, audit H9; guide p.754): BYTE is the
+        # documented default (COMM_TYPE=0). Drives the PREamble?/DATA?
+        # binary responses built in connection/mock/siglent.py.
+        self.waveform_width: str = "BYTE"
 
         self.sample_rate = sample_rate
         self.timebase = timebase
@@ -713,6 +717,18 @@ class MockConnection(BaseConnection):
             # scope's SCDP? reply is parsed in screen_capture.py.
             payload = _build_ieee_block(MOCK_SCREENSHOT_BMP)
             return payload[:size] if size is not None else payload
+
+        # Modern :WAVeform:PREamble?/:WAVeform:DATA? binary blocks (Task 18,
+        # audit H9): which one read_raw() returns is determined by the last
+        # write, exactly like the SCDP? branch above.
+        if self.scope_dialect == "modern" and self.writes:
+            last_write = self.writes[-1].upper()
+            if last_write == ":WAVEFORM:PREAMBLE?":
+                payload = siglent.build_waveform_preamble(self)
+                return payload[:size] if size is not None else payload
+            if last_write == ":WAVEFORM:DATA?":
+                payload = siglent.build_waveform_data(self)
+                return payload[:size] if size is not None else payload
 
         personality = _PERSONALITIES.get(self.scope_vendor, siglent)
         payload = personality.build_waveform_response(self)

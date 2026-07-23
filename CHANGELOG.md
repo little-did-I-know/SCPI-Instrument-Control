@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Oscilloscope: modern-dialect (SDS800X HD / SDS5000X) waveform capture now goes over the documented
+  `:WAVeform:SOURce`/`:WAVeform:PREamble?`/`:WAVeform:DATA?` subsystem instead of the legacy
+  `C<n>:WF? DAT2`/`DESC` forms, which have zero occurrences anywhere in the modern programming guide
+  (audit H9). Voltage and time reconstruction use the guide's own documented formulas (p.758/p.759).
+
 ### Deprecated
 
 - Power supply: setting `ovp_level`/`ocp_level` on an SPD3303X/-E now emits a `FutureWarning`. The
@@ -16,6 +23,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Testing: `MockConnection` gained `strict=True`, which makes unmatched PSU/AWG/DAQ queries raise
   `TimeoutError` like real instruments instead of returning `""`. Strict becomes the default in v5.0.0 —
   pass `strict=False` explicitly to keep the old behavior past that release.
+- Testing: `MockConnection` still answers legacy `C<n>:WF?` writes on a modern-dialect (`SDS8xx HD`/
+  `SDS5000X`) instance, even though the driver's modern capture path no longer sends it (audit H9,
+  Task 18). This is a backward-compatibility shim for anything still issuing that form by hand; the
+  modern guide documents no such command, and the mock handler is removed in v5.0.0.
 
 ## [4.0.0] - 2026-07-22
 

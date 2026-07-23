@@ -1064,56 +1064,86 @@ WIRE_FORMS: List[WireForm] = [
     ),
     # -- Waveform acquisition --
     # WF? appears ZERO times anywhere in this guide -- the legacy C{ch}:WF?
-    # transfer command has no modern equivalent under any header. The
-    # documented modern transfer is the :WAVeform: subsystem (guide p.746-763:
-    # SOURce/STARt/INTerval/POINt/MAXPoint/WIDTh/PREamble/DATA/SEQuence).
+    # transfer command has no modern equivalent under any header. Task 18
+    # rewires the modern capture path (waveform_transfer.ModernTransfer) onto
+    # the documented :WAVeform:SOURce/PREamble/DATA subsystem; these two ops
+    # are the trigger commands for the descriptor and the sample data.
     WireForm(
         table="scope",
         dialect="modern",
         op="get_waveform",
         params={"ch": 1},
-        request="C1:WF? DAT2",
+        request=":WAVeform:DATA?",
         source=f"{MODERN_GUIDE} p.757",
-        status=MISMATCH_DEFERRED,
         mock_kwargs={"idn": MODERN_IDN},
         note=(
-            "[HIGH severity -- already scheduled, audit finding H9 / Task 18] "
-            "Modern uses :WAVeform:PREamble?/:WAVeform:DATA? (guide p.746ff, "
-            "DATA specifically p.757); 'C{ch}:WF? DAT2' is absent from the "
-            "modern guide entirely (zero hits for 'WF?', full-text search). "
-            "get_waveform is on the default waveform-capture path (waveform.py, "
-            "waveform_transfer.py, the GUI capture worker, the webapp scope "
-            "API) -- Task 17 added the :WAVeform: SOURce/STARt/INTerval/POINt "
-            "transfer-parameter scalars (see the corpus block below) as prep; "
-            "the binary preamble/data transfer itself, and rewiring this "
-            "get_waveform op onto it, is Task 18 per the task-5 plan. Not "
-            "fixed here."
+            "Task 18 (audit H9 fix): repointed from the invented "
+            "'C{ch}:WF? DAT2' (zero hits anywhere in this 855-page guide) to "
+            "the documented :WAVeform:DATA? query. Response is binary (an "
+            "IEEE block, not a query()-able string), so this entry pins the "
+            "REQUEST only (no `response`) -- see get_waveform_data below and "
+            "tests/test_modern_waveform_transfer.py for the binary-transfer "
+            "round trip. 'ch' is accepted for signature compatibility with "
+            "the other three dialects' get_waveform but unused: the source "
+            "channel is a separate :WAVeform:SOURce command (see below)."
         ),
     ),
     WireForm(
         table="scope",
         dialect="modern",
         op="get_waveform_preamble",
-        params={"ch": 1},
-        request="C1:WF? DESC",
-        source=f"{MODERN_GUIDE} p.754",
-        status=MISMATCH_DEFERRED,
+        params={},
+        request=":WAVeform:PREamble?",
+        source=f"{MODERN_GUIDE} p.755",
         mock_kwargs={"idn": MODERN_IDN},
         note=(
-            "[HIGH severity -- already scheduled, audit finding H9 / Task 18] "
-            "Same absence as get_waveform above. Modern uses "
-            ":WAVeform:PREamble? (guide p.754); 'C{ch}:WF? DESC' does not exist "
-            "in this manual. Task 17 added the transfer-parameter scalars "
-            "(SOURce/STARt/INTerval/POINt, see below) that PREamble?/DATA? "
-            "will read back against; the PREamble? binary descriptor block "
-            "and its parser are Task 18. Not fixed here."
+            "Task 18 (audit H9 fix): repointed from the invented "
+            "'C{ch}:WF? DESC' (not in this manual) to the documented "
+            ":WAVeform:PREamble? query. Binary response (a 346-byte WAVEDESC "
+            "block per Table 1, p.755-756) -- pinned request-only, same as "
+            "get_waveform above; see tests/test_modern_waveform_transfer.py."
         ),
+    ),
+    WireForm(
+        table="scope",
+        dialect="modern",
+        op="get_waveform_data",
+        params={},
+        request=":WAVeform:DATA?",
+        source=f"{MODERN_GUIDE} p.757",
+        mock_kwargs={"idn": MODERN_IDN},
+        note=(
+            "Task 18: the :WAVeform:DATA? leaf under its own documented name "
+            "(waveform_transfer.ModernTransfer calls this op, not the generic "
+            "get_waveform alias above). Binary response, pinned request-only."
+        ),
+    ),
+    WireForm(
+        table="scope",
+        dialect="modern",
+        op="set_waveform_width",
+        params={"value": "WORD"},
+        request=":WAVeform:WIDTh WORD",
+        source=f"{MODERN_GUIDE} p.754",
+        mock_kwargs={"idn": MODERN_IDN},
+    ),
+    WireForm(
+        table="scope",
+        dialect="modern",
+        op="get_waveform_width",
+        params={},
+        request=":WAVeform:WIDTh?",
+        response="BYTE",
+        parsed="BYTE",
+        source=f"{MODERN_GUIDE} p.754",
+        mock_kwargs={"idn": MODERN_IDN},
+        note="Mock's default width is 'BYTE' (COMM_TYPE=0), matching the guide's own 'Default value is 0' note on COMM_TYPE (p.755).",
     ),
     # -- Waveform transfer-parameter scalars (Task 17, audit H9) --
     # :WAVeform:SOURce/STARt/INTerval/POINt (guide pp.749-752): the documented
-    # modern scalar transfer-parameter commands that configure a subsequent
-    # :WAVeform:DATA?/:WAVeform:PREamble? transfer (Task 18; not implemented
-    # here -- see the two MISMATCH_DEFERRED entries directly above). Response
+    # modern scalar transfer-parameter commands that configure the
+    # :WAVeform:DATA?/:WAVeform:PREamble? transfer (see the VERIFIED entries
+    # above -- Task 18 rewired the capture path onto them). Response
     # values below are the mock's fresh-connection defaults (no prior write),
     # matching how test_mock_answers_documented_response exercises every
     # RESPONSE_FORMS entry: it queries a brand-new MockConnection built from

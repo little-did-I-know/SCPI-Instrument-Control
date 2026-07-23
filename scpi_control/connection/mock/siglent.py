@@ -4,9 +4,13 @@ write/query dialects, plus the waveform-response builder."""
 from __future__ import annotations
 
 import re
+import struct
 from typing import Dict, Optional, Tuple
 
-from scpi_control.connection.mock.helpers import _build_ieee_block, _format_nr3, _format_scientific, _format_si_sample_rate
+import numpy as np
+
+from scpi_control import exceptions
+from scpi_control.connection.mock.helpers import _build_ieee_block, _build_ieee_block_9digit, _format_nr3, _format_scientific, _format_si_sample_rate
 from scpi_control.connection.mock import synth as mock_synth
 
 # Canonical PAVA? measurement values for the legacy dialect (mirrors real
@@ -95,6 +99,11 @@ def handle_write(conn, command: str) -> bool:
             return True
         if match := re.match(r":WAVeform:POINt\s+(-?\d+)", command, re.IGNORECASE):
             conn.waveform_point = int(match.group(1))
+            return True
+        # Transfer width (Task 18, audit H9; guide p.754): selects the
+        # COMM_TYPE the PREamble?/DATA? responses use.
+        if match := re.match(r":WAVeform:WIDTh\s+(BYTE|WORD)", command, re.IGNORECASE):
+            conn.waveform_width = match.group(1).upper()
             return True
         # Unknown modern writes fall through and are merely recorded,
         # mirroring real scopes which silently drop unknown commands
@@ -206,6 +215,8 @@ def handle_query(conn, command: str) -> Optional[str]:
             return str(conn.waveform_interval)
         if upper == ":WAVEFORM:POINT?":  # bare NR1, p.752
             return str(conn.waveform_point)
+        if upper == ":WAVEFORM:WIDTH?":  # BYTE|WORD, p.754
+            return conn.waveform_width
 
     if conn.scope_dialect == "legacy":
         if match := re.match(r"C(\d+):VDIV\?", command, re.IGNORECASE):
@@ -283,7 +294,109 @@ def handle_query(conn, command: str) -> Optional[str]:
 
 
 def build_waveform_response(conn) -> bytes:
-    """Construct a minimal Siglent-style waveform block response."""
+    """Construct a minimal Siglent-style waveform block response.
+
+    Legacy-dialect "C{ch}:WF? DAT2"/"DESC" only (Task 18 deprecation: kept
+    answering until v5.0.0, but the modern-dialect driver capture path no
+    longer sends it -- see build_waveform_preamble/build_waveform_data below).
+    """
     channel = conn._last_waveform_channel or next(iter(conn._waveform_payloads), 1)
     payload = mock_synth.payload_for(conn, channel, include_offset=True)
     return b"DESC," + _build_ieee_block(payload)
+
+
+# ---- Modern :WAVeform:PREamble?/:WAVeform:DATA? binary responses ----------
+# SDS Series Programming Guide EN11G p.755-756 (Table 1: "Explanation of the
+# descriptor block"). Field offsets are from the first byte AFTER the
+# "#9<9-digits>" header. wave_desc_length is fixed at 346 bytes; fields not
+# read by ModernTransfer (Reserved, instrument/template name beyond the fixed
+# prefix, the model-dependent Timebase enum, etc.) are left zeroed.
+_MODERN_WAVEDESC_LEN = 346
+_MODERN_COMM_TYPE = 32  # short: 0=byte, 1=word (p.755)
+_MODERN_COMM_ORDER = 34  # short: 0=LSB, 1=MSB (p.755) -- mock always writes 0 (little-endian)
+_MODERN_WAVE_DESC_LENGTH = 36  # long (p.755)
+_MODERN_WAVE_ARRAY_1 = 60  # long: bytes in the transmitted array (p.755)
+_MODERN_WAVE_ARRAY_COUNT = 116  # long: number of data points (p.755)
+_MODERN_FIRST_POINT = 132  # long: = :WAVeform:STARt (p.755)
+_MODERN_DATA_INTERVAL = 136  # long: = :WAVeform:INTerval (p.755)
+_MODERN_VERTICAL_GAIN = 156  # float: V/div, no probe attenuation (p.756)
+_MODERN_VERTICAL_OFFSET = 160  # float (p.756)
+_MODERN_CODE_PER_DIV = 164  # float (p.756)
+_MODERN_HORIZ_INTERVAL = 176  # float: 1/sample_rate (p.756)
+_MODERN_HORIZ_OFFSET = 180  # double: trigger offset, seconds (p.756)
+
+# code_per_div the mock encodes with. BYTE mirrors WAVEFORM_CODE_PER_DIV_8BIT
+# (waveform.py); WORD is that value left-shifted 8 bits (256x), matching
+# p.758's note that >8-bit models transmit word samples "left aligned, and
+# the lower bit is zero filled" -- i.e. WAVEFORM_CODE_PER_DIV_16BIT is
+# WAVEFORM_CODE_PER_DIV_8BIT * 256. Restated here (not imported) to avoid a
+# waveform.py <-> connection.mock import edge; kept numerically identical.
+_MODERN_CODE_PER_DIV_BYTE = 25.0
+_MODERN_CODE_PER_DIV_WORD = 25.0 * 256
+
+
+def _modern_source_channel(conn) -> int:
+    """Extract the analog channel number from the stored :WAVeform:SOURce token."""
+    match = re.fullmatch(r"C(\d+)", conn.waveform_source, re.IGNORECASE)
+    if not match:
+        raise exceptions.CommandError(f"Mock :WAVeform:SOURce {conn.waveform_source!r} is not an analog channel (only C<n> sources are modeled)")
+    return int(match.group(1))
+
+
+def build_waveform_preamble(conn) -> bytes:
+    """Build the modern :WAVeform:PREamble? response: "#9<9-digits>" + a 346-byte WAVEDESC.
+
+    SDS Series Programming Guide EN11G p.755 (Table 1). The scaling fields
+    (vertical_gain/vertical_offset/code_per_div/horizontal_interval) are
+    exactly what build_waveform_data below encodes samples with, so the
+    driver's parser recovers the mock's true volts (audit H9, Task 18).
+    """
+    channel = _modern_source_channel(conn)
+    n_points = mock_synth.point_count(conn, channel)
+    word = conn.waveform_width == "WORD"
+    bytes_per_point = 2 if word else 1
+    code_per_div = _MODERN_CODE_PER_DIV_WORD if word else _MODERN_CODE_PER_DIV_BYTE
+
+    desc = bytearray(_MODERN_WAVEDESC_LEN)
+    desc[0:8] = b"WAVEDESC"
+    desc[16:23] = b"WAVEACE"
+    struct.pack_into("<h", desc, _MODERN_COMM_TYPE, 1 if word else 0)
+    struct.pack_into("<h", desc, _MODERN_COMM_ORDER, 0)
+    struct.pack_into("<i", desc, _MODERN_WAVE_DESC_LENGTH, _MODERN_WAVEDESC_LEN)
+    struct.pack_into("<i", desc, _MODERN_WAVE_ARRAY_1, n_points * bytes_per_point)
+    struct.pack_into("<i", desc, _MODERN_WAVE_ARRAY_COUNT, n_points)
+    struct.pack_into("<i", desc, _MODERN_FIRST_POINT, conn.waveform_start)
+    struct.pack_into("<i", desc, _MODERN_DATA_INTERVAL, conn.waveform_interval)
+    struct.pack_into("<f", desc, _MODERN_VERTICAL_GAIN, conn._voltage_scales.get(channel, 1.0))
+    struct.pack_into("<f", desc, _MODERN_VERTICAL_OFFSET, conn._voltage_offsets.get(channel, 0.0))
+    struct.pack_into("<f", desc, _MODERN_CODE_PER_DIV, code_per_div)
+    struct.pack_into("<f", desc, _MODERN_HORIZ_INTERVAL, (1.0 / conn.sample_rate) if conn.sample_rate else 0.0)
+    struct.pack_into("<d", desc, _MODERN_HORIZ_OFFSET, 0.0)  # mock triggers at the first sample
+    return _build_ieee_block_9digit(bytes(desc))
+
+
+def build_waveform_data(conn) -> bytes:
+    """Build the modern :WAVeform:DATA? response: "#9<9-digits>" + raw sample codes.
+
+    SDS Series Programming Guide EN11G p.757-758. Codes are encoded with the
+    INVERSE of the guide's own p.758 voltage formula (code = (volts+voffset)
+    * code_per_div / vdiv), so waveform_transfer.ModernTransfer's forward
+    formula recovers the original volts (the round-trip this sub-project
+    exists to make trustworthy -- see wavedesc-reference.md).
+    """
+    channel = _modern_source_channel(conn)
+    explicit = conn._waveform_payloads.get(channel)
+    word = conn.waveform_width == "WORD"
+    if explicit is not None:
+        payload = explicit
+    else:
+        code_per_div = _MODERN_CODE_PER_DIV_WORD if word else _MODERN_CODE_PER_DIV_BYTE
+        vdiv = conn._voltage_scales.get(channel, 1.0)
+        voffset = conn._voltage_offsets.get(channel, 0.0)
+        volts = mock_synth.raw_volts(conn, channel)
+        codes = np.rint((volts + voffset) * code_per_div / vdiv)
+        if word:
+            payload = np.clip(codes, -32768, 32767).astype("<i2").tobytes()
+        else:
+            payload = np.clip(codes, -128, 127).astype(np.int8).tobytes()
+    return _build_ieee_block_9digit(payload)

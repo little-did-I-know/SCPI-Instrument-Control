@@ -1,8 +1,11 @@
 """Per-dialect waveform transfer strategies.
 
-Siglent (both dialects) speaks WF? DAT2 with fixed code-per-division scaling;
+Legacy Siglent speaks WF? DAT2 with fixed code-per-division scaling;
 Tektronix speaks the CURVe protocol scaled by the WFMOutpre preamble; LeCroy
-(Task 15) speaks WF? ALL scaled by the WAVEDESC descriptor. The IEEE-488.2
+(Task 15) speaks WF? ALL scaled by the WAVEDESC descriptor; modern Siglent
+(Task 18, audit H9) speaks the documented :WAVeform:SOURce/PREamble/DATA
+subsystem, also scaled by a WAVEDESC-shaped descriptor but with an explicit
+code_per_div field the LeCroy path does not have. The IEEE-488.2
 definite-length block framing is shared by all of them.
 """
 
@@ -360,6 +363,151 @@ class LeCroyTransfer:
         )
 
 
+# Modern-dialect WAVEDESC field offsets -- SDS Series Programming Guide EN11G
+# p.755-756 (Table 1). Structurally the same 346-byte WAVEDESC layout as the
+# LeCroy descriptor above (_WAVEDESC_* constants), but kept as its own table:
+# the modern voltage formula (ModernTransfer.acquire, below) reads an
+# EXPLICIT code_per_div field the LeCroy path never touches, and the two
+# dialects must stay independently editable (Task 15 vs Task 18).
+_MODERN_COMM_TYPE = 32  # short: 0=byte, 1=word
+_MODERN_WAVE_ARRAY_COUNT = 116  # long: number of data points
+_MODERN_VERTICAL_GAIN = 156  # float: V/div, no probe attenuation
+_MODERN_VERTICAL_OFFSET = 160  # float
+_MODERN_CODE_PER_DIV = 164  # float
+_MODERN_HORIZ_INTERVAL = 176  # float: 1/sample_rate
+_MODERN_HORIZ_OFFSET = 180  # double: trigger offset, seconds
+
+
+def parse_modern_wavedesc(payload: bytes, *, error_context: str = "") -> dict:
+    """Parse the WAVEDESC out of a modern-dialect :WAVeform:PREamble? response.
+
+    SDS Series Programming Guide EN11G p.755-756 (Table 1). Unlike the LeCroy
+    WAVEDESC (parse_wavedesc above), the modern descriptor's vertical_gain is
+    "the value of vertical scale [...] without probe attenuation" (V/div) and
+    a SEPARATE code_per_div field is needed to turn it into volts/code -- see
+    the p.758 worked formula in ModernTransfer.acquire below.
+    """
+
+    def _err(message: str) -> str:
+        return f"{message} ({error_context})" if error_context else message
+
+    if len(payload) < _MODERN_HORIZ_OFFSET + 8:
+        raise exceptions.CommandError(_err(f"Invalid modern WAVEDESC: expected at least {_MODERN_HORIZ_OFFSET + 8} bytes, got {len(payload)}"))
+    return {
+        "comm_type": struct.unpack_from("<h", payload, _MODERN_COMM_TYPE)[0],
+        "wave_array_count": struct.unpack_from("<i", payload, _MODERN_WAVE_ARRAY_COUNT)[0],
+        "vertical_gain": struct.unpack_from("<f", payload, _MODERN_VERTICAL_GAIN)[0],
+        "vertical_offset": struct.unpack_from("<f", payload, _MODERN_VERTICAL_OFFSET)[0],
+        "code_per_div": struct.unpack_from("<f", payload, _MODERN_CODE_PER_DIV)[0],
+        "horiz_interval": struct.unpack_from("<f", payload, _MODERN_HORIZ_INTERVAL)[0],
+        "horiz_offset": struct.unpack_from("<d", payload, _MODERN_HORIZ_OFFSET)[0],
+    }
+
+
+class ModernTransfer:
+    """:WAVeform: SOURce/PREamble/DATA transfer for modern-dialect Siglent scopes.
+
+    SDS Series Programming Guide EN11G pp.748-758 (audit H9, Task 18): the
+    legacy "C{ch}:WF? DAT2" transfer has ZERO occurrences anywhere in this
+    855-page guide (full-text search). This class replaces it for
+    dialect="modern" scopes; SiglentTransfer above is unchanged and keeps
+    serving dialect="legacy" scopes.
+    """
+
+    def __init__(self, scope: "Oscilloscope"):
+        self._scope = scope
+
+    def acquire(self, channel: int, format: str = "BYTE") -> WaveformData:
+        """Acquire waveform data from a channel via :WAVeform:SOURce/PREamble/DATA.
+
+        Args:
+            channel: Channel number (1-4)
+            format: Data format - 'BYTE' or 'WORD' (default: 'BYTE'); sets
+                :WAVeform:WIDTh before the transfer so COMM_TYPE in the
+                preamble matches what DATA? actually sends.
+
+        Returns:
+            WaveformData scaled by the PREamble's vertical_gain/
+            vertical_offset/code_per_div (volts) and horiz_offset/
+            horiz_interval (time).
+
+        Raises:
+            InvalidParameterError: If a non-BYTE/WORD format is requested.
+            CommandError: If either binary block is malformed.
+        """
+        format = format.upper()
+        if format not in ("BYTE", "WORD"):
+            raise exceptions.InvalidParameterError(f"Invalid format: {format}")
+        scope = self._scope
+
+        # Source (and width) must be selected before PREamble?/DATA? read
+        # them back -- both act "using the source specified by
+        # :WAVeform:SOURce" (guide p.748/p.754).
+        scope.write(scope._get_command("set_waveform_source", ch=channel))
+        scope.write(scope._get_command("set_waveform_width", value=format))
+
+        with scope._connection.lock:
+            scope.write(scope._get_command("get_waveform_preamble"))
+            preamble_raw = scope.read_raw()
+        preamble_context = f"host {scope.host}:{scope.port}, command ':WAVeform:PREamble?'"
+        preamble_payload = parse_ieee_block(preamble_raw, np.uint8, error_context=preamble_context).tobytes()
+        meta = parse_modern_wavedesc(preamble_payload, error_context=preamble_context)
+
+        with scope._connection.lock:
+            scope.write(scope._get_command("get_waveform_data"))
+            data_raw = scope.read_raw()
+        data_context = f"host {scope.host}:{scope.port}, command ':WAVeform:DATA?'"
+        dtype = np.int16 if meta["comm_type"] == 1 else np.int8
+        codes = parse_ieee_block(data_raw, dtype, error_context=data_context)
+
+        if meta["code_per_div"] == 0:
+            raise exceptions.CommandError(f"Modern WAVEDESC code_per_div is 0 ({data_context})")
+
+        # SDS Series Programming Guide EN11G p.758 ("Read Waveform Data",
+        # analog example, Step 3): "voltage value (V) = code value
+        # *(vdiv /code_per_div) - voffset". vdiv/voffset/code_per_div are the
+        # PREamble's vertical_gain/vertical_offset/code_per_div fields
+        # (WAVEDESC addresses 156-159/160-163/164-167). Confirmed against the
+        # guide's own worked numbers: code=-11, vdiv=10, code_per_div=30,
+        # voffset=14.5 -> -11*(10/30)-14.5 = -18.167 V, matching the guide's
+        # own printed "-18.167 V" exactly.
+        voltage = codes.astype(np.float64) * (meta["vertical_gain"] / meta["code_per_div"]) - meta["vertical_offset"]
+
+        # SDS Series Programming Guide EN11G p.759 ("Read Waveform Data",
+        # Step 4): "time value(S) = delay-(timebase*grid/2)+index*interval".
+        # delay/interval are the PREamble's horiz_offset/horiz_interval;
+        # "timebase" (s/div) is read via the existing :TIMebase:SCALe? getter
+        # rather than decoded from the WAVEDESC's Timebase field (address
+        # 324-325), which is a MODEL-DEPENDENT enumerated index into a table
+        # this guide explicitly says is not universal ("Different models have
+        # different time base enumeration", p.756, Table 2) -- decoding it
+        # would mean inventing a mapping the guide itself withholds.
+        # grid=10 for the SDS800X HD/SDS5000X/SDS2000X families this project
+        # targets (p.759); SHS800X/SHS1000X use 12 and are out of scope.
+        #
+        # NOTE: this is NOT "horiz_offset + i*interval" (a simpler-looking but
+        # WRONG equivalence) -- verified against the guide's own worked
+        # example (delay=1.72E-8, timebase=20E-9, interval=2E-10): the
+        # documented first-point time is -8.28E-08 s, which only the
+        # delay-(timebase*grid/2) form reproduces.
+        grid = 10
+        timebase = scope.waveform._get_timebase()
+        n = len(codes)
+        time = meta["horiz_offset"] - (timebase * grid / 2) + np.arange(n) * meta["horiz_interval"]
+
+        logger.info(f"Acquired {n} samples from channel {channel} (modern)")
+        return WaveformData(
+            time=time,
+            voltage=voltage,
+            channel=channel,
+            sample_rate=(1.0 / meta["horiz_interval"]) if meta["horiz_interval"] else None,
+            record_length=n,
+            timebase=timebase,
+            voltage_scale=meta["vertical_gain"],
+            voltage_offset=meta["vertical_offset"],
+        )
+
+
 def make_transfer(scope: "Oscilloscope"):
     """Select the waveform transfer strategy for a connected scope's dialect."""
     dialect = getattr(scope, "dialect", None) or "legacy"
@@ -367,4 +515,6 @@ def make_transfer(scope: "Oscilloscope"):
         return TektronixTransfer(scope)
     if dialect == "lecroy":
         return LeCroyTransfer(scope)
+    if dialect == "modern":
+        return ModernTransfer(scope)
     return SiglentTransfer(scope)

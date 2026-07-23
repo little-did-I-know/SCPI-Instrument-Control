@@ -71,8 +71,13 @@ class TestModernTable:
         assert self.cmds.get_command("set_bandwidth_limit", ch=1, limit="20M") == ":CHANnel1:BWLimit 20M"
         assert self.cmds.get_command("auto_setup") == ":AUToset"
 
-    def test_waveform_stays_legacy_until_sp2(self):
-        assert self.cmds.get_command("get_waveform", ch=1) == "C1:WF? DAT2"
+    def test_waveform_uses_the_documented_waveform_subsystem(self):
+        # SDS Series Programming Guide EN11G p.757 (audit H9, Task 18): "WF?"
+        # has zero occurrences anywhere in this guide. "ch" is accepted but
+        # unused -- the source channel is a separate :WAVeform:SOURce command.
+        assert self.cmds.get_command("get_waveform", ch=1) == ":WAVeform:DATA?"
+        assert self.cmds.get_command("get_waveform_preamble") == ":WAVeform:PREamble?"
+        assert self.cmds.get_command("get_waveform_data") == ":WAVeform:DATA?"
 
 
 class TestEnumMappers:

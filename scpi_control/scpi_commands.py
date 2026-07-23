@@ -105,8 +105,9 @@ class SCPICommandSet:
         "get_trigger_slope": "{src}:TRSL?",
         "set_trigger_coupling": "{src}:TRCP {coupling}",
         "get_trigger_coupling": "{src}:TRCP?",
-        # Waveform acquisition (transfer path unchanged until the waveform
-        # sub-project; the DAT2 path works on both scope generations)
+        # Waveform acquisition -- legacy-only, unchanged by Task 18. DAT2/DESC
+        # are documented for this dialect (RC01020-E01C p.141); the modern
+        # dialect's equivalent moved to the :WAVeform: subsystem below.
         "get_waveform": "C{ch}:WF? DAT2",
         "get_waveform_preamble": "C{ch}:WF? DESC",
         # Measurements
@@ -183,16 +184,22 @@ class SCPICommandSet:
         "get_trigger_slope": ":TRIGger:EDGE:SLOPe?",
         "set_trigger_coupling": ":TRIGger:EDGE:COUPling {coupling}",
         "get_trigger_coupling": ":TRIGger:EDGE:COUPling?",
-        # Waveform acquisition — unchanged until the waveform sub-project
-        "get_waveform": "C{ch}:WF? DAT2",
-        "get_waveform_preamble": "C{ch}:WF? DESC",
+        # Waveform acquisition (Task 18, audit H9 fix): the modern guide has
+        # ZERO occurrences of "WF?" anywhere -- "C{ch}:WF? DAT2"/"DESC" were
+        # invented. The documented transfer is the :WAVeform: subsystem
+        # (SOURce p.749, STARt p.750, INTerval p.751, POINt p.752, MAXPoint
+        # p.753, WIDTh p.754, PREamble p.755, DATA p.757/758). ModernTransfer
+        # (waveform_transfer.py) is the only caller of get_waveform_preamble/
+        # get_waveform_data/set_waveform_source/set_waveform_width below; the
+        # generic "get_waveform" key is kept (repointed, not removed) purely
+        # for symmetry with the other three dialect tables and any direct
+        # get_command("get_waveform") caller.
+        "get_waveform": ":WAVeform:DATA?",  # p.757
+        "get_waveform_preamble": ":WAVeform:PREamble?",  # p.755
+        "get_waveform_data": ":WAVeform:DATA?",  # p.757 (ModernTransfer's own name for the DATA? leaf)
         # Waveform transfer-parameter scalars (Task 17, audit H9): the
         # documented :WAVeform: subsystem's SOURce/STARt/INTerval/POINt
-        # commands, verified against the SDS800XHD guide. These are net-new
-        # keys, added ahead of the binary preamble/data transfer (Task 18)
-        # and deep-memory chunking (Task 19) -- get_waveform/
-        # get_waveform_preamble above still send the legacy C{ch}:WF? forms
-        # until Task 18 rewires the capture path.
+        # commands, verified against the SDS800XHD guide.
         "set_waveform_source": ":WAVeform:SOURce C{ch}",  # p.749
         "get_waveform_source": ":WAVeform:SOURce?",  # p.749
         "set_waveform_start": ":WAVeform:STARt {value}",  # p.750
@@ -201,6 +208,10 @@ class SCPICommandSet:
         "get_waveform_interval": ":WAVeform:INTerval?",  # p.751
         "set_waveform_point": ":WAVeform:POINt {value}",  # p.752
         "get_waveform_point": ":WAVeform:POINt?",  # p.752
+        # Transfer width (Task 18, audit H9): selects BYTE/WORD samples,
+        # which the WAVEDESC's COMM_TYPE field (offset 32-33) then echoes.
+        "set_waveform_width": ":WAVeform:WIDTh {value}",  # p.754
+        "get_waveform_width": ":WAVeform:WIDTh?",  # p.754
         # Measurements — get_parameter_value stays available (measure() keeps
         # working on modern, a documented gap); statistics/cursors/holdoff/unit
         # are legacy-only and intentionally absent so they gate cleanly.

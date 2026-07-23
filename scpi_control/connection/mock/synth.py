@@ -73,11 +73,14 @@ def point_count(conn: "MockConnection", channel: int) -> int:
     return max(2, min(MAX_POINTS, int(round(conn.sample_rate * window))))
 
 
-def payload_for(conn: "MockConnection", channel: int, *, include_offset: bool) -> bytes:
-    """int8 code bytes for a channel: explicit payload if given, else synthesized."""
-    explicit = conn._waveform_payloads.get(channel)
-    if explicit is not None:
-        return explicit
+def raw_volts(conn: "MockConnection", channel: int) -> np.ndarray:
+    """Synthesize one channel's sample volts, advancing its acquisition count.
+
+    Shared by the legacy int8 encoder (payload_for) and the modern-dialect
+    encoder (connection/mock/siglent.py's build_waveform_data), so both
+    dialects see the same signal for the same mock state -- only the
+    code-per-division scaling that turns volts into codes differs.
+    """
     spec = spec_for(conn, channel)
     n = point_count(conn, channel)
     count = conn._acquisition_counts.get(channel, 0)
@@ -89,7 +92,15 @@ def payload_for(conn: "MockConnection", channel: int, *, include_offset: bool) -
     else:
         t0 = count * window * _DRIFT_FRACTION  # untriggerable: free-run drift
     per_acquisition = spec if spec.seed is None else replace(spec, seed=spec.seed + count)
-    volts = synthesize(per_acquisition, conn.sample_rate, n, t0=t0)
+    return synthesize(per_acquisition, conn.sample_rate, n, t0=t0)
+
+
+def payload_for(conn: "MockConnection", channel: int, *, include_offset: bool) -> bytes:
+    """int8 code bytes for a channel: explicit payload if given, else synthesized."""
+    explicit = conn._waveform_payloads.get(channel)
+    if explicit is not None:
+        return explicit
+    volts = raw_volts(conn, channel)
     vdiv = conn._voltage_scales.get(channel, 1.0)
     voffset = conn._voltage_offsets.get(channel, 0.0) if include_offset else 0.0
     codes = np.clip(np.rint((volts + voffset) * CODES_PER_DIV / vdiv), -CODE_LIMIT, CODE_LIMIT)

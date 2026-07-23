@@ -119,12 +119,17 @@ extended to also strip legacy's header-echoed `"BWL "` prefix before splitting
 
 Checked against the SDS800X HD Series Programming Guide
 (`SDS800XHD_Series_ProgrammingGuide_EN11G.pdf`, cited below as "EN11G") on
-2026-07-23, plus the eight `:WAVeform:` transfer-parameter scalars added in
-Task 17 (audit H9) on 2026-07-23. All 48 commands in the table are covered.
-The PDF's internal page sequence is offset by +1 from the printed page
-numbers baked into each page's header/footer; every "p.N" citation below is
-the printed page number (confirmed against the guide's own table of
-contents, pp.2-11).
+2026-07-23, plus the `:WAVeform:` transfer-parameter scalars added in Task 17
+(audit H9) and the binary preamble/data transfer wired up in Task 18 (audit
+H9), both on 2026-07-23. All 51 commands in the table are covered.
+
+Every "p.N" citation below is the **PDF file page position** ("go to page N"
+in a viewer), NOT the printed footer -- this guide's footer runs one page
+behind the file position (e.g. cited `p.749` shows footer `748`). See
+`docs/development/vendor-manuals.md`'s citation-convention table. (An earlier
+draft of this paragraph claimed the opposite -- that citations were the
+printed footer number -- which was never true of how the entries below, or
+`tests/wire_forms.py`, were actually transcribed; corrected in Task 18.)
 
 | Command | We send | Documented | Status | Source |
 |---|---|---|---|---|
@@ -147,12 +152,14 @@ contents, pp.2-11).
 | `get_trigger_type` | `:TRIGger:TYPE?` | same; response bare, matches | VERIFIED | EN11G p.484 |
 | `get_voltage_div` | `:CHANnel{ch}:SCALe?` | same; response bare NR3, matches | VERIFIED | EN11G p.58 |
 | `get_voltage_offset` | `:CHANnel{ch}:OFFSet?` | same; response bare NR3, matches | VERIFIED | EN11G p.56 |
-| `get_waveform` | `C{ch}:WF? DAT2` | absent from manual entirely (zero hits for `WF?`); documented transfer is `:WAVeform:DATA?` (H9, scheduled Task 18) | MISMATCH_DEFERRED | EN11G p.757 |
+| `get_waveform` | `:WAVeform:DATA?` | `:WAVeform:DATA?`; binary IEEE block (request-verified only, see note below) | VERIFIED | EN11G p.757 |
+| `get_waveform_data` | `:WAVeform:DATA?` | same as `get_waveform` -- documented name, used by `ModernTransfer` | VERIFIED | EN11G p.757 |
 | `get_waveform_interval` | `:WAVeform:INTerval?` | `:WAVeform:INTerval?`; response bare NR1, matches (mock default `1`; manual's own EXAMPLE sets `200` first) | VERIFIED | EN11G p.751 |
 | `get_waveform_point` | `:WAVeform:POINt?` | `:WAVeform:POINt?`; response bare NR1, matches (mock default `0`; manual's own EXAMPLE sets `20000` first) | VERIFIED | EN11G p.752 |
-| `get_waveform_preamble` | `C{ch}:WF? DESC` | absent from manual entirely; documented transfer is `:WAVeform:PREamble?` (H9, scheduled Task 18) | MISMATCH_DEFERRED | EN11G p.754 |
+| `get_waveform_preamble` | `:WAVeform:PREamble?` | `:WAVeform:PREamble?`; binary 346-byte WAVEDESC block (request-verified only) | VERIFIED | EN11G p.755 |
 | `get_waveform_source` | `:WAVeform:SOURce?` | `:WAVeform:SOURce?`; response bare source token, matches (mock default `C1`; manual's own EXAMPLE sets `C2` first) | VERIFIED | EN11G p.749 |
 | `get_waveform_start` | `:WAVeform:STARt?` | `:WAVeform:STARt?`; response bare NR1, matches (mock default `0`; manual's own EXAMPLE sets `1000` first) | VERIFIED | EN11G p.750 |
+| `get_waveform_width` | `:WAVeform:WIDTh?` | `:WAVeform:WIDTh?`; response bare `BYTE`\|`WORD`, matches (mock default `BYTE`) | VERIFIED | EN11G p.754 |
 | `hardcopy_print` | `HCSU PRINT` | `HCSU` absent from manual entirely; capture+print folded into `:PRINt?`; dead code (no caller) | MISMATCH_DEFERRED | EN11G p.33 |
 | `run` | `:TRIGger:RUN` | `:TRIGger:RUN` | VERIFIED | EN11G p.483 |
 | `screen_dump` | `SCDP` | `SCDP` absent (only appears as a filename in an example); documented command is `:PRINt? <type>[,<format>]` | MISMATCH_DEFERRED | EN11G p.33 |
@@ -175,22 +182,35 @@ contents, pp.2-11).
 | `set_waveform_point` | `:WAVeform:POINt {value}` | `:WAVeform:POINt <value>` | VERIFIED | EN11G p.752 |
 | `set_waveform_source` | `:WAVeform:SOURce C{ch}` | `:WAVeform:SOURce <source>` | VERIFIED | EN11G p.749 |
 | `set_waveform_start` | `:WAVeform:STARt {value}` | `:WAVeform:STARt <value>` | VERIFIED | EN11G p.750 |
+| `set_waveform_width` | `:WAVeform:WIDTh {value}` | `:WAVeform:WIDTh <type>`, `{BYTE\|WORD}` | VERIFIED | EN11G p.754 |
 | `stop` | `:TRIGger:STOP` | `:TRIGger:STOP` | VERIFIED | EN11G p.484 |
 
-**Tally: 41 VERIFIED, 7 MISMATCH_DEFERRED, 0 UNCITED (48 total).**
+**Tally: 46 VERIFIED, 5 MISMATCH_DEFERRED, 0 UNCITED (51 total).**
 
-Task 17 (audit H9) added the eight rows above with a `get_waveform_`/
-`set_waveform_` prefix: the documented `:WAVeform:SOURce`/`STARt`/
-`INTerval`/`POINt` transfer-parameter scalars (EN11G p.749-752), verified
-against a fresh reading of those four pages (page citations in earlier plan
-drafts for this subsystem had been wrong; re-verified directly from the PDF).
-These configure a subsequent `:WAVeform:DATA?`/`:WAVeform:PREamble?`
-transfer — the binary preamble/data path itself, and rewiring `get_waveform`/
-`get_waveform_preamble` off the legacy `C{ch}:WF?` forms onto it, is Task 18;
-deep-memory chunking (`:WAVeform:MAXPoint`) is Task 19. `MockConnection` now
+Task 17 (audit H9) added eight rows with a `get_waveform_`/`set_waveform_`
+prefix: the documented `:WAVeform:SOURce`/`STARt`/`INTerval`/`POINt`
+transfer-parameter scalars (EN11G p.749-752), verified against a fresh
+reading of those four pages (page citations in earlier plan drafts for this
+subsystem had been wrong; re-verified directly from the PDF). `MockConnection`
 carries `waveform_source`/`waveform_start`/`waveform_interval`/
-`waveform_point` state (defaults `"C1"`/`0`/`1`/`0`) so the four getters are
+`waveform_point` state (defaults `"C1"`/`0`/`1`/`0`) so those four getters are
 response-VERIFIED, not request-only.
+
+Task 18 (audit H9 fix) rewired the capture path itself onto that subsystem:
+`get_waveform`/`get_waveform_preamble` are repointed from the invented
+`C{ch}:WF? DAT2`/`DESC` (zero hits anywhere in this 855-page guide) to the
+documented `:WAVeform:DATA?`/`:WAVeform:PREamble?` queries, and
+`waveform_transfer.ModernTransfer` sends them in that order after selecting
+the source and width. Both are **binary** responses (an IEEE block, not a
+`query()`-able string), so their corpus entries and this table's "Documented"
+column are request-verified only — the actual byte-for-byte parser/producer
+agreement is proven by the round-trip tests in
+`tests/test_modern_waveform_transfer.py`, not by `test_mock_answers_documented_response`.
+Task 18 also added `get_waveform_data` (the `:WAVeform:DATA?` leaf under its
+own name, since `ModernTransfer` calls that instead of the generic
+`get_waveform` alias) and `set_waveform_width`/`get_waveform_width`
+(`:WAVeform:WIDTh`, EN11G p.754 — selects the WAVEDESC's COMM_TYPE field, byte
+vs. word samples). Deep-memory chunking (`:WAVeform:MAXPoint`) remains Task 19.
 
 Full detail — exact current vs. documented wire form, severity against the
 pull-in bar, and why each is deferred rather than fixed — is in each entry's
