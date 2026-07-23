@@ -8,6 +8,15 @@ here plus as a citation in `tests/wire_forms.py` (the corpus enforced by
 which manuals are cited, where to get them, and why they aren't committed to the
 repo.
 
+Four command tables are covered end-to-end: the legacy and modern Siglent scope
+dialects (`SCPICommandSet`, swept 2026-07-23 in tasks 5a/5b) and the Siglent SPD
+power-supply and SDG function-generator overrides (`PSUSCPICommandSet` /
+`AWGSCPICommandSet`, swept 2026-07-23 in task 5c, below). A parametrized test,
+`test_every_command_has_a_corpus_entry` in `tests/test_wire_conformance.py`,
+enumerates every command in all four tables and fails the suite if any command
+has no row here / no corresponding entry in `tests/wire_forms.py` -- this is
+what keeps the inventory from going stale the next time a command is added.
+
 Statuses mirror `tests/wire_forms.py`:
 
 - **VERIFIED** — the command table renders exactly what the manual documents,
@@ -174,3 +183,124 @@ exactly right); they are parameter-*value* translation gaps one layer up, in
   `MockConnection` state-seeding defect, not a driver or table defect: the
   wire template and the `coupling_to_wire`/`coupling_from_wire` mappings are
   both correct for modern.
+
+## Siglent SPD power supply (`PSUSCPICommandSet.SIGLENT_SPD_OVERRIDES`)
+
+Checked against the SPD3303X/3303X-E Quick Start guide
+(`SPD3303X_QuickStart_QS0503X-E01B.pdf`, cited below as "QS0503X-E01B") on
+2026-07-23. All 27 commands in the table are covered. This is a Quick Start
+guide, not a full programming manual — its entire SCPI reference is Chapter 3
+(pp.36-43). Page citations below are the PDF's own page index, not the printed
+footer number (which runs 8 lower on every page).
+
+| Command | We send | Documented | Status | Source |
+|---|---|---|---|---|
+| `get_current` | `CH{ch}:CURR?` | `[{CH1\|CH2}:]CURRent?`; response bare NR2, matches structure | VERIFIED | QS0503X-E01B p.39 |
+| `get_output` | `OUTPut? CH{ch}` | no output-state query documented anywhere; state comes from `SYSTem:STATus?` (bit-encoded) | MISMATCH_DEFERRED | QS0503X-E01B p.36, p.41 |
+| `get_remote_sense` | `SYST:SENS? CH{ch}` | absent from manual entirely (zero hits for "SENS"); dead code (no caller) | MISMATCH_DEFERRED | QS0503X-E01B p.36 |
+| `get_timer_current` | `TIMEr:CURR? CH{ch}` | absent from manual entirely; only `TIMEr:SET?` exists (group-addressed); dead code (no caller) | MISMATCH_DEFERRED | QS0503X-E01B p.40-41 |
+| `get_timer_enable` | `TIMEr? CH{ch}` | no query form documented for `TIMEr {CH1\|CH2},{ON\|OFF}`; only `TIMEr:SET?` (group voltage/current/time, not enabled state) | MISMATCH_DEFERRED | QS0503X-E01B p.40-41 |
+| `get_timer_voltage` | `TIMEr:VOLT? CH{ch}` | absent from manual entirely; only `TIMEr:SET?` exists (group-addressed); dead code (no caller) | MISMATCH_DEFERRED | QS0503X-E01B p.40-41 |
+| `get_tracking` | `OUTP:TRACK?` | no query form documented for `OUTPut:TRACK {0\|1\|2}` | MISMATCH_DEFERRED | QS0503X-E01B p.40 |
+| `get_voltage` | `CH{ch}:VOLT?` | `[{CH1\|CH2}:]VOLTage?`; response bare NR2, matches structure | VERIFIED | QS0503X-E01B p.39 |
+| `get_wave_amplitude` | `WAVE:AMPL? CH{ch}` | absent from manual entirely; dead code (no caller) | MISMATCH_DEFERRED | QS0503X-E01B p.36 |
+| `get_wave_enable` | `WAVE? CH{ch}` | no query form documented for `OUTPut:WAVE {CH1\|CH2},{ON\|OFF}` | MISMATCH_DEFERRED | QS0503X-E01B p.40 |
+| `get_wave_freq` | `WAVE:FREQ? CH{ch}` | absent from manual entirely; dead code (no caller) | MISMATCH_DEFERRED | QS0503X-E01B p.36 |
+| `get_wave_type` | `WAVE:TYPE? CH{ch}` | absent from manual entirely; dead code (no caller) | MISMATCH_DEFERRED | QS0503X-E01B p.36 |
+| `measure_current` | `MEASure{ch}:CURRent?` | `MEASure:CURRent? [{CH1\|CH2}]` (channel is a query argument, not fused to the keyword) | MISMATCH_DEFERRED | QS0503X-E01B p.38 |
+| `measure_power` | `MEASure{ch}:POWer?` | `MEASure:POWEr? [{CH1\|CH2}]` (channel is a query argument; code also misspells POWEr) | MISMATCH_DEFERRED | QS0503X-E01B p.38 |
+| `measure_voltage` | `MEASure{ch}:VOLTage?` | `MEASure:VOLTage? [{CH1\|CH2}]` (channel is a query argument, not fused to the keyword) | MISMATCH_DEFERRED | QS0503X-E01B p.38 |
+| `set_current` | `CH{ch}:CURR {current}` | `[{CH1\|CH2}:]CURRent <current>` (CURR is the documented abbreviation) | VERIFIED | QS0503X-E01B p.39 |
+| `set_output` | `OUTPut CH{ch},{state}` | `OUTPut {CH1\|CH2\|CH3},{ON\|OFF}` | VERIFIED | QS0503X-E01B p.40 |
+| `set_remote_sense` | `SYST:SENS CH{ch},{state}` | absent from manual entirely; dead code (no caller) | MISMATCH_DEFERRED | QS0503X-E01B p.36 |
+| `set_timer_current` | `TIMEr:CURR CH{ch},{current}` | absent from manual entirely; only `TIMEr:SET` sets voltage/current/time together for a memory group; dead code (no caller) | MISMATCH_DEFERRED | QS0503X-E01B p.40 |
+| `set_timer_enable` | `TIMEr CH{ch},{state}` | `TIMEr {CH1\|CH2},{ON\|OFF}` | VERIFIED | QS0503X-E01B p.41 |
+| `set_timer_voltage` | `TIMEr:VOLT CH{ch},{voltage}` | absent from manual entirely; only `TIMEr:SET` (group-addressed); dead code (no caller) | MISMATCH_DEFERRED | QS0503X-E01B p.40 |
+| `set_tracking` | `OUTP:TRACK {mode}` | `OUTPut:TRACK {0\|1\|2}` — code sends a word enum (INDEPENDENT/SERIES/PARALLEL), manual requires a numeric digit | MISMATCH_DEFERRED | QS0503X-E01B p.40 |
+| `set_voltage` | `CH{ch}:VOLT {voltage}` | `[{CH1\|CH2}:]VOLTage <voltage>` (VOLT is the documented abbreviation) | VERIFIED | QS0503X-E01B p.39 |
+| `set_wave_amplitude` | `WAVE:AMPL CH{ch},{amplitude}` | absent from manual entirely; dead code (no caller) | MISMATCH_DEFERRED | QS0503X-E01B p.36 |
+| `set_wave_enable` | `WAVE CH{ch},{state}` | `OUTPut:WAVE {CH1\|CH2},{ON\|OFF}` (`OUTPut:` prefix missing) | MISMATCH_DEFERRED | QS0503X-E01B p.40 |
+| `set_wave_freq` | `WAVE:FREQ CH{ch},{frequency}` | absent from manual entirely; dead code (no caller) | MISMATCH_DEFERRED | QS0503X-E01B p.36 |
+| `set_wave_type` | `WAVE:TYPE CH{ch},{wave_type}` | absent from manual entirely; dead code (no caller) | MISMATCH_DEFERRED | QS0503X-E01B p.36 |
+
+**Tally: 6 VERIFIED, 21 MISMATCH_DEFERRED, 0 UNCITED (27 total).**
+
+Full detail — exact current vs. documented wire form, severity against the
+pull-in bar, and why each is deferred rather than fixed — is in each entry's
+`note` field in `tests/wire_forms.py`. Three findings here are already-known,
+tracked audit IDs with a fix owner: `measure_voltage`/`measure_current`/
+`measure_power` (H6, Task 6), `set_tracking`/`get_tracking` (H19, Task 7), and
+`get_output` (H20, Task 8). The rest — the six-command "waveform generation"
+surface (`set_wave_type`/`get_wave_type`/`set_wave_freq`/`get_wave_freq`/
+`set_wave_amplitude`/`get_wave_amplitude`), `set_remote_sense`/
+`get_remote_sense`, and the four `TIMEr:VOLT`/`TIMEr:CURR` commands — are new
+findings from this sweep: none has a caller anywhere in the repo outside the
+command table itself, so all are low severity (dead code, below the pull-in
+bar) and simply queued.
+
+## Siglent SDG function generator (`AWGSCPICommandSet.SIGLENT_SDG_OVERRIDES`)
+
+Checked against the SDG Series Programming Guide
+(`SDG_ProgrammingGuide_PG02-E05B.pdf`, cited below as "PG02-E05B") on
+2026-07-23. All 28 commands in the table are covered. Page citations below are
+the PDF's own page index, not the printed footer number (which runs 12 lower
+on every page).
+
+Every setter in this table renders exactly what the manual documents — the SET
+side of `SIGLENT_SDG_OVERRIDES` has no defects. The recurring problem is
+entirely on the GET side: every parameterized subsystem (`BSWV`/`OUTP`/`ARWV`/
+`MDWV`/`BTWV`/`SWWV`) documents a **bare** query (e.g. `<channel>:BaSic_WaVe?`)
+whose response always returns *every* parameter of that subsystem in one
+comma-joined reply — there is no selector syntax to ask for just one field.
+The driver invents one anyway (e.g. `C1:BSWV? FRQ`), a pattern that recurs
+across eleven of the fourteen getters below.
+
+| Command | We send | Documented | Status | Source |
+|---|---|---|---|---|
+| `get_amplitude` | `C{ch}:BSWV? AMP` | bare `<channel>:BaSic_WaVe?` returns every BSWV parameter; no `AMP` selector | MISMATCH_DEFERRED | PG02-E05B p.31 |
+| `get_arb_waveform` | `C{ch}:ARWV? NAME` | bare `<channel>:ARbWaVe?` returns `INDEX` and `NAME` together; no selector; dead code (no caller) | MISMATCH_DEFERRED | PG02-E05B p.62 |
+| `get_burst_state` | `C{ch}:BTWV? STATE` | bare `<channel>:BTWV(BursTWaVe)?` returns every BTWV parameter; no selector; dead code (no caller) | MISMATCH_DEFERRED | PG02-E05B p.60 |
+| `get_frequency` | `C{ch}:BSWV? FRQ` | bare `<channel>:BaSic_WaVe?` returns every BSWV parameter; no `FRQ` selector | MISMATCH_DEFERRED | PG02-E05B p.31 |
+| `get_function` | `C{ch}:BSWV? WVTP` | bare `<channel>:BaSic_WaVe?` returns every BSWV parameter; no `WVTP` selector | MISMATCH_DEFERRED | PG02-E05B p.31 |
+| `get_modulation` | `C{ch}:MDWV? STATE` | bare `<channel>:MoDulateWaVe?` returns every MDWV parameter; no selector; dead code (no caller) | MISMATCH_DEFERRED | PG02-E05B p.36 |
+| `get_offset` | `C{ch}:BSWV? OFST` | bare `<channel>:BaSic_WaVe?` returns every BSWV parameter; no `OFST` selector | MISMATCH_DEFERRED | PG02-E05B p.31 |
+| `get_output` | `C{ch}:OUTP?` | request matches exactly; response is `<channel>:OUTP ON\|OFF,LOAD,<load>,PLRT,<polarity>` (mock answers bare `ON`/`OFF`) | MISMATCH_DEFERRED | PG02-E05B p.27-28 |
+| `get_output_load` | `C{ch}:OUTP? LOAD` | bare `<channel>:OUTPut?` returns every field; no `LOAD` selector; dead code (no caller) | MISMATCH_DEFERRED | PG02-E05B p.27-28 |
+| `get_output_polarity` | `C{ch}:OUTP? PLRT` | bare `<channel>:OUTPut?` returns every field; no `PLRT` selector; dead code (no caller) | MISMATCH_DEFERRED | PG02-E05B p.27-28 |
+| `get_phase` | `C{ch}:BSWV? PHSE` | bare `<channel>:BaSic_WaVe?` returns every BSWV parameter; no `PHSE` selector | MISMATCH_DEFERRED | PG02-E05B p.31 |
+| `get_pulse_duty` | `C{ch}:BSWV? DUTY` | bare `<channel>:BaSic_WaVe?` returns every BSWV parameter; no `DUTY` selector | MISMATCH_DEFERRED | PG02-E05B p.31 |
+| `get_ramp_symmetry` | `C{ch}:BSWV? SYM` | bare `<channel>:BaSic_WaVe?` returns every BSWV parameter; no `SYM` selector | MISMATCH_DEFERRED | PG02-E05B p.31 |
+| `get_sweep_state` | `C{ch}:SWWV? STATE` | bare `<channel>:SWeepWaVe?` returns every SWWV parameter; no selector; dead code (no caller) | MISMATCH_DEFERRED | PG02-E05B p.38 |
+| `set_amplitude` | `C{ch}:BSWV AMP,{amplitude}` | `<channel>:BaSic_WaVe AMP,<amplitude>` | VERIFIED | PG02-E05B p.31 |
+| `set_arb_waveform` | `C{ch}:ARWV NAME,{name}` | `<channel>:ArbWaVe NAME,<name>` (Format2); not mocked, dead code (no caller) | VERIFIED | PG02-E05B p.62, p.188 |
+| `set_burst_state` | `C{ch}:BTWV STATE,{state}` | `<channel>:BursTWaVe STATE,<state>`; not mocked, dead code (no caller) | VERIFIED | PG02-E05B p.59-60 |
+| `set_frequency` | `C{ch}:BSWV FRQ,{frequency}` | `<channel>:BaSic_WaVe FRQ,<frequency>` | VERIFIED | PG02-E05B p.31 |
+| `set_function` | `C{ch}:BSWV WVTP,{function}` | `<channel>:BaSic_WaVe WVTP,<type>` | VERIFIED | PG02-E05B p.31 |
+| `set_modulation` | `C{ch}:MDWV STATE,{state}` | `<channel>:MoDulateWaVe STATE,<state>`; not mocked, dead code (no caller) | VERIFIED | PG02-E05B p.33, p.36 |
+| `set_offset` | `C{ch}:BSWV OFST,{offset}` | `<channel>:BaSic_WaVe OFST,<offset>` | VERIFIED | PG02-E05B p.29-30, p.31 |
+| `set_output` | `C{ch}:OUTP {state}` | `<channel>:OUTPut ON\|OFF` (state independently settable per the worked EXAMPLEs) | VERIFIED | PG02-E05B p.28 |
+| `set_output_load` | `C{ch}:OUTP LOAD,{load}` | `<channel>:OUTPut LOAD,<load>`; not mocked | VERIFIED | PG02-E05B p.28 |
+| `set_output_polarity` | `C{ch}:OUTP PLRT,{polarity}` | `<channel>:OUTPut PLRT,<polarity>`; not mocked, dead code (no caller) | VERIFIED | PG02-E05B p.28 |
+| `set_phase` | `C{ch}:BSWV PHSE,{phase}` | `<channel>:BaSic_WaVe PHSE,<phase>` | VERIFIED | PG02-E05B p.29-30, p.31 |
+| `set_pulse_duty` | `C{ch}:BSWV DUTY,{duty}` | `<channel>:BaSic_WaVe DUTY,<duty>` | VERIFIED | PG02-E05B p.29-30 |
+| `set_ramp_symmetry` | `C{ch}:BSWV SYM,{symmetry}` | `<channel>:BaSic_WaVe SYM,<symmetry>` | VERIFIED | PG02-E05B p.29-30 |
+| `set_sweep_state` | `C{ch}:SWWV STATE,{state}` | `<channel>:SweepWaVe STATE,<state>`; not mocked, dead code (no caller) | VERIFIED | PG02-E05B p.37, p.39 |
+
+**Tally: 14 VERIFIED, 14 MISMATCH_DEFERRED, 0 UNCITED (28 total).**
+
+Full detail — exact current vs. documented wire form, severity against the
+pull-in bar, and why each is deferred rather than fixed — is in each entry's
+`note` field in `tests/wire_forms.py`. All fourteen deferred getters share one
+audit ID (H5, fix Task 10), but severity varies sharply by reachability:
+`get_function`/`get_frequency`/`get_amplitude`/`get_offset`/`get_phase` are
+HIGH (each is read unguarded, with no try/except, on `awg_output.py`'s
+`get_configuration()` path, which `examples/function_generator_basic.py`
+calls by default); `get_pulse_duty`/`get_ramp_symmetry` are medium (same path,
+but conditional and wrapped in a try/except there); `get_output` is low —
+unlike the rest, its *request* already matches the manual exactly, and the
+only real defect is the mock's answer shape, which the driver's own tolerant
+parsing (`"ON" in response.upper()`) would likely absorb against real
+hardware anyway; and the remaining seven getters (`get_output_load`,
+`get_output_polarity`, `get_arb_waveform`, `get_modulation`,
+`get_burst_state`, `get_sweep_state`) are low because none has a caller
+anywhere in the repo outside the command table itself.

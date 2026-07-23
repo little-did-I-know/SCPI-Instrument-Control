@@ -1153,4 +1153,705 @@ WIRE_FORMS: List[WireForm] = [
             "hardcopy_print. Queued."
         ),
     ),
+
+    # --- Siglent SPD power supply: sweep 2026-07-23 (task 5c) -----------------
+    # Every command in PSUSCPICommandSet.SIGLENT_SPD_OVERRIDES (27 total),
+    # checked against SPD_GUIDE (SPD3303X_QuickStart_QS0503X-E01B.pdf, 45
+    # pages -- a Quick Start guide, not a full programming manual; its entire
+    # SCPI reference is Chapter 3, pp.36-43). Page citations below are the
+    # PDF's own page index (i.e. the page you land on scrolling to "page N"),
+    # NOT the printed footer number baked into each page (which runs 8 lower
+    # on every page, e.g. footer "28" on PDF p.36) -- this matches how the
+    # task-5c brief itself cites SPD pages, unlike the printed-page
+    # convention used for the modern-scope EN11G guide above.
+
+    # p.39 EXAMPLE: "CH1: VOLTage 25" -> "CH1:VOLTage 25"; VOLT is the
+    # documented abbreviated spelling of VOLTage (p.35, syntax conventions --
+    # upper-case letters are the short form).
+    WireForm(table="psu", variant="siglent_spd", op="set_voltage", params={"ch": 1, "voltage": 25}, request="CH1:VOLT 25", source=f"{SPD_GUIDE} p.39", mock_kwargs={"psu_mode": True}),
+    WireForm(
+        table="psu",
+        variant="siglent_spd",
+        op="get_voltage",
+        params={"ch": 1},
+        request="CH1:VOLT?",
+        response="0.000",
+        parsed=0.0,
+        source=f"{SPD_GUIDE} p.39",
+        mock_kwargs={"psu_mode": True},
+        note=(
+            "Manual's own worked EXAMPLE: 'CH1: VOLTage?' -> Typical Return "
+            "'25.000' (bare, no header). Mock's default channel-1 voltage is "
+            "0.0 (not the manual's 25V fixture value) -- same divergence-is-"
+            "fine rule as the legacy get_sample_rate entry above; only the "
+            "bare-NR2 structure is pinned."
+        ),
+    ),
+    # p.39 EXAMPLE: "CH1:CURRent 0.5"; CURR is the documented abbreviation.
+    WireForm(table="psu", variant="siglent_spd", op="set_current", params={"ch": 1, "current": 0.5}, request="CH1:CURR 0.5", source=f"{SPD_GUIDE} p.39", mock_kwargs={"psu_mode": True}),
+    WireForm(
+        table="psu",
+        variant="siglent_spd",
+        op="get_current",
+        params={"ch": 1},
+        request="CH1:CURR?",
+        response="0.000",
+        parsed=0.0,
+        source=f"{SPD_GUIDE} p.39",
+        mock_kwargs={"psu_mode": True},
+        note="Manual's example returns bare '0.500'; mock's default channel-1 current is 0.0. Structure (bare NR2) is what's pinned, same rule as get_voltage above.",
+    ),
+
+    # p.38: MEASure:VOLTage?/CURRent?/POWEr? all take the channel as an
+    # ARGUMENT after the query mark ("MEASure:VOLTage? CH1"), not fused to
+    # the MEASure keyword. Code (psu_scpi_commands.py SIGLENT_SPD_OVERRIDES)
+    # sends 'MEASure{ch}:VOLTage?' etc -- channel digit spliced directly onto
+    # 'MEASure', no space/argument.
+    WireForm(
+        table="psu",
+        variant="siglent_spd",
+        op="measure_voltage",
+        params={"ch": 1},
+        request="MEASure:VOLTage? CH1",
+        response="30.000",
+        source=f"{SPD_GUIDE} p.38",
+        status=MISMATCH_DEFERRED,
+        mock_kwargs={"psu_mode": True},
+        note=(
+            "[HIGH severity -- pull-in candidate] Code sends "
+            "'MEASure1:VOLTage?'; manual's Command format is "
+            "'MEASure: CURRent?/VOLTage?/POWEr? [{CH1|CH2}]', EXAMPLE "
+            "'MEASure: VOLTage? CH1' -> Typical Return '30.000' (channel is "
+            "a query argument, not fused to the keyword). On the default "
+            "polling path: gui/widgets/psu_control.py's _update_measurements "
+            "(1s QTimer, started unconditionally in __init__) calls "
+            "output.measure_voltage() every tick inside a broad try/except, "
+            "so a malformed request against real hardware would silently "
+            "freeze the live voltage reading rather than crash -- still "
+            "breaks the GUI's default display path. H6, fix Task 6."
+        ),
+    ),
+    WireForm(
+        table="psu",
+        variant="siglent_spd",
+        op="measure_current",
+        params={"ch": 1},
+        request="MEASure:CURRent? CH1",
+        response="3.000",
+        source=f"{SPD_GUIDE} p.38",
+        status=MISMATCH_DEFERRED,
+        mock_kwargs={"psu_mode": True},
+        note=(
+            "[HIGH severity -- pull-in candidate] Same MEASure keyword/"
+            "channel-argument mismatch as measure_voltage above "
+            "('MEASure:CURRent? CH1' documented vs 'MEASure1:CURRent?' "
+            "sent). Same GUI default-path exposure (psu_control.py "
+            "_update_measurements). H6, fix Task 6."
+        ),
+    ),
+    WireForm(
+        table="psu",
+        variant="siglent_spd",
+        op="measure_power",
+        params={"ch": 1},
+        request="MEASure:POWEr? CH1",
+        response="90.000",
+        source=f"{SPD_GUIDE} p.38",
+        status=MISMATCH_DEFERRED,
+        mock_kwargs={"psu_mode": True},
+        note=(
+            "[HIGH severity -- pull-in candidate] Same MEASure keyword/"
+            "channel-argument mismatch as measure_voltage above "
+            "('MEASure:POWEr? CH1' documented vs code's 'MEASure1:POWer?', "
+            "which also misspells POWEr as POWer). Same GUI default-path "
+            "exposure. H6, fix Task 6."
+        ),
+    ),
+
+    # p.40 EXAMPLE: "OUTPut CH1,ON" -- matches exactly.
+    WireForm(table="psu", variant="siglent_spd", op="set_output", params={"ch": 1, "state": "ON"}, request="OUTPut CH1,ON", source=f"{SPD_GUIDE} p.40", mock_kwargs={"psu_mode": True}),
+    WireForm(
+        table="psu",
+        variant="siglent_spd",
+        op="get_output",
+        params={"ch": 1},
+        request="OUTPut? CH1",
+        source=f"{SPD_GUIDE} p.36, p.41",
+        status=MISMATCH_DEFERRED,
+        mock_kwargs={"psu_mode": True},
+        note=(
+            "[HIGH severity -- pull-in candidate] The SPD3303X command list "
+            "(p.36, Chapter 3.2) has no output-state QUERY at all -- the "
+            "OUTPut Subsystem section (p.40) documents only the setter "
+            "'OUTPut {CH1|CH2|CH3},{ON|OFF}'. Output/channel state is instead "
+            "read from the bit-encoded 'SYSTem:STATus?' (p.41, Typical "
+            "Return '0x0224', decoded via the bit table on p.42), a wholly "
+            "different command this table does not use. "
+            "power_supply_output.py's 'enabled' property (get_output) is "
+            "called directly, unguarded by a try/except, from "
+            "get_configuration() -- unlike the measurement fields a few "
+            "lines below it in the same method, which ARE wrapped -- and "
+            "examples/psu_basic_control.py calls get_configuration() on its "
+            "default/documented-usage path. H20, fix Task 8."
+        ),
+    ),
+
+    # p.41 EXAMPLE: "TIMEr CH1,ON" -- matches exactly.
+    WireForm(table="psu", variant="siglent_spd", op="set_timer_enable", params={"ch": 1, "state": "ON"}, request="TIMEr CH1,ON", source=f"{SPD_GUIDE} p.41", mock_kwargs={"psu_mode": True}),
+    WireForm(
+        table="psu",
+        variant="siglent_spd",
+        op="get_timer_enable",
+        params={"ch": 1},
+        request="TIMEr? CH1",
+        source=f"{SPD_GUIDE} p.40-41",
+        status=MISMATCH_DEFERRED,
+        mock_kwargs={"psu_mode": True},
+        note=(
+            "[medium-high severity] 'TIMEr {CH1|CH2},{ON|OFF}' (p.41) has no "
+            "documented query form at all -- the only query in the TIMEr "
+            "subsystem is 'TIMEr:SET? {CH1|CH2},{1|2|3|4|5}' (p.40-41), which "
+            "returns a memory group's stored voltage/current/time, not "
+            "whether the timer is currently running. 'TIMEr? CH1' is absent "
+            "from the manual entirely. Mock's TIMEr? handler "
+            "(connection/mock/base.py) was written to answer this same "
+            "invented form, not the manual's -- audit theme 2. Reachable: "
+            "examples/psu_advanced_features.py reads and writes "
+            "'output.timer_enabled' on its default walkthrough path. Queued."
+        ),
+    ),
+    WireForm(
+        table="psu",
+        variant="siglent_spd",
+        op="set_timer_voltage",
+        params={"ch": 1, "voltage": 1.0},
+        request="TIMEr:VOLT CH1,1.0",
+        source=f"{SPD_GUIDE} p.40",
+        status=MISMATCH_DEFERRED,
+        mock_kwargs={"psu_mode": True},
+        note=(
+            "[low severity] 'TIMEr:VOLT' does not exist in this manual -- "
+            "the only documented way to set a timer group's voltage is "
+            "'TIMEr:SET {CH1|CH2},{1|2|3|4|5},<voltage>,<current>,<time>' "
+            "(p.40), which sets all three parameters together for one of "
+            "five stored memory groups, addressed by group number, not just "
+            "a channel. Dead code: no caller anywhere in the repo invokes "
+            "set_timer_voltage. Queued."
+        ),
+    ),
+    WireForm(
+        table="psu",
+        variant="siglent_spd",
+        op="get_timer_voltage",
+        params={"ch": 1},
+        request="TIMEr:VOLT? CH1",
+        source=f"{SPD_GUIDE} p.40-41",
+        status=MISMATCH_DEFERRED,
+        mock_kwargs={"psu_mode": True},
+        note=(
+            "[low severity] Same absence as set_timer_voltage above; the "
+            "documented query is 'TIMEr:SET? {CH1|CH2},{1|2|3|4|5}' (group-"
+            "addressed, returns 'voltage,current,time' together, p.41). Dead "
+            "code: no caller anywhere in the repo invokes get_timer_voltage. "
+            "Queued."
+        ),
+    ),
+    WireForm(
+        table="psu",
+        variant="siglent_spd",
+        op="set_timer_current",
+        params={"ch": 1, "current": 1.0},
+        request="TIMEr:CURR CH1,1.0",
+        source=f"{SPD_GUIDE} p.40",
+        status=MISMATCH_DEFERRED,
+        mock_kwargs={"psu_mode": True},
+        note=(
+            "[low severity] Same absence as set_timer_voltage above -- "
+            "'TIMEr:CURR' does not exist; current is one field of the "
+            "group-addressed 'TIMEr:SET' command. Dead code: no caller "
+            "anywhere in the repo invokes set_timer_current. Queued."
+        ),
+    ),
+    WireForm(
+        table="psu",
+        variant="siglent_spd",
+        op="get_timer_current",
+        params={"ch": 1},
+        request="TIMEr:CURR? CH1",
+        source=f"{SPD_GUIDE} p.40-41",
+        status=MISMATCH_DEFERRED,
+        mock_kwargs={"psu_mode": True},
+        note=(
+            "[low severity] Same absence as get_timer_voltage above. Dead "
+            "code: no caller anywhere in the repo invokes get_timer_current. "
+            "Queued."
+        ),
+    ),
+
+    # p.40 EXAMPLE: "OUTPut:WAVE CH1,ON" -- the code's 'WAVE CH1,ON' omits
+    # the required 'OUTPut:' prefix.
+    WireForm(
+        table="psu",
+        variant="siglent_spd",
+        op="set_wave_enable",
+        params={"ch": 1, "state": "ON"},
+        request="OUTPut:WAVE CH1,ON",
+        source=f"{SPD_GUIDE} p.40",
+        status=MISMATCH_DEFERRED,
+        mock_kwargs={"psu_mode": True},
+        note=(
+            "[medium-high severity] Code sends 'WAVE CH1,ON'; documented "
+            "COMMAND format is 'OUTPut:WAVE {CH1|CH2},{ON|OFF}' (p.40) -- the "
+            "'OUTPut:' prefix is required and missing. Mock's write handler "
+            "(connection/mock/base.py) matches the same prefix-less form the "
+            "code sends, not the manual's -- audit theme 2. Reachable: "
+            "examples/psu_advanced_features.py sets 'output.waveform_enabled "
+            "= True' on its default walkthrough path; against real hardware "
+            "the missing prefix would likely make this a silent no-op of the "
+            "waveform-display toggle (pull-in bar #2 territory). Queued for "
+            "a code fix."
+        ),
+    ),
+    WireForm(
+        table="psu",
+        variant="siglent_spd",
+        op="get_wave_enable",
+        params={"ch": 1},
+        request="WAVE? CH1",
+        source=f"{SPD_GUIDE} p.40",
+        status=MISMATCH_DEFERRED,
+        mock_kwargs={"psu_mode": True},
+        note=(
+            "[medium-high severity] 'OUTPut:WAVE {CH1|CH2},{ON|OFF}' (p.40) "
+            "has no documented query form at all (only the setter is "
+            "shown). 'WAVE? CH1' is absent from the manual entirely; mock's "
+            "WAVE? handler answers the same invented form the code sends. "
+            "Reachable: examples/psu_advanced_features.py reads "
+            "'output.waveform_enabled' on its default walkthrough path. "
+            "Queued."
+        ),
+    ),
+
+    # WAVE:TYPE / WAVE:FREQ / WAVE:AMPL do not exist anywhere in this manual
+    # (zero hits, full-text search) -- the "Waveform display" feature this
+    # manual documents (control-panel section 2.9) is a real-time V/I
+    # *monitor* (a plotted readback of voltage/current already being drawn),
+    # not a signal the PSU generates with a settable type, frequency, or
+    # amplitude. This entire six-command "waveform generation" surface in
+    # SIGLENT_SPD_OVERRIDES appears to be invented outright; none of the six
+    # has a caller anywhere in the repo besides the table itself.
+    WireForm(table="psu", variant="siglent_spd", op="set_wave_type", params={"ch": 1, "wave_type": "SINE"}, request="WAVE:TYPE CH1,SINE", source=f"{SPD_GUIDE} p.36", status=MISMATCH_DEFERRED, mock_kwargs={"psu_mode": True}, note="[low severity] Absent from manual entirely (see module comment above). Dead code: no caller. Queued."),
+    WireForm(table="psu", variant="siglent_spd", op="get_wave_type", params={"ch": 1}, request="WAVE:TYPE? CH1", source=f"{SPD_GUIDE} p.36", status=MISMATCH_DEFERRED, mock_kwargs={"psu_mode": True}, note="[low severity] Absent from manual entirely. Dead code: no caller. Queued."),
+    WireForm(table="psu", variant="siglent_spd", op="set_wave_freq", params={"ch": 1, "frequency": 1000}, request="WAVE:FREQ CH1,1000", source=f"{SPD_GUIDE} p.36", status=MISMATCH_DEFERRED, mock_kwargs={"psu_mode": True}, note="[low severity] Absent from manual entirely. Dead code: no caller. Queued."),
+    WireForm(table="psu", variant="siglent_spd", op="get_wave_freq", params={"ch": 1}, request="WAVE:FREQ? CH1", source=f"{SPD_GUIDE} p.36", status=MISMATCH_DEFERRED, mock_kwargs={"psu_mode": True}, note="[low severity] Absent from manual entirely. Dead code: no caller. Queued."),
+    WireForm(table="psu", variant="siglent_spd", op="set_wave_amplitude", params={"ch": 1, "amplitude": 1}, request="WAVE:AMPL CH1,1", source=f"{SPD_GUIDE} p.36", status=MISMATCH_DEFERRED, mock_kwargs={"psu_mode": True}, note="[low severity] Absent from manual entirely. Dead code: no caller. Queued."),
+    WireForm(table="psu", variant="siglent_spd", op="get_wave_amplitude", params={"ch": 1}, request="WAVE:AMPL? CH1", source=f"{SPD_GUIDE} p.36", status=MISMATCH_DEFERRED, mock_kwargs={"psu_mode": True}, note="[low severity] Absent from manual entirely. Dead code: no caller. Queued."),
+
+    # p.40 EXAMPLE: "OUTPut: TRACK 0" -- <mode>:={0|1|2} is a NUMERIC enum
+    # (0=independent, 1=series, 2=parallel per the description).
+    WireForm(
+        table="psu",
+        variant="siglent_spd",
+        op="set_tracking",
+        params={"mode": "SERIES"},
+        request="OUTP:TRACK 1",
+        source=f"{SPD_GUIDE} p.40",
+        status=MISMATCH_DEFERRED,
+        mock_kwargs={"psu_mode": True},
+        note=(
+            "[HIGH severity -- pull-in candidate] Code sends 'OUTP:TRACK "
+            "{mode}' with mode a word enum (INDEPENDENT/SERIES/PARALLEL, per "
+            "connection/mock/base.py's tracking-mode regex, which the "
+            "driver/mock co-invented -- audit theme 2); documented COMMAND "
+            "format is 'OUTPut:TRACK {0|1|2}' (p.40), EXAMPLE 'OUTPut: TRACK "
+            "0'. A word sent where a real instrument expects a bare digit is "
+            "likely rejected or ignored -- a silent no-op of the mode "
+            "(series doubles the output voltage; parallel doubles the "
+            "current), which is safety-relevant given the topology change "
+            "involved. Reachable: examples/psu_advanced_features.py sets "
+            "tracking mode on its default walkthrough path. H19, fix Task 7."
+        ),
+    ),
+    WireForm(
+        table="psu",
+        variant="siglent_spd",
+        op="get_tracking",
+        params={},
+        request="OUTP:TRACK?",
+        source=f"{SPD_GUIDE} p.40",
+        status=MISMATCH_DEFERRED,
+        mock_kwargs={"psu_mode": True},
+        note=(
+            "[medium-high severity] 'OUTPut:TRACK {0|1|2}' (p.40) has no "
+            "documented query form at all -- only the setter is shown. If a "
+            "query does exist on real hardware, per the setter's numeric "
+            "enum it would presumably also answer numerically, not with the "
+            "INDEPENDENT/SERIES/PARALLEL words the mock (and power_supply.py "
+            "callers) use. Same root vocabulary issue as set_tracking above. "
+            "H19, fix Task 7."
+        ),
+    ),
+
+    # SENS/SENSE/'remote sens' has zero hits anywhere in this manual --
+    # full-text search confirms the SPD3303X has no documented remote-sense
+    # (4-wire) command under any header.
+    WireForm(table="psu", variant="siglent_spd", op="set_remote_sense", params={"ch": 1, "state": "ON"}, request="SYST:SENS CH1,ON", source=f"{SPD_GUIDE} p.36", status=MISMATCH_DEFERRED, mock_kwargs={"psu_mode": True}, note="[low severity] Absent from manual entirely (see module comment above; zero hits for 'SENS'). Dead code: no caller. Queued."),
+    WireForm(table="psu", variant="siglent_spd", op="get_remote_sense", params={"ch": 1}, request="SYST:SENS? CH1", source=f"{SPD_GUIDE} p.36", status=MISMATCH_DEFERRED, mock_kwargs={"psu_mode": True}, note="[low severity] Same absence as set_remote_sense above. Dead code: no caller. Queued."),
+
+    # --- Siglent SDG function generator: sweep 2026-07-23 (task 5c) -----------
+    # Every command in AWGSCPICommandSet.SIGLENT_SDG_OVERRIDES (28 total),
+    # checked against SDG_GUIDE (SDG_ProgrammingGuide_PG02-E05B.pdf, 201
+    # pages). Page citations are the PDF's own page index, same convention
+    # as the SPD section above (this guide's own printed footer runs 12
+    # lower, e.g. footer "16" on PDF p.28 -- not used here).
+    #
+    # Every setter below renders EXACTLY the documented "<channel>:BaSic_WaVe
+    # <parameter>,<value>" (or sibling OUTP/ARWV/MDWV/BTWV/SWWV) form -- the
+    # driver's SET side of this table is correct. The recurring defect is
+    # entirely on the GET side: every "get_*" entry for the parameterized
+    # subsystems (BSWV/OUTP/ARWV/MDWV/BTWV/SWWV) sends an invented
+    # "<channel>:<CMD>? <PARAM>" selector-style query (e.g. 'C1:BSWV? FRQ').
+    # None of these command families documents a selector query anywhere in
+    # this guide -- every QUERY SYNTAX is bare ("<channel>:BaSic_WaVe?",
+    # "<channel>:ARbWaVe?", etc.) and its RESPONSE FORMAT always returns
+    # EVERY parameter of the subsystem in one comma-joined reply. H5, fix
+    # Task 10.
+
+    # p.31 EXAMPLE: "Change the waveform type of C1 to Ramp: C1:BSWV WVTP,RAMP".
+    WireForm(table="awg", variant="siglent_sdg", op="set_function", params={"ch": 1, "function": "RAMP"}, request="C1:BSWV WVTP,RAMP", source=f"{SDG_GUIDE} p.31", mock_kwargs={"awg_mode": True}),
+    WireForm(
+        table="awg",
+        variant="siglent_sdg",
+        op="get_function",
+        params={"ch": 1},
+        request="C1:BSWV?",
+        response="C1:BSWV WVTP,SINE,FRQ,100HZ,PERI,0.01S,AMP,2V,OFST,0V,HLEV,1V,LLEV,-1V,PHSE,0",
+        source=f"{SDG_GUIDE} p.31",
+        status=MISMATCH_DEFERRED,
+        mock_kwargs={"awg_mode": True},
+        note=(
+            "[HIGH severity -- pull-in candidate] Code sends 'C1:BSWV? "
+            "WVTP' -- a parameter selector this guide never documents. "
+            "QUERY SYNTAX is bare '<channel>: BaSic_WaVe?' (p.31); RESPONSE "
+            "FORMAT '<channel>:BSWV <parameter>' always returns ALL "
+            "parameters of the current basic wave (worked EXAMPLE "
+            "transcribed above). Reachable and unguarded: awg_output.py's "
+            "'function' property calls get_function directly (not wrapped "
+            "in try/except), and is one of the first fields "
+            "get_configuration() builds -- examples/function_generator_"
+            "basic.py calls 'awg.channel1.get_configuration()' on its "
+            "default path. Against real hardware the unrecognised selector "
+            "would likely error rather than silently return a wrong value, "
+            "but either way it breaks this default call chain. H5, fix Task "
+            "10. (Root pattern for every 'get_*' BSWV/OUTP/ARWV/MDWV/BTWV/"
+            "SWWV entry below -- see module comment above.)"
+        ),
+    ),
+    # p.31 EXAMPLE: "Change the frequency of C1 to 2000 Hz: C1:BSWV FRQ,2000".
+    WireForm(table="awg", variant="siglent_sdg", op="set_frequency", params={"ch": 1, "frequency": 2000}, request="C1:BSWV FRQ,2000", source=f"{SDG_GUIDE} p.31", mock_kwargs={"awg_mode": True}),
+    WireForm(
+        table="awg",
+        variant="siglent_sdg",
+        op="get_frequency",
+        params={"ch": 1},
+        request="C1:BSWV?",
+        response="C1:BSWV WVTP,SINE,FRQ,100HZ,PERI,0.01S,AMP,2V,OFST,0V,HLEV,1V,LLEV,-1V,PHSE,0",
+        source=f"{SDG_GUIDE} p.31",
+        status=MISMATCH_DEFERRED,
+        mock_kwargs={"awg_mode": True},
+        note=(
+            "[HIGH severity -- pull-in candidate] Same invented-selector "
+            "defect as get_function above ('C1:BSWV? FRQ' sent; bare "
+            "'C1:BSWV?' documented). Same unguarded default-path exposure -- "
+            "awg_output.py's 'frequency' property is the second field "
+            "get_configuration() builds. H5, fix Task 10."
+        ),
+    ),
+    # p.31 EXAMPLE: "Set the amplitude of C1 to 3 Vpp: C1:BSWV AMP,3".
+    WireForm(table="awg", variant="siglent_sdg", op="set_amplitude", params={"ch": 1, "amplitude": 3}, request="C1:BSWV AMP,3", source=f"{SDG_GUIDE} p.31", mock_kwargs={"awg_mode": True}),
+    WireForm(
+        table="awg",
+        variant="siglent_sdg",
+        op="get_amplitude",
+        params={"ch": 1},
+        request="C1:BSWV?",
+        response="C1:BSWV WVTP,SINE,FRQ,100HZ,PERI,0.01S,AMP,2V,OFST,0V,HLEV,1V,LLEV,-1V,PHSE,0",
+        source=f"{SDG_GUIDE} p.31",
+        status=MISMATCH_DEFERRED,
+        mock_kwargs={"awg_mode": True},
+        note=(
+            "[HIGH severity -- pull-in candidate] Same invented-selector "
+            "defect as get_function above ('C1:BSWV? AMP' sent; bare "
+            "'C1:BSWV?' documented). Same unguarded default-path exposure -- "
+            "awg_output.py's 'amplitude' property is the third field "
+            "get_configuration() builds. H5, fix Task 10."
+        ),
+    ),
+    # p.30 parameter table: "OFST <offset> := offset. The unit is volts 'V'.";
+    # general COMMAND SYNTAX '<channel>:BaSic_WaVe <parameter>,<value>'
+    # (p.29) instantiated with the documented OFST keyword; field spelling
+    # confirmed by the get_function response example above ("...OFST,0V...").
+    WireForm(table="awg", variant="siglent_sdg", op="set_offset", params={"ch": 1, "offset": 0.5}, request="C1:BSWV OFST,0.5", source=f"{SDG_GUIDE} p.29-30, p.31", mock_kwargs={"awg_mode": True}),
+    WireForm(
+        table="awg",
+        variant="siglent_sdg",
+        op="get_offset",
+        params={"ch": 1},
+        request="C1:BSWV?",
+        response="C1:BSWV WVTP,SINE,FRQ,100HZ,PERI,0.01S,AMP,2V,OFST,0V,HLEV,1V,LLEV,-1V,PHSE,0",
+        source=f"{SDG_GUIDE} p.31",
+        status=MISMATCH_DEFERRED,
+        mock_kwargs={"awg_mode": True},
+        note=(
+            "[HIGH severity -- pull-in candidate] Same invented-selector "
+            "defect as get_function above ('C1:BSWV? OFST' sent; bare "
+            "'C1:BSWV?' documented). Same unguarded default-path exposure -- "
+            "awg_output.py's 'offset' property is the fourth field "
+            "get_configuration() builds. H5, fix Task 10."
+        ),
+    ),
+    # p.30 parameter table: "PHSE <phase> := {0 to 360}. The unit is 'degree'.";
+    # same general-syntax instantiation as set_offset above; field spelling
+    # confirmed by the get_function response example ("...PHSE,0").
+    WireForm(table="awg", variant="siglent_sdg", op="set_phase", params={"ch": 1, "phase": 90}, request="C1:BSWV PHSE,90", source=f"{SDG_GUIDE} p.29-30, p.31", mock_kwargs={"awg_mode": True}),
+    WireForm(
+        table="awg",
+        variant="siglent_sdg",
+        op="get_phase",
+        params={"ch": 1},
+        request="C1:BSWV?",
+        response="C1:BSWV WVTP,SINE,FRQ,100HZ,PERI,0.01S,AMP,2V,OFST,0V,HLEV,1V,LLEV,-1V,PHSE,0",
+        source=f"{SDG_GUIDE} p.31",
+        status=MISMATCH_DEFERRED,
+        mock_kwargs={"awg_mode": True},
+        note=(
+            "[HIGH severity -- pull-in candidate] Same invented-selector "
+            "defect as get_function above ('C1:BSWV? PHSE' sent; bare "
+            "'C1:BSWV?' documented). Same unguarded default-path exposure -- "
+            "awg_output.py's 'phase' property is the fifth field "
+            "get_configuration() builds. H5, fix Task 10."
+        ),
+    ),
+    # p.30 parameter table: "DUTY <duty> := {0 to 100}. ... Only settable "
+    # "when WVTP is SQUARE or PULSE."; same general-syntax instantiation.
+    WireForm(table="awg", variant="siglent_sdg", op="set_pulse_duty", params={"ch": 1, "duty": 25}, request="C1:BSWV DUTY,25", source=f"{SDG_GUIDE} p.29-30", mock_kwargs={"awg_mode": True}),
+    WireForm(
+        table="awg",
+        variant="siglent_sdg",
+        op="get_pulse_duty",
+        params={"ch": 1},
+        request="C1:BSWV?",
+        response="C1:BSWV WVTP,SINE,FRQ,100HZ,PERI,0.01S,AMP,2V,OFST,0V,HLEV,1V,LLEV,-1V,PHSE,0",
+        source=f"{SDG_GUIDE} p.31",
+        status=MISMATCH_DEFERRED,
+        mock_kwargs={"awg_mode": True},
+        note=(
+            "[medium severity] Same invented-selector defect as get_function "
+            "above ('C1:BSWV? DUTY' sent; bare 'C1:BSWV?' documented). "
+            "Reachable via awg_output.py's 'pulse_duty_cycle' property, but "
+            "only conditionally (get_configuration() only reads it when "
+            "function=='PULSE') and wrapped in its own try/except there, "
+            "unlike function/frequency/amplitude/offset/phase above -- an "
+            "exception is caught and logged rather than propagated. H5, fix "
+            "Task 10."
+        ),
+    ),
+    # p.29-30 parameter table: "SYM <symmetry> := {0 to 100}. Symmetry of "
+    # "RAMP. ... Only settable when WVTP is RAMP."; same general-syntax
+    # instantiation.
+    WireForm(table="awg", variant="siglent_sdg", op="set_ramp_symmetry", params={"ch": 1, "symmetry": 50}, request="C1:BSWV SYM,50", source=f"{SDG_GUIDE} p.29-30", mock_kwargs={"awg_mode": True}),
+    WireForm(
+        table="awg",
+        variant="siglent_sdg",
+        op="get_ramp_symmetry",
+        params={"ch": 1},
+        request="C1:BSWV?",
+        response="C1:BSWV WVTP,SINE,FRQ,100HZ,PERI,0.01S,AMP,2V,OFST,0V,HLEV,1V,LLEV,-1V,PHSE,0",
+        source=f"{SDG_GUIDE} p.31",
+        status=MISMATCH_DEFERRED,
+        mock_kwargs={"awg_mode": True},
+        note=(
+            "[medium severity] Same invented-selector defect as get_function "
+            "above ('C1:BSWV? SYM' sent; bare 'C1:BSWV?' documented). Same "
+            "conditional/try-wrapped exposure as get_pulse_duty above (only "
+            "read when function=='RAMP', exception caught). H5, fix Task 10."
+        ),
+    ),
+
+    # p.27 COMMAND SYNTAX: "<channel>:OUTPut ON|OFF,LOAD,<load>,PLRT,
+    # <polarity>" -- but its own worked EXAMPLEs (p.28) show each field is
+    # independently settable: "C1:OUTP ON" (bare state), "C1:OUTP LOAD,50",
+    # "C1:OUTP PLRT,NOR".
+    WireForm(table="awg", variant="siglent_sdg", op="set_output", params={"ch": 1, "state": "ON"}, request="C1:OUTP ON", source=f"{SDG_GUIDE} p.28", mock_kwargs={"awg_mode": True}),
+    WireForm(
+        table="awg",
+        variant="siglent_sdg",
+        op="get_output",
+        params={"ch": 1},
+        request="C1:OUTP?",
+        response="C1:OUTP ON,LOAD,HZ,PLRT,NOR",
+        source=f"{SDG_GUIDE} p.27-28",
+        status=MISMATCH_DEFERRED,
+        mock_kwargs={"awg_mode": True},
+        note=(
+            "[low severity] Unlike every other 'get_*' entry in this "
+            "section, the REQUEST here already matches the manual exactly -- "
+            "QUERY SYNTAX '<channel>:OUTPut?' (p.27) is bare, and the code's "
+            "table entry ('C{ch}:OUTP?') is bare too, no invented selector. "
+            "The only mismatch is mock/response shape: RESPONSE FORMAT is "
+            "'<channel>:OUTP ON|OFF,LOAD,<load>,PLRT,<polarity>' (p.27, "
+            "worked EXAMPLE transcribed above), but mock's C(n):OUTP? "
+            "handler (connection/mock/base.py) answers bare 'ON'/'OFF' -- "
+            "same mock-fixture-only pattern as the modern-scope get_coupling "
+            "entry above, not a driver/table defect. awg_output.py's "
+            "'enabled' property parses via 'return \"ON\" in "
+            "response.upper()', which is tolerant of the documented full-"
+            "list form too (neither 'OFF' nor any LOAD/PLRT value contains "
+            "the substring 'ON'), so this would likely work correctly "
+            "against real hardware even though the mock's answer shape "
+            "differs. Grouped under H5 (fix Task 10) for tracking, but the "
+            "fix here is the mock, not the table."
+        ),
+    ),
+    # p.28 EXAMPLE: "Set the load of CH1 to 50 ohms: C1:OUTP LOAD,50" --
+    # matches exactly. Not mocked (no LOAD handler in connection/mock/base.py).
+    WireForm(table="awg", variant="siglent_sdg", op="set_output_load", params={"ch": 1, "load": 50}, request="C1:OUTP LOAD,50", source=f"{SDG_GUIDE} p.28", mock_kwargs={"awg_mode": True}),
+    WireForm(
+        table="awg",
+        variant="siglent_sdg",
+        op="get_output_load",
+        params={"ch": 1},
+        request="C1:OUTP?",
+        response="C1:OUTP ON,LOAD,HZ,PLRT,NOR",
+        source=f"{SDG_GUIDE} p.27-28",
+        status=MISMATCH_DEFERRED,
+        mock_kwargs={"awg_mode": True},
+        note=(
+            "[low severity] Code sends 'C1:OUTP? LOAD' -- an invented "
+            "selector; there is no way to query just the load value, only "
+            "the bare '<channel>:OUTPut?' returning ALL fields (transcribed "
+            "above). Dead code: no caller anywhere in the repo invokes "
+            "get_output_load. H5-class defect (fix Task 10), not otherwise "
+            "reachable."
+        ),
+    ),
+    # p.28 EXAMPLE: "Set the polarity of CH1 to normal: C1:OUTP PLRT,NOR" --
+    # matches exactly. Not mocked, dead code (no caller anywhere).
+    WireForm(table="awg", variant="siglent_sdg", op="set_output_polarity", params={"ch": 1, "polarity": "NOR"}, request="C1:OUTP PLRT,NOR", source=f"{SDG_GUIDE} p.28", mock_kwargs={"awg_mode": True}),
+    WireForm(
+        table="awg",
+        variant="siglent_sdg",
+        op="get_output_polarity",
+        params={"ch": 1},
+        request="C1:OUTP?",
+        response="C1:OUTP ON,LOAD,HZ,PLRT,NOR",
+        source=f"{SDG_GUIDE} p.27-28",
+        status=MISMATCH_DEFERRED,
+        mock_kwargs={"awg_mode": True},
+        note=(
+            "[low severity] Code sends 'C1:OUTP? PLRT' -- same invented-"
+            "selector defect as get_output_load above. Dead code: no caller "
+            "anywhere in the repo invokes get_output_polarity. H5-class "
+            "defect (fix Task 10), not otherwise reachable."
+        ),
+    ),
+
+    # p.62 Format2: "<channel>:ArbWaVe NAME,<name>"; the unquoted rendering
+    # matches this guide's own Python code-sample appendix exactly (p.188:
+    # dev.write("C1:ARWV NAME,wave1")) rather than the inline prose EXAMPLE's
+    # quoted form (C1:ARWV NAME,"wave_1") -- both are the same documented
+    # command, just with/without quotes around the name literal. Not mocked
+    # (no ARWV handler), dead code (no caller anywhere in the repo).
+    WireForm(table="awg", variant="siglent_sdg", op="set_arb_waveform", params={"ch": 1, "name": "wave1"}, request="C1:ARWV NAME,wave1", source=f"{SDG_GUIDE} p.62, p.188", mock_kwargs={"awg_mode": True}),
+    WireForm(
+        table="awg",
+        variant="siglent_sdg",
+        op="get_arb_waveform",
+        params={"ch": 1},
+        request="C1:ARWV?",
+        response="C1:ARWV INDEX,2,NAME,StairUp",
+        source=f"{SDG_GUIDE} p.62",
+        status=MISMATCH_DEFERRED,
+        mock_kwargs={"awg_mode": True},
+        note=(
+            "[low severity] Code sends 'C1:ARWV? NAME' -- an invented "
+            "selector; QUERY SYNTAX is bare '<channel>:ARbWaVe?' (p.62), "
+            "RESPONSE FORMAT always returns BOTH 'INDEX,<index>,NAME,"
+            "<name>' together (worked EXAMPLE transcribed above). Dead code: "
+            "no caller anywhere in the repo invokes get_arb_waveform. "
+            "H5-class defect (fix Task 10), not otherwise reachable."
+        ),
+    ),
+
+    # p.36 EXAMPLE: "Set CH1 modulation state to on: C1:MDWV STATE,ON" --
+    # matches exactly. Not mocked, dead code (no caller anywhere).
+    WireForm(table="awg", variant="siglent_sdg", op="set_modulation", params={"ch": 1, "state": "ON"}, request="C1:MDWV STATE,ON", source=f"{SDG_GUIDE} p.33, p.36", mock_kwargs={"awg_mode": True}),
+    WireForm(
+        table="awg",
+        variant="siglent_sdg",
+        op="get_modulation",
+        params={"ch": 1},
+        request="C1:MDWV?",
+        response="C1:MDWV STATE,OFF",
+        source=f"{SDG_GUIDE} p.36",
+        status=MISMATCH_DEFERRED,
+        mock_kwargs={"awg_mode": True},
+        note=(
+            "[low severity] Code sends 'C1:MDWV? STATE' -- an invented "
+            "selector; QUERY SYNTAX is bare '<channel>:MoDulateWaVe?' "
+            "(p.36), RESPONSE FORMAT always returns every parameter of the "
+            "current modulation (worked EXAMPLE for the STATE-is-OFF case "
+            "transcribed above). Dead code: no caller anywhere in the repo "
+            "invokes get_modulation. H5-class defect (fix Task 10), not "
+            "otherwise reachable."
+        ),
+    ),
+
+    # p.59-60 EXAMPLE: "Set CH1 burst state to ON C1:BTWV STATE,ON" --
+    # matches exactly. Not mocked, dead code (no caller anywhere).
+    WireForm(table="awg", variant="siglent_sdg", op="set_burst_state", params={"ch": 1, "state": "ON"}, request="C1:BTWV STATE,ON", source=f"{SDG_GUIDE} p.59-60", mock_kwargs={"awg_mode": True}),
+    WireForm(
+        table="awg",
+        variant="siglent_sdg",
+        op="get_burst_state",
+        params={"ch": 1},
+        request="C1:BTWV?",
+        response="C1:BTWV STATE,OFF",
+        source=f"{SDG_GUIDE} p.60",
+        status=MISMATCH_DEFERRED,
+        mock_kwargs={"awg_mode": True},
+        note=(
+            "[low severity] Code sends 'C1:BTWV? STATE' -- an invented "
+            "selector; QUERY SYNTAX is bare '<channel>:BTWV(BursTWaVe)?' "
+            "(p.60), RESPONSE FORMAT always returns every parameter of the "
+            "current burst (worked EXAMPLE for the STATE-is-OFF case "
+            "transcribed above). Dead code: no caller anywhere in the repo "
+            "invokes get_burst_state. H5-class defect (fix Task 10), not "
+            "otherwise reachable."
+        ),
+    ),
+
+    # p.37, p.39 EXAMPLE: "Set CH1 sweep state to ON: C1:SWWV STATE,ON" --
+    # matches exactly. Not mocked, dead code (no caller anywhere).
+    WireForm(table="awg", variant="siglent_sdg", op="set_sweep_state", params={"ch": 1, "state": "ON"}, request="C1:SWWV STATE,ON", source=f"{SDG_GUIDE} p.37, p.39", mock_kwargs={"awg_mode": True}),
+    WireForm(
+        table="awg",
+        variant="siglent_sdg",
+        op="get_sweep_state",
+        params={"ch": 1},
+        request="C1:SWWV?",
+        response="C1:SWWV STATE,OFF",
+        source=f"{SDG_GUIDE} p.38",
+        status=MISMATCH_DEFERRED,
+        mock_kwargs={"awg_mode": True},
+        note=(
+            "[low severity] Code sends 'C1:SWWV? STATE' -- an invented "
+            "selector; QUERY SYNTAX is bare '<channel>:SWeepWaVe?' (p.38), "
+            "RESPONSE FORMAT always returns every parameter of the current "
+            "sweep (worked EXAMPLE for the STATE-is-OFF case transcribed "
+            "above, p.39). Dead code: no caller anywhere in the repo "
+            "invokes get_sweep_state. H5-class defect (fix Task 10), not "
+            "otherwise reachable."
+        ),
+    ),
 ]

@@ -65,3 +65,32 @@ def test_deferred_entries_explain_themselves():
     for wf in WIRE_FORMS:
         if wf.status == MISMATCH_DEFERRED:
             assert wf.note, f"{_ident(wf)}: deferred entries must record the audit ID and why"
+
+
+COVERED_TABLES = {
+    ("scope", "legacy"): SCPICommandSet("legacy").LEGACY_COMMANDS,
+    ("scope", "modern"): SCPICommandSet("modern").MODERN_COMMANDS,
+    ("psu", "siglent_spd"): PSUSCPICommandSet("siglent_spd").SIGLENT_SPD_OVERRIDES,
+    ("awg", "siglent_sdg"): AWGSCPICommandSet("siglent_sdg").SIGLENT_SDG_OVERRIDES,
+}
+
+
+@pytest.mark.parametrize("key", sorted(COVERED_TABLES, key=str), ids=str)
+def test_every_command_has_a_corpus_entry(key):
+    """A new command with no citation must fail the suite.
+
+    This is the recurrence prevention. Audit theme 2 appeared in the 2026-07-13
+    audit, was not fixed, and reappeared on 2026-07-22 -- because nothing forced
+    a new wire form to justify itself.
+    """
+    table, variant_or_dialect = key
+    documented = {
+        wf.op
+        for wf in WIRE_FORMS
+        if wf.table == table and (wf.dialect == variant_or_dialect or wf.variant == variant_or_dialect)
+    }
+    missing = sorted(set(COVERED_TABLES[key]) - documented)
+    assert not missing, (
+        f"{table}/{variant_or_dialect}: no corpus entry for {missing}. "
+        f"Add one citing the manual, or mark it UNCITED with a reason."
+    )
