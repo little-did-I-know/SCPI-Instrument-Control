@@ -71,7 +71,9 @@ class PSUSCPICommandSet:
         "set_timer_current": "TIMEr:CURR CH{ch},{current}",
         "get_timer_current": "TIMEr:CURR? CH{ch}",
         # Waveform generation
-        "set_wave_enable": "WAVE CH{ch},{state}",
+        # QS0503X-E01B p.40: "OUTPut:WAVE {CH1|CH2},{ON|OFF}" -- the "OUTPut:"
+        # prefix is required (audit H19, Task 7); the code previously omitted it.
+        "set_wave_enable": "OUTPut:WAVE CH{ch},{state}",
         "get_wave_enable": "WAVE? CH{ch}",
         "set_wave_type": "WAVE:TYPE CH{ch},{wave_type}",  # SINE, SQUARE, etc.
         "get_wave_type": "WAVE:TYPE? CH{ch}",
@@ -79,13 +81,24 @@ class PSUSCPICommandSet:
         "get_wave_freq": "WAVE:FREQ? CH{ch}",
         "set_wave_amplitude": "WAVE:AMPL CH{ch},{amplitude}",
         "get_wave_amplitude": "WAVE:AMPL? CH{ch}",
-        # Tracking modes (series/parallel)
-        "set_tracking": "OUTP:TRACK {mode}",  # INDEPENDENT, SERIES, PARALLEL
+        # Tracking modes (series/parallel). QS0503X-E01B p.40: "OUTPut:TRACK
+        # {0|1|2}" is a NUMERIC parameter on the wire (0=independent,
+        # 1=series, 2=parallel) -- the template keeps the documented "OUTP:"
+        # abbreviation used elsewhere in this table; get_command() below maps
+        # the public word enum (INDEPENDENT/SERIES/PARALLEL) to that number
+        # right before formatting (audit H19, Task 7).
+        "set_tracking": "OUTP:TRACK {mode}",
         "get_tracking": "OUTP:TRACK?",
         # Remote sensing
         "set_remote_sense": "SYST:SENS CH{ch},{state}",
         "get_remote_sense": "SYST:SENS? CH{ch}",
     }
+
+    # QS0503X-E01B p.40: OUTPut:TRACK's argument is the NUMERIC {0|1|2}, not
+    # the INDEPENDENT/SERIES/PARALLEL words power_supply.py's public
+    # `tracking_mode` property uses. This is the wire-encoding boundary
+    # get_command() consults for "set_tracking" (audit H19, Task 7).
+    SPD_TRACKING_WIRE: Dict[str, int] = {"INDEPENDENT": 0, "SERIES": 1, "PARALLEL": 2}
 
     def __init__(self, variant: str = "generic"):
         """Initialize SCPI command set with variant.
@@ -123,6 +136,15 @@ class PSUSCPICommandSet:
         if self.variant == "siglent_spd":
             if command_name in self.SIGLENT_SPD_OVERRIDES:
                 template = self.SIGLENT_SPD_OVERRIDES[command_name]
+                if command_name == "set_tracking" and isinstance(kwargs.get("mode"), str):
+                    # QS0503X-E01B p.40: wire wants NUMERIC {0|1|2}; the
+                    # caller (power_supply.py's tracking_mode setter) passes
+                    # the public word enum. Translate right before formatting.
+                    word = kwargs["mode"].upper()
+                    try:
+                        kwargs = {**kwargs, "mode": self.SPD_TRACKING_WIRE[word]}
+                    except KeyError:
+                        raise ValueError(f"Unknown tracking mode '{kwargs['mode']}'; expected one of {sorted(self.SPD_TRACKING_WIRE)}")
                 try:
                     return template.format(**kwargs)
                 except KeyError as e:

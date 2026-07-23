@@ -1365,8 +1365,8 @@ WIRE_FORMS: List[WireForm] = [
         ),
     ),
 
-    # p.40 EXAMPLE: "OUTPut:WAVE CH1,ON" -- the code's 'WAVE CH1,ON' omits
-    # the required 'OUTPut:' prefix.
+    # p.40 EXAMPLE: "OUTPut:WAVE CH1,ON" -- fixed Task 7 (audit H19): the code
+    # previously sent 'WAVE CH1,ON', omitting the required 'OUTPut:' prefix.
     WireForm(
         table="psu",
         variant="siglent_spd",
@@ -1374,20 +1374,7 @@ WIRE_FORMS: List[WireForm] = [
         params={"ch": 1, "state": "ON"},
         request="OUTPut:WAVE CH1,ON",
         source=f"{SPD_GUIDE} p.40",
-        status=MISMATCH_DEFERRED,
         mock_kwargs={"psu_mode": True},
-        note=(
-            "[medium-high severity] Code sends 'WAVE CH1,ON'; documented "
-            "COMMAND format is 'OUTPut:WAVE {CH1|CH2},{ON|OFF}' (p.40) -- the "
-            "'OUTPut:' prefix is required and missing. Mock's write handler "
-            "(connection/mock/base.py) matches the same prefix-less form the "
-            "code sends, not the manual's -- audit theme 2. Reachable: "
-            "examples/psu_advanced_features.py sets 'output.waveform_enabled "
-            "= True' on its default walkthrough path; against real hardware "
-            "the missing prefix would likely make this a silent no-op of the "
-            "waveform-display toggle (pull-in bar #2 territory). Queued for "
-            "a code fix."
-        ),
     ),
     WireForm(
         table="psu",
@@ -1425,7 +1412,10 @@ WIRE_FORMS: List[WireForm] = [
     WireForm(table="psu", variant="siglent_spd", op="get_wave_amplitude", params={"ch": 1}, request="WAVE:AMPL? CH1", source=f"{SPD_GUIDE} p.36", status=MISMATCH_DEFERRED, mock_kwargs={"psu_mode": True}, note="[low severity] Absent from manual entirely. Dead code: no caller. Queued."),
 
     # p.40 EXAMPLE: "OUTPut: TRACK 0" -- <mode>:={0|1|2} is a NUMERIC enum
-    # (0=independent, 1=series, 2=parallel per the description).
+    # (0=independent, 1=series, 2=parallel per the description). Fixed Task 7
+    # (audit H19): psu_scpi_commands.py's get_command() now maps the public
+    # word enum (params here is still the word, matching how power_supply.py
+    # calls it) to the documented number before formatting.
     WireForm(
         table="psu",
         variant="siglent_spd",
@@ -1433,21 +1423,7 @@ WIRE_FORMS: List[WireForm] = [
         params={"mode": "SERIES"},
         request="OUTP:TRACK 1",
         source=f"{SPD_GUIDE} p.40",
-        status=MISMATCH_DEFERRED,
         mock_kwargs={"psu_mode": True},
-        note=(
-            "[HIGH severity -- pull-in candidate] Code sends 'OUTP:TRACK "
-            "{mode}' with mode a word enum (INDEPENDENT/SERIES/PARALLEL, per "
-            "connection/mock/base.py's tracking-mode regex, which the "
-            "driver/mock co-invented -- audit theme 2); documented COMMAND "
-            "format is 'OUTPut:TRACK {0|1|2}' (p.40), EXAMPLE 'OUTPut: TRACK "
-            "0'. A word sent where a real instrument expects a bare digit is "
-            "likely rejected or ignored -- a silent no-op of the mode "
-            "(series doubles the output voltage; parallel doubles the "
-            "current), which is safety-relevant given the topology change "
-            "involved. Reachable: examples/psu_advanced_features.py sets "
-            "tracking mode on its default walkthrough path. H19, fix Task 7."
-        ),
     ),
     WireForm(
         table="psu",

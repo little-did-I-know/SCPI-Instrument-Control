@@ -21,6 +21,12 @@ _PERSONALITIES = {
     "lecroy": lecroy,
 }
 
+# QS0503X-E01B p.40: OUTPut:TRACK's wire argument is NUMERIC ({0|1|2}); this
+# maps it back to the INDEPENDENT/SERIES/PARALLEL words psu_tracking_mode
+# stores internally, so the OUTP:TRACK? handler (still a documented-mismatch
+# query, audit H19) keeps answering the same shape it always has.
+_TRACKING_NUMERIC_TO_WORD = {"0": "INDEPENDENT", "1": "SERIES", "2": "PARALLEL"}
+
 
 class MockConnection(BaseConnection):
     """Mock connection that returns deterministic SCPI responses.
@@ -212,9 +218,12 @@ class MockConnection(BaseConnection):
                     self.psu_outputs[ch]["enabled"] = enabled
                 return
 
-            # Tracking mode: OUTP:TRACK SERIES
-            if match := re.match(r"OUTP(?:UT)?:TRACK\s+(INDEPENDENT|SERIES|PARALLEL)", command, re.IGNORECASE):
-                self.psu_tracking_mode = match.group(1).upper()
+            # Tracking mode: OUTP:TRACK 1 (QS0503X-E01B p.40: NUMERIC
+            # {0|1|2} -- 0=independent, 1=series, 2=parallel). Stored
+            # internally as the word so existing readers (psu_tracking_mode,
+            # the OUTP:TRACK? handler below) are unaffected.
+            if match := re.match(r"OUTP(?:UT)?:TRACK\s+([012])", command, re.IGNORECASE):
+                self.psu_tracking_mode = _TRACKING_NUMERIC_TO_WORD[match.group(1)]
                 return
 
             # Timer enable: TIMEr CH1,ON
@@ -224,8 +233,8 @@ class MockConnection(BaseConnection):
                 self.psu_timer_enabled[ch] = enabled
                 return
 
-            # Waveform enable: WAVE CH1,ON
-            if match := re.match(r"WAVE\s+CH(\d+),(ON|OFF)", command, re.IGNORECASE):
+            # Waveform display enable: OUTPut:WAVE CH1,ON (QS0503X-E01B p.40)
+            if match := re.match(r"OUTP(?:UT)?:WAVE\s+CH(\d+),(ON|OFF)", command, re.IGNORECASE):
                 ch = int(match.group(1))
                 enabled = match.group(2).upper() == "ON"
                 self.psu_waveform_enabled[ch] = enabled

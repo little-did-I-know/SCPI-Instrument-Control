@@ -216,27 +216,30 @@ footer number (which runs 8 lower on every page).
 | `set_timer_current` | `TIMEr:CURR CH{ch},{current}` | absent from manual entirely; only `TIMEr:SET` sets voltage/current/time together for a memory group; dead code (no caller) | MISMATCH_DEFERRED | QS0503X-E01B p.40 |
 | `set_timer_enable` | `TIMEr CH{ch},{state}` | `TIMEr {CH1\|CH2},{ON\|OFF}` | VERIFIED | QS0503X-E01B p.41 |
 | `set_timer_voltage` | `TIMEr:VOLT CH{ch},{voltage}` | absent from manual entirely; only `TIMEr:SET` (group-addressed); dead code (no caller) | MISMATCH_DEFERRED | QS0503X-E01B p.40 |
-| `set_tracking` | `OUTP:TRACK {mode}` | `OUTPut:TRACK {0\|1\|2}` — code sends a word enum (INDEPENDENT/SERIES/PARALLEL), manual requires a numeric digit | MISMATCH_DEFERRED | QS0503X-E01B p.40 |
+| `set_tracking` | `OUTP:TRACK {mode}` | `OUTPut:TRACK {0\|1\|2}` — the public word enum (INDEPENDENT/SERIES/PARALLEL) is mapped to the documented numeric digit at the `get_command()` boundary before sending (fixed Task 7) | VERIFIED | QS0503X-E01B p.40 |
 | `set_voltage` | `CH{ch}:VOLT {voltage}` | `[{CH1\|CH2}:]VOLTage <voltage>` (VOLT is the documented abbreviation) | VERIFIED | QS0503X-E01B p.39 |
 | `set_wave_amplitude` | `WAVE:AMPL CH{ch},{amplitude}` | absent from manual entirely; dead code (no caller) | MISMATCH_DEFERRED | QS0503X-E01B p.36 |
-| `set_wave_enable` | `WAVE CH{ch},{state}` | `OUTPut:WAVE {CH1\|CH2},{ON\|OFF}` (`OUTPut:` prefix missing) | MISMATCH_DEFERRED | QS0503X-E01B p.40 |
+| `set_wave_enable` | `OUTPut:WAVE CH{ch},{state}` | `OUTPut:WAVE {CH1\|CH2},{ON\|OFF}` (fixed Task 7 — the missing `OUTPut:` prefix is now sent) | VERIFIED | QS0503X-E01B p.40 |
 | `set_wave_freq` | `WAVE:FREQ CH{ch},{frequency}` | absent from manual entirely; dead code (no caller) | MISMATCH_DEFERRED | QS0503X-E01B p.36 |
 | `set_wave_type` | `WAVE:TYPE CH{ch},{wave_type}` | absent from manual entirely; dead code (no caller) | MISMATCH_DEFERRED | QS0503X-E01B p.36 |
 
-**Tally: 6 VERIFIED, 21 MISMATCH_DEFERRED, 0 UNCITED (27 total).**
+**Tally: 8 VERIFIED, 19 MISMATCH_DEFERRED, 0 UNCITED (27 total).**
 
 Full detail — exact current vs. documented wire form, severity against the
 pull-in bar, and why each is deferred rather than fixed — is in each entry's
 `note` field in `tests/wire_forms.py`. Three findings here are already-known,
 tracked audit IDs with a fix owner: `measure_voltage`/`measure_current`/
-`measure_power` (H6, Task 6), `set_tracking`/`get_tracking` (H19, Task 7), and
-`get_output` (H20, Task 8). The rest — the six-command "waveform generation"
-surface (`set_wave_type`/`get_wave_type`/`set_wave_freq`/`get_wave_freq`/
-`set_wave_amplitude`/`get_wave_amplitude`), `set_remote_sense`/
-`get_remote_sense`, and the four `TIMEr:VOLT`/`TIMEr:CURR` commands — are new
-findings from this sweep: none has a caller anywhere in the repo outside the
-command table itself, so all are low severity (dead code, below the pull-in
-bar) and simply queued.
+`measure_power` (H6, Task 6), `set_tracking` and `set_wave_enable` (H19, fixed
+Task 7 — the wire now sends `OUTPut:TRACK {0|1|2}` and `OUTPut:WAVE
+CH{ch},{state}`; their query counterparts, `get_tracking` and
+`get_wave_enable`, stay MISMATCH_DEFERRED because the manual documents no
+query form for either command at all), and `get_output` (H20, Task 8). The
+rest — the six-command "waveform generation" surface (`set_wave_type`/
+`get_wave_type`/`set_wave_freq`/`get_wave_freq`/`set_wave_amplitude`/
+`get_wave_amplitude`), `set_remote_sense`/`get_remote_sense`, and the four
+`TIMEr:VOLT`/`TIMEr:CURR` commands — are new findings from this sweep: none
+has a caller anywhere in the repo outside the command table itself, so all
+are low severity (dead code, below the pull-in bar) and simply queued.
 
 ## Siglent SDG function generator (`AWGSCPICommandSet.SIGLENT_SDG_OVERRIDES`)
 
