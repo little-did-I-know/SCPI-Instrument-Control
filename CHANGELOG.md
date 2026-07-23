@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.0.0] - 2026-07-22
+
 ### ⚠️ Breaking Changes
 
 - Power supply and function-generator readback (`measure_voltage`/`measure_current`/`measure_power`,
