@@ -1,6 +1,7 @@
 """Token store: hashing, verification, revocation, persistence."""
 
 import json
+from pathlib import Path
 
 import pytest
 
@@ -105,3 +106,39 @@ def test_names_lists_without_secrets(tmp_path):
     store.mint("bench-laptop")
     assert sorted(store.names()) == ["bench-laptop", "robin"]
     assert json.loads((tmp_path / "tokens.json").read_text())["tokens"][0]["name"]
+
+
+def test_no_argument_defaults_never_touch_the_real_home(tmp_path):
+    """Proves the autouse `_no_real_home` guard in conftest.py actually works.
+
+    TokenStore() and ReferenceWaveform() with no arguments both fall back to
+    a path derived from the real home directory unless something redirects
+    them. This is the regression that already bit this branch once (a CLI
+    test minted a live token into the developer's real ~/.siglent/tokens.json).
+    If this assertion ever starts failing, the guard fixture has broken and
+    every other test in the suite is one missed `--config-dir`/`storage_dir`
+    away from writing outside the sandbox again.
+    """
+    import os
+
+    from scpi_control.reference_waveform import ReferenceWaveform
+    from scpi_control.server.auth import TokenStore as UnpinnedTokenStore
+
+    # os.path.expanduser bypasses pathlib entirely, so it still reports the
+    # genuine home directory even though this test's autouse fixture has
+    # monkeypatched Path.home() for the duration of the test. Note this can't
+    # be asserted as "not an ancestor of the resolved path" -- on this
+    # machine tmp_path itself lives under the real home (...\AppData\Local\
+    # Temp\...), so that relationship would hold true even when the guard is
+    # broken. Compare against the exact real-default path instead.
+    real_home = Path(os.path.expanduser("~"))
+    real_default_token_path = real_home / ".siglent" / "tokens.json"
+    real_default_reference_dir = real_home / ".siglent" / "references"
+
+    store = UnpinnedTokenStore()
+    assert tmp_path in store.path.parents
+    assert store.path != real_default_token_path
+
+    reference = ReferenceWaveform()
+    assert tmp_path in reference.storage_dir.parents
+    assert reference.storage_dir != real_default_reference_dir

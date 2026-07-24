@@ -59,3 +59,79 @@ def test_serve_does_not_remint_when_tokens_exist(tmp_path, capsys, monkeypatch):
     main(["--config-dir", str(tmp_path)])
     assert TokenStore(str(tmp_path / "tokens.json")).names() == ["robin"]
     assert "?token=" not in capsys.readouterr().out
+
+
+# --- --config-dir ordering regressions -------------------------------------
+#
+# argparse's subparsers action reparses the remaining argv into a fresh
+# namespace and then unconditionally copies every attribute from it back
+# over the outer namespace. Each `token <cmd>` subparser also declares its
+# own `--config-dir` (with default=None) so it can accept the flag *after*
+# the subcommand; but when the flag is given *before* the subcommand
+# instead, that per-subparser default of None was clobbering the value the
+# top-level parser had already parsed. `scpi-web --config-dir X token add
+# name` -- a completely natural invocation -- silently fell back to the
+# real ~/.siglent. Every test above places --config-dir *after* the
+# subcommand, which is why none of them caught it. These assert the
+# directory actually used, not merely a zero exit code.
+
+
+def test_config_dir_before_subcommand_is_used_for_token_add(tmp_path, capsys):
+    main(["--config-dir", str(tmp_path), "token", "add", "robin"])
+    printed = capsys.readouterr().out
+    raw = [word for word in printed.split() if word.startswith("scpi_")][0]
+    assert (tmp_path / "tokens.json").exists()
+    assert TokenStore(str(tmp_path / "tokens.json")).verify(raw) == "robin"
+
+
+def test_config_dir_after_subcommand_is_used_for_token_add(tmp_path, capsys):
+    main(["token", "add", "robin", "--config-dir", str(tmp_path)])
+    printed = capsys.readouterr().out
+    raw = [word for word in printed.split() if word.startswith("scpi_")][0]
+    assert (tmp_path / "tokens.json").exists()
+    assert TokenStore(str(tmp_path / "tokens.json")).verify(raw) == "robin"
+
+
+def test_config_dir_before_subcommand_is_used_for_token_list(tmp_path, capsys):
+    main(["--config-dir", str(tmp_path), "token", "add", "robin"])
+    capsys.readouterr()
+    main(["--config-dir", str(tmp_path), "token", "list"])
+    printed = capsys.readouterr().out
+    assert "robin" in printed
+    assert (tmp_path / "tokens.json").exists()
+
+
+def test_config_dir_after_subcommand_is_used_for_token_list(tmp_path, capsys):
+    main(["token", "add", "robin", "--config-dir", str(tmp_path)])
+    capsys.readouterr()
+    main(["token", "list", "--config-dir", str(tmp_path)])
+    printed = capsys.readouterr().out
+    assert "robin" in printed
+    assert (tmp_path / "tokens.json").exists()
+
+
+def test_config_dir_before_subcommand_is_used_for_token_revoke(tmp_path):
+    main(["--config-dir", str(tmp_path), "token", "add", "robin"])
+    # Asserted before the revoke: otherwise a buggy resolution that sends
+    # both the add and the revoke to the same *wrong* directory still leaves
+    # tmp_path's (nonexistent) store trivially empty, masking the bug.
+    assert (tmp_path / "tokens.json").exists()
+    main(["--config-dir", str(tmp_path), "token", "revoke", "robin"])
+    assert TokenStore(str(tmp_path / "tokens.json")).names() == []
+
+
+def test_config_dir_after_subcommand_is_used_for_token_revoke(tmp_path):
+    main(["token", "add", "robin", "--config-dir", str(tmp_path)])
+    main(["token", "revoke", "robin", "--config-dir", str(tmp_path)])
+    assert TokenStore(str(tmp_path / "tokens.json")).names() == []
+
+
+def test_config_dir_before_bare_serve_bootstraps_into_given_directory(tmp_path, capsys, monkeypatch):
+    """The bare serve path has no subcommand, so --config-dir only has one
+    position to appear in -- but it must still land in tmp_path, not the
+    real ~/.siglent, and this asserts that directly rather than trusting a
+    zero exit code."""
+    monkeypatch.setattr("uvicorn.run", lambda app, host, port: None)
+    main(["--config-dir", str(tmp_path), "--port", "9999"])
+    assert (tmp_path / "tokens.json").exists()
+    assert TokenStore(str(tmp_path / "tokens.json")).names() == ["default"]

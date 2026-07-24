@@ -1,12 +1,46 @@
 """Fixtures shared across the test suite."""
 
 from contextlib import contextmanager
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pytest
 
 from scpi_control.report_generator.models.report_data import WaveformData
+
+
+@pytest.fixture(autouse=True)
+def _no_real_home(monkeypatch, tmp_path):
+    """Never let a test touch the real home directory's default config/storage.
+
+    Per-test discipline has already failed once: a CLI test invoked without
+    pinning --config-dir minted a live token into the developer's actual
+    ~/.siglent/tokens.json. This fixture is the backstop so that mistake
+    cannot happen again, regardless of which test makes it.
+
+    Two known hazards, both worked around here:
+
+    - ``scpi_control.server.auth.DEFAULT_CONFIG_DIR`` is computed once at
+      import time (``Path.home() / ".siglent"``), so monkeypatching
+      ``Path.home`` after import does not affect it -- the module attribute
+      itself has to be patched. ``scpi_control.server.__main__`` imports that
+      same name by value (``from ... import DEFAULT_CONFIG_DIR``), which
+      copies the binding at import time, so it is patched separately too.
+    - ``scpi_control.reference_waveform.ReferenceWaveform.__init__`` calls
+      ``Path.home()`` at runtime when no ``storage_dir`` is given, so
+      patching ``Path.home`` globally covers that path.
+
+    This only changes *default* resolution: tests that pass an explicit path
+    (e.g. ``TokenStore(str(tmp_path / "tokens.json"))``) never consult
+    ``Path.home()`` or ``DEFAULT_CONFIG_DIR`` and are unaffected.
+    """
+    fake_home = tmp_path / "fake-home"
+    fake_home.mkdir()
+    monkeypatch.setattr(Path, "home", lambda: fake_home)
+    monkeypatch.setattr("scpi_control.server.auth.DEFAULT_CONFIG_DIR", fake_home / ".siglent")
+    monkeypatch.setattr("scpi_control.server.__main__.DEFAULT_CONFIG_DIR", fake_home / ".siglent")
+    yield fake_home
 
 
 @contextmanager

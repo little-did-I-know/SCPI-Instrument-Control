@@ -15,8 +15,19 @@ def _store(args) -> TokenStore:
     return TokenStore(str(config_dir / "tokens.json"))
 
 
-def _add_config_dir(parser) -> None:
-    parser.add_argument("--config-dir", default=None, help="directory holding tokens.json (default: ~/.siglent)")
+def _add_config_dir(parser, default=None) -> None:
+    """Register --config-dir.
+
+    Subparsers must use ``default=argparse.SUPPRESS`` rather than ``None``.
+    argparse's subparsers action reparses the remaining argv into a fresh
+    namespace and then unconditionally copies every attribute from it back
+    over the outer namespace -- so if a subparser's own --config-dir has a
+    concrete default, that default overwrites a value the top-level parser
+    already parsed whenever the flag isn't repeated after the subcommand.
+    SUPPRESS omits the attribute entirely when the flag is absent, so the
+    outer namespace's value (whatever position it was given in) survives.
+    """
+    parser.add_argument("--config-dir", default=default, help="directory holding tokens.json (default: ~/.siglent)")
 
 
 def main(argv=None) -> None:
@@ -29,12 +40,12 @@ def main(argv=None) -> None:
     token = sub.add_parser("token", help="manage access tokens").add_subparsers(dest="token_command", required=True)
     add = token.add_parser("add", help="mint a token (printed once)")
     add.add_argument("name")
-    _add_config_dir(add)
+    _add_config_dir(add, default=argparse.SUPPRESS)
     listing = token.add_parser("list", help="list token names")
-    _add_config_dir(listing)
+    _add_config_dir(listing, default=argparse.SUPPRESS)
     revoke = token.add_parser("revoke", help="revoke a token by name")
     revoke.add_argument("name")
-    _add_config_dir(revoke)
+    _add_config_dir(revoke, default=argparse.SUPPRESS)
 
     args = parser.parse_args(argv)
 
