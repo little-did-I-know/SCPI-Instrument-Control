@@ -73,6 +73,32 @@ class TestSocketConnect:
         with pytest.raises(Exception):
             conn.connect()
 
+    def test_connect_failure_does_not_leak_peer_bytes(self, mock_socket):
+        """A connect() failure must never surface bytes read from the peer.
+
+        connect() has no legitimate reason to call recv() at all -- it only opens
+        the socket -- but if a future change folded a banner/peek read into the
+        failure path, an attacker-controlled peer could get its bytes echoed into
+        exception text that reaches lower-trust callers (e.g. the SSRF-guarded
+        gateway API; see tests/test_server_ssrf.py). Prime recv() with a
+        realistic banner so the peer "sent" something before connect() itself
+        fails, and assert the error text carries none of it.
+        """
+        banner = b"SSH-2.0-OpenSSH_9.6 SECRETBANNER"
+        mock_socket.recv.return_value = banner
+        mock_socket.connect.side_effect = socket.error("Connection refused")
+
+        conn = SocketConnection("192.168.1.100")
+
+        with pytest.raises(Exception) as exc_info:
+            conn.connect()
+
+        message = str(exc_info.value)
+        assert banner.decode("ascii") not in message
+        assert "SSH-2.0-OpenSSH_9.6" not in message
+        assert "SECRETBANNER" not in message
+        assert "SSH" not in message
+
     def test_already_connected(self, mock_socket):
         """Test connecting when already connected."""
         conn = SocketConnection("192.168.1.100")
