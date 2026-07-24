@@ -18,7 +18,7 @@
         <link rel="prev" href="../user-guide/advanced-features/">
       
       
-        <link rel="next" href="browser-ui/">
+        <link rel="next" href="security/">
       
       
         
@@ -1114,6 +1114,34 @@
   
 </nav>
       
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="security/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Security
+  
+
+    
+  </span>
+  
+  
+
+      </a>
     </li>
   
 
@@ -3515,6 +3543,12 @@ sits near your instruments, and any browser on the LAN gets a full
 oscilloscope UI — no client install, no drivers, just a URL. V1 is
 scope-only, and the server supports named multi-sessions, so several
 instruments (or several views of the same instrument) can be open at once.</p>
+<blockquote>
+<p><strong>Security first:</strong> every request needs a bearer token. Read the
+<strong><a href="security/">Gateway security guide</a></strong> for tokens, session ownership, the
+SSRF gate, and deployment guidance before exposing the gateway beyond
+<code>127.0.0.1</code>.</p>
+</blockquote>
 <h2 id="install-and-run">Install and run<a class="headerlink" href="#install-and-run" title="Permanent link">&para;</a></h2>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot;SCPI-Instrument-Control[web]&quot;</span>
 </span></code></pre></div>
@@ -3523,15 +3557,19 @@ instruments (or several views of the same instrument) can be open at once.</p>
 </span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="c1"># or</span>
 </span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>python<span class="w"> </span>-m<span class="w"> </span>scpi_control.server
 </span></code></pre></div>
-<p>By default the gateway listens on <code>http://127.0.0.1:8765</code>.</p>
+<p>By default the gateway listens on <code>http://127.0.0.1:8765</code>. On first run it
+mints an access token and prints a ready-to-open URL
+(<code>http://127.0.0.1:8765/?token=…</code>) — open that to reach the browser UI.</p>
 <h2 id="security-posture">Security posture<a class="headerlink" href="#security-posture" title="Permanent link">&para;</a></h2>
-<p>The server binds to <code>127.0.0.1</code> by default, so it is not reachable from the
-network until you opt in. Exposing it to the LAN is an explicit choice:</p>
+<p>Every <code>/api/*</code> route (other than <code>GET /api/health</code>) requires a valid bearer
+token — there is no unauthenticated path. The server also binds to
+<code>127.0.0.1</code> by default, so it is not reachable from the network until you opt
+in. Exposing it to the LAN is an explicit choice:</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>scpi-web<span class="w"> </span>--host<span class="w"> </span><span class="m">0</span>.0.0.0
 </span></code></pre></div>
-<p>There is <strong>no authentication</strong> in this release. Anyone who can reach the
-gateway's port can control the connected instruments. Only bind to <code>0.0.0.0</code>
-on networks you trust.</p>
+<p>See the <strong><a href="security/">Gateway security guide</a></strong> for the full model: tokens,
+session ownership, the SSRF gate that validates outbound connection targets,
+the session cap, and deployment guidance (TLS, reverse proxies).</p>
 <h2 id="mock-first">Mock-first<a class="headerlink" href="#mock-first" title="Permanent link">&para;</a></h2>
 <p>You don't need hardware to try the gateway. The home screen always offers a
 mock oscilloscope session (<code>mock: true</code>), and every feature — waveform
@@ -3559,6 +3597,8 @@ ever plugging in an instrument.</p>
 </ul>
 <h2 id="where-to-next">Where to next<a class="headerlink" href="#where-to-next" title="Permanent link">&para;</a></h2>
 <ul>
+<li><a href="security/">Gateway security</a> — tokens, session ownership, the SSRF gate,
+  and deployment guidance</li>
 <li><a href="browser-ui/">Browser UI Tour</a> — a walkthrough of the home screen, canvas
   modes, and rail tabs</li>
 <li><a href="api/">REST &amp; WebSocket API</a> — the complete wire reference, with a curl

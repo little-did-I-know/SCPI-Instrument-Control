@@ -1019,6 +1019,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../gateway/security/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Security
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../gateway/browser-ui/" class="md-nav__link">
         
   
@@ -3502,6 +3530,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#web-gateway" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Web gateway
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -3771,6 +3810,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#web-gateway" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Web gateway
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -3989,6 +4039,20 @@
 <li>Rapid acquisition loops could impact system performance</li>
 </ul>
 <p><strong>Mitigation</strong>: Implement appropriate timeouts and rate limiting in your code</p>
+<h3 id="web-gateway">Web gateway<a class="headerlink" href="#web-gateway" title="Permanent link">&para;</a></h3>
+<ul>
+<li>The optional web gateway (<code>scpi-web</code>) authenticates every <code>/api/*</code> request
+  with a bearer token, except the unauthenticated <code>GET /api/health</code> probe</li>
+<li>Instrument sessions are owned by the token that created them — only the
+  owner may issue writes; other tokens may read and watch</li>
+<li>Outbound connection targets are validated (an SSRF gate) before the gateway
+  opens a socket to an instrument</li>
+<li>Concurrent instrument sessions are capped</li>
+<li>The gateway does <strong>not</strong> terminate TLS; traffic (including the bearer
+  token) is unencrypted unless you place it behind a TLS-terminating reverse
+  proxy or keep it on a trusted network</li>
+</ul>
+<p>See the <a href="../../gateway/security/">Gateway security guide</a> for the full model.</p>
 <h2 id="dependency-security">Dependency Security<a class="headerlink" href="#dependency-security" title="Permanent link">&para;</a></h2>
 <p>We use automated tools to monitor dependencies for known vulnerabilities:</p>
 <ul>
@@ -4034,7 +4098,7 @@
 <h2 id="questions">Questions?<a class="headerlink" href="#questions" title="Permanent link">&para;</a></h2>
 <p>If you have questions about this security policy, please open a GitHub Discussion or contact the maintainers.</p>
 <hr />
-<p><strong>Last Updated</strong>: 2025-12-30</p>
+<p><strong>Last Updated</strong>: 2026-07-24</p>
 
 
 

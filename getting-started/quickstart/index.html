@@ -1187,6 +1187,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../gateway/security/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Security
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../gateway/browser-ui/" class="md-nav__link">
         
   
@@ -3657,7 +3685,10 @@
 <p><code>bash
     pip install "SCPI-Instrument-Control[web]"
     scpi-web</code></p>
-<div class="language-text highlight"><pre><span></span><code>Then open &lt;http://127.0.0.1:8765&gt; in your browser.
+<div class="language-text highlight"><pre><span></span><code>On first run this prints a ready-to-open URL with an access token
+(`http://127.0.0.1:8765/?token=…`) — open that in your browser. Every
+request needs a token; see the
+[Gateway security guide](../gateway/security.md) for details.
 </code></pre></div>
 <div class="tabbed-set tabbed-alternate" data-tabs="4:1"><input checked="checked" id="__tabbed_4_1" name="__tabbed_4" type="radio" /><div class="tabbed-labels"><label for="__tabbed_4_1">Everything</label></div>
 <div class="tabbed-content">

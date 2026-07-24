@@ -1024,6 +1024,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../security/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Security
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../browser-ui/" class="md-nav__link">
         
   
@@ -3603,6 +3631,10 @@ are relative to the server root (default <code>http://127.0.0.1:8765</code>); ev
 <code>/api/*</code> route accepts and returns JSON. This page mirrors what the browser
 UI itself calls — everything documented here is exercised by the shipping
 frontend.</p>
+<p>Every route below requires <code>Authorization: Bearer &lt;token&gt;</code> <strong>except</strong>
+<code>GET /api/health</code>. See the <a href="../security/">Gateway security guide</a> for how to
+mint a token, how ownership gates writes, and the WebSocket authentication
+handshake.</p>
 <h2 id="sessions-discovery">Sessions &amp; discovery<a class="headerlink" href="#sessions-discovery" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -3874,7 +3906,7 @@ frontend.</p>
 <td><code>reference</code></td>
 <td><code>{name}</code> or <code>{name: null}</code> to clear</td>
 <td>The active overlay (as above)</td>
-<td>404 unknown reference name</td>
+<td>404 unknown reference name (<strong>400</strong> if the store holds un-migrated pre-5.0 files — run <code>scpi-web references migrate</code>)</td>
 </tr>
 </tbody>
 </table>
@@ -4016,27 +4048,33 @@ frontend.</p>
 </tbody>
 </table>
 <h2 id="curl-quickstart">Curl quickstart<a class="headerlink" href="#curl-quickstart" title="Permanent link">&para;</a></h2>
-<p>Create a mock session, configure a channel, and fetch its waveform as JSON — no hardware required (start the gateway first: <code>scpi-web</code>):</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1"># 1. Create a mock scope session</span>
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>curl<span class="w"> </span>-s<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>http://127.0.0.1:8765/api/sessions<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">  </span>-H<span class="w"> </span><span class="s2">&quot;Content-Type: application/json&quot;</span><span class="w"> </span><span class="se">\</span>
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">  </span>-d<span class="w"> </span><span class="s1">&#39;{&quot;mock&quot;: true, &quot;label&quot;: &quot;curl demo&quot;}&#39;</span>
-</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="c1"># -&gt; 201 {&quot;id&quot;: &quot;a1b2c3d4&quot;, &quot;label&quot;: &quot;curl demo&quot;, &quot;mock&quot;: true, &quot;address&quot;: null,</span>
-</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="c1">#         &quot;state&quot;: &quot;connected&quot;, &quot;idn&quot;: &quot;Siglent Technologies,SDS1104X-E,MOCK0001,1.0.0.0&quot;,</span>
-</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="c1">#         &quot;model&quot;: &quot;SDS1104X-E&quot;, &quot;dialect&quot;: &quot;legacy&quot;, &quot;num_channels&quot;: 4, &quot;viewers&quot;: 0}</span>
-</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>
-</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="nv">SESSION_ID</span><span class="o">=</span>a1b2c3d4<span class="w">   </span><span class="c1"># substitute the &quot;id&quot; from the response above</span>
-</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>
-</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="c1"># 2. Enable channel 1 and set its vertical scale</span>
-</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>curl<span class="w"> </span>-s<span class="w"> </span>-X<span class="w"> </span>PATCH<span class="w"> </span><span class="s2">&quot;http://127.0.0.1:8765/api/sessions/</span><span class="nv">$SESSION_ID</span><span class="s2">/scope/channels/1&quot;</span><span class="w"> </span><span class="se">\</span>
-</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="w">  </span>-H<span class="w"> </span><span class="s2">&quot;Content-Type: application/json&quot;</span><span class="w"> </span><span class="se">\</span>
-</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a><span class="w">  </span>-d<span class="w"> </span><span class="s1">&#39;{&quot;enabled&quot;: true, &quot;voltage_scale&quot;: 0.5}&#39;</span>
-</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>
-</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a><span class="c1"># 3. Fetch channel 1&#39;s waveform as JSON, decimated to 200 points</span>
-</span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>curl<span class="w"> </span>-s<span class="w"> </span><span class="s2">&quot;http://127.0.0.1:8765/api/sessions/</span><span class="nv">$SESSION_ID</span><span class="s2">/scope/waveform?channels=1&amp;max_points=200&quot;</span>
-</span><span id="__span-0-18"><a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>
-</span><span id="__span-0-19"><a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a><span class="c1"># 4. Clean up</span>
-</span><span id="__span-0-20"><a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a>curl<span class="w"> </span>-s<span class="w"> </span>-X<span class="w"> </span>DELETE<span class="w"> </span><span class="s2">&quot;http://127.0.0.1:8765/api/sessions/</span><span class="nv">$SESSION_ID</span><span class="s2">&quot;</span>
+<p>Create a mock session, configure a channel, and fetch its waveform as JSON — no hardware required. Start the gateway first (<code>scpi-web</code> prints a token on first run; mint another with <code>scpi-web token add &lt;name&gt;</code>) and export it:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nb">export</span><span class="w"> </span><span class="nv">TOKEN</span><span class="o">=</span>scpi_...<span class="w">   </span><span class="c1"># from the gateway&#39;s startup output</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="c1"># 1. Create a mock scope session</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>curl<span class="w"> </span>-s<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>http://127.0.0.1:8765/api/sessions<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">  </span>-H<span class="w"> </span><span class="s2">&quot;Authorization: Bearer </span><span class="nv">$TOKEN</span><span class="s2">&quot;</span><span class="w"> </span><span class="se">\</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="w">  </span>-H<span class="w"> </span><span class="s2">&quot;Content-Type: application/json&quot;</span><span class="w"> </span><span class="se">\</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="w">  </span>-d<span class="w"> </span><span class="s1">&#39;{&quot;mock&quot;: true, &quot;label&quot;: &quot;curl demo&quot;}&#39;</span>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="c1"># -&gt; 201 {&quot;id&quot;: &quot;a1b2c3d4&quot;, &quot;label&quot;: &quot;curl demo&quot;, &quot;mock&quot;: true, &quot;address&quot;: null,</span>
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="c1">#         &quot;state&quot;: &quot;connected&quot;, &quot;idn&quot;: &quot;Siglent Technologies,SDS1104X-E,MOCK0001,1.0.0.0&quot;,</span>
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="c1">#         &quot;model&quot;: &quot;SDS1104X-E&quot;, &quot;dialect&quot;: &quot;legacy&quot;, &quot;num_channels&quot;: 4, &quot;viewers&quot;: 0}</span>
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>
+</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="nv">SESSION_ID</span><span class="o">=</span>a1b2c3d4<span class="w">   </span><span class="c1"># substitute the &quot;id&quot; from the response above</span>
+</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>
+</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a><span class="c1"># 2. Enable channel 1 and set its vertical scale</span>
+</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>curl<span class="w"> </span>-s<span class="w"> </span>-X<span class="w"> </span>PATCH<span class="w"> </span><span class="s2">&quot;http://127.0.0.1:8765/api/sessions/</span><span class="nv">$SESSION_ID</span><span class="s2">/scope/channels/1&quot;</span><span class="w"> </span><span class="se">\</span>
+</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a><span class="w">  </span>-H<span class="w"> </span><span class="s2">&quot;Authorization: Bearer </span><span class="nv">$TOKEN</span><span class="s2">&quot;</span><span class="w"> </span><span class="se">\</span>
+</span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a><span class="w">  </span>-H<span class="w"> </span><span class="s2">&quot;Content-Type: application/json&quot;</span><span class="w"> </span><span class="se">\</span>
+</span><span id="__span-0-18"><a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a><span class="w">  </span>-d<span class="w"> </span><span class="s1">&#39;{&quot;enabled&quot;: true, &quot;voltage_scale&quot;: 0.5}&#39;</span>
+</span><span id="__span-0-19"><a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a>
+</span><span id="__span-0-20"><a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a><span class="c1"># 3. Fetch channel 1&#39;s waveform as JSON, decimated to 200 points</span>
+</span><span id="__span-0-21"><a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a>curl<span class="w"> </span>-s<span class="w"> </span>-H<span class="w"> </span><span class="s2">&quot;Authorization: Bearer </span><span class="nv">$TOKEN</span><span class="s2">&quot;</span><span class="w"> </span><span class="se">\</span>
+</span><span id="__span-0-22"><a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a><span class="w">  </span><span class="s2">&quot;http://127.0.0.1:8765/api/sessions/</span><span class="nv">$SESSION_ID</span><span class="s2">/scope/waveform?channels=1&amp;max_points=200&quot;</span>
+</span><span id="__span-0-23"><a id="__codelineno-0-23" name="__codelineno-0-23" href="#__codelineno-0-23"></a>
+</span><span id="__span-0-24"><a id="__codelineno-0-24" name="__codelineno-0-24" href="#__codelineno-0-24"></a><span class="c1"># 4. Clean up</span>
+</span><span id="__span-0-25"><a id="__codelineno-0-25" name="__codelineno-0-25" href="#__codelineno-0-25"></a>curl<span class="w"> </span>-s<span class="w"> </span>-X<span class="w"> </span>DELETE<span class="w"> </span>-H<span class="w"> </span><span class="s2">&quot;Authorization: Bearer </span><span class="nv">$TOKEN</span><span class="s2">&quot;</span><span class="w"> </span><span class="se">\</span>
+</span><span id="__span-0-26"><a id="__codelineno-0-26" name="__codelineno-0-26" href="#__codelineno-0-26"></a><span class="w">  </span><span class="s2">&quot;http://127.0.0.1:8765/api/sessions/</span><span class="nv">$SESSION_ID</span><span class="s2">&quot;</span>
 </span></code></pre></div>
 
 
