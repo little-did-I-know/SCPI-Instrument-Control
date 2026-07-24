@@ -55,7 +55,14 @@ export function TokenGate({ children }: { children: React.ReactNode }) {
   }, [check]);
 
   if (status === "ready") return <>{children}</>;
-  if (status === "checking") return <p>Connecting…</p>;
+  // aria-live so a screen-reader user hears the wait; without it the first
+  // screen of the app is silent until it resolves.
+  if (status === "checking")
+    return (
+      <p role="status" aria-live="polite">
+        Connecting…
+      </p>
+    );
 
   return (
     <div style={{ display: "flex", justifyContent: "center", padding: "var(--space-4)" }}>
