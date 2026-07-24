@@ -3318,7 +3318,18 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="[Unreleased]">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#500-2026-07-24" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [5.0.0] - 2026-07-24
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[5.0.0] - 2026-07-24">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -4716,7 +4727,18 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="[Unreleased]">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#500-2026-07-24" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [5.0.0] - 2026-07-24
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[5.0.0] - 2026-07-24">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -6032,6 +6054,7 @@
 <p>The format is based on <a href="https://keepachangelog.com/en/1.0.0/">Keep a Changelog</a>,
 and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semantic Versioning</a>.</p>
 <h2 id="unreleased">[Unreleased]<a class="headerlink" href="#unreleased" title="Permanent link">&para;</a></h2>
+<h2 id="500-2026-07-24">[5.0.0] - 2026-07-24<a class="headerlink" href="#500-2026-07-24" title="Permanent link">&para;</a></h2>
 <h3 id="breaking-changes">⚠️ Breaking Changes<a class="headerlink" href="#breaking-changes" title="Permanent link">&para;</a></h3>
 <ul>
 <li>Web gateway: every <code>/api/*</code> request now requires a bearer token, and the live-stream
@@ -6048,6 +6071,17 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 <li>Reference waveforms: stored metadata moved from a pickled dict to a JSON string so reference
   files load without <code>allow_pickle</code>. Files saved by 4.x raise an error naming the file until
   converted. <strong>Migration:</strong> run <code>scpi-web references migrate</code> once.</li>
+<li>Power supply (SPD3303X/-E): <code>ovp_level</code>/<code>ocp_level</code> now raise <code>NotImplementedError</code> — the
+  SPD3303X command set has no protection subsystem, so these calls never armed anything on real
+  hardware (they emitted a <code>FutureWarning</code> in 4.1.0). The model's <code>has_ovp</code>/<code>has_ocp</code> capabilities
+  are now <code>False</code>. <strong>Migration:</strong> stop calling these on an SPD3303X; gate on
+  <code>has_ovp</code>/<code>has_ocp</code> if you support multiple PSU models.</li>
+<li>Testing: <code>MockConnection</code> now defaults to <code>strict=True</code>, so an unmatched PSU/AWG/DAQ query raises
+  <code>TimeoutError</code> like real hardware instead of returning <code>""</code>. <strong>Migration:</strong> pass <code>strict=False</code>
+  explicitly to restore the old lenient behavior.</li>
+<li>Testing: <code>MockConnection</code> no longer answers the legacy <code>C&lt;n&gt;:WF?</code> waveform read on a
+  modern-dialect instance (SDS800X HD / SDS5000X); it now times out, matching real modern
+  hardware, which documents no such command. Legacy-dialect scopes are unaffected.</li>
 </ul>
 <h3 id="added">Added<a class="headerlink" href="#added" title="Permanent link">&para;</a></h3>
 <ul>
