@@ -38,10 +38,30 @@ class TokenStore:
         self._tokens: List[Dict[str, Any]] = []
         if self.path.exists():
             try:
-                self._tokens = json.loads(self.path.read_text(encoding="utf-8")).get("tokens", [])
+                raw = json.loads(self.path.read_text(encoding="utf-8"))
+                self._tokens = self._validate_tokens(raw)
             except (ValueError, OSError) as exc:
                 # Never fall back to "no tokens" — that would silently open the gateway.
                 raise ValueError("token store {0} is unreadable: {1}".format(self.path, exc))
+
+    @staticmethod
+    def _validate_tokens(raw: Any) -> List[Dict[str, Any]]:
+        """Validate the parsed store shape; raise ValueError for anything malformed.
+
+        A store that parses as JSON but has the wrong shape must fail exactly like
+        corrupt JSON does -- never silently degrade to "no tokens".
+        """
+        if not isinstance(raw, dict):
+            raise ValueError("expected a JSON object at the top level, got {0}".format(type(raw).__name__))
+        tokens = raw.get("tokens", [])
+        if not isinstance(tokens, list):
+            raise ValueError('expected "tokens" to be a list, got {0}'.format(type(tokens).__name__))
+        for entry in tokens:
+            if not isinstance(entry, dict):
+                raise ValueError("expected each token entry to be an object, got {0}".format(type(entry).__name__))
+            if not isinstance(entry.get("name"), str) or not isinstance(entry.get("hash"), str):
+                raise ValueError('each token entry must have string "name" and "hash" keys')
+        return tokens
 
     def _save(self) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)

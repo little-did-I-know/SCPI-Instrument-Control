@@ -63,6 +63,27 @@ def test_corrupt_store_is_not_silently_empty(tmp_path):
         TokenStore(str(path))
 
 
+def test_top_level_array_is_rejected(tmp_path):
+    path = tmp_path / "tokens.json"
+    path.write_text(json.dumps([{"name": "robin", "hash": "deadbeef"}]))
+    with pytest.raises(ValueError):
+        TokenStore(str(path))
+
+
+def test_tokens_as_string_is_rejected(tmp_path):
+    path = tmp_path / "tokens.json"
+    path.write_text(json.dumps({"tokens": "robin"}))
+    with pytest.raises(ValueError):
+        TokenStore(str(path))
+
+
+def test_entry_missing_hash_is_rejected(tmp_path):
+    path = tmp_path / "tokens.json"
+    path.write_text(json.dumps({"tokens": [{"name": "robin"}]}))
+    with pytest.raises(ValueError):
+        TokenStore(str(path))
+
+
 def test_names_lists_without_secrets(tmp_path):
     store = TokenStore(str(tmp_path / "tokens.json"))
     store.mint("robin")
