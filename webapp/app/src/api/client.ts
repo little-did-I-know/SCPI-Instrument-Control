@@ -50,6 +50,7 @@ export const api = {
   listSessions: () => request<SessionInfo[]>("/api/sessions"),
   getSession: (id: string) => request<SessionInfo>(`/api/sessions/${id}`),
   deleteSession: (id: string) => request<void>(`/api/sessions/${id}`, { method: "DELETE" }),
+  claimSession: (id: string) => request<SessionInfo>(`/api/sessions/${id}/claim`, { method: "POST" }),
   getState: (id: string) => request<ScopeState>(`${scope(id)}/state`),
   patchChannel: (id: string, channel: number, body: ChannelPatch) => request<ScopeState>(`${scope(id)}/channels/${channel}`, json("PATCH", body)),
   patchTimebase: (id: string, timebase: number) => request<ScopeState>(`${scope(id)}/timebase`, json("PATCH", { timebase })),

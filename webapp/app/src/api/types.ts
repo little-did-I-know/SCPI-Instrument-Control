@@ -33,6 +33,7 @@ export type SessionInfo = {
   dialect: string;
   num_channels: number;
   viewers: number;
+  owner: string;
 };
 
 export type DiscoveredDevice = {

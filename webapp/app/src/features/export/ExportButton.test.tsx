@@ -7,7 +7,7 @@ const BASE = { run_state: "STOP", timebase: 0.001, trigger: { mode: "AUTO", sour
 
 beforeEach(() => {
   useSession.getState().clearSession();
-  useSession.getState().setSession({ id: "abc", label: "x", mock: true, address: null, state: "connected", idn: "", model: "", dialect: "legacy", num_channels: 4, viewers: 0 });
+  useSession.getState().setSession({ id: "abc", label: "x", mock: true, address: null, state: "connected", idn: "", model: "", dialect: "legacy", num_channels: 4, viewers: 0, owner: "" });
 });
 
 describe("ExportButton", () => {

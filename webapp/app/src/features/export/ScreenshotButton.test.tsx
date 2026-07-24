@@ -7,7 +7,7 @@ beforeEach(() => useSession.getState().clearSession());
 
 describe("ScreenshotButton", () => {
   it("links to the screenshot URL when connected", () => {
-    useSession.getState().setSession({ id: "abc", label: "x", mock: true, address: null, state: "connected", idn: "", model: "", dialect: "legacy", num_channels: 4, viewers: 0 });
+    useSession.getState().setSession({ id: "abc", label: "x", mock: true, address: null, state: "connected", idn: "", model: "", dialect: "legacy", num_channels: 4, viewers: 0, owner: "" });
     render(<ScreenshotButton />);
     expect(screen.getByRole("link", { name: /screenshot/i })).toHaveAttribute("href", "/api/sessions/abc/scope/screenshot.png");
   });

@@ -13,7 +13,7 @@ const RECORDING: LogInfo = { state: "recording", started_at: 100, row_count: 0, 
 beforeEach(() => {
   clearTrend();
   useSession.getState().clearSession();
-  useSession.getState().setSession({ id: "abc", label: "x", mock: true, address: null, state: "connected", idn: "", model: "", dialect: "legacy", num_channels: 4, viewers: 0 });
+  useSession.getState().setSession({ id: "abc", label: "x", mock: true, address: null, state: "connected", idn: "", model: "", dialect: "legacy", num_channels: 4, viewers: 0, owner: "" });
   vi.spyOn(api, "getLog").mockResolvedValue(IDLE);
   vi.spyOn(api, "getLogData").mockResolvedValue({ columns: [], rows: [] });
 });
