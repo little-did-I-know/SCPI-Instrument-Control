@@ -19,6 +19,7 @@ from scpi_control import Oscilloscope
 from scpi_control.connection.mock import MockConnection
 from scpi_control.exceptions import InvalidParameterError, SiglentConnectionError, SiglentError
 from scpi_control.server import compute
+from scpi_control.server.netpolicy import validate_target
 from scpi_control.server.recorder import TrendRecorder
 
 MAX_FRAME_POINTS = 2000
@@ -192,6 +193,7 @@ class InstrumentSession:
         model: Optional[str] = None,
         poll_interval: float = 0.25,
         owner: str = "",
+        allowed_ports: Optional[frozenset] = None,
         _connection=None,
     ) -> "InstrumentSession":
         if mock:
@@ -200,6 +202,7 @@ class InstrumentSession:
         else:
             if not address:
                 raise ValueError("address is required for a non-mock session")
+            validate_target(address, port, allowed_ports=allowed_ports)
             scope = Oscilloscope(address, port=port)
         session = cls(label, scope, mock, address, poll_interval)
         session.owner = owner
@@ -415,12 +418,13 @@ class InstrumentSession:
 class SessionManager:
     """Registry of live sessions. create() connects before registering."""
 
-    def __init__(self) -> None:
+    def __init__(self, allowed_ports: Optional[frozenset] = None) -> None:
         self._sessions: Dict[str, InstrumentSession] = {}
         self._lock = threading.Lock()
+        self.allowed_ports = allowed_ports
 
     def create(self, label: str, *, address: Optional[str] = None, port: int = 5025, mock: bool = False, model: Optional[str] = None, owner: str = "", _connection=None) -> InstrumentSession:
-        session = InstrumentSession.open(label, address=address, port=port, mock=mock, model=model, owner=owner, _connection=_connection)
+        session = InstrumentSession.open(label, address=address, port=port, mock=mock, model=model, owner=owner, allowed_ports=self.allowed_ports, _connection=_connection)
         with self._lock:
             self._sessions[session.id] = session
         return session

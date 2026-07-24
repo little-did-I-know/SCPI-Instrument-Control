@@ -20,8 +20,19 @@ def _error_response(status: int, exc: BaseException) -> JSONResponse:
     return JSONResponse(status_code=status, content={"error": type(exc).__name__, "detail": str(exc)})
 
 
-def create_app(manager: Optional[SessionManager] = None, references_dir: Optional[str] = None, token_store: Optional[TokenStore] = None, abandon_after: float = 300.0) -> FastAPI:
-    manager = manager if manager is not None else SessionManager()
+def create_app(
+    manager: Optional[SessionManager] = None,
+    references_dir: Optional[str] = None,
+    token_store: Optional[TokenStore] = None,
+    abandon_after: float = 300.0,
+    allowed_ports: Optional[frozenset] = None,
+) -> FastAPI:
+    # allowed_ports only affects a manager create_app builds itself: an
+    # explicitly-passed manager already carries its own policy (or the
+    # netpolicy default), and silently overriding it here would surprise a
+    # caller (e.g. a test) that constructed SessionManager(allowed_ports=...)
+    # on purpose.
+    manager = manager if manager is not None else SessionManager(allowed_ports=allowed_ports)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
