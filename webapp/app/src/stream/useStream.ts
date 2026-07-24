@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { getToken } from "../api/token";
 import type { StreamMessage } from "../api/types";
 import { appendTrend, clearTrend, seedTrend } from "../features/trend/trend";
 import { clearFrames, setFrame } from "../features/waveform/frames";
@@ -12,7 +13,9 @@ export function useStream(sessionId: string | null): void {
     if (!sessionId) return;
 
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const socket = new WebSocket(`${protocol}//${window.location.host}/api/sessions/${sessionId}/stream`);
+    const token = getToken();
+    const subprotocols = token ? [`scpi-token.${token}`, "scpi"] : ["scpi"];
+    const socket = new WebSocket(`${protocol}//${window.location.host}/api/sessions/${sessionId}/stream`, subprotocols);
     let ended = false;
 
     socket.onmessage = (event: MessageEvent) => {
