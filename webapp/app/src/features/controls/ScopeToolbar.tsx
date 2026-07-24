@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { ReactNode } from "react";
 import { ApiError, api } from "../../api/client";
+import { downloadAuthenticated } from "../../api/download";
 import type { ChannelState, RunOp } from "../../api/types";
 import { Button } from "../../ds/Button";
 import { Toolbar, ToolbarSeparator } from "../../ds/Toolbar";
@@ -22,7 +23,7 @@ export function ScopeToolbar({ viewToggle }: { viewToggle?: ReactNode }) {
     .sort((a, b) => a - b);
   const [error, setError] = useState<string | null>(null);
 
-  const linkStyle = { fontSize: "var(--text-sm)", fontFamily: "var(--font-ui)", padding: "6px 12px", borderRadius: "var(--lc-radius-sm)", border: "1px solid var(--lc-border-strong)", color: "var(--lc-text)", textDecoration: "none" } as const;
+  const linkStyle = { fontSize: "var(--text-sm)", fontFamily: "var(--font-ui)", padding: "6px 12px", borderRadius: "var(--lc-radius-sm)", border: "1px solid var(--lc-border-strong)", color: "var(--lc-text)", background: "transparent", cursor: "pointer" } as const;
   const disabledLinkStyle = { ...linkStyle, color: "var(--lc-muted)", opacity: 0.6 };
 
   async function op(next: RunOp) {
@@ -30,6 +31,16 @@ export function ScopeToolbar({ viewToggle }: { viewToggle?: ReactNode }) {
     setError(null);
     try {
       await api.runOp(session.id, next);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.detail : String(err));
+    }
+  }
+
+  async function downloadWaveformJson() {
+    if (!session) return;
+    setError(null);
+    try {
+      await downloadAuthenticated(api.waveformJsonUrl(session.id, enabled), "waveform.json");
     } catch (err) {
       setError(err instanceof ApiError ? err.detail : String(err));
     }
@@ -56,9 +67,9 @@ export function ScopeToolbar({ viewToggle }: { viewToggle?: ReactNode }) {
             {!session || enabled.length === 0 ? (
               <span style={disabledLinkStyle}>JSON</span>
             ) : (
-              <a href={api.waveformJsonUrl(session.id, enabled)} download style={linkStyle}>
+              <button type="button" onClick={downloadWaveformJson} style={linkStyle}>
                 JSON
-              </a>
+              </button>
             )}
             <ScreenshotButton />
             <Button variant="danger" onClick={disconnect}>Disconnect</Button>
