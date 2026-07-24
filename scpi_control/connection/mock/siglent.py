@@ -298,9 +298,12 @@ def handle_query(conn, command: str) -> Optional[str]:
 def build_waveform_response(conn) -> bytes:
     """Construct a minimal Siglent-style waveform block response.
 
-    Legacy-dialect "C{ch}:WF? DAT2"/"DESC" only (Task 18 deprecation: kept
-    answering until v5.0.0, but the modern-dialect driver capture path no
-    longer sends it -- see build_waveform_preamble/build_waveform_data below).
+    Legacy-dialect "C{ch}:WF? DAT2"/"DESC" only. As of v5.0.0 the modern
+    dialect no longer falls through to this builder (Task 18's back-compat
+    shim was removed on schedule); a modern-dialect read_raw() times out on
+    an unrecognized/legacy waveform read instead, matching real modern
+    hardware -- see build_waveform_preamble/build_waveform_data below for
+    the documented modern path.
     """
     channel = conn._last_waveform_channel or next(iter(conn._waveform_payloads), 1)
     payload = mock_synth.payload_for(conn, channel, include_offset=True)

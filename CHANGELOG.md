@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.0.0] - 2026-07-24
+
 ### ⚠️ Breaking Changes
 
 - Web gateway: every `/api/*` request now requires a bearer token, and the live-stream
@@ -23,6 +25,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Reference waveforms: stored metadata moved from a pickled dict to a JSON string so reference
   files load without `allow_pickle`. Files saved by 4.x raise an error naming the file until
   converted. **Migration:** run `scpi-web references migrate` once.
+- Power supply (SPD3303X/-E): `ovp_level`/`ocp_level` now raise `NotImplementedError` — the
+  SPD3303X command set has no protection subsystem, so these calls never armed anything on real
+  hardware (they emitted a `FutureWarning` in 4.1.0). The model's `has_ovp`/`has_ocp` capabilities
+  are now `False`. **Migration:** stop calling these on an SPD3303X; gate on
+  `has_ovp`/`has_ocp` if you support multiple PSU models.
+- Testing: `MockConnection` now defaults to `strict=True`, so an unmatched PSU/AWG/DAQ query raises
+  `TimeoutError` like real hardware instead of returning `""`. **Migration:** pass `strict=False`
+  explicitly to restore the old lenient behavior.
+- Testing: `MockConnection` no longer answers the legacy `C<n>:WF?` waveform read on a
+  modern-dialect instance (SDS800X HD / SDS5000X); it now times out, matching real modern
+  hardware, which documents no such command. Legacy-dialect scopes are unaffected.
 
 ### Added
 

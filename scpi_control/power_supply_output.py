@@ -5,7 +5,6 @@ Represents a single power supply output with voltage, current, and enable contro
 
 import logging
 import re
-import warnings
 from typing import TYPE_CHECKING, Dict
 
 from scpi_control import exceptions
@@ -244,19 +243,6 @@ class PowerSupplyOutput:
         Raises:
             NotImplementedError: If OVP is not supported by this model
         """
-        if self._psu.model_capability.scpi_variant == "siglent_spd":
-            # QS0503X-E01B p.36 lists the full SPD3303X command set; it has no
-            # protection subsystem, so this command is silently discarded by the
-            # instrument. FutureWarning (not DeprecationWarning) because the latter
-            # is hidden by default outside __main__, and a user who believes OVP is
-            # armed must see this. Capability flips to False and this raises in
-            # v5.0.0 (audit H18).
-            warnings.warn(
-                "SPD3303X has no protection subsystem; this call arms nothing. " "It will raise NotImplementedError in v5.0.0.",
-                FutureWarning,
-                stacklevel=2,
-            )
-
         if not self._psu.model_capability.has_ovp:
             raise NotImplementedError(f"Over-voltage protection not supported on {self._psu.model_capability.model_name}")
 
@@ -291,19 +277,6 @@ class PowerSupplyOutput:
         Raises:
             NotImplementedError: If OCP is not supported by this model
         """
-        if self._psu.model_capability.scpi_variant == "siglent_spd":
-            # QS0503X-E01B p.36 lists the full SPD3303X command set; it has no
-            # protection subsystem, so this command is silently discarded by the
-            # instrument. FutureWarning (not DeprecationWarning) because the latter
-            # is hidden by default outside __main__, and a user who believes OCP is
-            # armed must see this. Capability flips to False and this raises in
-            # v5.0.0 (audit H18).
-            warnings.warn(
-                "SPD3303X has no protection subsystem; this call arms nothing. " "It will raise NotImplementedError in v5.0.0.",
-                FutureWarning,
-                stacklevel=2,
-            )
-
         if not self._psu.model_capability.has_ocp:
             raise NotImplementedError(f"Over-current protection not supported on {self._psu.model_capability.model_name}")
 

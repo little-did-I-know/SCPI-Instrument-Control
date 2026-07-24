@@ -45,6 +45,17 @@ class TestModernResponses:
         with pytest.raises(TimeoutError):
             self.conn.query("TDIV?")
 
+    def test_legacy_waveform_read_times_out_on_modern_scope(self):
+        # v5.0.0: the C<n>:WF? DAT2/DESC back-compat shim (Task 18) is
+        # removed. The modern programming guide documents no such command,
+        # so a modern-dialect instance must no longer serve a legacy
+        # waveform block for it, even when the request is issued by hand
+        # instead of through the driver's (already-correct) modern capture
+        # path -- read_raw() must time out like real modern hardware.
+        self.conn.write("C1:WF? DAT2")
+        with pytest.raises(TimeoutError):
+            self.conn.read_raw()
+
     def test_legacy_write_is_recorded_but_ignored(self):
         # Real scopes silently drop unknown writes; only queries time out
         self.conn.write("TDIV 0.001")
