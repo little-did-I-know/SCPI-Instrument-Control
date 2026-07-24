@@ -8,7 +8,7 @@ from fastapi.testclient import TestClient  # noqa: E402
 from starlette.websockets import WebSocketDisconnect  # noqa: E402
 
 from scpi_control.server.app import create_app  # noqa: E402
-from scpi_control.server.auth import TokenStore  # noqa: E402
+from scpi_control.server.auth import TokenStore, _route_path  # noqa: E402
 from scpi_control.server.sessions import SessionManager  # noqa: E402
 
 
@@ -93,3 +93,36 @@ def test_websocket_with_a_bad_token_is_rejected(client):
         with client.websocket_connect("/api/sessions/nope/stream", subprotocols=["scpi-token.scpi_bogus", "scpi"]):
             pass
     assert exc_info.value.code == 1008
+
+
+def test_route_path_matches_starlette_private_helper():
+    """``_route_path`` is a deliberate copy of ``starlette._utils.get_route_path``.
+
+    Importing the private name in production code would turn any upstream
+    rename into an ImportError at boot, and this project pins no Starlette
+    version, so a routine ``pip install -U`` must not be able to brick a
+    gateway that has to come up. The tradeoff is silent drift: if upstream
+    ever changes its root_path stripping, our copy could quietly diverge and
+    the root_path auth-bypass ``_route_path`` exists to close could reopen.
+
+    Import the private helper here, in the test only -- never in
+    scpi_control/server/auth.py -- and skip cleanly (not fail) if it
+    disappears; the point is a red signal on drift, not a broken suite on a
+    routine Starlette upgrade.
+    """
+    starlette_utils = pytest.importorskip("starlette._utils")
+    get_route_path = getattr(starlette_utils, "get_route_path", None)
+    if get_route_path is None:
+        pytest.skip("starlette._utils.get_route_path no longer exists; drift guard is stale")
+
+    scopes = [
+        {"path": "/api/sessions", "root_path": ""},  # no root_path (typical deployment)
+        {"path": "/gw/api/sessions", "root_path": "/gw"},  # normal proxy mount
+        {"path": "/gw/api/sessions", "root_path": "/gw/"},  # trailing slash on root_path
+        {"path": "/gwapi/x", "root_path": "/gw"},  # coincidental prefix, not a path boundary
+        {"path": "/gw", "root_path": "/gw"},  # path == root_path
+        {"path": "/api/sessions", "root_path": "/other"},  # root_path is not a prefix at all
+        {"path": "/gw/gw/api/sessions", "root_path": "/gw"},  # doubled prefix
+    ]
+    for scope in scopes:
+        assert _route_path(scope) == get_route_path(scope), scope
