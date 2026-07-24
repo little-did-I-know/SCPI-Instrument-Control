@@ -1,0 +1,4852 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Universal Python library for controlling SCPI-compatible test equipment (oscilloscopes, function generators, power supplies) via Ethernet/LAN">
+      
+      
+        <meta name="author" content="Robin Mumm">
+      
+      
+        <link rel="canonical" href="https://little-did-I-know.github.io/SCPI-Instrument-Control/development/wire-form-inventory/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Wire-form inventory - SCPI Instrument Control</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#wire-form-inventory" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+      <div data-md-color-scheme="default" data-md-component="outdated" hidden>
+        
+      </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="SCPI Instrument Control" class="md-header__button md-logo" aria-label="SCPI Instrument Control" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            SCPI Instrument Control
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Wire-form inventory
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/little-did-I-know/SCPI-Instrument-Control" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    little-did-I-know/SCPI-Instrument-Control
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+    
+      
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../getting-started/installation/" class="md-tabs__link">
+          
+  
+  
+  Getting Started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../user-guide/basic-usage/" class="md-tabs__link">
+          
+  
+  
+  User Guide
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../gateway/" class="md-tabs__link">
+          
+  
+  
+  Web Gateway
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../gui/overview/" class="md-tabs__link">
+          
+  
+  
+  GUI Application
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../report-generator/" class="md-tabs__link">
+          
+  
+  
+  Report Generator
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../api/oscilloscope/" class="md-tabs__link">
+          
+  
+  
+  API Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../examples/beginner/" class="md-tabs__link">
+          
+  
+  
+  Examples
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../contributing/" class="md-tabs__link">
+          
+  
+  
+  Development
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../about/changelog/" class="md-tabs__link">
+          
+  
+  
+  About
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+    
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="SCPI Instrument Control" class="md-nav__button md-logo" aria-label="SCPI Instrument Control" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    SCPI Instrument Control
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/little-did-I-know/SCPI-Instrument-Control" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    little-did-I-know/SCPI-Instrument-Control
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/quickstart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick Start
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/connection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Connection Setup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/basic-usage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Basic Usage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/scpi-dialects/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SCPI Dialects
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/waveform-capture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Waveform Capture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/data-provenance/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Provenance
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/synthetic-signals/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Synthetic Signals
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/measurements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Measurements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/trigger-control/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Trigger Control
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/advanced-features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Advanced Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Web Gateway
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Web Gateway
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../gateway/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../gateway/browser-ui/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Browser UI Tour
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../gateway/api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    REST & WebSocket API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    GUI Application
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    GUI Application
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../gui/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../gui/interface/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Interface Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../gui/live-view/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Live View
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../gui/visual-measurements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Visual Measurements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../gui/fft-analysis/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FFT Analysis
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../gui/protocol-decoding/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Protocol Decoding
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../gui/vector-graphics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Vector Graphics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Report Generator
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Report Generator
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../report-generator/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../report-generator/getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../report-generator/llm-setup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    LLM Setup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../report-generator/templates/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Templates & Criteria
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../report-generator/api-reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/oscilloscope/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Oscilloscope
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/channel/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Channel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/trigger/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Trigger
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/waveform/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Waveform
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/signal_synth/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Signal Synthesis
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/waveform_io/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Waveform I/O
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/comparison/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Comparison & Batch Reports
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/provenance/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Provenance
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/scpi_extract/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SCPI Extract (CLI)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/measurement/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Measurement
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/analysis/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Analysis
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/automation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Automation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/connection_socket/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Socket Connection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/exceptions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exceptions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Models
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/vector_graphics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Vector Graphics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/screen_capture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Screen Capture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/reference_waveform/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference Waveform
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/math_channel/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Math Channel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/function_generator/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Function Generator
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/awg_output/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AWG Output
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/power_supply/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Power Supply
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/power_supply_output/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Power Supply Output
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/data_logger/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Logger (DAQ)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/psu_data_logger/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    PSU Data Logger
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/protocol_decode/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Protocol Decode
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_27" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_27" id="__nav_7_27_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Web Gateway
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_27_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_27">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Web Gateway
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/server_sessions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sessions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/server_recorder/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Trend Recorder
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/server_compute/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Analysis Compute
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/server_discovery/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Discovery
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/gui/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    GUI Components
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Examples
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Examples
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../examples/beginner/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Beginner Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../examples/intermediate/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Intermediate Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../examples/advanced/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Advanced Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Development
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Development
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../contributing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../building/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Building
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../structure/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Project Structure
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_9_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_9_5" id="__nav_9_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Maintainer Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_9_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Maintainer Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PRE_COMMIT_CHECKS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pre-commit Checks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../BUILDING_EXECUTABLES/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Building Executables
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../CODE_SIGNING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Code Signing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ICON_SETUP/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Icon Setup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PYPI_DEPLOYMENT/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    PyPI Deployment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../VERSION_BUMPING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Version Bumping
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../TESTING_BUILD_WORKFLOW/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Build Workflow Testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../EXPERIMENTAL_FEATURES/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experimental Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PROJECT_STRUCTURE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Detailed Project Structure
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_10" >
+        
+          
+          <label class="md-nav__link" for="__nav_10" id="__nav_10_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    About
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_10">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    About
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../about/changelog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Changelog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../about/license/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    License
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../about/security/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Security
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#legacy-siglent-scope-scpicommandsetlegacy_commands" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Legacy Siglent scope (SCPICommandSet.LEGACY_COMMANDS)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#modern-siglent-scope-scpicommandsetmodern_commands" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Modern Siglent scope (SCPICommandSet.MODERN_COMMANDS)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#siglent-spd-power-supply-psuscpicommandsetsiglent_spd_overrides" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Siglent SPD power supply (PSUSCPICommandSet.SIGLENT_SPD_OVERRIDES)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#siglent-sdg-function-generator-awgscpicommandsetsiglent_sdg_overrides" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Siglent SDG function generator (AWGSCPICommandSet.SIGLENT_SDG_OVERRIDES)
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="wire-form-inventory">Wire-form inventory<a class="headerlink" href="#wire-form-inventory" title="Permanent link">&para;</a></h1>
+<p>This is the durable answer to "how much of this driver's SCPI is invented?" Every
+command in a covered command table is checked, one row at a time, against the
+vendor programming guide that documents that dialect, and the result is recorded
+here plus as a citation in <code>tests/wire_forms.py</code> (the corpus enforced by
+<code>tests/test_wire_conformance.py</code>). See <code>docs/development/vendor-manuals.md</code> for
+which manuals are cited, where to get them, and why they aren't committed to the
+repo.</p>
+<p>Four command tables are covered end-to-end: the legacy and modern Siglent scope
+dialects (<code>SCPICommandSet</code>, swept 2026-07-23 in tasks 5a/5b) and the Siglent SPD
+power-supply and SDG function-generator overrides (<code>PSUSCPICommandSet</code> /
+<code>AWGSCPICommandSet</code>, swept 2026-07-23 in task 5c, below). A parametrized test,
+<code>test_every_command_has_a_corpus_entry</code> in <code>tests/test_wire_conformance.py</code>,
+enumerates every command in all four tables and fails the suite if any command
+has no row here / no corresponding entry in <code>tests/wire_forms.py</code> -- this is
+what keeps the inventory from going stale the next time a command is added.</p>
+<p>Statuses mirror <code>tests/wire_forms.py</code>:</p>
+<ul>
+<li><strong>VERIFIED</strong> — the command table renders exactly what the manual documents,
+  and (if the mock answers the query) the mock's response matches the
+  documented structure too.</li>
+<li><strong>MISMATCH_DEFERRED</strong> — the code disagrees with the manual, or the command is
+  absent from the manual entirely. Not fixed here (this inventory is a
+  read-only sweep); see the <code>note</code> field on the corresponding corpus entry in
+  <code>tests/wire_forms.py</code> for what's wrong, why it's deferred, and its severity
+  against the pull-in bar (does it put a wrong number in front of a user, does
+  it silently no-op a safety-relevant setting, or does it break something the
+  GUI/webapp/an example issues on a default path?).</li>
+<li><strong>UNCITED</strong> — no manual could be obtained for this surface at all (e.g.
+  LeCroy, TBS1102C). Not used in this table; every legacy command table
+  command has the vendor manual available.</li>
+</ul>
+<p>This file only records the wire-form <strong>structure</strong> (which bytes cross the
+wire, and the shape of the response) — it does not re-litigate which SCPI
+vocabulary is "nicer" or propose fixes. Fixes are a separate, later task; see
+the <code>note</code> column for what a follow-up would need to change.</p>
+<h2 id="legacy-siglent-scope-scpicommandsetlegacy_commands">Legacy Siglent scope (<code>SCPICommandSet.LEGACY_COMMANDS</code>)<a class="headerlink" href="#legacy-siglent-scope-scpicommandsetlegacy_commands" title="Permanent link">&para;</a></h2>
+<p>Checked against the Siglent Digital Oscilloscopes Programming Guide
+(<code>SDS_DigitalOscilloscopes_ProgrammingGuide_RC01020-E01C.pdf</code>, cited below as
+"RC01020-E01C") on 2026-07-23. All 52 commands in the table are covered.</p>
+<table>
+<thead>
+<tr>
+<th>Command</th>
+<th>We send</th>
+<th>Documented</th>
+<th>Status</th>
+<th>Source</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>add_measurement</code></td>
+<td><code>PACU {mtype},C{ch}</code></td>
+<td><code>PACU &lt;parameter&gt;,&lt;qualifier&gt;</code></td>
+<td>VERIFIED</td>
+<td>RC01020-E01C p.87</td>
+</tr>
+<tr>
+<td><code>arm_trigger</code></td>
+<td><code>ARM</code></td>
+<td><code>ARM</code></td>
+<td>VERIFIED</td>
+<td>RC01020-E01C p.21</td>
+</tr>
+<tr>
+<td><code>auto_setup</code></td>
+<td><code>ASET</code></td>
+<td><code>ASET</code></td>
+<td>VERIFIED</td>
+<td>RC01020-E01C p.24</td>
+</tr>
+<tr>
+<td><code>clear_measurements</code></td>
+<td><code>PACL</code></td>
+<td><code>PACL</code></td>
+<td>VERIFIED</td>
+<td>RC01020-E01C p.86</td>
+</tr>
+<tr>
+<td><code>force_trigger</code></td>
+<td><code>FRTR</code></td>
+<td><code>FRTR</code></td>
+<td>VERIFIED</td>
+<td>RC01020-E01C p.56</td>
+</tr>
+<tr>
+<td><code>get_acq_status</code></td>
+<td><code>SAST?</code></td>
+<td>request matches; response is <code>SAST &lt;status&gt;</code> (mock answers bare, no header)</td>
+<td>MISMATCH_DEFERRED</td>
+<td>RC01020-E01C p.116</td>
+</tr>
+<tr>
+<td><code>get_bandwidth_limit</code></td>
+<td><code>BWL?</code></td>
+<td><code>BandWidth_Limit?</code> (bare, no channel — returns ALL channels as header-echoed <code>&lt;channel&gt;,&lt;mode&gt;</code> pairs); mock now answers <code>BWL C1,OFF,C2,OFF,...</code></td>
+<td>VERIFIED</td>
+<td>RC01020-E01C p.27</td>
+</tr>
+<tr>
+<td><code>get_channel_display</code></td>
+<td><code>C{ch}:TRA?</code></td>
+<td>request matches; response is <code>&lt;trace&gt;:TRAce &lt;mode&gt;</code> (mock answers bare)</td>
+<td>MISMATCH_DEFERRED</td>
+<td>RC01020-E01C p.124</td>
+</tr>
+<tr>
+<td><code>get_channel_unit</code></td>
+<td><code>C{ch}:UNIT?</code></td>
+<td><code>&lt;channel&gt;:UNIT?</code></td>
+<td>VERIFIED</td>
+<td>RC01020-E01C p.137</td>
+</tr>
+<tr>
+<td><code>get_coupling</code></td>
+<td><code>C{ch}:CPL?</code></td>
+<td>request matches; response is <code>&lt;channel&gt;:CouPLing &lt;coupling&gt;</code> (mock answers bare)</td>
+<td>MISMATCH_DEFERRED</td>
+<td>RC01020-E01C p.35</td>
+</tr>
+<tr>
+<td><code>get_cursor_type</code></td>
+<td><code>CRST?</code></td>
+<td>CRST is CURSOR_SET, a trace-prefixed <em>positioning</em> query, not a mode selector; also dead code (no caller)</td>
+<td>MISMATCH_DEFERRED</td>
+<td>RC01020-E01C p.38</td>
+</tr>
+<tr>
+<td><code>get_cursor_value</code></td>
+<td><code>CRVA?</code></td>
+<td><code>&lt;trace&gt;:CuRsor_Value? [&lt;mode&gt;,...]</code> (trace prefix + mode required); response shape driver expects also disagrees with the manual's worked example</td>
+<td>MISMATCH_DEFERRED</td>
+<td>RC01020-E01C p.40</td>
+</tr>
+<tr>
+<td><code>get_math_display</code></td>
+<td><code>MATH{n}:TRA?</code></td>
+<td><code>MATH{n}:TRA</code> does not exist in this manual; dead code (no caller)</td>
+<td>MISMATCH_DEFERRED</td>
+<td>RC01020-E01C p.124</td>
+</tr>
+<tr>
+<td><code>get_parameter_value</code></td>
+<td><code>C{ch}:PAVA? {param}</code></td>
+<td><code>&lt;trace&gt;:PArameter_VAlue? &lt;parameter&gt;</code></td>
+<td>VERIFIED</td>
+<td>RC01020-E01C p.88</td>
+</tr>
+<tr>
+<td><code>get_probe_ratio</code></td>
+<td><code>C{ch}:ATTN?</code></td>
+<td><code>&lt;channel&gt;:ATTeNuation?</code>; response <code>&lt;channel&gt;:ATTeNuation &lt;attenuation&gt;</code> — mock now answers exactly, e.g. <code>C1:ATTN 1</code></td>
+<td>VERIFIED</td>
+<td>RC01020-E01C p.22</td>
+</tr>
+<tr>
+<td><code>get_sample_rate</code></td>
+<td><code>SARA?</code></td>
+<td><code>SARA?</code></td>
+<td>VERIFIED</td>
+<td>RC01020-E01C p.117</td>
+</tr>
+<tr>
+<td><code>get_time_div</code></td>
+<td><code>TDIV?</code></td>
+<td>request matches; response is <code>Time_DIV &lt;value&gt;</code> (mock answers bare)</td>
+<td>MISMATCH_DEFERRED</td>
+<td>RC01020-E01C p.122</td>
+</tr>
+<tr>
+<td><code>get_time_offset</code></td>
+<td><code>TRDL?</code></td>
+<td><code>TRig_DeLay?</code></td>
+<td>VERIFIED</td>
+<td>RC01020-E01C p.127</td>
+</tr>
+<tr>
+<td><code>get_trigger_coupling</code></td>
+<td><code>{src}:TRCP?</code></td>
+<td>request matches; response is <code>&lt;trig_source&gt;:TRig_CouPling &lt;coupling&gt;</code> (mock answers bare)</td>
+<td>MISMATCH_DEFERRED</td>
+<td>RC01020-E01C p.126</td>
+</tr>
+<tr>
+<td><code>get_trigger_holdoff</code></td>
+<td><code>TRIG_DELAY?</code></td>
+<td>wire syntax is valid, but TRIG_DELAY/TRDL is documented as trigger <em>delay</em>, not holdoff — no holdoff command exists in this manual</td>
+<td>MISMATCH_DEFERRED</td>
+<td>RC01020-E01C p.127</td>
+</tr>
+<tr>
+<td><code>get_trigger_level</code></td>
+<td><code>{src}:TRLV?</code></td>
+<td>request matches; response is <code>&lt;trig_source&gt;:TRig_LeVel &lt;trig_level&gt;</code> (mock answers bare)</td>
+<td>MISMATCH_DEFERRED</td>
+<td>RC01020-E01C p.128</td>
+</tr>
+<tr>
+<td><code>get_trigger_mode</code></td>
+<td><code>TRIG_MODE?</code></td>
+<td>request matches; response is <code>TRig_MoDe &lt;mode&gt;</code> (mock answers bare)</td>
+<td>MISMATCH_DEFERRED</td>
+<td>RC01020-E01C p.130</td>
+</tr>
+<tr>
+<td><code>get_trigger_select</code></td>
+<td><code>TRIG_SELECT?</code></td>
+<td>request matches; response is <code>TRig_Select &lt;type&gt;,SR,&lt;src&gt;,HT,&lt;type&gt;,HV,&lt;value&gt;</code> (mock answers without header or HT/HV pair)</td>
+<td>MISMATCH_DEFERRED</td>
+<td>RC01020-E01C p.131-132</td>
+</tr>
+<tr>
+<td><code>get_trigger_slope</code></td>
+<td><code>{src}:TRSL?</code></td>
+<td>request matches; response is <code>&lt;trig_source&gt;:TRig_Slope &lt;trig_slope&gt;</code> (mock answers bare)</td>
+<td>MISMATCH_DEFERRED</td>
+<td>RC01020-E01C p.134</td>
+</tr>
+<tr>
+<td><code>get_voltage_div</code></td>
+<td><code>C{ch}:VDIV?</code></td>
+<td>request matches; response is <code>&lt;channel&gt;:Volt_DIV &lt;v_gain&gt;</code> (mock answers bare)</td>
+<td>MISMATCH_DEFERRED</td>
+<td>RC01020-E01C p.139, p.142</td>
+</tr>
+<tr>
+<td><code>get_voltage_offset</code></td>
+<td><code>C{ch}:OFST?</code></td>
+<td>request matches; response is <code>&lt;channel&gt;:OFfSeT &lt;offset&gt;</code> (mock answers bare)</td>
+<td>MISMATCH_DEFERRED</td>
+<td>RC01020-E01C p.83, p.142</td>
+</tr>
+<tr>
+<td><code>get_waveform</code></td>
+<td><code>C{ch}:WF? DAT2</code></td>
+<td><code>&lt;trace&gt;:WaveForm? DAT2</code></td>
+<td>VERIFIED</td>
+<td>RC01020-E01C p.141</td>
+</tr>
+<tr>
+<td><code>get_waveform_preamble</code></td>
+<td><code>C{ch}:WF? DESC</code></td>
+<td><code>&lt;trace&gt;:WaveForm? DESC</code></td>
+<td>VERIFIED</td>
+<td>RC01020-E01C p.141</td>
+</tr>
+<tr>
+<td><code>hardcopy_print</code></td>
+<td><code>HCSU PRINT</code></td>
+<td><code>HCSU PRTKEY,PRINT</code> (PRTKEY keyword omitted); dead code (no caller)</td>
+<td>MISMATCH_DEFERRED</td>
+<td>RC01020-E01C p.70</td>
+</tr>
+<tr>
+<td><code>reset_statistics</code></td>
+<td><code>PASTAT RESET</code></td>
+<td>absent from manual entirely (zero hits for PASTAT anywhere)</td>
+<td>MISMATCH_DEFERRED</td>
+<td>RC01020-E01C p.16</td>
+</tr>
+<tr>
+<td><code>run</code></td>
+<td><code>TRIG_MODE AUTO</code></td>
+<td><code>TRig_MoDe AUTO</code></td>
+<td>VERIFIED</td>
+<td>RC01020-E01C p.130</td>
+</tr>
+<tr>
+<td><code>screen_dump</code></td>
+<td><code>SCDP</code></td>
+<td><code>SCDP</code></td>
+<td>VERIFIED</td>
+<td>RC01020-E01C p.106</td>
+</tr>
+<tr>
+<td><code>set_bandwidth_limit</code></td>
+<td><code>BWL C{ch},{limit}</code></td>
+<td><code>BandWidth_Limit &lt;channel&gt;,&lt;mode&gt;</code> (BWL keyword first, comma-separated, not colon-prefixed channel)</td>
+<td>VERIFIED</td>
+<td>RC01020-E01C p.27</td>
+</tr>
+<tr>
+<td><code>set_channel_display</code></td>
+<td><code>C{ch}:TRA {state}</code></td>
+<td><code>&lt;trace&gt;:TRAce &lt;mode&gt;</code></td>
+<td>VERIFIED</td>
+<td>RC01020-E01C p.124</td>
+</tr>
+<tr>
+<td><code>set_channel_unit</code></td>
+<td><code>C{ch}:UNIT {unit}</code></td>
+<td><code>&lt;channel&gt;:UNIT &lt;type&gt;</code></td>
+<td>VERIFIED</td>
+<td>RC01020-E01C p.137</td>
+</tr>
+<tr>
+<td><code>set_coupling</code></td>
+<td><code>C{ch}:CPL {coupling}</code></td>
+<td><code>&lt;channel&gt;:CouPLing &lt;coupling&gt;</code></td>
+<td>VERIFIED</td>
+<td>RC01020-E01C p.35</td>
+</tr>
+<tr>
+<td><code>set_cursor_type</code></td>
+<td><code>CRST {type}</code></td>
+<td>CRST is CURSOR_SET, a trace-prefixed <em>positioning</em> command, not a mode selector (real mode command is CRMS, bare, but with a different vocabulary)</td>
+<td>MISMATCH_DEFERRED</td>
+<td>RC01020-E01C p.37-38</td>
+</tr>
+<tr>
+<td><code>set_hardcopy_format</code></td>
+<td><code>HCSU DEV,FORMAT,{format}</code></td>
+<td><code>HCSU FORMAT,{format}</code> (<code>DEV</code> is not a documented keyword); dead code (no caller)</td>
+<td>MISMATCH_DEFERRED</td>
+<td>RC01020-E01C p.70</td>
+</tr>
+<tr>
+<td><code>set_math_display</code></td>
+<td><code>MATH{n}:TRA {state}</code></td>
+<td><code>MATH{n}:TRA</code> does not exist in this manual; dead code (no caller)</td>
+<td>MISMATCH_DEFERRED</td>
+<td>RC01020-E01C p.124</td>
+</tr>
+<tr>
+<td><code>set_probe_ratio</code></td>
+<td><code>C{ch}:ATTN {ratio}</code></td>
+<td><code>&lt;channel&gt;:ATTeNuation &lt;attenuation&gt;</code></td>
+<td>VERIFIED</td>
+<td>RC01020-E01C p.22</td>
+</tr>
+<tr>
+<td><code>set_statistics</code></td>
+<td><code>PAST {state}</code></td>
+<td>absent from manual entirely (zero hits for PAST/PASTAT/statistic anywhere)</td>
+<td>MISMATCH_DEFERRED</td>
+<td>RC01020-E01C p.16</td>
+</tr>
+<tr>
+<td><code>set_time_div</code></td>
+<td><code>TDIV {tdiv}</code></td>
+<td><code>Time_DIV &lt;value&gt;</code></td>
+<td>VERIFIED</td>
+<td>RC01020-E01C p.122</td>
+</tr>
+<tr>
+<td><code>set_time_offset</code></td>
+<td><code>TRDL {offset}</code></td>
+<td><code>TRig_DeLay &lt;value&gt;</code></td>
+<td>VERIFIED</td>
+<td>RC01020-E01C p.127</td>
+</tr>
+<tr>
+<td><code>set_trigger_coupling</code></td>
+<td><code>{src}:TRCP {coupling}</code></td>
+<td><code>&lt;trig_source&gt;:TRig_CouPling &lt;trig_coupling&gt;</code></td>
+<td>VERIFIED</td>
+<td>RC01020-E01C p.126</td>
+</tr>
+<tr>
+<td><code>set_trigger_holdoff</code></td>
+<td><code>TRIG_DELAY {t}</code></td>
+<td>wire syntax is valid, but TRIG_DELAY/TRDL is documented as trigger <em>delay</em>, not holdoff — no holdoff command exists in this manual</td>
+<td>MISMATCH_DEFERRED</td>
+<td>RC01020-E01C p.127</td>
+</tr>
+<tr>
+<td><code>set_trigger_level</code></td>
+<td><code>{src}:TRLV {level}</code></td>
+<td><code>&lt;trig_source&gt;:TRig_LeVel &lt;trig_level&gt;</code></td>
+<td>VERIFIED</td>
+<td>RC01020-E01C p.128</td>
+</tr>
+<tr>
+<td><code>set_trigger_mode</code></td>
+<td><code>TRIG_MODE {mode}</code></td>
+<td><code>TRig_MoDe &lt;mode&gt;</code> (long form; manual's own example uses the short form <code>TRMD</code>, both documented-valid per p.10)</td>
+<td>VERIFIED</td>
+<td>RC01020-E01C p.130</td>
+</tr>
+<tr>
+<td><code>set_trigger_select</code></td>
+<td><code>TRIG_SELECT {type},SR,{src}</code></td>
+<td><code>TRig_SElect &lt;type&gt;,SR,&lt;src&gt;[,HT,&lt;type&gt;,HV,&lt;value&gt;]</code> (HT/HV pair is a documented-optional subset)</td>
+<td>VERIFIED</td>
+<td>RC01020-E01C p.131</td>
+</tr>
+<tr>
+<td><code>set_trigger_slope</code></td>
+<td><code>{src}:TRSL {slope}</code></td>
+<td><code>&lt;trig_source&gt;:TRig_SLope &lt;trig_slope&gt;</code></td>
+<td>VERIFIED</td>
+<td>RC01020-E01C p.134</td>
+</tr>
+<tr>
+<td><code>set_voltage_div</code></td>
+<td><code>C{ch}:VDIV {vdiv}</code></td>
+<td><code>&lt;channel&gt;:Volt_DIV &lt;v_gain&gt;</code></td>
+<td>VERIFIED</td>
+<td>RC01020-E01C p.139</td>
+</tr>
+<tr>
+<td><code>set_voltage_offset</code></td>
+<td><code>C{ch}:OFST {offset}</code></td>
+<td><code>&lt;channel&gt;:OFfSeT &lt;offset&gt;</code></td>
+<td>VERIFIED</td>
+<td>RC01020-E01C p.83</td>
+</tr>
+<tr>
+<td><code>stop</code></td>
+<td><code>STOP</code></td>
+<td><code>STOP</code></td>
+<td>VERIFIED</td>
+<td>RC01020-E01C p.111</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Tally: 30 VERIFIED, 22 MISMATCH_DEFERRED, 0 UNCITED (52 total).</strong></p>
+<p>Full detail — exact current vs. documented wire form, severity against the
+pull-in bar, and why each is deferred rather than fixed — is in each entry's
+<code>note</code> field in <code>tests/wire_forms.py</code>.</p>
+<p>Task 14 (audit L3) flipped three rows from the counts above: <code>get_probe_ratio</code>
+gained a mock <code>ATTN?</code>/<code>ATTN</code>-write handler (it was already request-verified,
+now response-verified too); <code>set_bandwidth_limit</code>/<code>get_bandwidth_limit</code> were
+fixed from the invented, colon-prefixed <code>C{ch}:BWL {limit}</code>/<code>C{ch}:BWL?</code> forms
+to the documented global <code>BWL C{ch},{limit}</code>/<code>BWL?</code> forms (identical in shape
+to the LeCroy dialect's own BWL, which this dialect descends from) — reusing
+the LeCroy pairs-parsing branch in <code>channel.py</code>'s <code>bandwidth_limit</code> getter,
+extended to also strip legacy's header-echoed <code>"BWL "</code> prefix before splitting
+(LeCroy's own CHDR OFF connect-time setup already suppresses that header).</p>
+<h2 id="modern-siglent-scope-scpicommandsetmodern_commands">Modern Siglent scope (<code>SCPICommandSet.MODERN_COMMANDS</code>)<a class="headerlink" href="#modern-siglent-scope-scpicommandsetmodern_commands" title="Permanent link">&para;</a></h2>
+<p>Checked against the SDS800X HD Series Programming Guide
+(<code>SDS800XHD_Series_ProgrammingGuide_EN11G.pdf</code>, cited below as "EN11G") on
+2026-07-23, plus the <code>:WAVeform:</code> transfer-parameter scalars added in Task 17
+(audit H9), the binary preamble/data transfer wired up in Task 18 (audit H9),
+and the <code>:WAVeform:MAXPoint?</code> deep-memory-chunking query added in Task 19, all
+on 2026-07-23. All 52 commands in the table are covered.</p>
+<p>Every "p.N" citation below is the <strong>PDF file page position</strong> ("go to page N"
+in a viewer), NOT the printed footer -- this guide's footer runs one page
+behind the file position (e.g. cited <code>p.749</code> shows footer <code>748</code>). See
+<code>docs/development/vendor-manuals.md</code>'s citation-convention table. (An earlier
+draft of this paragraph claimed the opposite -- that citations were the
+printed footer number -- which was never true of how the entries below, or
+<code>tests/wire_forms.py</code>, were actually transcribed; corrected in Task 18.)</p>
+<table>
+<thead>
+<tr>
+<th>Command</th>
+<th>We send</th>
+<th>Documented</th>
+<th>Status</th>
+<th>Source</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>auto_setup</code></td>
+<td><code>:AUToset</code></td>
+<td><code>:AUToset</code></td>
+<td>VERIFIED</td>
+<td>EN11G p.33</td>
+</tr>
+<tr>
+<td><code>force_trigger</code></td>
+<td><code>:TRIGger:MODE FTRIG</code></td>
+<td><code>:TRIGger:MODE &lt;mode&gt;</code>, FTRIG is a documented mode value</td>
+<td>VERIFIED</td>
+<td>EN11G p.482</td>
+</tr>
+<tr>
+<td><code>get_acq_status</code></td>
+<td><code>:TRIGger:STATus?</code></td>
+<td>same; response <code>&lt;status&gt;</code> bare, matches</td>
+<td>VERIFIED</td>
+<td>EN11G p.483</td>
+</tr>
+<tr>
+<td><code>get_bandwidth_limit</code></td>
+<td><code>:CHANnel{ch}:BWLimit?</code></td>
+<td><code>:CHANnel&lt;n&gt;:BWLimit?</code> (not mocked)</td>
+<td>VERIFIED</td>
+<td>EN11G p.50</td>
+</tr>
+<tr>
+<td><code>get_channel_display</code></td>
+<td><code>:CHANnel{ch}:SWITch?</code></td>
+<td>same; response <code>&lt;state&gt;</code> bare, matches</td>
+<td>VERIFIED</td>
+<td>EN11G p.60</td>
+</tr>
+<tr>
+<td><code>get_coupling</code></td>
+<td><code>:CHANnel{ch}:COUPling?</code></td>
+<td>request matches; mock fixture answers the LEGACY token <code>D1M</code> (invalid modern enum member)</td>
+<td>MISMATCH_DEFERRED</td>
+<td>EN11G p.51</td>
+</tr>
+<tr>
+<td><code>get_parameter_value</code></td>
+<td><code>C{ch}:PAVA? {param}</code></td>
+<td>absent from manual entirely (zero hits for PAVA); modern measurement path is a separate concern</td>
+<td>MISMATCH_DEFERRED</td>
+<td>EN11G p.784</td>
+</tr>
+<tr>
+<td><code>get_probe_ratio</code></td>
+<td><code>:CHANnel{ch}:PROBe?</code></td>
+<td><code>:CHANnel&lt;n&gt;:PROBe?</code> (not mocked)</td>
+<td>VERIFIED</td>
+<td>EN11G p.57</td>
+</tr>
+<tr>
+<td><code>get_sample_rate</code></td>
+<td><code>:ACQuire:SRATe?</code></td>
+<td>same; response bare NR3, matches</td>
+<td>VERIFIED</td>
+<td>EN11G p.46</td>
+</tr>
+<tr>
+<td><code>get_time_div</code></td>
+<td><code>:TIMebase:SCALe?</code></td>
+<td>same; response bare NR3, matches</td>
+<td>VERIFIED</td>
+<td>EN11G p.476</td>
+</tr>
+<tr>
+<td><code>get_time_offset</code></td>
+<td><code>:TIMebase:DELay?</code></td>
+<td><code>:TIMebase:DELay?</code> (not mocked)</td>
+<td>VERIFIED</td>
+<td>EN11G p.473</td>
+</tr>
+<tr>
+<td><code>get_trigger_coupling</code></td>
+<td><code>:TRIGger:EDGE:COUPling?</code></td>
+<td>same; response bare, matches</td>
+<td>VERIFIED</td>
+<td>EN11G p.486</td>
+</tr>
+<tr>
+<td><code>get_trigger_level</code></td>
+<td><code>:TRIGger:EDGE:LEVel?</code></td>
+<td>same; response bare NR3, matches</td>
+<td>VERIFIED</td>
+<td>EN11G p.492</td>
+</tr>
+<tr>
+<td><code>get_trigger_mode</code></td>
+<td><code>:TRIGger:MODE?</code></td>
+<td>same; response bare, matches</td>
+<td>VERIFIED</td>
+<td>EN11G p.482</td>
+</tr>
+<tr>
+<td><code>get_trigger_slope</code></td>
+<td><code>:TRIGger:EDGE:SLOPe?</code></td>
+<td>same; response bare, matches</td>
+<td>VERIFIED</td>
+<td>EN11G p.494</td>
+</tr>
+<tr>
+<td><code>get_trigger_source</code></td>
+<td><code>:TRIGger:EDGE:SOURce?</code></td>
+<td>same; response bare, matches</td>
+<td>VERIFIED</td>
+<td>EN11G p.495</td>
+</tr>
+<tr>
+<td><code>get_trigger_type</code></td>
+<td><code>:TRIGger:TYPE?</code></td>
+<td>same; response bare, matches</td>
+<td>VERIFIED</td>
+<td>EN11G p.484</td>
+</tr>
+<tr>
+<td><code>get_voltage_div</code></td>
+<td><code>:CHANnel{ch}:SCALe?</code></td>
+<td>same; response bare NR3, matches</td>
+<td>VERIFIED</td>
+<td>EN11G p.58</td>
+</tr>
+<tr>
+<td><code>get_voltage_offset</code></td>
+<td><code>:CHANnel{ch}:OFFSet?</code></td>
+<td>same; response bare NR3, matches</td>
+<td>VERIFIED</td>
+<td>EN11G p.56</td>
+</tr>
+<tr>
+<td><code>get_waveform</code></td>
+<td><code>:WAVeform:DATA?</code></td>
+<td><code>:WAVeform:DATA?</code>; binary IEEE block (request-verified only, see note below)</td>
+<td>VERIFIED</td>
+<td>EN11G p.757</td>
+</tr>
+<tr>
+<td><code>get_waveform_maxpoint</code></td>
+<td><code>:WAVeform:MAXPoint?</code></td>
+<td><code>:WAVeform:MAXPoint?</code>; response bare NR1, matches (mock default <code>10000000</code> -- the guide's own EXAMPLE response for SDS2000X Plus, transcribed verbatim, not an arbitrary mock value)</td>
+<td>VERIFIED</td>
+<td>EN11G p.753</td>
+</tr>
+<tr>
+<td><code>get_waveform_data</code></td>
+<td><code>:WAVeform:DATA?</code></td>
+<td>same as <code>get_waveform</code> -- documented name, used by <code>ModernTransfer</code></td>
+<td>VERIFIED</td>
+<td>EN11G p.757</td>
+</tr>
+<tr>
+<td><code>get_waveform_interval</code></td>
+<td><code>:WAVeform:INTerval?</code></td>
+<td><code>:WAVeform:INTerval?</code>; response bare NR1, matches (mock default <code>1</code>; manual's own EXAMPLE sets <code>200</code> first)</td>
+<td>VERIFIED</td>
+<td>EN11G p.751</td>
+</tr>
+<tr>
+<td><code>get_waveform_point</code></td>
+<td><code>:WAVeform:POINt?</code></td>
+<td><code>:WAVeform:POINt?</code>; response bare NR1, matches (mock default <code>0</code>; manual's own EXAMPLE sets <code>20000</code> first)</td>
+<td>VERIFIED</td>
+<td>EN11G p.752</td>
+</tr>
+<tr>
+<td><code>get_waveform_preamble</code></td>
+<td><code>:WAVeform:PREamble?</code></td>
+<td><code>:WAVeform:PREamble?</code>; binary 346-byte WAVEDESC block (request-verified only)</td>
+<td>VERIFIED</td>
+<td>EN11G p.755</td>
+</tr>
+<tr>
+<td><code>get_waveform_source</code></td>
+<td><code>:WAVeform:SOURce?</code></td>
+<td><code>:WAVeform:SOURce?</code>; response bare source token, matches (mock default <code>C1</code>; manual's own EXAMPLE sets <code>C2</code> first)</td>
+<td>VERIFIED</td>
+<td>EN11G p.749</td>
+</tr>
+<tr>
+<td><code>get_waveform_start</code></td>
+<td><code>:WAVeform:STARt?</code></td>
+<td><code>:WAVeform:STARt?</code>; response bare NR1, matches (mock default <code>0</code>; manual's own EXAMPLE sets <code>1000</code> first)</td>
+<td>VERIFIED</td>
+<td>EN11G p.750</td>
+</tr>
+<tr>
+<td><code>get_waveform_width</code></td>
+<td><code>:WAVeform:WIDTh?</code></td>
+<td><code>:WAVeform:WIDTh?</code>; response bare <code>BYTE</code>|<code>WORD</code>, matches (mock default <code>BYTE</code>)</td>
+<td>VERIFIED</td>
+<td>EN11G p.754</td>
+</tr>
+<tr>
+<td><code>hardcopy_print</code></td>
+<td><code>HCSU PRINT</code></td>
+<td><code>HCSU</code> absent from manual entirely; capture+print folded into <code>:PRINt?</code>; dead code (no caller)</td>
+<td>MISMATCH_DEFERRED</td>
+<td>EN11G p.33</td>
+</tr>
+<tr>
+<td><code>run</code></td>
+<td><code>:TRIGger:RUN</code></td>
+<td><code>:TRIGger:RUN</code></td>
+<td>VERIFIED</td>
+<td>EN11G p.483</td>
+</tr>
+<tr>
+<td><code>screen_dump</code></td>
+<td><code>SCDP</code></td>
+<td><code>SCDP</code> absent (only appears as a filename in an example); documented command is <code>:PRINt? &lt;type&gt;[,&lt;format&gt;]</code></td>
+<td>MISMATCH_DEFERRED</td>
+<td>EN11G p.33</td>
+</tr>
+<tr>
+<td><code>set_bandwidth_limit</code></td>
+<td><code>:CHANnel{ch}:BWLimit {limit}</code></td>
+<td><code>:CHANnel&lt;n&gt;:BWLimit &lt;bwlimit&gt;</code>, <code>{FULL\|20M\|200M}</code> (not mocked)</td>
+<td>VERIFIED</td>
+<td>EN11G p.50</td>
+</tr>
+<tr>
+<td><code>set_channel_display</code></td>
+<td><code>:CHANnel{ch}:SWITch {state}</code></td>
+<td><code>:CHANnel&lt;n&gt;:SWITch &lt;state&gt;</code></td>
+<td>VERIFIED</td>
+<td>EN11G p.60</td>
+</tr>
+<tr>
+<td><code>set_coupling</code></td>
+<td><code>:CHANnel{ch}:COUPling {coupling}</code></td>
+<td><code>:CHANnel&lt;n&gt;:COUPling &lt;coupling_mode&gt;</code></td>
+<td>VERIFIED</td>
+<td>EN11G p.51</td>
+</tr>
+<tr>
+<td><code>set_hardcopy_format</code></td>
+<td><code>HCSU DEV,FORMAT,{format}</code></td>
+<td><code>HCSU</code> absent from manual entirely; closest concept is <code>:PRINt?</code>'s <code>&lt;format&gt;:={NORMal\|INVerted}</code> (different axis); dead code (no caller)</td>
+<td>MISMATCH_DEFERRED</td>
+<td>EN11G p.33</td>
+</tr>
+<tr>
+<td><code>set_probe_ratio</code></td>
+<td><code>:CHANnel{ch}:PROBe VALue,{ratio}</code></td>
+<td><code>:CHANnel&lt;n&gt;:PROBe &lt;attenuation&gt;[,&lt;value&gt;]</code> (not mocked)</td>
+<td>VERIFIED</td>
+<td>EN11G p.57</td>
+</tr>
+<tr>
+<td><code>set_time_div</code></td>
+<td><code>:TIMebase:SCALe {tdiv}</code></td>
+<td><code>:TIMebase:SCALe &lt;value&gt;</code></td>
+<td>VERIFIED</td>
+<td>EN11G p.476</td>
+</tr>
+<tr>
+<td><code>set_time_offset</code></td>
+<td><code>:TIMebase:DELay {offset}</code></td>
+<td><code>:TIMebase:DELay &lt;delay_value&gt;</code></td>
+<td>VERIFIED</td>
+<td>EN11G p.473</td>
+</tr>
+<tr>
+<td><code>set_trigger_coupling</code></td>
+<td><code>:TRIGger:EDGE:COUPling {coupling}</code></td>
+<td><code>:TRIGger:EDGE:COUPling &lt;mode&gt;</code>, <code>{DC\|AC\|LFREJect\|HFREJect}</code></td>
+<td>VERIFIED</td>
+<td>EN11G p.486</td>
+</tr>
+<tr>
+<td><code>set_trigger_level</code></td>
+<td><code>:TRIGger:EDGE:LEVel {level}</code></td>
+<td><code>:TRIGger:EDGE:LEVel &lt;level_value&gt;</code></td>
+<td>VERIFIED</td>
+<td>EN11G p.492</td>
+</tr>
+<tr>
+<td><code>set_trigger_mode</code></td>
+<td><code>:TRIGger:MODE {mode}</code></td>
+<td><code>:TRIGger:MODE &lt;mode&gt;</code>, <code>{SINGle\|NORMal\|AUTO\|FTRIG}</code></td>
+<td>VERIFIED</td>
+<td>EN11G p.482</td>
+</tr>
+<tr>
+<td><code>set_trigger_slope</code></td>
+<td><code>:TRIGger:EDGE:SLOPe {slope}</code></td>
+<td><code>:TRIGger:EDGE:SLOPe &lt;slope_type&gt;</code>, <code>{RISing\|FALLing\|ALTernate}</code></td>
+<td>VERIFIED</td>
+<td>EN11G p.494</td>
+</tr>
+<tr>
+<td><code>set_trigger_source</code></td>
+<td><code>:TRIGger:EDGE:SOURce {src}</code></td>
+<td><code>:TRIGger:EDGE:SOURce &lt;source&gt;</code>, <code>{C&lt;n&gt;\|D&lt;d&gt;\|EX\|EX5\|LINE}</code></td>
+<td>VERIFIED</td>
+<td>EN11G p.495</td>
+</tr>
+<tr>
+<td><code>set_trigger_type</code></td>
+<td><code>:TRIGger:TYPE {type}</code></td>
+<td><code>:TRIGger:TYPE &lt;type&gt;</code> (see note below the table)</td>
+<td>VERIFIED</td>
+<td>EN11G p.484</td>
+</tr>
+<tr>
+<td><code>set_voltage_div</code></td>
+<td><code>:CHANnel{ch}:SCALe {vdiv}</code></td>
+<td><code>:CHANnel&lt;n&gt;:SCALe &lt;scale&gt;</code></td>
+<td>VERIFIED</td>
+<td>EN11G p.58</td>
+</tr>
+<tr>
+<td><code>set_voltage_offset</code></td>
+<td><code>:CHANnel{ch}:OFFSet {offset}</code></td>
+<td><code>:CHANnel&lt;n&gt;:OFFSet &lt;offset_value&gt;</code></td>
+<td>VERIFIED</td>
+<td>EN11G p.56</td>
+</tr>
+<tr>
+<td><code>set_waveform_interval</code></td>
+<td><code>:WAVeform:INTerval {value}</code></td>
+<td><code>:WAVeform:INTerval &lt;value&gt;</code></td>
+<td>VERIFIED</td>
+<td>EN11G p.751</td>
+</tr>
+<tr>
+<td><code>set_waveform_point</code></td>
+<td><code>:WAVeform:POINt {value}</code></td>
+<td><code>:WAVeform:POINt &lt;value&gt;</code></td>
+<td>VERIFIED</td>
+<td>EN11G p.752</td>
+</tr>
+<tr>
+<td><code>set_waveform_source</code></td>
+<td><code>:WAVeform:SOURce C{ch}</code></td>
+<td><code>:WAVeform:SOURce &lt;source&gt;</code></td>
+<td>VERIFIED</td>
+<td>EN11G p.749</td>
+</tr>
+<tr>
+<td><code>set_waveform_start</code></td>
+<td><code>:WAVeform:STARt {value}</code></td>
+<td><code>:WAVeform:STARt &lt;value&gt;</code></td>
+<td>VERIFIED</td>
+<td>EN11G p.750</td>
+</tr>
+<tr>
+<td><code>set_waveform_width</code></td>
+<td><code>:WAVeform:WIDTh {value}</code></td>
+<td><code>:WAVeform:WIDTh &lt;type&gt;</code>, <code>{BYTE\|WORD}</code></td>
+<td>VERIFIED</td>
+<td>EN11G p.754</td>
+</tr>
+<tr>
+<td><code>stop</code></td>
+<td><code>:TRIGger:STOP</code></td>
+<td><code>:TRIGger:STOP</code></td>
+<td>VERIFIED</td>
+<td>EN11G p.484</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Tally: 47 VERIFIED, 5 MISMATCH_DEFERRED, 0 UNCITED (52 total).</strong></p>
+<p>Task 17 (audit H9) added eight rows with a <code>get_waveform_</code>/<code>set_waveform_</code>
+prefix: the documented <code>:WAVeform:SOURce</code>/<code>STARt</code>/<code>INTerval</code>/<code>POINt</code>
+transfer-parameter scalars (EN11G p.749-752), verified against a fresh
+reading of those four pages (page citations in earlier plan drafts for this
+subsystem had been wrong; re-verified directly from the PDF). <code>MockConnection</code>
+carries <code>waveform_source</code>/<code>waveform_start</code>/<code>waveform_interval</code>/
+<code>waveform_point</code> state (defaults <code>"C1"</code>/<code>0</code>/<code>1</code>/<code>0</code>) so those four getters are
+response-VERIFIED, not request-only.</p>
+<p>Task 18 (audit H9 fix) rewired the capture path itself onto that subsystem:
+<code>get_waveform</code>/<code>get_waveform_preamble</code> are repointed from the invented
+<code>C{ch}:WF? DAT2</code>/<code>DESC</code> (zero hits anywhere in this 855-page guide) to the
+documented <code>:WAVeform:DATA?</code>/<code>:WAVeform:PREamble?</code> queries, and
+<code>waveform_transfer.ModernTransfer</code> sends them in that order after selecting
+the source and width. Both are <strong>binary</strong> responses (an IEEE block, not a
+<code>query()</code>-able string), so their corpus entries and this table's "Documented"
+column are request-verified only — the actual byte-for-byte parser/producer
+agreement is proven by the round-trip tests in
+<code>tests/test_modern_waveform_transfer.py</code>, not by <code>test_mock_answers_documented_response</code>.
+Task 18 also added <code>get_waveform_data</code> (the <code>:WAVeform:DATA?</code> leaf under its
+own name, since <code>ModernTransfer</code> calls that instead of the generic
+<code>get_waveform</code> alias) and <code>set_waveform_width</code>/<code>get_waveform_width</code>
+(<code>:WAVeform:WIDTh</code>, EN11G p.754 — selects the WAVEDESC's COMM_TYPE field, byte
+vs. word samples).</p>
+<p>Task 19 added <code>get_waveform_maxpoint</code> (<code>:WAVeform:MAXPoint?</code>, EN11G p.753).
+Unlike every other <code>:WAVeform:</code> leaf in this table, p.753 has no COMMAND
+SYNTAX section at all — it is Query-only, so there is deliberately no
+<code>set_waveform_maxpoint</code>: a real scope reports its own per-transfer cap, the
+controller does not set it. <code>ModernTransfer.acquire</code> reads the PREamble's
+wave_array_count (address 116-119, "Number of data points in the data
+array" — the FULL record) once, then loops <code>:WAVeform:STARt</code> in
+<code>:WAVeform:MAXPoint</code>-sized windows, concatenating each <code>:WAVeform:DATA?</code>
+window until the whole record is read; for a record that already fits in one
+window (record_length &lt;= max_points, the common case and every Task 18 test)
+the loop runs exactly once, byte-for-byte the same single transfer as before.
+<code>MockConnection</code> gained matching <code>max_points</code> (default <code>10000000</code>, the
+guide's own worked EXAMPLE value) and <code>record_length</code> (default <code>None</code>, which
+defers to the pre-existing single-shot point-count formula) state, and its
+modern <code>:WAVeform:DATA?</code> handler is now window-aware: it slices
+<code>[waveform_start : waveform_start + window]</code> out of a per-channel full-record
+code array that <code>:WAVeform:PREamble?</code> synthesizes once per capture (so
+repeated windowed reads see one consistent waveform instead of each
+independently re-synthesizing and desyncing).</p>
+<p>Full detail — exact current vs. documented wire form, severity against the
+pull-in bar, and why each is deferred rather than fixed — is in each entry's
+<code>note</code> field in <code>tests/wire_forms.py</code>.</p>
+<p>Two observations found during this sweep are recorded as comments in
+<code>tests/wire_forms.py</code> rather than as corpus rows, because they are not
+<code>MODERN_COMMANDS</code> template mismatches (the table's <code>{placeholder}</code> strings are
+exactly right); they are parameter-<em>value</em> translation gaps one layer up, in
+<code>trigger.py</code>/<code>scpi_commands.py</code>:</p>
+<ul>
+<li><strong><code>set_trigger_type</code>/<code>get_trigger_type</code></strong> is VERIFIED for <code>type="EDGE"</code> (both
+  a valid manual enum member and a valid driver public value). But three of
+  <code>trigger.py</code>'s six public trigger types — <code>SLEW</code>, <code>GLIT</code>, <code>INTV</code> — have no
+  <code>type_to_wire</code>/<code>type_from_wire</code> mapping anywhere and are sent to the wire
+  as-is; none of the three is a member of the modern <code>&lt;type&gt;</code> enum
+  (<code>{EDGE|PULSE|SLOPe|INTerval|PATTern|RUNT|WINDow|DROPout|VIDeo|QUALified|
+  NEDGe|DELay|SHOLd|IIC|SPI|UART|LIN|CAN|FLEXray|CANFd|IIS|M1553|SENT|A429}</code>,
+  p.484) — the nearest documented concepts are spelled <code>SLOPe</code>/<code>PULSE</code>/
+  <code>INTerval</code>. <code>set_trigger_type(type="SLEW")</code> on modern would send
+  <code>:TRIGger:TYPE SLEW</code>, undocumented and likely rejected by real hardware.</li>
+<li><strong><code>get_coupling</code></strong>'s mock-fixture bug (see the table row above) is a
+  <code>MockConnection</code> state-seeding defect, not a driver or table defect: the
+  wire template and the <code>coupling_to_wire</code>/<code>coupling_from_wire</code> mappings are
+  both correct for modern.</li>
+</ul>
+<h2 id="siglent-spd-power-supply-psuscpicommandsetsiglent_spd_overrides">Siglent SPD power supply (<code>PSUSCPICommandSet.SIGLENT_SPD_OVERRIDES</code>)<a class="headerlink" href="#siglent-spd-power-supply-psuscpicommandsetsiglent_spd_overrides" title="Permanent link">&para;</a></h2>
+<p>Checked against the SPD3303X/3303X-E Quick Start guide
+(<code>SPD3303X_QuickStart_QS0503X-E01B.pdf</code>, cited below as "QS0503X-E01B") on
+2026-07-23. All 27 commands in the table are covered. This is a Quick Start
+guide, not a full programming manual — its entire SCPI reference is Chapter 3
+(pp.36-43). Page citations below are the PDF's own page index, not the printed
+footer number (which runs 8 lower on every page).</p>
+<table>
+<thead>
+<tr>
+<th>Command</th>
+<th>We send</th>
+<th>Documented</th>
+<th>Status</th>
+<th>Source</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>get_current</code></td>
+<td><code>CH{ch}:CURR?</code></td>
+<td><code>[{CH1\|CH2}:]CURRent?</code>; response bare NR2, matches structure</td>
+<td>VERIFIED</td>
+<td>QS0503X-E01B p.39</td>
+</tr>
+<tr>
+<td><code>get_remote_sense</code></td>
+<td><code>SYST:SENS? CH{ch}</code></td>
+<td>absent from manual entirely (zero hits for "SENS"); dead code (no caller)</td>
+<td>MISMATCH_DEFERRED</td>
+<td>QS0503X-E01B p.36</td>
+</tr>
+<tr>
+<td><code>get_status</code></td>
+<td><code>SYSTem:STATus?</code></td>
+<td><code>SYSTem:STATus?</code>; response bare hex word (Typical Return <code>0x0224</code>), decoded via the p.42 bit table (bit 4 = CH1 output, bit 5 = CH2 output)</td>
+<td>VERIFIED</td>
+<td>QS0503X-E01B p.41-42</td>
+</tr>
+<tr>
+<td><code>get_timer_current</code></td>
+<td><code>TIMEr:CURR? CH{ch}</code></td>
+<td>absent from manual entirely; only <code>TIMEr:SET?</code> exists (group-addressed); dead code (no caller)</td>
+<td>MISMATCH_DEFERRED</td>
+<td>QS0503X-E01B p.40-41</td>
+</tr>
+<tr>
+<td><code>get_timer_enable</code></td>
+<td><code>TIMEr? CH{ch}</code></td>
+<td>no query form documented for <code>TIMEr {CH1\|CH2},{ON\|OFF}</code>; only <code>TIMEr:SET?</code> (group voltage/current/time, not enabled state)</td>
+<td>MISMATCH_DEFERRED</td>
+<td>QS0503X-E01B p.40-41</td>
+</tr>
+<tr>
+<td><code>get_timer_voltage</code></td>
+<td><code>TIMEr:VOLT? CH{ch}</code></td>
+<td>absent from manual entirely; only <code>TIMEr:SET?</code> exists (group-addressed); dead code (no caller)</td>
+<td>MISMATCH_DEFERRED</td>
+<td>QS0503X-E01B p.40-41</td>
+</tr>
+<tr>
+<td><code>get_tracking</code></td>
+<td><code>OUTP:TRACK?</code></td>
+<td>no query form documented for <code>OUTPut:TRACK {0\|1\|2}</code></td>
+<td>MISMATCH_DEFERRED</td>
+<td>QS0503X-E01B p.40</td>
+</tr>
+<tr>
+<td><code>get_voltage</code></td>
+<td><code>CH{ch}:VOLT?</code></td>
+<td><code>[{CH1\|CH2}:]VOLTage?</code>; response bare NR2, matches structure</td>
+<td>VERIFIED</td>
+<td>QS0503X-E01B p.39</td>
+</tr>
+<tr>
+<td><code>get_wave_amplitude</code></td>
+<td><code>WAVE:AMPL? CH{ch}</code></td>
+<td>absent from manual entirely; dead code (no caller)</td>
+<td>MISMATCH_DEFERRED</td>
+<td>QS0503X-E01B p.36</td>
+</tr>
+<tr>
+<td><code>get_wave_enable</code></td>
+<td><code>WAVE? CH{ch}</code></td>
+<td>no query form documented for <code>OUTPut:WAVE {CH1\|CH2},{ON\|OFF}</code></td>
+<td>MISMATCH_DEFERRED</td>
+<td>QS0503X-E01B p.40</td>
+</tr>
+<tr>
+<td><code>get_wave_freq</code></td>
+<td><code>WAVE:FREQ? CH{ch}</code></td>
+<td>absent from manual entirely; dead code (no caller)</td>
+<td>MISMATCH_DEFERRED</td>
+<td>QS0503X-E01B p.36</td>
+</tr>
+<tr>
+<td><code>get_wave_type</code></td>
+<td><code>WAVE:TYPE? CH{ch}</code></td>
+<td>absent from manual entirely; dead code (no caller)</td>
+<td>MISMATCH_DEFERRED</td>
+<td>QS0503X-E01B p.36</td>
+</tr>
+<tr>
+<td><code>measure_current</code></td>
+<td><code>MEASure{ch}:CURRent?</code></td>
+<td><code>MEASure:CURRent? [{CH1\|CH2}]</code> (channel is a query argument, not fused to the keyword)</td>
+<td>MISMATCH_DEFERRED</td>
+<td>QS0503X-E01B p.38</td>
+</tr>
+<tr>
+<td><code>measure_power</code></td>
+<td><code>MEASure{ch}:POWer?</code></td>
+<td><code>MEASure:POWEr? [{CH1\|CH2}]</code> (channel is a query argument; code also misspells POWEr)</td>
+<td>MISMATCH_DEFERRED</td>
+<td>QS0503X-E01B p.38</td>
+</tr>
+<tr>
+<td><code>measure_voltage</code></td>
+<td><code>MEASure{ch}:VOLTage?</code></td>
+<td><code>MEASure:VOLTage? [{CH1\|CH2}]</code> (channel is a query argument, not fused to the keyword)</td>
+<td>MISMATCH_DEFERRED</td>
+<td>QS0503X-E01B p.38</td>
+</tr>
+<tr>
+<td><code>set_current</code></td>
+<td><code>CH{ch}:CURR {current}</code></td>
+<td><code>[{CH1\|CH2}:]CURRent &lt;current&gt;</code> (CURR is the documented abbreviation)</td>
+<td>VERIFIED</td>
+<td>QS0503X-E01B p.39</td>
+</tr>
+<tr>
+<td><code>set_output</code></td>
+<td><code>OUTPut CH{ch},{state}</code></td>
+<td><code>OUTPut {CH1\|CH2\|CH3},{ON\|OFF}</code></td>
+<td>VERIFIED</td>
+<td>QS0503X-E01B p.40</td>
+</tr>
+<tr>
+<td><code>set_remote_sense</code></td>
+<td><code>SYST:SENS CH{ch},{state}</code></td>
+<td>absent from manual entirely; dead code (no caller)</td>
+<td>MISMATCH_DEFERRED</td>
+<td>QS0503X-E01B p.36</td>
+</tr>
+<tr>
+<td><code>set_timer_current</code></td>
+<td><code>TIMEr:CURR CH{ch},{current}</code></td>
+<td>absent from manual entirely; only <code>TIMEr:SET</code> sets voltage/current/time together for a memory group; dead code (no caller)</td>
+<td>MISMATCH_DEFERRED</td>
+<td>QS0503X-E01B p.40</td>
+</tr>
+<tr>
+<td><code>set_timer_enable</code></td>
+<td><code>TIMEr CH{ch},{state}</code></td>
+<td><code>TIMEr {CH1\|CH2},{ON\|OFF}</code></td>
+<td>VERIFIED</td>
+<td>QS0503X-E01B p.41</td>
+</tr>
+<tr>
+<td><code>set_timer_voltage</code></td>
+<td><code>TIMEr:VOLT CH{ch},{voltage}</code></td>
+<td>absent from manual entirely; only <code>TIMEr:SET</code> (group-addressed); dead code (no caller)</td>
+<td>MISMATCH_DEFERRED</td>
+<td>QS0503X-E01B p.40</td>
+</tr>
+<tr>
+<td><code>set_tracking</code></td>
+<td><code>OUTP:TRACK {mode}</code></td>
+<td><code>OUTPut:TRACK {0\|1\|2}</code> — the public word enum (INDEPENDENT/SERIES/PARALLEL) is mapped to the documented numeric digit at the <code>get_command()</code> boundary before sending (fixed Task 7)</td>
+<td>VERIFIED</td>
+<td>QS0503X-E01B p.40</td>
+</tr>
+<tr>
+<td><code>set_voltage</code></td>
+<td><code>CH{ch}:VOLT {voltage}</code></td>
+<td><code>[{CH1\|CH2}:]VOLTage &lt;voltage&gt;</code> (VOLT is the documented abbreviation)</td>
+<td>VERIFIED</td>
+<td>QS0503X-E01B p.39</td>
+</tr>
+<tr>
+<td><code>set_wave_amplitude</code></td>
+<td><code>WAVE:AMPL CH{ch},{amplitude}</code></td>
+<td>absent from manual entirely; dead code (no caller)</td>
+<td>MISMATCH_DEFERRED</td>
+<td>QS0503X-E01B p.36</td>
+</tr>
+<tr>
+<td><code>set_wave_enable</code></td>
+<td><code>OUTPut:WAVE CH{ch},{state}</code></td>
+<td><code>OUTPut:WAVE {CH1\|CH2},{ON\|OFF}</code> (fixed Task 7 — the missing <code>OUTPut:</code> prefix is now sent)</td>
+<td>VERIFIED</td>
+<td>QS0503X-E01B p.40</td>
+</tr>
+<tr>
+<td><code>set_wave_freq</code></td>
+<td><code>WAVE:FREQ CH{ch},{frequency}</code></td>
+<td>absent from manual entirely; dead code (no caller)</td>
+<td>MISMATCH_DEFERRED</td>
+<td>QS0503X-E01B p.36</td>
+</tr>
+<tr>
+<td><code>set_wave_type</code></td>
+<td><code>WAVE:TYPE CH{ch},{wave_type}</code></td>
+<td>absent from manual entirely; dead code (no caller)</td>
+<td>MISMATCH_DEFERRED</td>
+<td>QS0503X-E01B p.36</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Tally: 12 VERIFIED, 15 MISMATCH_DEFERRED, 0 UNCITED (27 total).</strong> (Recomputed
+directly from <code>tests/wire_forms.py</code> — see the module docstring's counting
+one-liner. The table above still shows <code>measure_voltage</code>/<code>measure_current</code>/
+<code>measure_power</code> as MISMATCH_DEFERRED text, which is now stale: those three
+were flipped to VERIFIED by Task 6 and the row text here was never updated to
+match. Left as-is since fixing it is outside Task 8's scope; noted here so the
+next sweep doesn't re-trust the row text over the corpus.)</p>
+<p>Full detail — exact current vs. documented wire form, severity against the
+pull-in bar, and why each is deferred rather than fixed — is in each entry's
+<code>note</code> field in <code>tests/wire_forms.py</code>. Three findings here are already-known,
+tracked audit IDs with a fix owner: <code>measure_voltage</code>/<code>measure_current</code>/
+<code>measure_power</code> (H6, Task 6), <code>set_tracking</code> and <code>set_wave_enable</code> (H19, fixed
+Task 7 — the wire now sends <code>OUTPut:TRACK {0|1|2}</code> and <code>OUTPut:WAVE
+CH{ch},{state}</code>; their query counterparts, <code>get_tracking</code> and
+<code>get_wave_enable</code>, stay MISMATCH_DEFERRED because the manual documents no
+query form for either command at all), and <code>get_status</code> (formerly <code>get_output</code>;
+H20, fixed Task 8 — the wire now sends <code>SYSTem:STATus?</code> and decodes CH1/CH2
+output state from the returned bit-encoded hex word instead of the
+nonexistent <code>OUTPut? CH{ch}</code> query). The
+rest — the six-command "waveform generation" surface (<code>set_wave_type</code>/
+<code>get_wave_type</code>/<code>set_wave_freq</code>/<code>get_wave_freq</code>/<code>set_wave_amplitude</code>/
+<code>get_wave_amplitude</code>), <code>set_remote_sense</code>/<code>get_remote_sense</code>, and the four
+<code>TIMEr:VOLT</code>/<code>TIMEr:CURR</code> commands — are new findings from this sweep: none
+has a caller anywhere in the repo outside the command table itself, so all
+are low severity (dead code, below the pull-in bar) and simply queued.</p>
+<h2 id="siglent-sdg-function-generator-awgscpicommandsetsiglent_sdg_overrides">Siglent SDG function generator (<code>AWGSCPICommandSet.SIGLENT_SDG_OVERRIDES</code>)<a class="headerlink" href="#siglent-sdg-function-generator-awgscpicommandsetsiglent_sdg_overrides" title="Permanent link">&para;</a></h2>
+<p>Checked against the SDG Series Programming Guide
+(<code>SDG_ProgrammingGuide_PG02-E05B.pdf</code>, cited below as "PG02-E05B") on
+2026-07-23. All 28 commands in the table are covered. Page citations below are
+the PDF's own page index, not the printed footer number (which runs 12 lower
+on every page).</p>
+<p>Every setter in this table renders exactly what the manual documents — the SET
+side of <code>SIGLENT_SDG_OVERRIDES</code> has no defects. The GET side used to invent a
+per-field selector query (e.g. <code>C1:BSWV? FRQ</code>) for every parameterized
+subsystem (<code>BSWV</code>/<code>OUTP</code>/<code>ARWV</code>/<code>MDWV</code>/<code>BTWV</code>/<code>SWWV</code>), none of which the guide
+documents — each one's QUERY SYNTAX is <strong>bare</strong> (e.g. <code>&lt;channel&gt;:BaSic_WaVe?</code>)
+and its response always returns <em>every</em> parameter of that subsystem in one
+comma-joined reply. H5, fixed Task 10: every getter template below now renders
+the bare query; <code>BSWV</code>/<code>OUTP</code>/<code>ARWV</code> also gained a real parser
+(<code>parse_key_value_response</code>, <code>awg_scpi_commands.py</code>) and, where an
+<code>awg_output.py</code> property exists, a field-read out of the whole-list response.
+<code>MDWV</code>/<code>BTWV</code>/<code>SWWV</code> are "future expansion" — no Python getter, mock handler,
+or parser exists anywhere for them — so only the request was fixed; they are
+VERIFIED with no response (request-only) rather than inventing code nothing
+exercises.</p>
+<p>Fix wave 1 follow-up: <code>BSWV?</code>'s RESPONSE FORMAT is <strong>function-conditional</strong>
+(p.31: <code>&lt;parameter&gt; := {All the parameters of the current basic waveform}</code>).
+The mock used to always answer <code>DUTY,SYM</code> and never <code>HLEV,LLEV</code> — a shape the
+guide never shows for any waveform type. It now builds the reply from the
+channel's current <code>WVTP</code>: <code>HLEV</code>/<code>LLEV</code> are always present (computed from
+amplitude/offset, matching the p.31 worked SINE example exactly), <code>DUTY</code> is
+appended only for SQUARE/PULSE, <code>SYM</code> only for RAMP (p.29-30 parameter table).</p>
+<table>
+<thead>
+<tr>
+<th>Command</th>
+<th>We send</th>
+<th>Documented</th>
+<th>Status</th>
+<th>Source</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>get_amplitude</code></td>
+<td><code>C{ch}:BSWV?</code></td>
+<td><code>&lt;channel&gt;:BaSic_WaVe?</code> returns every BSWV parameter as one comma-joined reply; <code>AMP</code> read out of it</td>
+<td>VERIFIED</td>
+<td>PG02-E05B p.31</td>
+</tr>
+<tr>
+<td><code>get_arb_waveform</code></td>
+<td><code>C{ch}:ARWV?</code></td>
+<td>bare <code>&lt;channel&gt;:ARbWaVe?</code> returns <code>INDEX</code> and <code>NAME</code> together; dead code (no caller), verified at command-table/mock level only</td>
+<td>VERIFIED</td>
+<td>PG02-E05B p.62</td>
+</tr>
+<tr>
+<td><code>get_burst_state</code></td>
+<td><code>C{ch}:BTWV?</code></td>
+<td>bare <code>&lt;channel&gt;:BTWV(BursTWaVe)?</code>; future-expansion command, no getter/mock/parser wired, request-only</td>
+<td>VERIFIED</td>
+<td>PG02-E05B p.60</td>
+</tr>
+<tr>
+<td><code>get_frequency</code></td>
+<td><code>C{ch}:BSWV?</code></td>
+<td><code>&lt;channel&gt;:BaSic_WaVe?</code> returns every BSWV parameter as one comma-joined reply; <code>FRQ</code> read out of it</td>
+<td>VERIFIED</td>
+<td>PG02-E05B p.31</td>
+</tr>
+<tr>
+<td><code>get_function</code></td>
+<td><code>C{ch}:BSWV?</code></td>
+<td><code>&lt;channel&gt;:BaSic_WaVe?</code> returns every BSWV parameter as one comma-joined reply; <code>WVTP</code> read out of it</td>
+<td>VERIFIED</td>
+<td>PG02-E05B p.31</td>
+</tr>
+<tr>
+<td><code>get_modulation</code></td>
+<td><code>C{ch}:MDWV?</code></td>
+<td>bare <code>&lt;channel&gt;:MoDulateWaVe?</code>; future-expansion command, no getter/mock/parser wired, request-only</td>
+<td>VERIFIED</td>
+<td>PG02-E05B p.36</td>
+</tr>
+<tr>
+<td><code>get_offset</code></td>
+<td><code>C{ch}:BSWV?</code></td>
+<td><code>&lt;channel&gt;:BaSic_WaVe?</code> returns every BSWV parameter as one comma-joined reply; <code>OFST</code> read out of it</td>
+<td>VERIFIED</td>
+<td>PG02-E05B p.31</td>
+</tr>
+<tr>
+<td><code>get_output</code></td>
+<td><code>C{ch}:OUTP?</code></td>
+<td><code>&lt;channel&gt;:OUTPut?</code> returns <code>ON\|OFF,LOAD,&lt;load&gt;,PLRT,&lt;polarity&gt;</code> together; <code>STATE</code> read out of it</td>
+<td>VERIFIED</td>
+<td>PG02-E05B p.27-28</td>
+</tr>
+<tr>
+<td><code>get_output_load</code></td>
+<td><code>C{ch}:OUTP?</code></td>
+<td>same whole-list <code>&lt;channel&gt;:OUTPut?</code> reply as <code>get_output</code>; dead code (no caller), verified at command-table/mock level only</td>
+<td>VERIFIED</td>
+<td>PG02-E05B p.27-28</td>
+</tr>
+<tr>
+<td><code>get_output_polarity</code></td>
+<td><code>C{ch}:OUTP?</code></td>
+<td>same whole-list <code>&lt;channel&gt;:OUTPut?</code> reply as <code>get_output</code>; dead code (no caller), verified at command-table/mock level only</td>
+<td>VERIFIED</td>
+<td>PG02-E05B p.27-28</td>
+</tr>
+<tr>
+<td><code>get_phase</code></td>
+<td><code>C{ch}:BSWV?</code></td>
+<td><code>&lt;channel&gt;:BaSic_WaVe?</code> returns every BSWV parameter as one comma-joined reply; <code>PHSE</code> read out of it</td>
+<td>VERIFIED</td>
+<td>PG02-E05B p.31</td>
+</tr>
+<tr>
+<td><code>get_pulse_duty</code></td>
+<td><code>C{ch}:BSWV?</code></td>
+<td><code>&lt;channel&gt;:BaSic_WaVe?</code> returns every BSWV parameter as one comma-joined reply; <code>DUTY</code> only present when WVTP is SQUARE/PULSE, read out of it</td>
+<td>VERIFIED</td>
+<td>PG02-E05B p.31, p.29</td>
+</tr>
+<tr>
+<td><code>get_ramp_symmetry</code></td>
+<td><code>C{ch}:BSWV?</code></td>
+<td><code>&lt;channel&gt;:BaSic_WaVe?</code> returns every BSWV parameter as one comma-joined reply; <code>SYM</code> only present when WVTP is RAMP, read out of it</td>
+<td>VERIFIED</td>
+<td>PG02-E05B p.31, p.30</td>
+</tr>
+<tr>
+<td><code>get_sweep_state</code></td>
+<td><code>C{ch}:SWWV?</code></td>
+<td>bare <code>&lt;channel&gt;:SWeepWaVe?</code>; future-expansion command, no getter/mock/parser wired, request-only</td>
+<td>VERIFIED</td>
+<td>PG02-E05B p.38</td>
+</tr>
+<tr>
+<td><code>set_amplitude</code></td>
+<td><code>C{ch}:BSWV AMP,{amplitude}</code></td>
+<td><code>&lt;channel&gt;:BaSic_WaVe AMP,&lt;amplitude&gt;</code></td>
+<td>VERIFIED</td>
+<td>PG02-E05B p.31</td>
+</tr>
+<tr>
+<td><code>set_arb_waveform</code></td>
+<td><code>C{ch}:ARWV NAME,{name}</code></td>
+<td><code>&lt;channel&gt;:ArbWaVe NAME,&lt;name&gt;</code> (Format2); not mocked, dead code (no caller)</td>
+<td>VERIFIED</td>
+<td>PG02-E05B p.62, p.188</td>
+</tr>
+<tr>
+<td><code>set_burst_state</code></td>
+<td><code>C{ch}:BTWV STATE,{state}</code></td>
+<td><code>&lt;channel&gt;:BursTWaVe STATE,&lt;state&gt;</code>; not mocked, dead code (no caller)</td>
+<td>VERIFIED</td>
+<td>PG02-E05B p.59-60</td>
+</tr>
+<tr>
+<td><code>set_frequency</code></td>
+<td><code>C{ch}:BSWV FRQ,{frequency}</code></td>
+<td><code>&lt;channel&gt;:BaSic_WaVe FRQ,&lt;frequency&gt;</code></td>
+<td>VERIFIED</td>
+<td>PG02-E05B p.31</td>
+</tr>
+<tr>
+<td><code>set_function</code></td>
+<td><code>C{ch}:BSWV WVTP,{function}</code></td>
+<td><code>&lt;channel&gt;:BaSic_WaVe WVTP,&lt;type&gt;</code></td>
+<td>VERIFIED</td>
+<td>PG02-E05B p.31</td>
+</tr>
+<tr>
+<td><code>set_modulation</code></td>
+<td><code>C{ch}:MDWV STATE,{state}</code></td>
+<td><code>&lt;channel&gt;:MoDulateWaVe STATE,&lt;state&gt;</code>; not mocked, dead code (no caller)</td>
+<td>VERIFIED</td>
+<td>PG02-E05B p.33, p.36</td>
+</tr>
+<tr>
+<td><code>set_offset</code></td>
+<td><code>C{ch}:BSWV OFST,{offset}</code></td>
+<td><code>&lt;channel&gt;:BaSic_WaVe OFST,&lt;offset&gt;</code></td>
+<td>VERIFIED</td>
+<td>PG02-E05B p.29-30, p.31</td>
+</tr>
+<tr>
+<td><code>set_output</code></td>
+<td><code>C{ch}:OUTP {state}</code></td>
+<td><code>&lt;channel&gt;:OUTPut ON\|OFF</code> (state independently settable per the worked EXAMPLEs)</td>
+<td>VERIFIED</td>
+<td>PG02-E05B p.28</td>
+</tr>
+<tr>
+<td><code>set_output_load</code></td>
+<td><code>C{ch}:OUTP LOAD,{load}</code></td>
+<td><code>&lt;channel&gt;:OUTPut LOAD,&lt;load&gt;</code>; not mocked</td>
+<td>VERIFIED</td>
+<td>PG02-E05B p.28</td>
+</tr>
+<tr>
+<td><code>set_output_polarity</code></td>
+<td><code>C{ch}:OUTP PLRT,{polarity}</code></td>
+<td><code>&lt;channel&gt;:OUTPut PLRT,&lt;polarity&gt;</code>; not mocked, dead code (no caller)</td>
+<td>VERIFIED</td>
+<td>PG02-E05B p.28</td>
+</tr>
+<tr>
+<td><code>set_phase</code></td>
+<td><code>C{ch}:BSWV PHSE,{phase}</code></td>
+<td><code>&lt;channel&gt;:BaSic_WaVe PHSE,&lt;phase&gt;</code></td>
+<td>VERIFIED</td>
+<td>PG02-E05B p.29-30, p.31</td>
+</tr>
+<tr>
+<td><code>set_pulse_duty</code></td>
+<td><code>C{ch}:BSWV DUTY,{duty}</code></td>
+<td><code>&lt;channel&gt;:BaSic_WaVe DUTY,&lt;duty&gt;</code></td>
+<td>VERIFIED</td>
+<td>PG02-E05B p.29-30</td>
+</tr>
+<tr>
+<td><code>set_ramp_symmetry</code></td>
+<td><code>C{ch}:BSWV SYM,{symmetry}</code></td>
+<td><code>&lt;channel&gt;:BaSic_WaVe SYM,&lt;symmetry&gt;</code></td>
+<td>VERIFIED</td>
+<td>PG02-E05B p.29-30</td>
+</tr>
+<tr>
+<td><code>set_sweep_state</code></td>
+<td><code>C{ch}:SWWV STATE,{state}</code></td>
+<td><code>&lt;channel&gt;:SweepWaVe STATE,&lt;state&gt;</code>; not mocked, dead code (no caller)</td>
+<td>VERIFIED</td>
+<td>PG02-E05B p.37, p.39</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Tally: 28 VERIFIED, 0 MISMATCH_DEFERRED, 0 UNCITED (28 total).</strong></p>
+<p>Full detail — the parser, which fields each property reads, and why the three
+future-expansion getters stay request-only — is in each entry's <code>note</code> field
+in <code>tests/wire_forms.py</code>. All fourteen getters shared one audit ID (H5, fixed
+Task 10): <code>get_function</code>/<code>get_frequency</code>/<code>get_amplitude</code>/<code>get_offset</code>/
+<code>get_phase</code>/<code>get_pulse_duty</code>/<code>get_ramp_symmetry</code>/<code>get_output</code> now read their
+own field out of a single real <code>C{ch}:BSWV?</code>/<code>C{ch}:OUTP?</code> query via
+<code>parse_key_value_response</code> (<code>awg_scpi_commands.py</code>); <code>get_output_load</code>/
+<code>get_output_polarity</code>/<code>get_arb_waveform</code> got the same template+mock treatment
+but have no <code>awg_output.py</code> property to update (dead code, no caller), so
+they are verified at the command-table/mock level only; <code>get_modulation</code>/
+<code>get_burst_state</code>/<code>get_sweep_state</code> are "future expansion" — no getter, mock
+handler, or parser exists anywhere for them — so only the request template
+was fixed and they are VERIFIED with no response (request-only) rather than
+inventing code nothing exercises.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/little-did-I-know/SCPI-Instrument-Control" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://pypi.org/project/SCPI-Instrument-Control/" target="_blank" rel="noopener" title="pypi.org" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.8 200.5c-7.7-30.9-22.3-54.2-53.4-54.2h-40.1v47.4c0 36.8-31.2 67.8-66.8 67.8H172.7c-29.2 0-53.4 25-53.4 54.3v101.8c0 29 25.2 46 53.4 54.3 33.8 9.9 66.3 11.7 106.8 0 26.9-7.8 53.4-23.5 53.4-54.3v-40.7H226.2v-13.6h160.2c31.1 0 42.6-21.7 53.4-54.2 11.2-33.5 10.7-65.7 0-108.6M286.2 444.7a20.4 20.4 0 1 1 0-40.7 20.4 20.4 0 1 1 0 40.7M167.8 248.1h106.8c29.7 0 53.4-24.5 53.4-54.3V91.9c0-29-24.4-50.7-53.4-55.6-35.8-5.9-74.7-5.6-106.8.1-45.2 8-53.4 24.7-53.4 55.6v40.7h106.9v13.6h-147c-31.1 0-58.3 18.7-66.8 54.2-9.8 40.7-10.2 66.1 0 108.6 7.6 31.6 25.7 54.2 56.8 54.2H101v-48.8c0-35.3 30.5-66.4 66.8-66.4m-6.6-183.4a20.4 20.4 0 1 1 0 40.8 20.4 20.4 0 1 1 0-40.8"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.instant", "navigation.tracking", "navigation.tabs", "navigation.tabs.sticky", "navigation.sections", "navigation.expand", "navigation.top", "search.suggest", "search.highlight", "content.code.annotate", "content.code.copy", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>
