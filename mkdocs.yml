@@ -126,6 +126,7 @@ nav:
       - Advanced Features: user-guide/advanced-features.md
   - Web Gateway:
       - Overview: gateway/index.md
+      - Security: gateway/security.md
       - Browser UI Tour: gateway/browser-ui.md
       - REST & WebSocket API: gateway/api.md
   - GUI Application:

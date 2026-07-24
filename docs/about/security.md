@@ -131,6 +131,21 @@ def safe_connect(ip_str):
 
 **Mitigation**: Implement appropriate timeouts and rate limiting in your code
 
+### Web gateway
+
+- The optional web gateway (`scpi-web`) authenticates every `/api/*` request
+  with a bearer token, except the unauthenticated `GET /api/health` probe
+- Instrument sessions are owned by the token that created them — only the
+  owner may issue writes; other tokens may read and watch
+- Outbound connection targets are validated (an SSRF gate) before the gateway
+  opens a socket to an instrument
+- Concurrent instrument sessions are capped
+- The gateway does **not** terminate TLS; traffic (including the bearer
+  token) is unencrypted unless you place it behind a TLS-terminating reverse
+  proxy or keep it on a trusted network
+
+See the [Gateway security guide](../gateway/security.md) for the full model.
+
 ## Dependency Security
 
 We use automated tools to monitor dependencies for known vulnerabilities:
@@ -183,4 +198,4 @@ If you have questions about this security policy, please open a GitHub Discussio
 
 ---
 
-**Last Updated**: 2025-12-30
+**Last Updated**: 2026-07-24
