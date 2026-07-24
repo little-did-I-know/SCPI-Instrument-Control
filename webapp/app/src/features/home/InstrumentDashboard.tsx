@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { DiscoveredDevice } from "../../api/types";
+import type { DiscoveredDevice, SessionInfo } from "../../api/types";
 import { DeviceCard } from "./DeviceCard";
 import { deviceKey } from "./deviceKey";
 import { KIND_META, KIND_ORDER, type Kind } from "./kinds";
@@ -11,12 +11,17 @@ export type DashboardProps = {
   busyKey: string | null;
   onConnect: (device: DiscoveredDevice) => void;
   onOpen: (device: DiscoveredDevice) => void;
+  // Held sessions in full (for ownership) plus the viewer's own identity and
+  // a way to refresh after a claim. Only ever consulted for "session" cards.
+  sessions?: SessionInfo[];
+  identity?: string | null;
+  onClaimed?: () => void;
 };
 
 const zoneHeading = { fontSize: "var(--text-xs)", textTransform: "uppercase" as const, letterSpacing: "0.05em", color: "var(--lc-text-2)", fontWeight: 700, margin: "0 0 var(--space-2)" };
 const grid = { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: "var(--space-2)" };
 
-export function InstrumentDashboard({ devices, scanning, error, busyKey, onConnect, onOpen }: DashboardProps) {
+export function InstrumentDashboard({ devices, scanning, error, busyKey, onConnect, onOpen, sessions, identity, onClaimed }: DashboardProps) {
   const [query, setQuery] = useState("");
   const held = devices.filter((d) => d.connected);
   const available = devices.filter((d) => !d.connected);
@@ -25,7 +30,20 @@ export function InstrumentDashboard({ devices, scanning, error, busyKey, onConne
   const filtered = q ? available.filter((d) => `${d.model} ${d.address ?? ""} ${d.kind}`.toLowerCase().includes(q)) : available;
 
   function cardFor(device: DiscoveredDevice, variant: "available" | "session") {
-    return <DeviceCard key={deviceKey(device)} device={device} variant={variant} busy={busyKey !== null && busyKey === deviceKey(device)} onConnect={onConnect} onOpen={onOpen} />;
+    const session = variant === "session" ? sessions?.find((s) => s.id === device.session_id) : undefined;
+    return (
+      <DeviceCard
+        key={deviceKey(device)}
+        device={device}
+        variant={variant}
+        busy={busyKey !== null && busyKey === deviceKey(device)}
+        onConnect={onConnect}
+        onOpen={onOpen}
+        session={session}
+        identity={identity}
+        onClaimed={onClaimed}
+      />
+    );
   }
 
   return (

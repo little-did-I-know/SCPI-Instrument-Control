@@ -3,6 +3,7 @@ import { ApiError, api } from "../../api/client";
 import { clearToken, getToken, setToken } from "../../api/token";
 import { Button } from "../../ds/Button";
 import { GroupBox } from "../../ds/GroupBox";
+import { useIdentity } from "../../store/identity";
 
 type Status = "checking" | "needs-token" | "ready";
 
@@ -34,12 +35,14 @@ export function TokenGate({ children }: { children: React.ReactNode }) {
       return;
     }
     try {
-      await api.whoami();
+      const { identity } = await api.whoami();
+      useIdentity.getState().setIdentity(identity);
       setError("");
       setStatus("ready");
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
         clearToken();
+        useIdentity.getState().clearIdentity();
         setHasStoredToken(false);
         setError(UNAUTHORIZED);
       } else {

@@ -3,11 +3,13 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { TokenGate } from "./TokenGate";
 import { clearToken, getToken, setToken } from "../../api/token";
+import { useIdentity } from "../../store/identity";
 
 describe("TokenGate", () => {
   beforeEach(() => {
     localStorage.clear();
     vi.restoreAllMocks();
+    useIdentity.getState().clearIdentity();
   });
 
   it("asks for a token when none is stored", () => {
@@ -29,6 +31,23 @@ describe("TokenGate", () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ error: "Unauthorized", detail: "bad" }), { status: 401 })));
     render(<TokenGate><div>inside</div></TokenGate>);
     await waitFor(() => expect(screen.getByLabelText(/access token/i)).toBeInTheDocument());
+  });
+
+  it("captures whoami's identity so the rest of the app can read it", async () => {
+    setToken("scpi_good");
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ identity: "robin" }), { status: 200 })));
+    render(<TokenGate><div>inside</div></TokenGate>);
+    await waitFor(() => expect(screen.getByText("inside")).toBeInTheDocument());
+    expect(useIdentity.getState().identity).toBe("robin");
+  });
+
+  it("clears the identity when a stored token is rejected", async () => {
+    setToken("scpi_stale");
+    useIdentity.getState().setIdentity("stale-identity");
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ error: "Unauthorized", detail: "bad" }), { status: 401 })));
+    render(<TokenGate><div>inside</div></TokenGate>);
+    await waitFor(() => expect(screen.getByLabelText(/access token/i)).toBeInTheDocument());
+    expect(useIdentity.getState().identity).toBeNull();
   });
 
   it("clears the rejected token so a blank resubmit can't silently reuse it", async () => {

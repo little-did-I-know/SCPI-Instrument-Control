@@ -9,6 +9,7 @@ import { InstrumentDashboard } from "./InstrumentDashboard";
 import { ManualConnect } from "./ManualConnect";
 import { RecentBar } from "./RecentBar";
 import { pushRecent, type RecentEntry } from "./recent";
+import { useIdentity } from "../../store/identity";
 
 type Props = { onConnected: (session: SessionInfo) => void };
 
@@ -20,6 +21,7 @@ function sessionAsDevice(s: SessionInfo): DiscoveredDevice {
 
 export function HomeScreen({ onConnected }: Props) {
   const [devices, setDevices] = useState<DiscoveredDevice[]>([]);
+  const [sessions, setSessions] = useState<SessionInfo[]>([]);
   const [scanning, setScanning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -27,12 +29,14 @@ export function HomeScreen({ onConnected }: Props) {
   const [busy, setBusy] = useState(false);
   const [lastScanned, setLastScanned] = useState<string>("not scanned yet");
   const busyRef = useRef(false);
+  const identity = useIdentity((s) => s.identity);
 
   const scan = useCallback(async () => {
     setScanning(true);
     setError(null);
     try {
       const sessions = await api.listSessions();
+      setSessions(sessions);
       const heldSeed = sessions.map(sessionAsDevice); // ALL held sessions, real + mock
       const heldAddrs = new Set(sessions.map((s) => s.address).filter((a): a is string => a !== null));
       // seed the sessions zone immediately, before the slow discover scan resolves
@@ -109,7 +113,7 @@ export function HomeScreen({ onConnected }: Props) {
         <div style={{ flex: 3, display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
           <RecentBar onReconnect={onReconnect} />
           {actionError && <div role="alert" style={{ padding: "8px 10px", borderRadius: "var(--radius-sm)", background: "color-mix(in srgb, var(--danger) 12%, transparent)", color: "var(--danger)", fontSize: "var(--text-sm)" }}>{actionError}</div>}
-          <InstrumentDashboard devices={devices} scanning={scanning} error={error} busyKey={busyKey} onConnect={onConnectDevice} onOpen={onOpenDevice} />
+          <InstrumentDashboard devices={devices} scanning={scanning} error={error} busyKey={busyKey} onConnect={onConnectDevice} onOpen={onOpenDevice} sessions={sessions} identity={identity} onClaimed={scan} />
         </div>
         <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "var(--space-2)", minWidth: 220 }}>
           <GroupBox title="Connect manually"><ManualConnect busy={busy} onConnectAddress={onConnectAddress} onConnectMock={onConnectMock} /></GroupBox>
