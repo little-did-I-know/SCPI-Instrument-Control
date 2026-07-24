@@ -383,7 +383,7 @@ The SCPI Instrument Control GUI provides a comprehensive interface for controlli
 
 ### Main Window
 
-![Main Window](docs/images/main_window.png)
+![Main Window](https://raw.githubusercontent.com/little-did-I-know/SCPI-Instrument-Control/main/docs/images/main_window.png)
 
 The main interface consists of:
 
@@ -410,7 +410,7 @@ The oscilloscope must be connected to your network (default SCPI port: 5025).
 
 ### Channel Controls
 
-![Channel Controls](docs/images/channel_controls.png)
+![Channel Controls](https://raw.githubusercontent.com/little-did-I-know/SCPI-Instrument-Control/main/docs/images/channel_controls.png)
 
 The **Channels** tab provides complete control over all input channels:
 
@@ -448,7 +448,7 @@ Acquisition → Live View (Ctrl+R)
 
 ### Visual Measurements
 
-![Visual Measurements](docs/images/visual_measurements.png)
+![Visual Measurements](https://raw.githubusercontent.com/little-did-I-know/SCPI-Instrument-Control/main/docs/images/visual_measurements.png)
 
 Interactive measurement markers that you can place and adjust directly on waveforms:
 
@@ -489,7 +489,7 @@ Interactive measurement markers that you can place and adjust directly on wavefo
 
 ### Automated Measurements
 
-![Measurements Panel](docs/images/measurements_panel.png)
+![Measurements Panel](https://raw.githubusercontent.com/little-did-I-know/SCPI-Instrument-Control/main/docs/images/measurements_panel.png)
 
 The **Measurements** tab provides quick access to standard oscilloscope measurements:
 
@@ -500,7 +500,7 @@ The **Measurements** tab provides quick access to standard oscilloscope measurem
 
 ### Cursors
 
-![Cursors](docs/images/cursors.png)
+![Cursors](https://raw.githubusercontent.com/little-did-I-know/SCPI-Instrument-Control/main/docs/images/cursors.png)
 
 Interactive cursors for precise measurements:
 
@@ -512,7 +512,7 @@ Interactive cursors for precise measurements:
 
 ### FFT Analysis
 
-![FFT Analysis](docs/images/fft_analysis.png)
+![FFT Analysis](https://raw.githubusercontent.com/little-did-I-know/SCPI-Instrument-Control/main/docs/images/fft_analysis.png)
 
 Frequency domain analysis:
 
