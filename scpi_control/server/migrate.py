@@ -44,16 +44,28 @@ def migrate_references(storage_dir: str) -> Dict[str, int]:
     the write fully succeeds, so a failure never leaves a truncated or
     half-written file where a readable (if old-format) one used to be.
 
+    Before scanning, any leftover *.npz.tmp file is removed: that suffix is
+    only ever produced by _atomic_savez's own temp file, and one surviving
+    on disk means a previous run was killed (SIGKILL, power loss) between
+    the write and the os.replace swap. Such an orphan is not a reference
+    file -- it is not counted as converted, skipped, or failed.
+
     Args:
         storage_dir: Directory to scan for *.npz reference files.
 
     Returns:
         {"converted": n, "skipped": n, "failed": n}. The three counts always
-        sum to the number of .npz files examined.
+        sum to the number of .npz files examined -- stale temp files removed
+        during cleanup are not part of that count.
     """
     result = {"converted": 0, "skipped": 0, "failed": 0}
 
-    for filepath in sorted(Path(storage_dir).glob("*.npz")):
+    storage_path = Path(storage_dir)
+    for stale in sorted(storage_path.glob("*.npz.tmp")):
+        logger.info("removing stale temp file left by an interrupted run: %s", stale)
+        stale.unlink(missing_ok=True)
+
+    for filepath in sorted(storage_path.glob("*.npz")):
         try:
             payload = _build_payload(filepath)
         except Exception:
@@ -102,12 +114,24 @@ def _atomic_savez(filepath: Path, payload: Dict) -> None:
     sibling temp file and swapping it in with os.replace -- atomic on both
     POSIX and Windows for a same-directory rename -- means a failure here
     always leaves the original file exactly as it was.
+
+    The temp file is suffixed ".npz.tmp", not ".npz": migrate_references
+    scans with glob("*.npz"), and a temp file left behind by a killed
+    process (SIGKILL, power loss, anything that skips the except block
+    below) must never be picked up as if it were a reference file by a
+    later run. np.savez_compressed appends ".npz" to any string path that
+    doesn't already end in ".npz" -- passed the ".npz.tmp" name as a string,
+    it would silently divert the real write to a *third* file
+    ("....npz.tmp.npz") and leave the empty, just-created temp file to be
+    swapped in via os.replace, corrupting the target. Passing the already-
+    open file object instead sidesteps that renaming logic entirely (numpy
+    only string-checks paths, not file-like objects).
     """
-    fd, tmp_name = tempfile.mkstemp(prefix="{0}.".format(filepath.stem), suffix=".npz", dir=str(filepath.parent))
-    os.close(fd)
+    fd, tmp_name = tempfile.mkstemp(prefix="{0}.".format(filepath.stem), suffix=".npz.tmp", dir=str(filepath.parent))
     tmp_path = Path(tmp_name)
     try:
-        np.savez_compressed(str(tmp_path), **payload)
+        with os.fdopen(fd, "wb") as tmp_file:
+            np.savez_compressed(tmp_file, **payload)
         os.replace(str(tmp_path), str(filepath))
     except Exception:
         tmp_path.unlink(missing_ok=True)
