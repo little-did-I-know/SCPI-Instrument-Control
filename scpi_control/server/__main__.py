@@ -41,6 +41,12 @@ def main(argv=None) -> None:
     # value already parsed here. --allow-port has no subcommand use, so it is
     # simply never added to one.
     parser.add_argument("--allow-port", type=int, action="append", default=None, help="additional port the gateway may connect to (repeatable; 5025 is always allowed)")
+    # Registered ONLY on the top-level parser -- same trap as --allow-port
+    # above: a subparser's own --max-sessions with default=None would clobber
+    # a value already parsed here whenever the flag isn't repeated after the
+    # subcommand. --max-sessions has no subcommand use, so it is never added
+    # to one.
+    parser.add_argument("--max-sessions", type=int, default=8, help="maximum concurrent instrument sessions the gateway will hold open")
     _add_config_dir(parser)
 
     sub = parser.add_subparsers(dest="command")
@@ -89,7 +95,7 @@ def main(argv=None) -> None:
         raw = store.mint("default")
         print("\nGateway ready. Open:\n\n    http://{0}:{1}/?token={2}\n".format(args.host, args.port, raw))
     allowed_ports = frozenset(args.allow_port) | DEFAULT_ALLOWED_PORTS if args.allow_port else None
-    uvicorn.run(create_app(token_store=store, abandon_after=args.abandon_after, allowed_ports=allowed_ports), host=args.host, port=args.port)
+    uvicorn.run(create_app(token_store=store, abandon_after=args.abandon_after, allowed_ports=allowed_ports, max_sessions=args.max_sessions), host=args.host, port=args.port)
 
 
 if __name__ == "__main__":

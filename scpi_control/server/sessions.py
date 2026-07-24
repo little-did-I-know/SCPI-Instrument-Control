@@ -418,12 +418,20 @@ class InstrumentSession:
 class SessionManager:
     """Registry of live sessions. create() connects before registering."""
 
-    def __init__(self, allowed_ports: Optional[frozenset] = None) -> None:
+    def __init__(self, allowed_ports: Optional[frozenset] = None, max_sessions: int = 8) -> None:
         self._sessions: Dict[str, InstrumentSession] = {}
         self._lock = threading.Lock()
         self.allowed_ports = allowed_ports
+        self.max_sessions = max_sessions
 
     def create(self, label: str, *, address: Optional[str] = None, port: int = 5025, mock: bool = False, model: Optional[str] = None, owner: str = "", _connection=None) -> InstrumentSession:
+        # Checked BEFORE InstrumentSession.open: opening spawns a worker thread
+        # and blocks on a connect with a 30s timeout, so checking the cap after
+        # the fact would let concurrent requests past the cap occupy every
+        # threadpool worker anyway -- the exact exhaustion this guards against.
+        with self._lock:
+            if len(self._sessions) >= self.max_sessions:
+                raise SessionError("session limit reached ({0}); close a session first".format(self.max_sessions))
         session = InstrumentSession.open(label, address=address, port=port, mock=mock, model=model, owner=owner, allowed_ports=self.allowed_ports, _connection=_connection)
         with self._lock:
             self._sessions[session.id] = session

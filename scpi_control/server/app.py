@@ -26,17 +26,19 @@ def create_app(
     token_store: Optional[TokenStore] = None,
     abandon_after: float = 300.0,
     allowed_ports: Optional[frozenset] = None,
+    max_sessions: Optional[int] = None,
 ) -> FastAPI:
-    # allowed_ports only ever seeds a manager create_app builds itself: an
-    # explicitly-passed manager already carries its own policy (or the netpolicy
-    # default). Silently overriding it here would surprise a caller (e.g. a test)
-    # that constructed SessionManager(allowed_ports=...) on purpose -- but silently
-    # *dropping* allowed_ports when both are given is just as surprising to a
-    # caller who assumed the two compose, and could leave the gateway with no
-    # port policy at all. Refuse the ambiguous combination instead of guessing.
-    if manager is not None and allowed_ports is not None:
-        raise ValueError("create_app() received both an explicit manager and allowed_ports; configure the port policy on the manager (SessionManager(allowed_ports=...)) instead.")
-    manager = manager if manager is not None else SessionManager(allowed_ports=allowed_ports)
+    # allowed_ports and max_sessions only ever seed a manager create_app builds
+    # itself: an explicitly-passed manager already carries its own policy (or
+    # the class defaults). Silently overriding it here would surprise a caller
+    # (e.g. a test) that constructed SessionManager(...) on purpose -- but
+    # silently *dropping* a policy argument when both are given is just as
+    # surprising to a caller who assumed they compose, and could leave the
+    # gateway with no port policy or session cap at all. Refuse the ambiguous
+    # combination instead of guessing.
+    if manager is not None and (allowed_ports is not None or max_sessions is not None):
+        raise ValueError("create_app() received both an explicit manager and allowed_ports/max_sessions; configure those on the manager (SessionManager(...)) instead.")
+    manager = manager if manager is not None else SessionManager(allowed_ports=allowed_ports, max_sessions=max_sessions if max_sessions is not None else 8)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):

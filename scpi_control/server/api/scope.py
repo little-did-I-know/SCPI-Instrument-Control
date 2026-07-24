@@ -166,7 +166,7 @@ async def capture_csv(session_id: str, request: Request, channels: str = "1"):
         return [(c, scope.get_waveform(c)) for c in channel_list]
 
     captures = await run_job(session, capture)
-    csv_text = _build_csv(captures)
+    csv_text = await run_in_threadpool(_build_csv, captures)
     filename = "capture_{0}_C{1}.csv".format(session.id, "-".join(str(c) for c in channel_list))
     return PlainTextResponse(csv_text, media_type="text/csv", headers={"Content-Disposition": 'attachment; filename="{0}"'.format(filename)})
 
@@ -186,6 +186,10 @@ async def screenshot(session_id: str, request: Request):
     png = await run_job(session, grab)
     filename = "screenshot_{0}.png".format(session.id)
     return Response(content=png, media_type="image/png", headers={"Content-Disposition": 'attachment; filename="{0}"'.format(filename)})
+
+
+def _build_waveform_response(captures, max_points) -> dict:
+    return {"channels": [_waveform_json(c, data, max_points) for c, data in captures]}
 
 
 def _waveform_json(channel, data, max_points):
@@ -223,7 +227,7 @@ async def waveform_json(session_id: str, request: Request, channels: str = "1", 
 
     captures = await run_job(session, capture)
     cap = max_points if max_points > 0 else None
-    return {"channels": [_waveform_json(c, data, cap) for c, data in captures]}
+    return await run_in_threadpool(_build_waveform_response, captures, cap)
 
 
 def _math_state(scope):
