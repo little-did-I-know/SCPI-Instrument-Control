@@ -325,21 +325,28 @@ class TestViewers:
         assert connected and connected[0]["viewers"] == 0
 
 
-def test_cli_parses_defaults(monkeypatch):
+def test_cli_parses_defaults(tmp_path, monkeypatch):
     import scpi_control.server.__main__ as cli
+    from scpi_control.server.auth import TokenStore
 
     captured = {}
+    create_app_calls = []
+
+    def fake_create_app(**kwargs):
+        create_app_calls.append(kwargs)
+        return object()
 
     def fake_run(app, host, port, **kwargs):
         captured.update(host=host, port=port)
 
-    # create_app() with no token_store default-constructs a TokenStore against the
-    # real ~/.siglent/tokens.json; stub it out so this test never touches that file.
-    monkeypatch.setattr(cli, "create_app", lambda: object())
+    # --config-dir points at tmp_path so this never touches the developer's real
+    # ~/.siglent/tokens.json; create_app is stubbed so no real ASGI app is built.
+    monkeypatch.setattr(cli, "create_app", fake_create_app)
     monkeypatch.setattr(cli.uvicorn, "run", fake_run)
-    cli.main([])
+    cli.main(["--config-dir", str(tmp_path)])
     assert captured == {"host": "127.0.0.1", "port": 8765}
-    cli.main(["--host", "0.0.0.0", "--port", "9000"])
+    assert isinstance(create_app_calls[0]["token_store"], TokenStore)
+    cli.main(["--host", "0.0.0.0", "--port", "9000", "--config-dir", str(tmp_path)])
     assert captured == {"host": "0.0.0.0", "port": 9000}
 
 
