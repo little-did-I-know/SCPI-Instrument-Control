@@ -5,7 +5,6 @@ they stay valid across the migration. If one of these fails, the behaviour
 changed -- that is the signal they exist to give.
 """
 
-import sys
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -165,20 +164,6 @@ def test_names_with_path_characters_are_sanitized(store):
 # the coming format/path-resolution migration has to prove them unchanged as well.
 
 
-@pytest.mark.xfail(
-    condition=sys.platform.startswith("win"),
-    reason=(
-        "Pre-existing bug (not introduced by this test suite): rename_reference() keeps the "
-        "np.load() NpzFile from the source file alive (never closes it) while it still holds "
-        "time/voltage/metadata references, then calls old_filepath.unlink() on that same file. "
-        "Windows refuses to unlink a file with an open handle, so this raises WinError 32 and "
-        "rename_reference returns False instead of True. Likely POSIX-safe, since unlinking an "
-        "open file is permitted there. rename_reference has no other callers in the codebase. "
-        "strict=True so this starts failing loudly (XPASS) if a future change fixes it, as a "
-        "reminder to drop the xfail."
-    ),
-    strict=True,
-)
 def test_rename_reference_moves_data_to_the_new_name(store):
     waveform = _Waveform()
     store.save_reference(waveform, "old-name")

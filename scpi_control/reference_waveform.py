@@ -1,5 +1,6 @@
 """Reference waveform storage and management for comparison."""
 
+import json
 import logging
 import os
 from datetime import datetime
@@ -9,6 +10,46 @@ from typing import Any, Dict, List, Optional
 import numpy as np
 
 logger = logging.getLogger(__name__)
+
+REFERENCE_META_KEY = "meta_json"
+
+
+class LegacyReferenceFormatError(ValueError):
+    """A reference file still stores metadata as a pickled object array."""
+
+    def __init__(self, filepath) -> None:
+        super().__init__("{0} uses the pre-5.0 pickled reference format. Run 'scpi-web references migrate' to convert it.".format(filepath))
+        self.filepath = filepath
+
+
+class CorruptReferenceError(ValueError):
+    """A reference file's metadata block is present but unreadable."""
+
+    def __init__(self, filepath, detail) -> None:
+        super().__init__("{0} has an unreadable metadata block: {1}".format(filepath, detail))
+        self.filepath = filepath
+
+
+def _read_metadata(data, filepath) -> Dict[str, Any]:
+    """Extract the metadata dict from an open NpzFile, new format only.
+
+    Raises LegacyReferenceFormatError for pre-5.0 pickled files and
+    CorruptReferenceError for a present-but-unparseable/wrong-shaped block.
+    """
+    if REFERENCE_META_KEY in data.files:
+        try:
+            parsed = json.loads(str(data[REFERENCE_META_KEY]))
+        except ValueError as exc:
+            raise CorruptReferenceError(filepath, exc)
+        # A truncated or hand-edited file can hold valid JSON of the wrong shape;
+        # callers index this like a mapping, so reject anything else loudly here
+        # rather than letting an AttributeError surface three frames away.
+        if not isinstance(parsed, dict):
+            raise CorruptReferenceError(filepath, "expected a JSON object, got {0}".format(type(parsed).__name__))
+        return parsed
+    if "metadata" in data.files:
+        raise LegacyReferenceFormatError(filepath)
+    return {}
 
 
 class ReferenceWaveform:
@@ -85,8 +126,9 @@ class ReferenceWaveform:
         metadata["time_span"] = float(waveform.time[-1] - waveform.time[0]) if len(waveform.time) > 1 else 0.0
 
         try:
-            # Save as NPZ with compression
-            np.savez_compressed(filepath, time=waveform.time, voltage=waveform.voltage, metadata=metadata)
+            # Save as NPZ with compression; metadata is stored as a JSON string so
+            # loads never need allow_pickle=True.
+            np.savez_compressed(filepath, time=waveform.time, voltage=waveform.voltage, **{REFERENCE_META_KEY: json.dumps(metadata)})
 
             logger.info(f"Reference waveform saved: {filepath}")
             return str(filepath)
@@ -113,18 +155,21 @@ class ReferenceWaveform:
 
         try:
             # Load NPZ file
-            data = np.load(filepath, allow_pickle=True)
-
-            result = {
-                "time": data["time"],
-                "voltage": data["voltage"],
-                "metadata": data["metadata"].item() if "metadata" in data else {},
-                "filepath": str(filepath),
-            }
+            with np.load(filepath, allow_pickle=False) as data:
+                result = {
+                    "time": data["time"],
+                    "voltage": data["voltage"],
+                    "metadata": _read_metadata(data, filepath),
+                    "filepath": str(filepath),
+                }
 
             logger.info(f"Reference waveform loaded: {filepath}")
             return result
 
+        except (LegacyReferenceFormatError, CorruptReferenceError):
+            # Loud, actionable failures -- let the caller see them rather than
+            # silently reporting "not found".
+            raise
         except Exception as e:
             logger.error(f"Failed to load reference waveform: {e}")
             return None
@@ -142,22 +187,26 @@ class ReferenceWaveform:
             for filepath in self.storage_dir.glob("*.npz"):
                 try:
                     # Load metadata without loading full data
-                    data = np.load(filepath, allow_pickle=True)
-                    metadata = data["metadata"].item() if "metadata" in data else {}
+                    with np.load(filepath, allow_pickle=False) as data:
+                        try:
+                            metadata = _read_metadata(data, filepath)
+                        except LegacyReferenceFormatError:
+                            logger.warning("skipping %s: pre-5.0 format, run 'scpi-web references migrate'", filepath)
+                            continue
 
-                    ref_info = {
-                        "filename": filepath.name,
-                        "filepath": str(filepath),
-                        "name": metadata.get("name", filepath.stem),
-                        "timestamp": metadata.get("timestamp", ""),
-                        "channel": metadata.get("channel", "Unknown"),
-                        "num_samples": metadata.get("num_samples", 0),
-                        "time_span": metadata.get("time_span", 0.0),
-                        "min_voltage": metadata.get("min_voltage", 0.0),
-                        "max_voltage": metadata.get("max_voltage", 0.0),
-                        "file_size": filepath.stat().st_size,
-                        "modified_time": datetime.fromtimestamp(filepath.stat().st_mtime).isoformat(),
-                    }
+                        ref_info = {
+                            "filename": filepath.name,
+                            "filepath": str(filepath),
+                            "name": metadata.get("name", filepath.stem),
+                            "timestamp": metadata.get("timestamp", ""),
+                            "channel": metadata.get("channel", "Unknown"),
+                            "num_samples": metadata.get("num_samples", 0),
+                            "time_span": metadata.get("time_span", 0.0),
+                            "min_voltage": metadata.get("min_voltage", 0.0),
+                            "max_voltage": metadata.get("max_voltage", 0.0),
+                            "file_size": filepath.stat().st_size,
+                            "modified_time": datetime.fromtimestamp(filepath.stat().st_mtime).isoformat(),
+                        }
 
                     references.append(ref_info)
 
@@ -215,11 +264,13 @@ class ReferenceWaveform:
             return False
 
         try:
-            # Load and update metadata
-            data = np.load(old_filepath, allow_pickle=True)
-            time = data["time"]
-            voltage = data["voltage"]
-            metadata = data["metadata"].item() if "metadata" in data else {}
+            # Load and update metadata. Use a context manager so the NpzFile handle
+            # is closed before we unlink old_filepath below (Windows refuses to
+            # unlink a file that still has an open handle).
+            with np.load(old_filepath, allow_pickle=False) as data:
+                time = data["time"]
+                voltage = data["voltage"]
+                metadata = _read_metadata(data, old_filepath)
 
             # Update name in metadata
             metadata["name"] = new_name
@@ -231,7 +282,7 @@ class ReferenceWaveform:
             new_filepath = self.storage_dir / new_filename
 
             # Save with new name
-            np.savez_compressed(new_filepath, time=time, voltage=voltage, metadata=metadata)
+            np.savez_compressed(new_filepath, time=time, voltage=voltage, **{REFERENCE_META_KEY: json.dumps(metadata)})
 
             # Delete old file
             old_filepath.unlink()
@@ -359,11 +410,16 @@ class ReferenceWaveform:
         # Search for files containing the name
         for filepath in self.storage_dir.glob("*.npz"):
             try:
-                data = np.load(filepath, allow_pickle=True)
-                metadata = data["metadata"].item() if "metadata" in data else {}
+                with np.load(filepath, allow_pickle=False) as data:
+                    metadata = _read_metadata(data, filepath)
                 if metadata.get("name", "") == name:
                     return filepath
-            except:
+            except (LegacyReferenceFormatError, CorruptReferenceError):
+                # Can't safely read this file's embedded name without unpickling
+                # it, so let callers (e.g. load_reference) see the real problem
+                # instead of silently reporting "not found".
+                raise
+            except Exception:
                 continue
 
         return None
