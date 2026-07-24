@@ -2,7 +2,7 @@
 
 import json
 import logging
-import os
+import zipfile
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -404,7 +404,10 @@ class ReferenceWaveform:
         return safe_name if safe_name else "reference"
 
     def _find_reference_file(self, name: str) -> Optional[Path]:
-        """Find reference file by name.
+        """Resolve ``name`` to a file inside storage_dir, or None.
+
+        Absolute paths and traversal are rejected outright: this used to accept
+        any path on disk, which combined with pickled loads was an RCE vector.
 
         Args:
             name: Reference name or filename
@@ -412,45 +415,38 @@ class ReferenceWaveform:
         Returns:
             Path to reference file or None if not found
         """
-        # If name is already a full path, use it
-        if os.path.isabs(name):
-            filepath = Path(name)
-            if filepath.exists():
-                return filepath
+        safe = self._sanitize_name(name)
+        if not safe:
             return None
 
-        # Try as filename directly
-        filepath = self.storage_dir / name
-        if filepath.exists():
-            return filepath
-
-        # Try with .npz extension
-        if not name.endswith(".npz"):
-            filepath = self.storage_dir / f"{name}.npz"
-            if filepath.exists():
-                return filepath
+        root = self.storage_dir.resolve()
+        for candidate_name in (safe, "{0}.npz".format(safe)):
+            candidate = (self.storage_dir / candidate_name).resolve()
+            if candidate.is_file() and candidate.is_relative_to(root):
+                return candidate
 
         # Search for files containing the name. A file we can't safely read
         # (legacy pickle or corrupt metadata) must not block a match that's
         # elsewhere in the directory -- keep scanning and only raise the first
         # such error if nothing in the whole directory actually matches.
         deferred_error = None
-        for filepath in self.storage_dir.glob("*.npz"):
+        for filepath in sorted(self.storage_dir.glob("*.npz")):
             try:
                 with np.load(filepath, allow_pickle=False) as data:
                     metadata = _read_metadata(data, filepath)
-                if metadata.get("name", "") == name:
-                    return filepath
-            except (LegacyReferenceFormatError, CorruptReferenceError) as exc:
-                # Can't safely read this file's embedded name without unpickling
-                # it, so remember the problem instead of raising immediately --
-                # a later file in the scan may still be the valid match the
-                # caller asked for.
-                if deferred_error is None:
+            except (OSError, ValueError, zipfile.BadZipFile, LegacyReferenceFormatError, CorruptReferenceError) as exc:
+                # Unreadable, corrupt, or pre-5.0 file: can't safely read this
+                # file's embedded name without unpickling it, so remember the
+                # problem instead of raising immediately -- a later file in the
+                # scan may still be the valid match the caller asked for. Named
+                # explicitly -- the bare `except:` this replaces is part of what
+                # the audit flagged here, and a blanket catch would hide real bugs.
+                if isinstance(exc, (LegacyReferenceFormatError, CorruptReferenceError)) and deferred_error is None:
                     deferred_error = exc
                 continue
-            except Exception:
-                continue
+
+            if metadata.get("name", "") == name:
+                return filepath
 
         if deferred_error is not None:
             raise deferred_error
