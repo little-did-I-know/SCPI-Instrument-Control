@@ -80,7 +80,7 @@ All paths under `/api/sessions/{id}/scope/`.
 | `POST` | `references` | `{name, channel}` — snapshots the channel's current waveform | **201** — the full updated reference list (same shape as `GET references`, replace-on-save if `name` already existed) | 400 empty name or out-of-range channel; 409 if the session is in an error/closed state |
 | `DELETE` | `references/{name}` | — | **204** No Content | 404 unknown reference name |
 | `GET` | `reference` | — | The active overlay: `{name, channel, t0, dt, points}` (`name`/`channel` are `null` when no reference is active) | — |
-| `PUT` | `reference` | `{name}` or `{name: null}` to clear | The active overlay (as above) | 404 unknown reference name |
+| `PUT` | `reference` | `{name}` or `{name: null}` to clear | The active overlay (as above) | 404 unknown reference name (**400** if the store holds un-migrated pre-5.0 files — run `scpi-web references migrate`) |
 
 Setting the active reference (via `PUT`) broadcasts a `reference` message, and every poll tick afterward broadcasts a `reference_stats` message with live correlation/deviation.
 

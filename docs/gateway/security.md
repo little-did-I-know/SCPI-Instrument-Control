@@ -68,9 +68,13 @@ revoked 'default'
   cannot be recovered. The *name* is the identity — it is what appears as a
   session's owner and in any attribution.
 - **`token list`** shows names only, never secrets.
-- **`token revoke <name>`** removes a token. Revocation takes effect
-  **immediately** — the next request carrying that token is rejected, even
-  mid-session. Use it when a token is shared too widely or a laptop walks off.
+- **`token revoke <name>`** removes a token from `tokens.json`. Use it when a
+  token is shared too widely or a laptop walks off.
+
+  > **A running gateway loads its tokens once, at startup.** `token revoke` (and
+  > `token add`) edit the file from a separate process, so **restart `scpi-web`
+  > for a revocation to take effect.** Until it restarts, a revoked token keeps
+  > working. If you have revoked a token because it leaked, restart the gateway.
 
 Every token is equal: there are no roles or scopes. Anyone with a valid token can
 create sessions and read any session; ownership (below) governs who may *write*.
@@ -279,7 +283,7 @@ directory, when you run the command explicitly.
 |---|---|
 | `scpi-web token add <name>` | Mint a token (printed once) |
 | `scpi-web token list` | List token names |
-| `scpi-web token revoke <name>` | Revoke a token immediately |
+| `scpi-web token revoke <name>` | Revoke a token (restart the gateway to apply) |
 | `scpi-web references migrate` | Convert pre-5.0 reference files |
 
 | Status | Meaning |
