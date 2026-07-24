@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import { ApiError, api } from "../../api/client";
+import { downloadAuthenticated } from "../../api/download";
 import { getTrend, seedTrend, subscribeTrend } from "./trend";
 import { Button } from "../../ds/Button";
 import { GroupBox } from "../../ds/GroupBox";
 import { useSession } from "../../store/session";
 
-const linkStyle = { fontSize: "var(--text-sm)", fontFamily: "var(--font-ui)", padding: "6px 12px", borderRadius: "var(--lc-radius-sm)", border: "1px solid var(--lc-border-strong)", color: "var(--lc-text)", textDecoration: "none", alignSelf: "flex-start" } as const;
+const linkStyle = { fontSize: "var(--text-sm)", fontFamily: "var(--font-ui)", padding: "6px 12px", borderRadius: "var(--lc-radius-sm)", border: "1px solid var(--lc-border-strong)", color: "var(--lc-text)", background: "transparent", cursor: "pointer", alignSelf: "flex-start" } as const;
 const mutedStyle = { color: "var(--lc-muted)", fontSize: "var(--text-sm)" } as const;
 
 export function LogPanel() {
@@ -61,6 +62,16 @@ export function LogPanel() {
 
   const startedText = logStatus?.started_at != null ? new Date(logStatus.started_at * 1000).toLocaleTimeString() : null;
 
+  async function downloadCsv() {
+    if (!session) return;
+    setError(null);
+    try {
+      await downloadAuthenticated(api.logCsvUrl(session.id), "trend.csv");
+    } catch (err) {
+      setError(err instanceof ApiError ? err.detail : String(err));
+    }
+  }
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
       <GroupBox title="Recording">
@@ -74,9 +85,9 @@ export function LogPanel() {
       </GroupBox>
       <GroupBox title="Export">
         {session && hasLog ? (
-          <a href={api.logCsvUrl(session.id)} download style={linkStyle}>
+          <button type="button" onClick={downloadCsv} style={linkStyle}>
             Download CSV
-          </a>
+          </button>
         ) : (
           <span style={{ ...linkStyle, color: "var(--lc-muted)", opacity: 0.6 }}>Download CSV</span>
         )}

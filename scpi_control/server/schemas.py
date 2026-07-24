@@ -29,6 +29,7 @@ class SessionOut(BaseModel):
     dialect: str
     num_channels: int
     viewers: int = 0
+    owner: str = ""
 
 
 class ChannelPatch(BaseModel):
@@ -90,6 +91,10 @@ class ReferencePut(BaseModel):
     name: Optional[str] = None
 
 
+class OwnerPut(BaseModel):
+    name: str
+
+
 class ModelOut(BaseModel):
     model_name: str
     series: str
@@ -110,4 +115,5 @@ def session_out(session) -> Dict[str, Any]:
         dialect=session.dialect,
         num_channels=session.num_channels,
         viewers=session.viewers,
+        owner=session.owner,
     ).model_dump()

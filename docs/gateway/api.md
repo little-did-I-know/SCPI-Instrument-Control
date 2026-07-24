@@ -6,6 +6,11 @@ are relative to the server root (default `http://127.0.0.1:8765`); every
 UI itself calls — everything documented here is exercised by the shipping
 frontend.
 
+Every route below requires `Authorization: Bearer <token>` **except**
+`GET /api/health`. See the [Gateway security guide](security.md) for how to
+mint a token, how ownership gates writes, and the WebSocket authentication
+handshake.
+
 ## Sessions & discovery
 
 | Method | Path | Body / params | Response | Errors |
@@ -75,7 +80,7 @@ All paths under `/api/sessions/{id}/scope/`.
 | `POST` | `references` | `{name, channel}` — snapshots the channel's current waveform | **201** — the full updated reference list (same shape as `GET references`, replace-on-save if `name` already existed) | 400 empty name or out-of-range channel; 409 if the session is in an error/closed state |
 | `DELETE` | `references/{name}` | — | **204** No Content | 404 unknown reference name |
 | `GET` | `reference` | — | The active overlay: `{name, channel, t0, dt, points}` (`name`/`channel` are `null` when no reference is active) | — |
-| `PUT` | `reference` | `{name}` or `{name: null}` to clear | The active overlay (as above) | 404 unknown reference name |
+| `PUT` | `reference` | `{name}` or `{name: null}` to clear | The active overlay (as above) | 404 unknown reference name (**400** if the store holds un-migrated pre-5.0 files — run `scpi-web references migrate`) |
 
 Setting the active reference (via `PUT`) broadcasts a `reference` message, and every poll tick afterward broadcasts a `reference_stats` message with live correlation/deviation.
 
@@ -126,11 +131,14 @@ Every error response is JSON: `{"error": "<ExceptionClassName>", "detail": "<mes
 
 ## Curl quickstart
 
-Create a mock session, configure a channel, and fetch its waveform as JSON — no hardware required (start the gateway first: `scpi-web`):
+Create a mock session, configure a channel, and fetch its waveform as JSON — no hardware required. Start the gateway first (`scpi-web` prints a token on first run; mint another with `scpi-web token add <name>`) and export it:
 
 ```bash
+export TOKEN=scpi_...   # from the gateway's startup output
+
 # 1. Create a mock scope session
 curl -s -X POST http://127.0.0.1:8765/api/sessions \
+  -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"mock": true, "label": "curl demo"}'
 # -> 201 {"id": "a1b2c3d4", "label": "curl demo", "mock": true, "address": null,
@@ -141,12 +149,15 @@ SESSION_ID=a1b2c3d4   # substitute the "id" from the response above
 
 # 2. Enable channel 1 and set its vertical scale
 curl -s -X PATCH "http://127.0.0.1:8765/api/sessions/$SESSION_ID/scope/channels/1" \
+  -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"enabled": true, "voltage_scale": 0.5}'
 
 # 3. Fetch channel 1's waveform as JSON, decimated to 200 points
-curl -s "http://127.0.0.1:8765/api/sessions/$SESSION_ID/scope/waveform?channels=1&max_points=200"
+curl -s -H "Authorization: Bearer $TOKEN" \
+  "http://127.0.0.1:8765/api/sessions/$SESSION_ID/scope/waveform?channels=1&max_points=200"
 
 # 4. Clean up
-curl -s -X DELETE "http://127.0.0.1:8765/api/sessions/$SESSION_ID"
+curl -s -X DELETE -H "Authorization: Bearer $TOKEN" \
+  "http://127.0.0.1:8765/api/sessions/$SESSION_ID"
 ```

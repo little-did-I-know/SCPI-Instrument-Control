@@ -1452,15 +1452,17 @@ class MainWindow(QMainWindow):
                 QMessageBox.critical(self, "Error", f"Failed to save reference:\n{str(e)}")
                 logger.error(f"Failed to save reference: {e}")
 
-    def _on_load_reference(self, filepath: str):
+    def _on_load_reference(self, name: str):
         """Handle load reference request.
 
         Args:
-            filepath: Path to reference file
+            name: Short reference name, as stored by ReferencePanel's list
+                items (not the absolute filepath -- load_reference() only
+                resolves names confined to the storage directory).
         """
         try:
             # Load reference
-            reference_data = self.reference_manager.load_reference(filepath)
+            reference_data = self.reference_manager.load_reference(name)
 
             if reference_data:
                 # Set reference in waveform display
@@ -1481,7 +1483,7 @@ class MainWindow(QMainWindow):
                     self.reference_panel.update_comparison_stats(correlation, rms_diff)
 
                 self.statusBar().showMessage("Reference loaded")
-                logger.info(f"Reference loaded: {filepath}")
+                logger.info(f"Reference loaded: {name}")
             else:
                 QMessageBox.warning(self, "Error", "Failed to load reference")
 
@@ -1489,27 +1491,30 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(self, "Error", f"Failed to load reference:\n{str(e)}")
             logger.error(f"Failed to load reference: {e}")
 
-    def _on_delete_reference(self, filepath: str):
+    def _on_delete_reference(self, name: str):
         """Handle delete reference request.
 
         Args:
-            filepath: Path to reference file
+            name: Short reference name, as stored by ReferencePanel's list
+                items (not the absolute filepath -- delete_reference() only
+                resolves names confined to the storage directory).
         """
         try:
             # Delete reference
-            success = self.reference_manager.delete_reference(filepath)
+            success = self.reference_manager.delete_reference(name)
 
             if success:
                 QMessageBox.information(self, "Deleted", "Reference deleted successfully")
-                logger.info(f"Reference deleted: {filepath}")
+                logger.info(f"Reference deleted: {name}")
 
                 # Refresh list
                 self._refresh_reference_list()
 
                 # Clear if this was the loaded reference
-                if self.waveform_display.get_reference_data():
-                    ref_path = self.waveform_display.get_reference_data().get("filepath")
-                    if ref_path == filepath:
+                loaded_data = self.waveform_display.get_reference_data()
+                if loaded_data:
+                    loaded_name = loaded_data.get("metadata", {}).get("name")
+                    if loaded_name == name:
                         self.waveform_display.clear_reference()
                         self.reference_panel._on_unload_reference()
             else:

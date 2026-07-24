@@ -1,4 +1,5 @@
 import type { ChannelPatch, DiscoveredDevice, FilterConfig, LogData, LogInfo, MeasurementValue, ModelInfo, ReferenceInfo, ReferenceOverlay, RunOp, ScopeState, SessionCreate, SessionInfo, SpectrumConfig, TriggerPatch } from "./types";
+import { getToken } from "./token";
 
 export class ApiError extends Error {
   status: number;
@@ -15,7 +16,10 @@ export class ApiError extends Error {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(path, init);
+  const token = getToken();
+  const headers = new Headers(init?.headers);
+  if (token) headers.set("Authorization", `Bearer ${token}`);
+  const response = await fetch(path, { ...init, headers });
   if (!response.ok) {
     let error = "Error";
     let detail = "request failed";
@@ -39,12 +43,14 @@ function json(method: string, body: unknown): RequestInit {
 const scope = (id: string) => `/api/sessions/${id}/scope`;
 
 export const api = {
+  whoami: () => request<{ identity: string }>("/api/whoami"),
   models: () => request<ModelInfo[]>("/api/models"),
   discover: (cidr?: string) => request<DiscoveredDevice[]>(cidr ? `/api/discover?cidr=${encodeURIComponent(cidr)}` : "/api/discover"),
   createSession: (body: SessionCreate) => request<SessionInfo>("/api/sessions", json("POST", body)),
   listSessions: () => request<SessionInfo[]>("/api/sessions"),
   getSession: (id: string) => request<SessionInfo>(`/api/sessions/${id}`),
   deleteSession: (id: string) => request<void>(`/api/sessions/${id}`, { method: "DELETE" }),
+  claimSession: (id: string) => request<SessionInfo>(`/api/sessions/${id}/claim`, { method: "POST" }),
   getState: (id: string) => request<ScopeState>(`${scope(id)}/state`),
   patchChannel: (id: string, channel: number, body: ChannelPatch) => request<ScopeState>(`${scope(id)}/channels/${channel}`, json("PATCH", body)),
   patchTimebase: (id: string, timebase: number) => request<ScopeState>(`${scope(id)}/timebase`, json("PATCH", { timebase })),

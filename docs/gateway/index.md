@@ -6,6 +6,11 @@ oscilloscope UI — no client install, no drivers, just a URL. V1 is
 scope-only, and the server supports named multi-sessions, so several
 instruments (or several views of the same instrument) can be open at once.
 
+> **Security first:** every request needs a bearer token. Read the
+> **[Gateway security guide](security.md)** for tokens, session ownership, the
+> SSRF gate, and deployment guidance before exposing the gateway beyond
+> `127.0.0.1`.
+
 ## Install and run
 
 ```bash
@@ -20,20 +25,24 @@ scpi-web
 python -m scpi_control.server
 ```
 
-By default the gateway listens on `http://127.0.0.1:8765`.
+By default the gateway listens on `http://127.0.0.1:8765`. On first run it
+mints an access token and prints a ready-to-open URL
+(`http://127.0.0.1:8765/?token=…`) — open that to reach the browser UI.
 
 ## Security posture
 
-The server binds to `127.0.0.1` by default, so it is not reachable from the
-network until you opt in. Exposing it to the LAN is an explicit choice:
+Every `/api/*` route (other than `GET /api/health`) requires a valid bearer
+token — there is no unauthenticated path. The server also binds to
+`127.0.0.1` by default, so it is not reachable from the network until you opt
+in. Exposing it to the LAN is an explicit choice:
 
 ```bash
 scpi-web --host 0.0.0.0
 ```
 
-There is **no authentication** in this release. Anyone who can reach the
-gateway's port can control the connected instruments. Only bind to `0.0.0.0`
-on networks you trust.
+See the **[Gateway security guide](security.md)** for the full model: tokens,
+session ownership, the SSRF gate that validates outbound connection targets,
+the session cap, and deployment guidance (TLS, reverse proxies).
 
 ## Mock-first
 
@@ -64,6 +73,8 @@ ever plugging in an instrument.
 
 ## Where to next
 
+- [Gateway security](security.md) — tokens, session ownership, the SSRF gate,
+  and deployment guidance
 - [Browser UI Tour](browser-ui.md) — a walkthrough of the home screen, canvas
   modes, and rail tabs
 - [REST & WebSocket API](api.md) — the complete wire reference, with a curl

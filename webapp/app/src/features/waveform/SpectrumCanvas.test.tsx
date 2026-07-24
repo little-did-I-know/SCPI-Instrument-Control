@@ -11,7 +11,7 @@ const FRAME = { channel: 1, f0: 0, df: 10, points: [-60, -20, -60, -80], db: tru
 beforeEach(() => {
   clearSpectrum();
   useSession.getState().clearSession();
-  useSession.getState().setSession({ id: "abc", label: "x", mock: true, address: null, state: "connected", idn: "", model: "", dialect: "legacy", num_channels: 4, viewers: 0 });
+  useSession.getState().setSession({ id: "abc", label: "x", mock: true, address: null, state: "connected", idn: "", model: "", dialect: "legacy", num_channels: 4, viewers: 0, owner: "" });
 });
 afterEach(() => vi.restoreAllMocks());
 

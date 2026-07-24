@@ -1,4 +1,6 @@
-import { api } from "../../api/client";
+import { useState } from "react";
+import { ApiError, api } from "../../api/client";
+import { downloadAuthenticated } from "../../api/download";
 import type { ChannelState } from "../../api/types";
 import { useSession } from "../../store/session";
 
@@ -13,15 +15,30 @@ export function ExportButton() {
     .filter(([, channel]) => channel.enabled)
     .map(([key]) => Number(key))
     .sort((a, b) => a - b);
+  const [error, setError] = useState<string | null>(null);
 
-  const style = { fontSize: "var(--text-sm)", fontFamily: "var(--font-ui)", padding: "6px 12px", borderRadius: "var(--lc-radius-sm)", border: "1px solid var(--lc-border-strong)", color: "var(--lc-text)", textDecoration: "none" } as const;
+  const style = { fontSize: "var(--text-sm)", fontFamily: "var(--font-ui)", padding: "6px 12px", borderRadius: "var(--lc-radius-sm)", border: "1px solid var(--lc-border-strong)", color: "var(--lc-text)", background: "transparent", cursor: "pointer" } as const;
 
   if (!session || enabled.length === 0) {
     return <span style={{ ...style, color: "var(--lc-muted)", opacity: 0.6 }}>Export CSV</span>;
   }
+
+  async function handleClick() {
+    if (!session) return;
+    setError(null);
+    try {
+      await downloadAuthenticated(api.captureUrl(session.id, enabled), `capture_${session.id}_C${enabled.join("-")}.csv`);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.detail : String(err));
+    }
+  }
+
   return (
-    <a href={api.captureUrl(session.id, enabled)} download style={style}>
-      Export CSV
-    </a>
+    <>
+      <button type="button" onClick={handleClick} style={style}>
+        Export CSV
+      </button>
+      {error && <div role="alert" style={{ color: "var(--danger)", fontSize: "var(--text-sm)" }}>{error}</div>}
+    </>
   );
 }

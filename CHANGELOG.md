@@ -7,6 +7,60 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### ⚠️ Breaking Changes
+
+- Web gateway: every `/api/*` request now requires a bearer token, and the live-stream
+  WebSocket requires one too. On first run `scpi-web` mints a token and prints a
+  `http://127.0.0.1:8765/?token=…` URL; mint more with `scpi-web token add <name>`.
+  **Migration:** scripted HTTP clients must send `Authorization: Bearer <token>`; WebSocket
+  clients must offer the `scpi-token.<token>` subprotocol (alongside a plain `scpi`). A
+  query-parameter token is accepted only on the initial web-UI page load and is rejected on
+  `/api/*`. `GET /api/health` stays unauthenticated. See the
+  [gateway security guide](docs/gateway/security.md).
+- Web gateway: the interactive API docs at `/docs` and `/redoc` are removed and the OpenAPI
+  schema moved to `/api/openapi.json` (token required) — the old locations served the whole
+  control surface unauthenticated.
+- Reference waveforms: stored metadata moved from a pickled dict to a JSON string so reference
+  files load without `allow_pickle`. Files saved by 4.x raise an error naming the file until
+  converted. **Migration:** run `scpi-web references migrate` once.
+
+### Added
+
+- Web gateway: named bearer tokens — `scpi-web token add|list|revoke <name>`, stored hashed in
+  `~/.siglent/tokens.json` (relocate with `--config-dir`).
+- Web gateway: session ownership. The identity that creates an instrument session may write to
+  it; anyone authenticated may read, stream, and export. Non-owner writes return `409`.
+  `POST /api/sessions/{id}/claim` takes over a session whose owner has been idle past
+  `--abandon-after` (default 300 s) and is not actively watching the stream;
+  `POST /api/sessions/{id}/owner` hands it over by name (or releases it with `""`). The web UI
+  shows a read-only badge and a claim button to non-owners.
+- Web gateway: `--allow-port` to permit instrument ports beyond 5025, `--max-sessions`
+  (default 8) to bound concurrent sessions, and an unauthenticated `GET /api/health` endpoint.
+- Web gateway: `scpi-web references migrate` converts pre-5.0 reference files to the new format
+  (atomic and idempotent; `--dir` to point at a non-default store).
+
+### Fixed
+
+- Security: loading a waveform or reference archive no longer unpickles it, so a crafted `.npz`
+  can no longer execute code via `scpi-extract`, the report generator's loader, or the gateway.
+  The one remaining place that reads the old pickled format is `scpi-web references migrate`,
+  which the user runs explicitly on their own files.
+- Security: reference lookup no longer honours absolute paths or `..` traversal, and listing
+  references no longer deserializes every file in the storage directory.
+- Security: session creation validates the target before connecting — hostnames are resolved
+  and every resolved address checked, loopback/link-local/cloud-metadata addresses are refused,
+  ports must be allowlisted, and a failed connect returns a generic message rather than
+  reflecting the peer's bytes (no SSRF port-scanning or banner-grabbing).
+- Web gateway: full-resolution CSV/JSON serialization of deep-memory captures runs off the
+  event loop, so one large export no longer freezes the gateway for other users; the session
+  cap holds correctly under concurrent requests.
+- Reference storage: `rename_reference` no longer leaks the source file handle (a Windows-only
+  `WinError 32` that made it fail); reference lookups now confine themselves to the storage
+  directory.
+- Web UI: file downloads (capture CSV, screenshot, waveform JSON, trend CSV) fetch with the
+  bearer token instead of bare `<a href>` links, which could not carry an `Authorization`
+  header and would have returned `401` against the authenticated gateway.
+
 ## [4.1.1] - 2026-07-24
 
 ### Fixed

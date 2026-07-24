@@ -22,7 +22,10 @@ First, install the library:
     scpi-web
     `
 
-    Then open <http://127.0.0.1:8765> in your browser.
+    On first run this prints a ready-to-open URL with an access token
+    (`http://127.0.0.1:8765/?token=…`) — open that in your browser. Every
+    request needs a token; see the
+    [Gateway security guide](../gateway/security.md) for details.
 
 === "Everything"
 `bash

@@ -3,7 +3,13 @@
 Start the gateway first (in another terminal):
 
     pip install "SCPI-Instrument-Control[web]"
-    scpi-web
+    scpi-web            # prints a URL with a token on first run
+
+Every gateway request needs a bearer token. Mint one and export it before
+running this script:
+
+    scpi-web token add rest-demo     # prints the token once
+    export SCPI_WEB_TOKEN=scpi_...   # the token it printed
 
 Then run this script. It creates a hardware-free mock session, configures a
 channel, fetches full-resolution waveform data as JSON, and downloads a
@@ -15,10 +21,17 @@ Requirements:
 """
 
 import json
+import os
+import sys
+import urllib.error
 import urllib.request
 from typing import Optional, Union
 
 BASE = "http://127.0.0.1:8765/api"
+
+# The gateway authenticates every /api/* request with a bearer token. Read it
+# from the environment rather than hard-coding a credential in the script.
+TOKEN = os.environ.get("SCPI_WEB_TOKEN")
 
 Body = Optional[Union[dict, list]]  # examples run on the package floor, Python 3.9
 
@@ -26,6 +39,8 @@ Body = Optional[Union[dict, list]]  # examples run on the package floor, Python 
 def call(method: str, path: str, body: Body = None) -> bytes:
     data = None if body is None else json.dumps(body).encode()
     request = urllib.request.Request(BASE + path, data=data, method=method)
+    if TOKEN:
+        request.add_header("Authorization", "Bearer {0}".format(TOKEN))
     if data is not None:
         request.add_header("Content-Type", "application/json")
     with urllib.request.urlopen(request) as response:
@@ -37,6 +52,9 @@ def call_json(method: str, path: str, body: Body = None):
 
 
 def main() -> None:
+    if not TOKEN:
+        sys.exit("Set SCPI_WEB_TOKEN first — run 'scpi-web token add rest-demo' and export the token it prints.")
+
     # 1. Create a mock oscilloscope session (no hardware required)
     session = call_json("POST", "/sessions", {"mock": True, "label": "REST demo"})
     session_id = session["id"]

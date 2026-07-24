@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { LogPanel } from "./LogPanel";
 import { clearTrend } from "./trend";
 import { ApiError, api } from "../../api/client";
+import { setToken } from "../../api/token";
 import type { LogInfo } from "../../api/types";
 import { useSession } from "../../store/session";
 
@@ -12,12 +13,16 @@ const RECORDING: LogInfo = { state: "recording", started_at: 100, row_count: 0, 
 
 beforeEach(() => {
   clearTrend();
+  localStorage.clear();
   useSession.getState().clearSession();
-  useSession.getState().setSession({ id: "abc", label: "x", mock: true, address: null, state: "connected", idn: "", model: "", dialect: "legacy", num_channels: 4, viewers: 0 });
+  useSession.getState().setSession({ id: "abc", label: "x", mock: true, address: null, state: "connected", idn: "", model: "", dialect: "legacy", num_channels: 4, viewers: 0, owner: "" });
   vi.spyOn(api, "getLog").mockResolvedValue(IDLE);
   vi.spyOn(api, "getLogData").mockResolvedValue({ columns: [], rows: [] });
 });
-afterEach(() => vi.restoreAllMocks());
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+});
 
 describe("LogPanel", () => {
   it("seeds status from the server on mount", async () => {
@@ -41,11 +46,34 @@ describe("LogPanel", () => {
     expect(stop).toHaveBeenCalledWith("abc");
   });
 
-  it("links the CSV export once a recording exists, disabled before", async () => {
+  it("enables the CSV download once a recording exists, disabled before", async () => {
     render(<LogPanel />);
-    expect(screen.getByText("Download CSV").closest("a")).toBeNull(); // no recording yet: not a link
+    expect(screen.getByText("Download CSV").closest("button")).toBeNull(); // no recording yet: not a button
     act(() => useSession.getState().applyLogStatus(RECORDING));
-    await waitFor(() => expect(screen.getByRole("link", { name: "Download CSV" })).toHaveAttribute("href", "/api/sessions/abc/scope/log.csv"));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Download CSV" })).toBeInTheDocument());
+  });
+
+  it("downloads the trend CSV with the bearer token", async () => {
+    setToken("scpi_trend");
+    const fetchMock = vi.fn().mockResolvedValue(new Response(new Blob(["data"]), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal("URL", { ...URL, createObjectURL: vi.fn(() => "blob:x"), revokeObjectURL: vi.fn() });
+    render(<LogPanel />);
+    act(() => useSession.getState().applyLogStatus(RECORDING));
+    await userEvent.click(await screen.findByRole("button", { name: "Download CSV" }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe("/api/sessions/abc/scope/log.csv");
+    const headers = new Headers(init.headers);
+    expect(headers.get("Authorization")).toBe("Bearer scpi_trend");
+  });
+
+  it("surfaces a CSV download failure instead of silently doing nothing", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ error: "Unauthorized", detail: "missing bearer token" }), { status: 401 })));
+    render(<LogPanel />);
+    act(() => useSession.getState().applyLogStatus(RECORDING));
+    await userEvent.click(await screen.findByRole("button", { name: "Download CSV" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("missing bearer token");
   });
 
   it("surfaces a start error", async () => {

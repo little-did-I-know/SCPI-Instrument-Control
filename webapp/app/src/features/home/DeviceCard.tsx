@@ -1,5 +1,6 @@
-import type { DiscoveredDevice } from "../../api/types";
+import type { DiscoveredDevice, SessionInfo } from "../../api/types";
 import { Button } from "../../ds/Button";
+import { OwnerBadge } from "../sessions/OwnerBadge";
 import { kindMeta } from "./kinds";
 
 export type DeviceCardProps = {
@@ -8,9 +9,15 @@ export type DeviceCardProps = {
   busy?: boolean;
   onConnect: (device: DiscoveredDevice) => void;
   onOpen: (device: DiscoveredDevice) => void;
+  // Only meaningful for variant "session": the full session record (for
+  // ownership) and the viewer's own identity. Both are optional because
+  // "available" cards never carry them.
+  session?: SessionInfo;
+  identity?: string | null;
+  onClaimed?: () => void;
 };
 
-export function DeviceCard({ device, variant, busy = false, onConnect, onOpen }: DeviceCardProps) {
+export function DeviceCard({ device, variant, busy = false, onConnect, onOpen, session, identity, onClaimed }: DeviceCardProps) {
   const meta = kindMeta(device.kind);
   const viewers = device.viewers ?? 0;
 
@@ -47,6 +54,9 @@ export function DeviceCard({ device, variant, busy = false, onConnect, onOpen }:
         {device.address ? ` · ${device.address}` : ""}
         {device.dialect ? ` · ${device.dialect}` : ""}
       </div>
+      {variant === "session" && session && identity != null && (
+        <OwnerBadge session={session} identity={identity} onClaimed={onClaimed ?? (() => {})} />
+      )}
       <div style={{ display: "flex", justifyContent: "flex-end" }}>{action}</div>
     </div>
   );

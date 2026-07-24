@@ -5,17 +5,20 @@ import { useSession } from "../store/session";
 import { getFrame, clearFrames } from "../features/waveform/frames";
 import { getSpectrum, clearSpectrum } from "../features/waveform/spectrum";
 import { clearTrend, getTrend, seedTrend } from "../features/trend/trend";
+import { setToken, clearToken } from "../api/token";
 
 class FakeWebSocket {
   static last: FakeWebSocket | null = null;
   url: string;
+  protocols: string[] | undefined;
   onmessage: ((event: { data: string }) => void) | null = null;
   onclose: ((event: { code: number }) => void) | null = null;
   onerror: (() => void) | null = null;
   closed = false;
 
-  constructor(url: string) {
+  constructor(url: string, protocols?: string | string[]) {
     this.url = url;
+    this.protocols = protocols === undefined ? undefined : ([] as string[]).concat(protocols);
     FakeWebSocket.last = this;
   }
 
@@ -34,7 +37,7 @@ class FakeWebSocket {
   }
 }
 
-const SESSION = { id: "abc", label: "x", mock: true, address: null, state: "connected", idn: "", model: "", dialect: "legacy", num_channels: 4, viewers: 0 };
+const SESSION = { id: "abc", label: "x", mock: true, address: null, state: "connected", idn: "", model: "", dialect: "legacy", num_channels: 4, viewers: 0, owner: "" };
 
 beforeEach(() => {
   vi.stubGlobal("WebSocket", FakeWebSocket as unknown as typeof WebSocket);
@@ -42,6 +45,7 @@ beforeEach(() => {
   clearFrames();
   clearSpectrum();
   clearTrend();
+  clearToken();
 });
 
 const STATE = { run_state: "STOP", timebase: 0.001, channels: { "1": { enabled: true, voltage_scale: 0.5, voltage_offset: 0, coupling: "DC", probe_ratio: 10 } }, trigger: { mode: "AUTO", source: "C1", level: 0, slope: "POS", coupling: "DC" } };
@@ -82,7 +86,7 @@ describe("useStream", () => {
   });
 
   it("treats a closed message as a clean session end", async () => {
-    useSession.getState().setSession({ id: "abc", label: "x", mock: true, address: null, state: "connected", idn: "", model: "", dialect: "legacy", num_channels: 4, viewers: 0 });
+    useSession.getState().setSession({ id: "abc", label: "x", mock: true, address: null, state: "connected", idn: "", model: "", dialect: "legacy", num_channels: 4, viewers: 0, owner: "" });
     renderHook(() => useStream("abc"));
     FakeWebSocket.last!.emit({ type: "closed" });
     await waitFor(() => expect(useSession.getState().session).toBeNull());
@@ -205,5 +209,17 @@ describe("useStream", () => {
     FakeWebSocket.last!.emit({ type: "measurements", values: [{ channel: 1, mtype: "PKPK", value: 2 }], timestamp: 101 });
     await waitFor(() => expect(useSession.getState().measurements.length).toBe(1));
     expect(getTrend().rows).toEqual([]);
+  });
+
+  it("offers the token subprotocol", () => {
+    setToken("scpi_wstoken");
+    renderHook(() => useStream("abc"));
+    expect(FakeWebSocket.last?.protocols).toEqual(["scpi-token.scpi_wstoken", "scpi"]);
+  });
+
+  it("offers no token subprotocol when unauthenticated", () => {
+    clearToken();
+    renderHook(() => useStream("abc"));
+    expect(FakeWebSocket.last?.protocols).toEqual(["scpi"]);
   });
 });

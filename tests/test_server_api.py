@@ -11,19 +11,23 @@ from scpi_control.server.sessions import SessionManager  # noqa: E402
 
 
 @pytest.fixture()
-def client():
+def client(gateway_auth):
+    store, headers, _raw = gateway_auth
     manager = SessionManager()
-    app = create_app(manager)
+    app = create_app(manager, token_store=store)
     with TestClient(app) as test_client:
+        test_client.headers.update(headers)  # every request in this module is now authenticated
         yield test_client
     manager.close_all()
 
 
 @pytest.fixture()
-def ref_client(tmp_path):
+def ref_client(tmp_path, gateway_auth):
+    store, headers, _raw = gateway_auth
     manager = SessionManager()
-    app = create_app(manager, references_dir=str(tmp_path))
+    app = create_app(manager, references_dir=str(tmp_path), token_store=store)
     with TestClient(app) as test_client:
+        test_client.headers.update(headers)
         yield test_client
     manager.close_all()
 
@@ -62,11 +66,12 @@ def test_wrong_method_405_keeps_allow_header(client):
     assert "allow" in {k.lower() for k in response.headers}
 
 
-def test_lifespan_shutdown_closes_sessions():
+def test_lifespan_shutdown_closes_sessions(gateway_auth):
     # Fix 6: leaving the app context (lifespan teardown) closes live sessions.
+    store, headers, _raw = gateway_auth
     manager = SessionManager()
-    with TestClient(create_app(manager)) as client:
-        body = client.post("/api/sessions", json={"mock": True}).json()
+    with TestClient(create_app(manager, token_store=store)) as client:
+        body = client.post("/api/sessions", json={"mock": True}, headers=headers).json()
         session = manager.get(body["id"])
         assert session.state == "connected"
     # No explicit close_all() -> the lifespan teardown must have closed it.
@@ -320,19 +325,42 @@ class TestViewers:
         assert connected and connected[0]["viewers"] == 0
 
 
-def test_cli_parses_defaults(monkeypatch):
+def test_cli_parses_defaults(tmp_path, monkeypatch):
     import scpi_control.server.__main__ as cli
+    from scpi_control.server.auth import TokenStore
 
     captured = {}
+    create_app_calls = []
+
+    def fake_create_app(**kwargs):
+        create_app_calls.append(kwargs)
+        return object()
 
     def fake_run(app, host, port, **kwargs):
         captured.update(host=host, port=port)
 
+    # --config-dir points at tmp_path so this never touches the developer's real
+    # ~/.siglent/tokens.json; create_app is stubbed so no real ASGI app is built.
+    monkeypatch.setattr(cli, "create_app", fake_create_app)
     monkeypatch.setattr(cli.uvicorn, "run", fake_run)
-    cli.main([])
+    cli.main(["--config-dir", str(tmp_path)])
     assert captured == {"host": "127.0.0.1", "port": 8765}
-    cli.main(["--host", "0.0.0.0", "--port", "9000"])
+    assert isinstance(create_app_calls[0]["token_store"], TokenStore)
+    cli.main(["--host", "0.0.0.0", "--port", "9000", "--config-dir", str(tmp_path)])
     assert captured == {"host": "0.0.0.0", "port": 9000}
+
+
+@pytest.mark.parametrize("max_sessions", ["0", "-1"])
+def test_cli_rejects_non_positive_max_sessions(tmp_path, max_sessions, capsys):
+    # LOW 5: --max-sessions 0 (or negative) must not silently start a gateway
+    # that refuses every session with a confusing 409; reject it at the CLI
+    # with a clear message and a nonzero exit, before create_app/uvicorn run.
+    import scpi_control.server.__main__ as cli
+
+    with pytest.raises(SystemExit) as exc_info:
+        cli.main(["--config-dir", str(tmp_path), "--max-sessions", max_sessions])
+    assert exc_info.value.code != 0
+    assert "--max-sessions" in capsys.readouterr().err
 
 
 class TestScreenshot:
@@ -522,10 +550,12 @@ class TestReferences:
 
 
 @pytest.fixture()
-def managed_client():
+def managed_client(gateway_auth):
+    store, headers, _raw = gateway_auth
     manager = SessionManager()
-    app = create_app(manager)
+    app = create_app(manager, token_store=store)
     with TestClient(app) as test_client:
+        test_client.headers.update(headers)
         yield test_client, manager
     manager.close_all()
 

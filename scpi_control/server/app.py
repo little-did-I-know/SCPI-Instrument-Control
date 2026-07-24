@@ -10,6 +10,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from scpi_control.exceptions import InvalidParameterError, SiglentError, SiglentTimeoutError
+from scpi_control.server.auth import AuthMiddleware, TokenStore
 from scpi_control.server.sessions import SessionError, SessionManager
 
 STATIC_DIR = Path(__file__).parent / "static"
@@ -19,8 +20,25 @@ def _error_response(status: int, exc: BaseException) -> JSONResponse:
     return JSONResponse(status_code=status, content={"error": type(exc).__name__, "detail": str(exc)})
 
 
-def create_app(manager: Optional[SessionManager] = None, references_dir: Optional[str] = None) -> FastAPI:
-    manager = manager if manager is not None else SessionManager()
+def create_app(
+    manager: Optional[SessionManager] = None,
+    references_dir: Optional[str] = None,
+    token_store: Optional[TokenStore] = None,
+    abandon_after: float = 300.0,
+    allowed_ports: Optional[frozenset] = None,
+    max_sessions: Optional[int] = None,
+) -> FastAPI:
+    # allowed_ports and max_sessions only ever seed a manager create_app builds
+    # itself: an explicitly-passed manager already carries its own policy (or
+    # the class defaults). Silently overriding it here would surprise a caller
+    # (e.g. a test) that constructed SessionManager(...) on purpose -- but
+    # silently *dropping* a policy argument when both are given is just as
+    # surprising to a caller who assumed they compose, and could leave the
+    # gateway with no port policy or session cap at all. Refuse the ambiguous
+    # combination instead of guessing.
+    if manager is not None and (allowed_ports is not None or max_sessions is not None):
+        raise ValueError("create_app() received both an explicit manager and allowed_ports/max_sessions; configure those on the manager (SessionManager(...)) instead.")
+    manager = manager if manager is not None else SessionManager(allowed_ports=allowed_ports, max_sessions=max_sessions if max_sessions is not None else 8)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
@@ -28,12 +46,23 @@ def create_app(manager: Optional[SessionManager] = None, references_dir: Optiona
         # close_all() joins worker threads, so keep it off the event loop.
         await run_in_threadpool(app.state.manager.close_all)
 
-    app = FastAPI(title="SCPI Instrument Control Gateway", lifespan=lifespan)
+    # docs_url/redoc_url off and openapi_url moved under /api/ so the schema and
+    # HTML doc UIs sit behind AuthMiddleware like the rest of the instrument
+    # surface, instead of being served to anyone who reaches the port.
+    app = FastAPI(title="SCPI Instrument Control Gateway", lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url="/api/openapi.json")
     app.state.manager = manager
+    # A malformed token store must fail loudly (TokenStore.__init__ raises
+    # ValueError) rather than be caught here and silently degrade to an empty
+    # store, which would open the gateway to anonymous access.
+    app.state.tokens = token_store if token_store is not None else TokenStore()
     # Reference store is created lazily on first use: ReferenceWaveform.__init__
     # mkdirs its storage directory, and most requests never need it.
     app.state.references_dir = references_dir
     app.state.references = None
+    # Seconds of owner inactivity before another identity may claim a session
+    # (scpi_control.server.ownership.claim); mutable at runtime so tests can
+    # drive it to 0 instead of sleeping for a real timeout.
+    app.state.abandon_after = abandon_after
 
     from scpi_control.server.api import discovery as discovery_api
     from scpi_control.server.api import scope as scope_api
@@ -44,6 +73,14 @@ def create_app(manager: Optional[SessionManager] = None, references_dir: Optiona
     app.include_router(scope_api.router, prefix="/api")
     app.include_router(stream_api.router, prefix="/api")
     app.include_router(discovery_api.router, prefix="/api")
+
+    @app.get("/api/health")
+    async def health():
+        return {"status": "ok"}
+
+    @app.get("/api/whoami")
+    async def whoami(request: Request):
+        return {"identity": getattr(request.state, "identity", None)}
 
     @app.exception_handler(InvalidParameterError)
     async def _invalid_parameter(request: Request, exc: InvalidParameterError):
@@ -87,5 +124,9 @@ def create_app(manager: Optional[SessionManager] = None, references_dir: Optiona
             if full_path and candidate.is_file() and candidate.is_relative_to(static_root):
                 return FileResponse(str(candidate))
             return FileResponse(str(index_file))
+
+    # Added last so it wraps everything above, including the SPA catch-all: pure
+    # ASGI middleware (not BaseHTTPMiddleware) so it also guards WebSocket scopes.
+    app.add_middleware(AuthMiddleware, store=app.state.tokens)
 
     return app

@@ -4,6 +4,7 @@ import contextlib
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
+from scpi_control.server.auth import WS_ACCEPT_SUBPROTOCOL
 from scpi_control.server.sessions import read_state
 
 router = APIRouter(tags=["stream"])
@@ -70,7 +71,11 @@ async def stream(websocket: WebSocket, session_id: str):
     if session is None:
         await websocket.close(code=4404)
         return
-    await websocket.accept()
+    # Echo the accept subprotocol back only when the client actually offered
+    # it: echoing an unoffered subprotocol is invalid per RFC 6455 and browsers
+    # fail the handshake either way -- offered-and-unechoed, or echoed-unoffered.
+    subprotocol = WS_ACCEPT_SUBPROTOCOL if WS_ACCEPT_SUBPROTOCOL in websocket.scope.get("subprotocols", []) else None
+    await websocket.accept(subprotocol=subprotocol)
 
     loop = asyncio.get_running_loop()
     outbox: "asyncio.Queue" = asyncio.Queue(maxsize=OUTBOX_MAXSIZE)
@@ -79,9 +84,17 @@ async def stream(websocket: WebSocket, session_id: str):
         loop.call_soon_threadsafe(_enqueue, outbox, message)
 
     unsubscribe = session.subscribe(on_message)
+    # A live stream is one long-lived connection, so require_session's
+    # per-request touch() never fires here -- an owner who is watching a
+    # capture would otherwise look idle to the claim rule. Mark the owner as
+    # watching for the lifetime of the connection instead (no-op if this
+    # identity isn't the owner); unmark unconditionally in finally so an
+    # abnormal disconnect releases it just like a clean close does.
+    identity = getattr(websocket.state, "identity", "")
     receiver = None
     sender = None
     try:
+        unmark_owner_watching = session.mark_owner_watching(identity)
         initial = await asyncio.wrap_future(session.submit(read_state))
         await websocket.send_json({"type": "state", "state": initial})
         # Run the receiver (disconnect detection) and sender concurrently; whichever
@@ -95,6 +108,7 @@ async def stream(websocket: WebSocket, session_id: str):
         # Any failure on the send/receive path tears down quietly (no ASGI noise).
         pass
     finally:
+        unmark_owner_watching()
         unsubscribe()
         for task in (receiver, sender):
             if task is not None:

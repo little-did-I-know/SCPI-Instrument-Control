@@ -14,7 +14,7 @@ const FILTERS: FilterConfig[] = [
 
 beforeEach(() => {
   useSession.getState().clearSession();
-  useSession.getState().setSession({ id: "abc", label: "x", mock: true, address: null, state: "connected", idn: "", model: "", dialect: "legacy", num_channels: 4, viewers: 0 });
+  useSession.getState().setSession({ id: "abc", label: "x", mock: true, address: null, state: "connected", idn: "", model: "", dialect: "legacy", num_channels: 4, viewers: 0, owner: "" });
   vi.spyOn(api, "getSpectrum").mockResolvedValue(SPECTRUM);
   vi.spyOn(api, "getFilters").mockResolvedValue(FILTERS);
 });

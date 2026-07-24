@@ -10,6 +10,7 @@ import queue
 import threading
 import time
 import uuid
+from collections import Counter
 from concurrent.futures import Future
 from concurrent.futures import TimeoutError as FuturesTimeoutError
 from typing import Any, Callable, Dict, List, Optional, Tuple
@@ -18,6 +19,7 @@ from scpi_control import Oscilloscope
 from scpi_control.connection.mock import MockConnection
 from scpi_control.exceptions import InvalidParameterError, SiglentConnectionError, SiglentError
 from scpi_control.server import compute
+from scpi_control.server.netpolicy import validate_target
 from scpi_control.server.recorder import TrendRecorder
 
 MAX_FRAME_POINTS = 2000
@@ -126,6 +128,59 @@ class InstrumentSession:
         self.active_reference: Optional[Dict[str, Any]] = None  # {"name", "channel", "data": {"time","voltage",...}}
         self._shown: set = set()  # trace keys (M1/M2/F1/F2/SPEC) live on subscribers' canvases; worker-thread-only
         self.recorder = TrendRecorder()  # internally locked: worker appends, request threads control/read
+        self.owner = ""
+        self.owner_last_active = time.monotonic()
+        # Live stream watchers, keyed by identity (not by "is this the
+        # owner"): a Counter rather than a set because the same identity may
+        # open two tabs and close one, so a plain membership test would drop
+        # the identity on the first close while the second tab is still live.
+        self._watchers: "Counter[str]" = Counter()
+
+    def touch(self) -> None:
+        """Record owner activity; feeds the abandoned-session claim rule."""
+        self.owner_last_active = time.monotonic()
+
+    def owner_watching(self) -> bool:
+        """True while at least one live stream opened by the current owner is connected.
+
+        Evaluated at check time against the *current* owner and the live
+        per-identity watcher counts (see mark_owner_watching) -- never a
+        snapshot taken when some stream connected. Ownership can change
+        mid-stream via claim() or an explicit handoff, so "is the owner
+        watching" must always be asked fresh: a snapshot fails open (a
+        non-owner who claims the session while already watching would not
+        be protected) and also sticks stale (a former owner's lingering
+        socket would keep blocking claims after handoff).
+
+        A watching owner is never idle even though only writes touch()
+        owner_last_active -- the claim rule refuses outright while this is
+        true, regardless of the idle threshold.
+        """
+        return bool(self.owner) and self._watchers[self.owner] > 0
+
+    def mark_owner_watching(self, identity: str) -> Callable[[], None]:
+        """Register that ``identity`` opened the live stream; returns an unmark callback.
+
+        Tracks the watching identity itself, not whether it happened to be
+        the owner at connect time -- owner_watching() does that comparison
+        later, at check time, against whoever owns the session *then*. The
+        returned callback decrements exactly once no matter how many times
+        it is called, so it is safe to invoke unconditionally from a
+        ``finally`` block on any disconnect path (clean close, error, or
+        cancellation).
+        """
+        self._watchers[identity] += 1
+        released = False
+
+        def unmark() -> None:
+            nonlocal released
+            if not released:
+                released = True
+                self._watchers[identity] -= 1
+                if self._watchers[identity] <= 0:
+                    del self._watchers[identity]
+
+        return unmark
 
     @classmethod
     def open(
@@ -137,6 +192,8 @@ class InstrumentSession:
         mock: bool = False,
         model: Optional[str] = None,
         poll_interval: float = 0.25,
+        owner: str = "",
+        allowed_ports: Optional[frozenset] = None,
         _connection=None,
     ) -> "InstrumentSession":
         if mock:
@@ -145,8 +202,10 @@ class InstrumentSession:
         else:
             if not address:
                 raise ValueError("address is required for a non-mock session")
+            validate_target(address, port, allowed_ports=allowed_ports)
             scope = Oscilloscope(address, port=port)
         session = cls(label, scope, mock, address, poll_interval)
+        session.owner = owner
         session._thread.start()
         try:
             session.submit(session._connect_job).result(timeout=30)
@@ -359,14 +418,68 @@ class InstrumentSession:
 class SessionManager:
     """Registry of live sessions. create() connects before registering."""
 
-    def __init__(self) -> None:
+    def __init__(self, allowed_ports: Optional[frozenset] = None, max_sessions: int = 8) -> None:
+        if max_sessions < 1:
+            # A cap below 1 doesn't disable the gateway -- it silently makes
+            # every create() a 409 "session limit reached (0)", which reads
+            # like a bug rather than a configuration mistake. Reject eagerly
+            # here (the library boundary) rather than relying solely on the
+            # CLI to catch it, since SessionManager is also constructed
+            # directly by embedders and tests.
+            raise ValueError("max_sessions must be at least 1 (got {0})".format(max_sessions))
         self._sessions: Dict[str, InstrumentSession] = {}
         self._lock = threading.Lock()
+        self.allowed_ports = allowed_ports
+        self.max_sessions = max_sessions
+        # Slots claimed by an in-flight create() that hasn't registered yet.
+        # Counted alongside len(self._sessions) under the same lock as the
+        # cap check so the check and the reservation are one atomic step --
+        # see create() for why that matters.
+        self._pending = 0
 
-    def create(self, label: str, *, address: Optional[str] = None, port: int = 5025, mock: bool = False, model: Optional[str] = None, _connection=None) -> InstrumentSession:
-        session = InstrumentSession.open(label, address=address, port=port, mock=mock, model=model, _connection=_connection)
+    def create(self, label: str, *, address: Optional[str] = None, port: int = 5025, mock: bool = False, model: Optional[str] = None, owner: str = "", _connection=None) -> InstrumentSession:
+        # Checked BEFORE InstrumentSession.open: opening spawns a worker thread
+        # and blocks on a connect with a 30s timeout, so checking the cap after
+        # the fact would let concurrent requests past the cap occupy every
+        # threadpool worker anyway -- the exact exhaustion this guards against.
+        #
+        # The check alone isn't enough under concurrency: the lock used to be
+        # released between the check and registration, so N concurrent callers
+        # could all observe room and all proceed (TOCTOU) -- with a cap of 8
+        # and 100 concurrent requests, all 100 pass. Reserving a slot in
+        # self._pending under the SAME lock acquisition as the check closes
+        # that window: each successful check immediately claims capacity, so
+        # the next concurrent caller sees it.
+        #
+        # The reservation is released and the session registered in a SINGLE
+        # lock acquisition (below), not two: releasing the lock after
+        # decrementing self._pending and only later re-acquiring it to insert
+        # into self._sessions would reopen the same race one step later -- in
+        # that gap the slot is counted by neither self._pending nor
+        # self._sessions, so a concurrent caller's check can pass when it
+        # shouldn't. The `registered` flag lets the `finally` tell success
+        # from failure: on success the reservation was already released
+        # inside the try (alongside registration), so `finally` must not
+        # double-decrement; on any failure -- open() raising from a connect
+        # timeout, validate_target's policy rejection, or anything else --
+        # `registered` is still False and `finally` releases the reservation,
+        # so a failed attempt can never leak a slot and permanently shrink
+        # the cap.
         with self._lock:
-            self._sessions[session.id] = session
+            if len(self._sessions) + self._pending >= self.max_sessions:
+                raise SessionError("session limit reached ({0}); close a session first".format(self.max_sessions))
+            self._pending += 1
+        registered = False
+        try:
+            session = InstrumentSession.open(label, address=address, port=port, mock=mock, model=model, owner=owner, allowed_ports=self.allowed_ports, _connection=_connection)
+            with self._lock:
+                self._pending -= 1
+                self._sessions[session.id] = session
+                registered = True
+        finally:
+            if not registered:
+                with self._lock:
+                    self._pending -= 1
         return session
 
     def list(self) -> List[InstrumentSession]:
