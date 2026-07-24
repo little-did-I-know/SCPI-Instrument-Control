@@ -45,6 +45,8 @@ async def create_session(body: SessionCreate, request: Request):
 
 @router.delete("/sessions/{session_id}", status_code=204)
 async def delete_session(session_id: str, request: Request):
-    require_session(request, session_id)
+    from scpi_control.server.ownership import require_owner
+
+    require_owner(request, session_id)
     await run_in_threadpool(get_manager(request).delete, session_id)
     return Response(status_code=204)

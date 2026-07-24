@@ -10,6 +10,7 @@ from fastapi.responses import PlainTextResponse, Response
 
 from scpi_control.exceptions import InvalidParameterError
 from scpi_control.server.api.sessions import require_session
+from scpi_control.server.ownership import require_owner
 from scpi_control.server.schemas import (
     ALLOWED_COUPLING,
     ALLOWED_FILTER_KINDS,
@@ -51,7 +52,7 @@ async def get_state(session_id: str, request: Request):
 
 @router.patch("/sessions/{session_id}/scope/channels/{channel}")
 async def patch_channel(session_id: str, channel: int, body: ChannelPatch, request: Request):
-    session = require_session(request, session_id)
+    session = require_owner(request, session_id)
     if body.coupling is not None and body.coupling.upper() not in ALLOWED_COUPLING:
         raise InvalidParameterError("invalid coupling: {0}".format(body.coupling))
 
@@ -75,7 +76,7 @@ async def patch_channel(session_id: str, channel: int, body: ChannelPatch, reque
 
 @router.patch("/sessions/{session_id}/scope/timebase")
 async def patch_timebase(session_id: str, body: TimebasePatch, request: Request):
-    session = require_session(request, session_id)
+    session = require_owner(request, session_id)
 
     def apply(scope):
         scope.timebase = body.timebase
@@ -85,7 +86,7 @@ async def patch_timebase(session_id: str, body: TimebasePatch, request: Request)
 
 @router.patch("/sessions/{session_id}/scope/trigger")
 async def patch_trigger(session_id: str, body: TriggerPatch, request: Request):
-    session = require_session(request, session_id)
+    session = require_owner(request, session_id)
 
     def apply(scope):
         trig = scope.trigger
@@ -105,7 +106,7 @@ async def patch_trigger(session_id: str, body: TriggerPatch, request: Request):
 
 @router.post("/sessions/{session_id}/scope/command")
 async def send_command(session_id: str, body: CommandIn, request: Request):
-    session = require_session(request, session_id)
+    session = require_owner(request, session_id)
     command = body.command.strip()
     if not command:
         raise InvalidParameterError("empty command")
@@ -122,7 +123,7 @@ async def send_command(session_id: str, body: CommandIn, request: Request):
 
 @router.put("/sessions/{session_id}/scope/measurements")
 async def put_measurements(session_id: str, body: List[MeasurementItem], request: Request):
-    session = require_session(request, session_id)
+    session = require_owner(request, session_id)
     if session.recorder.state == "recording":
         raise SessionError("measurement selection is locked while recording")
     for item in body:
@@ -237,7 +238,7 @@ async def get_math(session_id: str, request: Request):
 
 @router.patch("/sessions/{session_id}/scope/math/{n}")
 async def patch_math(session_id: str, n: int, body: MathPatch, request: Request):
-    session = require_session(request, session_id)
+    session = require_owner(request, session_id)
     if n not in (1, 2):
         raise InvalidParameterError("math channel must be 1 or 2")
     if body.expression is not None and not body.expression.strip():
@@ -262,7 +263,7 @@ async def get_spectrum(session_id: str, request: Request):
 
 @router.patch("/sessions/{session_id}/scope/spectrum")
 async def patch_spectrum(session_id: str, body: SpectrumPatch, request: Request):
-    session = require_session(request, session_id)
+    session = require_owner(request, session_id)
     updates = {k: v for k, v in body.model_dump().items() if v is not None}
     if "window" in updates and updates["window"] not in ALLOWED_WINDOWS:
         raise InvalidParameterError("unknown window: {0}".format(updates["window"]))
@@ -284,7 +285,7 @@ async def get_filters(session_id: str, request: Request):
 
 @router.patch("/sessions/{session_id}/scope/filters/{n}")
 async def patch_filter(session_id: str, n: int, body: FilterPatch, request: Request):
-    session = require_session(request, session_id)
+    session = require_owner(request, session_id)
     if n not in (1, 2):
         raise InvalidParameterError("filter must be 1 or 2")
     updates = {k: v for k, v in body.model_dump().items() if v is not None}
@@ -343,7 +344,7 @@ async def list_references(session_id: str, request: Request):
 
 @router.post("/sessions/{session_id}/scope/references", status_code=201)
 async def save_reference(session_id: str, body: ReferenceCreate, request: Request):
-    session = require_session(request, session_id)
+    session = require_owner(request, session_id)
     name = body.name.strip()
     if not name:
         raise InvalidParameterError("reference name must not be empty")
@@ -364,7 +365,7 @@ async def save_reference(session_id: str, body: ReferenceCreate, request: Reques
 
 @router.delete("/sessions/{session_id}/scope/references/{name}", status_code=204)
 async def delete_reference(session_id: str, name: str, request: Request):
-    session = require_session(request, session_id)
+    session = require_owner(request, session_id)
     store = _reference_store(request)
 
     def remove():
@@ -388,7 +389,7 @@ async def get_reference(session_id: str, request: Request):
 
 @router.put("/sessions/{session_id}/scope/reference")
 async def put_reference(session_id: str, body: ReferencePut, request: Request):
-    session = require_session(request, session_id)
+    session = require_owner(request, session_id)
     if body.name is None:
         session.set_active_reference(None, None, None)
         return session.reference_overlay()
@@ -403,13 +404,13 @@ async def put_reference(session_id: str, body: ReferencePut, request: Request):
 
 @router.post("/sessions/{session_id}/scope/log/start")
 async def log_start(session_id: str, request: Request):
-    session = require_session(request, session_id)
+    session = require_owner(request, session_id)
     return session.start_recording()
 
 
 @router.post("/sessions/{session_id}/scope/log/stop")
 async def log_stop(session_id: str, request: Request):
-    session = require_session(request, session_id)
+    session = require_owner(request, session_id)
     return session.stop_recording()
 
 
@@ -460,7 +461,7 @@ _RUN_OPS = {
 
 @router.post("/sessions/{session_id}/scope/{op}")
 async def run_op(session_id: str, op: str, request: Request):
-    session = require_session(request, session_id)
+    session = require_owner(request, session_id)
     fn = _RUN_OPS.get(op)
     if fn is None:
         raise InvalidParameterError("unknown operation: {0}".format(op))
