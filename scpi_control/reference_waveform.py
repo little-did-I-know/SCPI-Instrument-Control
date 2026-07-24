@@ -40,7 +40,7 @@ def _read_metadata(data, filepath) -> Dict[str, Any]:
         try:
             parsed = json.loads(str(data[REFERENCE_META_KEY]))
         except ValueError as exc:
-            raise CorruptReferenceError(filepath, exc)
+            raise CorruptReferenceError(filepath, exc) from exc
         # A truncated or hand-edited file can hold valid JSON of the wrong shape;
         # callers index this like a mapping, so reject anything else loudly here
         # rather than letting an AttributeError surface three frames away.
@@ -125,10 +125,16 @@ class ReferenceWaveform:
         metadata["num_samples"] = len(waveform.voltage)
         metadata["time_span"] = float(waveform.time[-1] - waveform.time[0]) if len(waveform.time) > 1 else 0.0
 
+        # Serialize outside the try block: a caller passing non-JSON-serializable
+        # metadata (e.g. a numpy array or np.int64) is a caller mistake, not an
+        # I/O failure, so let TypeError/ValueError surface as themselves instead
+        # of being folded into the IOError below.
+        metadata_json = json.dumps(metadata)
+
         try:
             # Save as NPZ with compression; metadata is stored as a JSON string so
             # loads never need allow_pickle=True.
-            np.savez_compressed(filepath, time=waveform.time, voltage=waveform.voltage, **{REFERENCE_META_KEY: json.dumps(metadata)})
+            np.savez_compressed(filepath, time=waveform.time, voltage=waveform.voltage, **{REFERENCE_META_KEY: metadata_json})
 
             logger.info(f"Reference waveform saved: {filepath}")
             return str(filepath)
@@ -407,20 +413,30 @@ class ReferenceWaveform:
             if filepath.exists():
                 return filepath
 
-        # Search for files containing the name
+        # Search for files containing the name. A file we can't safely read
+        # (legacy pickle or corrupt metadata) must not block a match that's
+        # elsewhere in the directory -- keep scanning and only raise the first
+        # such error if nothing in the whole directory actually matches.
+        deferred_error = None
         for filepath in self.storage_dir.glob("*.npz"):
             try:
                 with np.load(filepath, allow_pickle=False) as data:
                     metadata = _read_metadata(data, filepath)
                 if metadata.get("name", "") == name:
                     return filepath
-            except (LegacyReferenceFormatError, CorruptReferenceError):
+            except (LegacyReferenceFormatError, CorruptReferenceError) as exc:
                 # Can't safely read this file's embedded name without unpickling
-                # it, so let callers (e.g. load_reference) see the real problem
-                # instead of silently reporting "not found".
-                raise
+                # it, so remember the problem instead of raising immediately --
+                # a later file in the scan may still be the valid match the
+                # caller asked for.
+                if deferred_error is None:
+                    deferred_error = exc
+                continue
             except Exception:
                 continue
+
+        if deferred_error is not None:
+            raise deferred_error
 
         return None
 
