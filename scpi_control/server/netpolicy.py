@@ -39,6 +39,14 @@ def _effective_address(ip: IPAddress) -> IPAddress:
 
 
 def validate_target(address: str, port: int, allowed_ports: Optional[frozenset] = None, resolver: Optional[Callable] = None) -> None:
+    """Reject a connection target that policy disallows, else return.
+
+    ``resolver`` must signal resolution failure with ``OSError`` (``socket.gaierror``,
+    which the default resolver raises, is a subclass). Anything else it raises is
+    treated as a bug in the resolver and propagates: converting arbitrary exceptions
+    into a "cannot resolve" rejection would disguise real defects as policy denials.
+    Either way no connection is attempted, so the failure is closed, not open.
+    """
     ports = DEFAULT_ALLOWED_PORTS if allowed_ports is None else allowed_ports
     if port not in ports:
         _reject(address, "port {0} is not in the allowed set {1}".format(port, sorted(ports)))
