@@ -6,13 +6,13 @@ import pytest
 
 fastapi = pytest.importorskip("fastapi")
 pytest.importorskip("httpx")
-from fastapi.routing import APIRoute  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 
 from scpi_control.server.app import create_app  # noqa: E402
 from scpi_control.server.auth import TokenStore  # noqa: E402
 from scpi_control.server.ownership import WRITE_ROUTES  # noqa: E402
 from scpi_control.server.sessions import SessionManager  # noqa: E402
+from tests.route_introspection import iter_http_routes  # noqa: E402
 
 
 @pytest.fixture()
@@ -122,17 +122,16 @@ def test_non_write_routes_stay_open_to_non_owner(two_users):
 
     checked = 0
     gated = []
-    for route in client.app.routes:
-        if not isinstance(route, APIRoute) or not route.path.startswith("/api/"):
+    # iter_http_routes is version-robust: Starlette 1.x nests include_router
+    # routes so a flat app.routes walk finds almost none (see route_introspection).
+    for method, path in iter_http_routes(client.app):
+        if (method, path) in write_paths or (method, path) in _OWNERSHIP_CONFLICT_EXEMPT:
             continue
-        for method in sorted(route.methods - {"HEAD", "OPTIONS"}):
-            if (method, route.path) in write_paths or (method, route.path) in _OWNERSHIP_CONFLICT_EXEMPT:
-                continue
-            checked += 1
-            url = _concrete(route.path, sid)
-            response = client.request(method, url, headers=bob, json=_BODY_OVERRIDES.get((method, url)), params=_QUERY_OVERRIDES.get(url))
-            if response.status_code == 409:
-                gated.append("{0} {1} -> {2}".format(method, route.path, response.status_code))
+        checked += 1
+        url = _concrete(path, sid)
+        response = client.request(method, url, headers=bob, json=_BODY_OVERRIDES.get((method, url)), params=_QUERY_OVERRIDES.get(url))
+        if response.status_code == 409:
+            gated.append("{0} {1} -> {2}".format(method, path, response.status_code))
 
     # A guard on an empty table would pass vacuously; pin a floor so this is
     # verified to be checking real routes, not an accidentally-empty set.

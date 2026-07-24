@@ -22,13 +22,13 @@ import pytest
 
 fastapi = pytest.importorskip("fastapi")
 pytest.importorskip("httpx")
-from fastapi.routing import APIRoute, APIWebSocketRoute  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 from starlette.websockets import WebSocketDisconnect  # noqa: E402
 
 from scpi_control.server.app import create_app  # noqa: E402
-from scpi_control.server.auth import EXEMPT_PATHS, TokenStore  # noqa: E402
+from scpi_control.server.auth import TokenStore  # noqa: E402
 from scpi_control.server.sessions import SessionManager  # noqa: E402
+from tests.route_introspection import iter_http_routes, iter_ws_routes  # noqa: E402
 
 
 @pytest.fixture()
@@ -121,17 +121,14 @@ def _concrete(path):
     return path
 
 
+# Enumeration is version-robust (see tests/route_introspection.py): Starlette 1.x
+# nests include_router routes so walking app.routes flat finds almost none.
 def _http_routes(app):
-    for route in app.routes:
-        if isinstance(route, APIRoute) and route.path.startswith("/api/") and route.path not in EXEMPT_PATHS:
-            for method in sorted(route.methods - {"HEAD", "OPTIONS"}):
-                yield method, route.path
+    return iter_http_routes(app)
 
 
 def _ws_routes(app):
-    for route in app.routes:
-        if isinstance(route, APIWebSocketRoute) and route.path.startswith("/api/"):
-            yield route.path
+    return iter_ws_routes(app)
 
 
 @pytest.fixture(scope="module")
