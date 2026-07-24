@@ -16,9 +16,9 @@ class ReferencePanel(QWidget):
     load, delete, and view information about each reference.
 
     Signals:
-        load_reference: Emitted when user requests to load a reference (filepath: str)
+        load_reference: Emitted when user requests to load a reference (name: str)
         save_reference: Emitted when user requests to save current waveform as reference
-        delete_reference: Emitted when user deletes a reference (filepath: str)
+        delete_reference: Emitted when user deletes a reference (name: str)
         show_difference: Emitted when user wants to show difference with reference
     """
 
@@ -176,12 +176,14 @@ class ReferencePanel(QWidget):
         Args:
             item: Selected list item
         """
-        # Get filepath from item data
-        filepath = item.data(Qt.ItemDataRole.UserRole)
+        # Get reference name from item data. Must be the short name, not the
+        # absolute filepath: _find_reference_file confines lookups to
+        # storage_dir and rejects paths outside it.
+        name = item.data(Qt.ItemDataRole.UserRole)
 
-        if filepath:
-            logger.info(f"Load reference requested: {filepath}")
-            self.load_reference.emit(filepath)
+        if name:
+            logger.info(f"Load reference requested: {name}")
+            self.load_reference.emit(name)
 
     def _on_delete_reference(self):
         """Handle delete reference button click."""
@@ -191,8 +193,7 @@ class ReferencePanel(QWidget):
             return
 
         item = selected_items[0]
-        name = item.text().split("\n")[0]  # Get first line (name)
-        filepath = item.data(Qt.ItemDataRole.UserRole)
+        name = item.data(Qt.ItemDataRole.UserRole)
 
         # Confirm deletion
         reply = QMessageBox.question(
@@ -203,8 +204,8 @@ class ReferencePanel(QWidget):
         )
 
         if reply == QMessageBox.StandardButton.Yes:
-            logger.info(f"Delete reference requested: {filepath}")
-            self.delete_reference.emit(filepath)
+            logger.info(f"Delete reference requested: {name}")
+            self.delete_reference.emit(name)
 
     def _on_show_difference_toggled(self, checked: bool):
         """Handle show difference toggle.
@@ -264,9 +265,10 @@ class ReferencePanel(QWidget):
             # Create item text
             item_text = f"{name}\n{channel} | {time_str} | {size_str}"
 
-            # Create list item
+            # Create list item. Store the short name, not the filepath: it's
+            # what load_reference()/delete_reference() accept post-security-fix.
             item = QListWidgetItem(item_text)
-            item.setData(Qt.ItemDataRole.UserRole, ref.get("filepath"))
+            item.setData(Qt.ItemDataRole.UserRole, name)
 
             self.reference_list.addItem(item)
 

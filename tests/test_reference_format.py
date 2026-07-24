@@ -1,7 +1,6 @@
 """Reference storage moves off pickled metadata onto a JSON string."""
 
 import json
-from pathlib import Path
 
 import numpy as np
 import pytest
@@ -53,71 +52,60 @@ def test_listing_does_not_unpickle_legacy_files(tmp_path):
     assert [entry["name"] for entry in listed] == ["good"]
 
 
-def _force_glob_order(monkeypatch, storage_dir, ordered_paths):
-    """Make storage_dir.glob("*.npz") yield ordered_paths regardless of filesystem order.
+def _legacy_and_good(tmp_path, legacy_sorts_last=False):
+    """Create one un-migrated legacy file and one valid new-format reference.
 
-    _find_reference_file's fallback scan is glob-order dependent, so tests that
-    pin "a match is found regardless of where the legacy file sorts" need
-    deterministic control over that order rather than relying on incidental
-    filesystem/OS behaviour (which is exactly the kind of luck this bug hid
-    behind).
+    _find_reference_file's fallback scan iterates ``sorted(glob("*.npz"))``,
+    so the scan order it actually sees is fixed by filename, not by directory
+    iteration order -- faking the latter (e.g. via a patched Path.glob) has no
+    effect once sorted() runs over it. To genuinely exercise "the unreadable
+    legacy file is encountered before the match" vs. "...after it", the
+    legacy file's name is chosen so it sorts before or after the good
+    reference's name for real.
     """
-    real_glob = Path.glob
-
-    def fake_glob(self, pattern, *args, **kwargs):
-        if self == storage_dir and pattern == "*.npz":
-            return iter(ordered_paths)
-        return real_glob(self, pattern, *args, **kwargs)
-
-    monkeypatch.setattr(Path, "glob", fake_glob)
-
-
-def _legacy_and_good(tmp_path):
-    """Create one un-migrated legacy file and one valid new-format reference."""
-    legacy = tmp_path / "aaa_legacy.npz"
-    np.savez_compressed(legacy, time=np.arange(4, dtype=float), voltage=np.zeros(4), metadata={"name": "legacy"})
     store = ReferenceWaveform(str(tmp_path))
     store.save_reference(_Waveform(), "zzz-good")
-    good = next(p for p in tmp_path.glob("*.npz") if p != legacy)
+    good = next(tmp_path.glob("*.npz"))
+
+    # "zzz-good_<timestamp>.npz" vs "aaa_legacy.npz"/"zzzz_legacy.npz": the
+    # 4th character ('-' vs 'z') decides sort order in the latter case, so
+    # this reliably lands after the good file regardless of the timestamp.
+    legacy_name = "zzzz_legacy.npz" if legacy_sorts_last else "aaa_legacy.npz"
+    legacy = tmp_path / legacy_name
+    np.savez_compressed(legacy, time=np.arange(4, dtype=float), voltage=np.zeros(4), metadata={"name": "legacy"})
     return store, legacy, good
 
 
-def test_load_reference_finds_valid_entry_when_legacy_file_sorts_first(tmp_path, monkeypatch):
-    store, legacy, good = _legacy_and_good(tmp_path)
-    _force_glob_order(monkeypatch, store.storage_dir, [legacy, good])
+def test_load_reference_finds_valid_entry_when_legacy_file_sorts_first(tmp_path):
+    store, legacy, good = _legacy_and_good(tmp_path, legacy_sorts_last=False)
+    assert sorted(tmp_path.glob("*.npz")) == [legacy, good]
 
     loaded = store.load_reference("zzz-good")
     assert loaded is not None
     assert loaded["metadata"]["name"] == "zzz-good"
 
 
-def test_load_reference_finds_valid_entry_when_legacy_file_sorts_last(tmp_path, monkeypatch):
-    store, legacy, good = _legacy_and_good(tmp_path)
-    _force_glob_order(monkeypatch, store.storage_dir, [good, legacy])
+def test_load_reference_finds_valid_entry_when_legacy_file_sorts_last(tmp_path):
+    store, legacy, good = _legacy_and_good(tmp_path, legacy_sorts_last=True)
+    assert sorted(tmp_path.glob("*.npz")) == [good, legacy]
 
     loaded = store.load_reference("zzz-good")
     assert loaded is not None
     assert loaded["metadata"]["name"] == "zzz-good"
 
 
-def test_delete_reference_succeeds_despite_legacy_file_in_directory(tmp_path, monkeypatch):
+def test_delete_reference_succeeds_despite_legacy_file_in_directory(tmp_path):
     store, legacy, good = _legacy_and_good(tmp_path)
-    _force_glob_order(monkeypatch, store.storage_dir, [legacy, good])
 
     assert store.delete_reference("zzz-good") is True
     assert not good.exists()
     assert legacy.exists()
 
 
-def test_rename_reference_succeeds_despite_legacy_file_in_directory(tmp_path, monkeypatch):
+def test_rename_reference_succeeds_despite_legacy_file_in_directory(tmp_path):
     store, legacy, good = _legacy_and_good(tmp_path)
-    _force_glob_order(monkeypatch, store.storage_dir, [legacy, good])
 
     assert store.rename_reference("zzz-good", "renamed") is True
-    # rename_reference wrote a new file our forced ordering doesn't know about;
-    # revert to real directory order to look it up (legacy is still present, so
-    # this still exercises the mixed-directory lookup, just without a pinned order).
-    monkeypatch.undo()
     assert store.load_reference("renamed") is not None
 
 

@@ -2,10 +2,21 @@
 
 import sys
 
+import numpy as np
 import pytest
 
 pytest.importorskip("PyQt6")
+from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QApplication
+
+
+class _Waveform:
+    """Minimal stand-in for a captured waveform, just enough for save_reference."""
+
+    def __init__(self):
+        self.time = np.linspace(0, 1, 16)
+        self.voltage = np.sin(self.time)
+        self.channel = 1
 
 
 @pytest.fixture(scope="module")
@@ -87,6 +98,40 @@ def test_reference_panel_creation(qapp):
     assert panel is not None
     assert hasattr(panel, "load_reference")
     assert hasattr(panel, "save_reference")
+
+
+def test_reference_panel_list_items_carry_loadable_names(qapp, tmp_path):
+    """The panel must feed load_reference/delete_reference a short *name*.
+
+    reference_waveform._find_reference_file now confines lookups to
+    storage_dir (the RCE-closing security fix) and no longer accepts the
+    absolute filepath that list_references() also returns. If
+    ReferencePanel.update_reference_list ever goes back to storing
+    ref["filepath"] as a list item's payload -- which is what the Load and
+    Delete buttons emit -- load_reference/delete_reference silently return
+    None/False for every reference, with no exception raised. Reproduce that
+    failure mode at the panel+store boundary here instead of relying on a
+    human clicking the button and finding nothing happens.
+    """
+    from scpi_control.gui.widgets.reference_panel import ReferencePanel
+    from scpi_control.reference_waveform import ReferenceWaveform
+
+    store = ReferenceWaveform(str(tmp_path))
+    store.save_reference(_Waveform(), "panel-ref")
+
+    panel = ReferencePanel()
+    panel.update_reference_list(store.list_references())
+
+    item = panel.reference_list.item(0)
+    payload = item.data(Qt.ItemDataRole.UserRole)
+
+    # This is exactly what _on_load_reference_item/_on_delete_reference emit
+    # via the load_reference/delete_reference signals.
+    loaded = store.load_reference(payload)
+    assert loaded is not None
+    assert loaded["metadata"]["name"] == "panel-ref"
+
+    assert store.delete_reference(payload) is True
 
 
 def test_protocol_decode_panel_creation(qapp):

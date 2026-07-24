@@ -147,7 +147,10 @@ class ReferenceWaveform:
         """Load a reference waveform by name.
 
         Args:
-            name: Reference name or filename
+            name: The reference's short name, as saved (e.g. via save_reference
+                or shown in list_references()'s "name" field). A literal
+                on-disk filename only resolves in the near-impossible case of
+                a saved file with no timestamp suffix; see _find_reference_file.
 
         Returns:
             Dictionary with 'time', 'voltage', and 'metadata' keys, or None if not found
@@ -233,7 +236,10 @@ class ReferenceWaveform:
         """Delete a reference waveform.
 
         Args:
-            name: Reference name or filename
+            name: The reference's short name, as saved (e.g. via save_reference
+                or shown in list_references()'s "name" field). A literal
+                on-disk filename only resolves in the near-impossible case of
+                a saved file with no timestamp suffix; see _find_reference_file.
 
         Returns:
             True if deleted successfully, False otherwise
@@ -266,7 +272,11 @@ class ReferenceWaveform:
         """Rename a reference waveform.
 
         Args:
-            old_name: Current reference name
+            old_name: The reference's current short name, as saved (e.g. via
+                save_reference or shown in list_references()'s "name" field).
+                A literal on-disk filename only resolves in the near-impossible
+                case of a saved file with no timestamp suffix; see
+                _find_reference_file.
             new_name: New reference name
 
         Returns:
@@ -410,14 +420,20 @@ class ReferenceWaveform:
         any path on disk, which combined with pickled loads was an RCE vector.
 
         Args:
-            name: Reference name or filename
+            name: The reference's short name, as saved (e.g. via save_reference
+                or shown in list_references()'s "name" field). A literal
+                on-disk filename only resolves in the near-impossible case of
+                a saved file with no timestamp suffix -- otherwise this falls
+                through to the metadata scan below, matched against the
+                reference's saved name rather than its filename.
 
         Returns:
             Path to reference file or None if not found
         """
+        # _sanitize_name always falls back to "reference" for an all-stripped
+        # input, so `safe` is never empty here -- no not-found short-circuit
+        # is needed before trying it as a candidate filename.
         safe = self._sanitize_name(name)
-        if not safe:
-            return None
 
         root = self.storage_dir.resolve()
         for candidate_name in (safe, "{0}.npz".format(safe)):
