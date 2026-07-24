@@ -106,7 +106,7 @@ class WaveformLoader:
     @staticmethod
     def _load_npz(filepath: Path) -> List[WaveformData]:
         """Load an NPZ, reading this library's schema exactly when present."""
-        data = np.load(filepath, allow_pickle=True)
+        data = np.load(filepath, allow_pickle=False)
 
         if _looks_like_ours(data.files):
             return [_from_loaded(_load_native(filepath))]

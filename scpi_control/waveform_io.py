@@ -114,7 +114,7 @@ def _channel_value(raw: Any) -> Optional[Union[int, str]]:
 
 
 def _load_npz(path: Path) -> LoadedWaveform:
-    data = np.load(path, allow_pickle=True)
+    data = np.load(path, allow_pickle=False)
     if ws.TIME not in data.files or ws.VOLTAGE not in data.files:
         raise ValueError(f"{path} does not contain '{ws.TIME}'/'{ws.VOLTAGE}' arrays; not a scpi_control waveform file")
     metadata: Dict[str, Any] = {}
