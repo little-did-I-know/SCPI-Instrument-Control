@@ -138,6 +138,45 @@ def test_non_dict_json_metadata_raises_corrupt_reference_error(tmp_path):
         store.load_reference("badmeta")
 
 
+def _only_legacy(tmp_path):
+    """Create a directory containing nothing but one un-migrated legacy file."""
+    legacy = tmp_path / "aaa_legacy.npz"
+    np.savez_compressed(legacy, time=np.arange(4, dtype=float), voltage=np.zeros(4), metadata={"name": "legacy"})
+    store = ReferenceWaveform(str(tmp_path))
+    return store, legacy
+
+
+def test_delete_reference_on_brand_new_name_returns_false_despite_legacy_file(tmp_path):
+    """delete_reference is a 'remove it if present' op: an unreadable legacy
+    file elsewhere in the directory is not proof the requested name exists,
+    so a name that was never saved must come back False, not raise."""
+    store, legacy = _only_legacy(tmp_path)
+    assert store.delete_reference("brand-new-name") is False
+    assert legacy.exists()
+
+
+def test_replace_on_save_loop_terminates_despite_legacy_file(tmp_path):
+    """Mirrors the server's replace-on-save shape (scope.py's
+    `while store.delete_reference(name): pass`) for a name being saved for
+    the first time -- it must terminate rather than raise."""
+    store, legacy = _only_legacy(tmp_path)
+    iterations = 0
+    while store.delete_reference("brand-new-name"):
+        iterations += 1
+        assert iterations < 100  # guard against an infinite loop masking the bug
+    assert iterations == 0
+    assert legacy.exists()
+
+
+def test_load_reference_still_raises_despite_delete_fix(tmp_path):
+    """The read path keeps its migrate hint: only delete_reference should
+    swallow the deferred legacy error, not load_reference."""
+    store, legacy = _only_legacy(tmp_path)
+    with pytest.raises(LegacyReferenceFormatError) as excinfo:
+        store.load_reference("brand-new-name")
+    assert "references migrate" in str(excinfo.value)
+
+
 def test_non_serializable_array_metadata_raises_type_error_not_io_error(tmp_path):
     store = ReferenceWaveform(str(tmp_path))
     with pytest.raises(TypeError):

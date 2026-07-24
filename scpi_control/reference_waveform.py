@@ -238,7 +238,16 @@ class ReferenceWaveform:
         Returns:
             True if deleted successfully, False otherwise
         """
-        filepath = self._find_reference_file(name)
+        try:
+            filepath = self._find_reference_file(name)
+        except (LegacyReferenceFormatError, CorruptReferenceError):
+            # Delete is a "remove it if present" operation: an unreadable
+            # file elsewhere in the directory is not proof the requested
+            # name exists, so treat it the same as not found rather than
+            # blocking every delete/replace-on-save of a name that was
+            # never actually saved.
+            logger.warning(f"Reference waveform not found: {name}")
+            return False
 
         if filepath is None:
             logger.warning(f"Reference waveform not found: {name}")
@@ -263,7 +272,15 @@ class ReferenceWaveform:
         Returns:
             True if renamed successfully, False otherwise
         """
-        old_filepath = self._find_reference_file(old_name)
+        try:
+            old_filepath = self._find_reference_file(old_name)
+        except (LegacyReferenceFormatError, CorruptReferenceError):
+            # Same reasoning as delete_reference: locating old_name is a
+            # "rename it if present" lookup, not a read request, so an
+            # unreadable file elsewhere in the directory must not block
+            # renaming a name that was never actually saved.
+            logger.warning(f"Reference waveform not found: {old_name}")
+            return False
 
         if old_filepath is None:
             logger.warning(f"Reference waveform not found: {old_name}")
