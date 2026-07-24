@@ -48,7 +48,19 @@ def main(argv=None) -> None:
     revoke.add_argument("name")
     _add_config_dir(revoke, default=argparse.SUPPRESS)
 
+    references = sub.add_parser("references", help="reference file maintenance").add_subparsers(dest="references_command", required=True)
+    migrate = references.add_parser("migrate", help="convert pre-5.0 pickled reference files")
+    migrate.add_argument("--dir", default=None, help="reference storage directory (default: ~/.siglent/references)")
+
     args = parser.parse_args(argv)
+
+    if args.command == "references":
+        from scpi_control.server.migrate import migrate_references
+
+        target = args.dir if args.dir else str(DEFAULT_CONFIG_DIR / "references")
+        result = migrate_references(target)
+        print("converted {converted}, skipped {skipped}, failed {failed} in {0}".format(target, **result))
+        return
 
     if args.command == "token":
         store = _store(args)
