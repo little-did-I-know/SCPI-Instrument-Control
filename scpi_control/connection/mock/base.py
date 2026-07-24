@@ -70,10 +70,11 @@ class MockConnection(BaseConnection):
         daq_idn: str = "Keysight Technologies,34970A,MY12345678,A.01.02",
         daq_readings: str = "1.234,2.345,3.456",
         tek_badges: Optional[Dict[int, Dict[str, str]]] = None,
-        # strict: When True, unmatched PSU/AWG/DAQ queries raise TimeoutError
-        # instead of returning "", matching real instruments. Default False
-        # in 4.1.0 for compatibility; becomes the default in v5.0.0.
-        strict: bool = False,
+        # strict: When True (the default as of v5.0.0), unmatched PSU/AWG/DAQ
+        # queries raise TimeoutError instead of returning "", matching real
+        # instruments. Pass strict=False to restore the old lenient
+        # "return empty string" behavior (the default through 4.1.0).
+        strict: bool = True,
     ):
         super().__init__(host, port, timeout)
         channels = channel_states.keys() if channel_states else range(1, 3)
