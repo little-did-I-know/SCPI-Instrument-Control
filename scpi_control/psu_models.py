@@ -64,8 +64,11 @@ PSU_MODEL_REGISTRY = {
             OutputSpec(2, 30.0, 3.0, 90.0, 0.001, 0.001),
             OutputSpec(3, 5.0, 3.0, 15.0, 0.01, 0.001),  # Fixed 5V output
         ],
-        has_ovp=True,
-        has_ocp=True,
+        # QS0503X-E01B p.36 lists the full SPD3303X command set; it has no
+        # protection subsystem, so OVP/OCP calls never armed anything on
+        # real hardware. False as of v5.0.0 (audit H18).
+        has_ovp=False,
+        has_ocp=False,
         has_timer=True,
         has_waveform=True,
         has_tracking=True,
@@ -81,8 +84,11 @@ PSU_MODEL_REGISTRY = {
             OutputSpec(2, 30.0, 3.0, 90.0, 0.001, 0.001),
             OutputSpec(3, 5.0, 3.0, 15.0, 0.01, 0.001),
         ],
-        has_ovp=True,
-        has_ocp=True,
+        # QS0503X-E01B p.36 lists the full SPD3303X command set; it has no
+        # protection subsystem, so OVP/OCP calls never armed anything on
+        # real hardware. False as of v5.0.0 (audit H18).
+        has_ovp=False,
+        has_ocp=False,
         has_timer=True,
         has_waveform=True,
         has_tracking=True,

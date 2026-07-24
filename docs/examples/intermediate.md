@@ -1054,10 +1054,15 @@ def demo_real_world_scenario():
     print("\nScenario: Testing a device at different voltage levels")
     print("Logging power consumption at each voltage step")
 
-    # Set up protection
-    psu.output1.ovp_level = 15.0
-    psu.output1.ocp_level = 2.0
-    print(f"\nSafety limits: OVP={psu.output1.ovp_level}V, OCP={psu.output1.ocp_level}A")
+    # Set up protection (SPD3303X has no protection subsystem -- QS0503X-E01B
+    # p.36 -- so ovp_level/ocp_level raise NotImplementedError; guard like the
+    # OVP/OCP demo above)
+    if psu.model_capability.has_ovp and psu.model_capability.has_ocp:
+        psu.output1.ovp_level = 15.0
+        psu.output1.ocp_level = 2.0
+        print(f"\nSafety limits: OVP={psu.output1.ovp_level}V, OCP={psu.output1.ocp_level}A")
+    else:
+        print("\nSafety limits: OVP/OCP not supported on this model")
 
     # Start data logging
     with PSUDataLogger(psu, "characterization_log.csv", outputs=[1]) as logger:

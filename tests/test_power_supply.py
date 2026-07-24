@@ -20,7 +20,9 @@ class TestPSUModels:
         assert cap.manufacturer == "Siglent"
         assert cap.num_outputs == 3
         assert cap.scpi_variant == "siglent_spd"
-        assert cap.has_ovp is True
+        # SPD3303X has no protection subsystem (QS0503X-E01B p.36) -- audit H18.
+        assert cap.has_ovp is False
+        assert cap.has_ocp is False
         assert cap.has_timer is True
 
     def test_detect_siglent_spd3303x_e(self):
@@ -398,27 +400,32 @@ class TestAdvancedFeatures:
             _ = psu.tracking_mode
 
     def test_ovp_level(self, siglent_psu):
-        """Test OVP (over-voltage protection) level."""
+        """Test OVP (over-voltage protection) level on SPD3303X, which has no
+        protection subsystem (QS0503X-E01B p.36) -- audit H18."""
         psu = siglent_psu
         output = psu.output1
 
-        assert psu.model_capability.has_ovp is True
+        assert psu.model_capability.has_ovp is False
 
-        # Set OVP level
-        output.ovp_level = 25.0
-        # Mock doesn't store this, but should not error
-        assert isinstance(output.ovp_level, float)
+        with pytest.raises(NotImplementedError):
+            output.ovp_level = 25.0
+
+        with pytest.raises(NotImplementedError):
+            _ = output.ovp_level
 
     def test_ocp_level(self, siglent_psu):
-        """Test OCP (over-current protection) level."""
+        """Test OCP (over-current protection) level on SPD3303X, which has no
+        protection subsystem (QS0503X-E01B p.36) -- audit H18."""
         psu = siglent_psu
         output = psu.output1
 
-        assert psu.model_capability.has_ocp is True
+        assert psu.model_capability.has_ocp is False
 
-        # Set OCP level
-        output.ocp_level = 2.5
-        assert isinstance(output.ocp_level, float)
+        with pytest.raises(NotImplementedError):
+            output.ocp_level = 2.5
+
+        with pytest.raises(NotImplementedError):
+            _ = output.ocp_level
 
     def test_ovp_generic_support(self):
         """Test OVP on generic PSU (SCPI-99 standard supports it)."""

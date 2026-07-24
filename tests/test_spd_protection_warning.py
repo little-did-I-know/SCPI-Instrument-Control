@@ -1,8 +1,9 @@
 """SPD3303X has no OVP/OCP subsystem (QS0503X-E01B p.36) -- audit H18.
 
-Until v5.0.0 the capability flags stay True for compatibility, but the call must
-not look successful: someone raising voltage on a 12V DUT believing protection is
-armed is the failure this warning exists to prevent.
+As of v5.0.0, `has_ovp`/`has_ocp` are False for the SPD3303X/-E and ovp_level/
+ocp_level raise NotImplementedError instead of silently discarding the command:
+someone raising voltage on a 12V DUT believing protection is armed is the
+failure this guard exists to prevent.
 """
 
 import pytest
@@ -19,11 +20,21 @@ def spd():
     return psu
 
 
-def test_setting_ovp_warns_that_nothing_is_armed(spd):
-    with pytest.warns(FutureWarning, match="no.*protection subsystem"):
+def test_setting_ovp_raises_not_implemented(spd):
+    with pytest.raises(NotImplementedError, match="Over-voltage protection not supported"):
         spd.output1.ovp_level = 12.0
 
 
-def test_setting_ocp_warns_that_nothing_is_armed(spd):
-    with pytest.warns(FutureWarning, match="no.*protection subsystem"):
+def test_getting_ovp_raises_not_implemented(spd):
+    with pytest.raises(NotImplementedError, match="Over-voltage protection not supported"):
+        _ = spd.output1.ovp_level
+
+
+def test_setting_ocp_raises_not_implemented(spd):
+    with pytest.raises(NotImplementedError, match="Over-current protection not supported"):
         spd.output1.ocp_level = 2.5
+
+
+def test_getting_ocp_raises_not_implemented(spd):
+    with pytest.raises(NotImplementedError, match="Over-current protection not supported"):
+        _ = spd.output1.ocp_level
