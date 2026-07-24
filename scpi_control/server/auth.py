@@ -72,6 +72,14 @@ class TokenStore:
             pass  # best effort; Windows ACLs do not map onto POSIX modes
 
     def mint(self, name: str) -> str:
+        if not name or not name.strip():
+            # An empty (or whitespace-only) name mints a token whose identity
+            # is "" -- and require_owner() in ownership.py treats owner == ""
+            # as unowned, so every session that token creates is writable by
+            # any authenticated identity. That silently defeats the ownership
+            # boundary, so reject it outright rather than normalize it (e.g.
+            # by stripping): the operator needs to know and pick a real name.
+            raise ValueError("token name must not be empty or whitespace-only")
         if any(entry["name"] == name for entry in self._tokens):
             raise DuplicateTokenName("a token named {0!r} already exists".format(name))
         raw = TOKEN_PREFIX + secrets.token_urlsafe(32)
@@ -89,9 +97,12 @@ class TokenStore:
                 # runs inline on the event loop for every authenticated request;
                 # last_used is audit-flavoured metadata, not security state, and
                 # is not worth a synchronous tokens.json rewrite (+ chmod) plus an
-                # unsynchronized read-modify-write race on that hot path. The
-                # value still reaches disk whenever the store is next saved for a
-                # real reason (mint/revoke).
+                # unsynchronized read-modify-write race on that hot path. In the
+                # real deployment, mint/revoke run in a separate CLI process from
+                # the one serving requests, so this in-memory update is never
+                # written back by *this* process: last_used is effectively
+                # ephemeral for the life of the running server and must not be
+                # relied on as an audit record.
                 entry["last_used"] = _now()
                 return str(entry["name"])
         return None

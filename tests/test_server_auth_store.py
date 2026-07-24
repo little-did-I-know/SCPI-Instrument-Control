@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+from scpi_control.server.__main__ import main
 from scpi_control.server.auth import DuplicateTokenName, TokenStore
 
 
@@ -42,6 +43,36 @@ def test_duplicate_name_rejected(tmp_path):
     store.mint("robin")
     with pytest.raises(DuplicateTokenName):
         store.mint("robin")
+
+
+def test_mint_rejects_empty_name(tmp_path):
+    # An empty name mints a token whose identity is "" -- and require_owner()
+    # in ownership.py treats owner == "" as unowned, so every session that
+    # token creates is writable by any authenticated identity. Reject it here
+    # rather than let that degenerate identity into existence.
+    store = TokenStore(str(tmp_path / "tokens.json"))
+    with pytest.raises(ValueError):
+        store.mint("")
+
+
+def test_mint_rejects_whitespace_only_name(tmp_path):
+    store = TokenStore(str(tmp_path / "tokens.json"))
+    with pytest.raises(ValueError):
+        store.mint("   ")
+
+
+def test_mint_still_accepts_a_normal_name(tmp_path):
+    # Guard against over-rejecting: a real name must still mint cleanly.
+    store = TokenStore(str(tmp_path / "tokens.json"))
+    raw = store.mint("robin")
+    assert store.verify(raw) == "robin"
+
+
+def test_cli_token_add_empty_name_exits_nonzero_and_writes_nothing(tmp_path):
+    with pytest.raises(SystemExit) as excinfo:
+        main(["token", "add", "", "--config-dir", str(tmp_path)])
+    assert excinfo.value.code != 0
+    assert TokenStore(str(tmp_path / "tokens.json")).names() == []
 
 
 def test_store_reloads_from_disk(tmp_path):

@@ -7,7 +7,7 @@ from pathlib import Path
 import uvicorn
 
 from scpi_control.server.app import create_app
-from scpi_control.server.auth import DEFAULT_CONFIG_DIR, DuplicateTokenName, TokenStore
+from scpi_control.server.auth import DEFAULT_CONFIG_DIR, TokenStore
 from scpi_control.server.netpolicy import DEFAULT_ALLOWED_PORTS
 
 
@@ -79,7 +79,11 @@ def main(argv=None) -> None:
         if args.token_command == "add":
             try:
                 print("token {0!r} created. Copy it now, it is not stored:\n\n    {1}\n".format(args.name, store.mint(args.name)))
-            except DuplicateTokenName as exc:
+            except ValueError as exc:
+                # Covers DuplicateTokenName (a ValueError subclass) as well as
+                # the bare ValueError mint() raises for an empty or
+                # whitespace-only name -- both must exit cleanly with a
+                # message, not surface as an uncaught traceback.
                 sys.exit(str(exc))
         elif args.token_command == "list":
             names = store.names()
