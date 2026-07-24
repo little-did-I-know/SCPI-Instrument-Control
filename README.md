@@ -620,13 +620,27 @@ Control instruments from any browser on your LAN:
 
 ```bash
 pip install scpi-instrument-control[web]   # includes the browser gateway
-scpi-web --host 0.0.0.0 --port 8765
+scpi-web                                   # first run prints a URL with a token
 ```
 
-Open `http://<gateway-pc>:8765`. Sessions can target real scopes by IP or a
-built-in mock (`mock: true`) for hardware-free use. The API is documented at
-`/docs` (OpenAPI). No authentication in this release — bind to `127.0.0.1`
-(the default) unless your LAN is trusted.
+On first run the gateway mints an access token and prints a ready-to-open URL
+(`http://127.0.0.1:8765/?token=…`). **Every request needs a token** — mint more
+with `scpi-web token add <name>`. Sessions can target real scopes by IP or a
+built-in mock (`mock: true`) for hardware-free use. The OpenAPI schema is served
+at `/api/openapi.json` (token required); the interactive `/docs`/`/redoc` UIs are
+disabled. Bind to `127.0.0.1` (the default) unless your LAN is trusted, and use
+`--host 0.0.0.0` to expose it.
+
+**Security model:** the gateway authenticates every request, gives each
+instrument session an owner (owner writes, everyone else watches), validates
+outbound connection targets, and caps concurrent sessions. It does **not**
+terminate TLS — put it behind a reverse proxy or keep it on a trusted network.
+See the **[Gateway security guide](docs/gateway/security.md)** for tokens,
+ownership, claiming, the SSRF gate, and deployment.
+
+> **Upgrading from 4.x:** the gateway now requires a token, and reference files
+> saved by 4.x must be converted once with `scpi-web references migrate`. Both
+> are covered in the security guide.
 
 Full documentation: [Web Gateway guide](https://little-did-I-know.github.io/SCPI-Instrument-Control/gateway/) — overview, browser UI tour, and the complete REST & WebSocket API reference.
 
@@ -651,9 +665,10 @@ make webapp-build         # build the UI into the server
 scpi-web --host 0.0.0.0   # serve API + UI on one port
 ```
 
-Open `http://<gateway-pc>:8765`. For UI development, run `scpi-web` in one
-terminal and `cd webapp/app && npm run dev` in another — Vite proxies `/api`
-(HTTP and WebSocket) to the gateway with hot reload.
+Open the tokened URL the gateway prints on startup. For UI development, run
+`scpi-web` in one terminal and `cd webapp/app && npm run dev` in another — Vite
+proxies `/api` (HTTP and WebSocket) to the gateway with hot reload; open the dev
+server with the `?token=…` from the gateway's startup URL so the UI picks it up.
 
 The home screen scans your LAN and lists instruments to connect to, resume, or
 open a shared session on — plus manual IP and a hardware-free mock.

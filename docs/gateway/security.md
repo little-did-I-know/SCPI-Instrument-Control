@@ -165,7 +165,8 @@ $ curl -X POST -H "Authorization: Bearer $TOKEN" \
 ```
 
 - The threshold is **`--abandon-after` seconds** (default **300**). Before it
-  elapses, `claim` returns **409** with how long to wait.
+  elapses, `claim` returns **409** naming the owner and how long they have been
+  idle (subtract that from `--abandon-after` for the remaining wait).
 - "Active" counts **reads and live-stream watching**, not just writes — so an
   owner watching a long capture, without touching a control, is *not* considered
   idle and cannot be claimed out from under them.
@@ -285,7 +286,7 @@ directory, when you run the command explicitly.
 |---|---|
 | **401** | Missing or invalid token |
 | **409** on a write | You are not the session owner (message names who is) |
-| **409** on `claim` | Owner still active/watching (message says how long to wait) |
+| **409** on `claim` | Owner still active/watching (message names them and their idle seconds) |
 | **409** on create | Session cap reached |
 | **400** on session create | Target address/port refused by the SSRF gate |
 | **WS close 1008** | WebSocket handshake was not authenticated |
