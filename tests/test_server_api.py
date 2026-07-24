@@ -11,19 +11,23 @@ from scpi_control.server.sessions import SessionManager  # noqa: E402
 
 
 @pytest.fixture()
-def client():
+def client(gateway_auth):
+    store, headers, _raw = gateway_auth
     manager = SessionManager()
-    app = create_app(manager)
+    app = create_app(manager, token_store=store)
     with TestClient(app) as test_client:
+        test_client.headers.update(headers)  # every request in this module is now authenticated
         yield test_client
     manager.close_all()
 
 
 @pytest.fixture()
-def ref_client(tmp_path):
+def ref_client(tmp_path, gateway_auth):
+    store, headers, _raw = gateway_auth
     manager = SessionManager()
-    app = create_app(manager, references_dir=str(tmp_path))
+    app = create_app(manager, references_dir=str(tmp_path), token_store=store)
     with TestClient(app) as test_client:
+        test_client.headers.update(headers)
         yield test_client
     manager.close_all()
 
@@ -62,11 +66,12 @@ def test_wrong_method_405_keeps_allow_header(client):
     assert "allow" in {k.lower() for k in response.headers}
 
 
-def test_lifespan_shutdown_closes_sessions():
+def test_lifespan_shutdown_closes_sessions(gateway_auth):
     # Fix 6: leaving the app context (lifespan teardown) closes live sessions.
+    store, headers, _raw = gateway_auth
     manager = SessionManager()
-    with TestClient(create_app(manager)) as client:
-        body = client.post("/api/sessions", json={"mock": True}).json()
+    with TestClient(create_app(manager, token_store=store)) as client:
+        body = client.post("/api/sessions", json={"mock": True}, headers=headers).json()
         session = manager.get(body["id"])
         assert session.state == "connected"
     # No explicit close_all() -> the lifespan teardown must have closed it.
@@ -328,6 +333,9 @@ def test_cli_parses_defaults(monkeypatch):
     def fake_run(app, host, port, **kwargs):
         captured.update(host=host, port=port)
 
+    # create_app() with no token_store default-constructs a TokenStore against the
+    # real ~/.siglent/tokens.json; stub it out so this test never touches that file.
+    monkeypatch.setattr(cli, "create_app", lambda: object())
     monkeypatch.setattr(cli.uvicorn, "run", fake_run)
     cli.main([])
     assert captured == {"host": "127.0.0.1", "port": 8765}
@@ -522,10 +530,12 @@ class TestReferences:
 
 
 @pytest.fixture()
-def managed_client():
+def managed_client(gateway_auth):
+    store, headers, _raw = gateway_auth
     manager = SessionManager()
-    app = create_app(manager)
+    app = create_app(manager, token_store=store)
     with TestClient(app) as test_client:
+        test_client.headers.update(headers)
         yield test_client, manager
     manager.close_all()
 

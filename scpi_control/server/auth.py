@@ -103,3 +103,67 @@ class TokenStore:
 
     def is_empty(self) -> bool:
         return not self._tokens
+
+
+EXEMPT_PATHS = frozenset({"/api/health"})
+WS_SUBPROTOCOL_PREFIX = "scpi-token."
+WS_ACCEPT_SUBPROTOCOL = "scpi"
+
+
+def _bearer(headers) -> str:
+    for key, value in headers:
+        if key == b"authorization":
+            text = value.decode("latin-1")
+            if text.lower().startswith("bearer "):
+                return text[7:].strip()
+            return ""
+    return ""
+
+
+class AuthMiddleware:
+    """Fail-closed ASGI middleware: every scope is authenticated unless exempt.
+
+    Handles ``http`` and ``websocket`` scopes itself rather than delegating to
+    BaseHTTPMiddleware, which never sees WebSocket upgrades.
+    """
+
+    def __init__(self, app, store: "TokenStore", exempt: Optional[frozenset] = None) -> None:
+        self.app = app
+        self.store = store
+        self.exempt = EXEMPT_PATHS if exempt is None else exempt
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] not in ("http", "websocket"):
+            await self.app(scope, receive, send)
+            return
+        path = scope.get("path", "")
+        # Only /api/* is guarded; the SPA and its assets are served anonymously
+        # so the browser can load the page that then asks for a token.
+        if path in self.exempt or not path.startswith("/api/"):
+            await self.app(scope, receive, send)
+            return
+        identity = self._identify(scope)
+        if identity is None:
+            await self._reject(scope, receive, send)
+            return
+        scope.setdefault("state", {})["identity"] = identity
+        await self.app(scope, receive, send)
+
+    def _identify(self, scope) -> Optional[str]:
+        if scope["type"] == "websocket":
+            for offered in scope.get("subprotocols", []):
+                if offered.startswith(WS_SUBPROTOCOL_PREFIX):
+                    return self.store.verify(offered[len(WS_SUBPROTOCOL_PREFIX) :])
+            return None
+        return self.store.verify(_bearer(scope.get("headers", [])))
+
+    async def _reject(self, scope, receive, send) -> None:
+        if scope["type"] == "websocket":
+            await receive()  # consume websocket.connect before closing
+            await send({"type": "websocket.close", "code": 1008})
+            return
+        body = json.dumps({"error": "Unauthorized", "detail": "missing or invalid bearer token"}).encode("utf-8")
+        await send(
+            {"type": "http.response.start", "status": 401, "headers": [(b"content-type", b"application/json"), (b"www-authenticate", b"Bearer"), (b"content-length", str(len(body)).encode("ascii"))]}
+        )
+        await send({"type": "http.response.body", "body": body})

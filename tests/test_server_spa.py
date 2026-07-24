@@ -13,14 +13,16 @@ from scpi_control.server.sessions import SessionManager  # noqa: E402
 
 
 @pytest.fixture()
-def static_client(tmp_path, monkeypatch):
+def static_client(tmp_path, monkeypatch, gateway_auth):
     static_dir = tmp_path / "static"
     static_dir.mkdir()
     (static_dir / "index.html").write_text("<!doctype html><title>gateway</title>", encoding="utf-8")
     (static_dir / "app.js").write_text("console.log('x')", encoding="utf-8")
     monkeypatch.setattr(app_module, "STATIC_DIR", static_dir)
+    store, headers, _raw = gateway_auth
     manager = SessionManager()
-    with TestClient(create_app(manager)) as client:
+    with TestClient(create_app(manager, token_store=store)) as client:
+        client.headers.update(headers)
         yield client
     manager.close_all()
 
@@ -47,14 +49,15 @@ def test_unknown_api_path_still_json_404(static_client):
     assert set(response.json()) == {"error", "detail"}
 
 
-def test_no_static_build_still_boots():
+def test_no_static_build_still_boots(gateway_auth):
+    store, headers, _raw = gateway_auth
     manager = SessionManager()
-    with TestClient(create_app(manager)) as client:
-        assert client.get("/api/sessions").status_code == 200
+    with TestClient(create_app(manager, token_store=store)) as client:
+        assert client.get("/api/sessions", headers=headers).status_code == 200
     manager.close_all()
 
 
-def test_encoded_traversal_is_contained(tmp_path, monkeypatch):
+def test_encoded_traversal_is_contained(tmp_path, monkeypatch, gateway_auth):
     # secret lives OUTSIDE the served static dir
     secret = tmp_path / "secret.txt"
     secret.write_text("TOP SECRET", encoding="utf-8")
@@ -62,8 +65,9 @@ def test_encoded_traversal_is_contained(tmp_path, monkeypatch):
     static_dir.mkdir()
     (static_dir / "index.html").write_text("<!doctype html><title>gateway</title>", encoding="utf-8")
     monkeypatch.setattr(app_module, "STATIC_DIR", static_dir)
+    store, _headers, _raw = gateway_auth
     manager = SessionManager()
-    with TestClient(create_app(manager)) as client:
+    with TestClient(create_app(manager, token_store=store)) as client:
         # Starlette decodes %2e%2e -> .. before the path param reaches the handler
         for payload in ("/%2e%2e/secret.txt", "/../secret.txt", "/%2e%2e%2fsecret.txt"):
             response = client.get(payload)

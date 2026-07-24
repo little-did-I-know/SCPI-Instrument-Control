@@ -10,6 +10,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from scpi_control.exceptions import InvalidParameterError, SiglentError, SiglentTimeoutError
+from scpi_control.server.auth import AuthMiddleware, TokenStore
 from scpi_control.server.sessions import SessionError, SessionManager
 
 STATIC_DIR = Path(__file__).parent / "static"
@@ -19,7 +20,7 @@ def _error_response(status: int, exc: BaseException) -> JSONResponse:
     return JSONResponse(status_code=status, content={"error": type(exc).__name__, "detail": str(exc)})
 
 
-def create_app(manager: Optional[SessionManager] = None, references_dir: Optional[str] = None) -> FastAPI:
+def create_app(manager: Optional[SessionManager] = None, references_dir: Optional[str] = None, token_store: Optional[TokenStore] = None) -> FastAPI:
     manager = manager if manager is not None else SessionManager()
 
     @asynccontextmanager
@@ -30,6 +31,10 @@ def create_app(manager: Optional[SessionManager] = None, references_dir: Optiona
 
     app = FastAPI(title="SCPI Instrument Control Gateway", lifespan=lifespan)
     app.state.manager = manager
+    # A malformed token store must fail loudly (TokenStore.__init__ raises
+    # ValueError) rather than be caught here and silently degrade to an empty
+    # store, which would open the gateway to anonymous access.
+    app.state.tokens = token_store if token_store is not None else TokenStore()
     # Reference store is created lazily on first use: ReferenceWaveform.__init__
     # mkdirs its storage directory, and most requests never need it.
     app.state.references_dir = references_dir
@@ -44,6 +49,14 @@ def create_app(manager: Optional[SessionManager] = None, references_dir: Optiona
     app.include_router(scope_api.router, prefix="/api")
     app.include_router(stream_api.router, prefix="/api")
     app.include_router(discovery_api.router, prefix="/api")
+
+    @app.get("/api/health")
+    async def health():
+        return {"status": "ok"}
+
+    @app.get("/api/whoami")
+    async def whoami(request: Request):
+        return {"identity": getattr(request.state, "identity", None)}
 
     @app.exception_handler(InvalidParameterError)
     async def _invalid_parameter(request: Request, exc: InvalidParameterError):
@@ -87,5 +100,9 @@ def create_app(manager: Optional[SessionManager] = None, references_dir: Optiona
             if full_path and candidate.is_file() and candidate.is_relative_to(static_root):
                 return FileResponse(str(candidate))
             return FileResponse(str(index_file))
+
+    # Added last so it wraps everything above, including the SPA catch-all: pure
+    # ASGI middleware (not BaseHTTPMiddleware) so it also guards WebSocket scopes.
+    app.add_middleware(AuthMiddleware, store=app.state.tokens)
 
     return app

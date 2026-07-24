@@ -17,22 +17,33 @@ from scpi_control.server.sessions import SessionManager  # noqa: E402
 
 
 @pytest.fixture()
-def client():
+def client(gateway_auth):
+    store, headers, _raw = gateway_auth
     manager = SessionManager()
-    app = create_app(manager)
+    app = create_app(manager, token_store=store)
     with TestClient(app) as test_client:
+        test_client.headers.update(headers)
         yield test_client
     manager.close_all()
 
 
 @pytest.fixture()
-def client_manager():
+def client_manager(gateway_auth):
     """Like ``client`` but also hands back the manager for white-box assertions."""
+    store, headers, _raw = gateway_auth
     manager = SessionManager()
-    app = create_app(manager)
+    app = create_app(manager, token_store=store)
     with TestClient(app) as test_client:
+        test_client.headers.update(headers)
         yield test_client, manager
     manager.close_all()
+
+
+@pytest.fixture()
+def ws_subprotocols(gateway_auth):
+    """WebSocket handshakes ignore default client headers; auth via subprotocol."""
+    _store, _headers, raw = gateway_auth
+    return ["scpi-token.{0}".format(raw), "scpi"]
 
 
 def _create_mock(client):
@@ -41,9 +52,9 @@ def _create_mock(client):
     return response.json()["id"]
 
 
-def test_stream_sends_initial_state_then_waveforms(client):
+def test_stream_sends_initial_state_then_waveforms(client, ws_subprotocols):
     sid = _create_mock(client)
-    with client.websocket_connect("/api/sessions/{0}/stream".format(sid)) as ws:
+    with client.websocket_connect("/api/sessions/{0}/stream".format(sid), subprotocols=ws_subprotocols) as ws:
         first = ws.receive_json()
         assert first["type"] == "state"
         assert first["state"]["channels"]["1"]["enabled"] is True
@@ -58,9 +69,9 @@ def test_stream_sends_initial_state_then_waveforms(client):
             pytest.fail("no waveform frame received")
 
 
-def test_stream_relays_state_broadcast_after_mutation(client):
+def test_stream_relays_state_broadcast_after_mutation(client, ws_subprotocols):
     sid = _create_mock(client)
-    with client.websocket_connect("/api/sessions/{0}/stream".format(sid)) as ws:
+    with client.websocket_connect("/api/sessions/{0}/stream".format(sid), subprotocols=ws_subprotocols) as ws:
         assert ws.receive_json()["type"] == "state"
         response = client.patch("/api/sessions/{0}/scope/timebase".format(sid), json={"timebase": 0.002})
         assert response.status_code == 200
@@ -72,9 +83,9 @@ def test_stream_relays_state_broadcast_after_mutation(client):
             pytest.fail("no state broadcast observed")
 
 
-def test_stream_unknown_session_closes(client):
+def test_stream_unknown_session_closes(client, ws_subprotocols):
     with pytest.raises(Exception):
-        with client.websocket_connect("/api/sessions/nope/stream") as ws:
+        with client.websocket_connect("/api/sessions/nope/stream", subprotocols=ws_subprotocols) as ws:
             ws.receive_json()
 
 
@@ -113,13 +124,13 @@ def test_enqueue_preserves_control_and_drops_incoming_waveform():
 # --- Fix 2: idle sessions still notice client disconnect -------------------
 
 
-def test_idle_stream_detects_disconnect_and_unsubscribes(client_manager):
+def test_idle_stream_detects_disconnect_and_unsubscribes(client_manager, ws_subprotocols):
     client, manager = client_manager
     sid = _create_mock(client)
     session = manager.get(sid)
     # Disable ch1 -> the session now publishes nothing, so the sender parks.
     assert client.patch("/api/sessions/{0}/scope/channels/1".format(sid), json={"enabled": False}).status_code == 200
-    with client.websocket_connect("/api/sessions/{0}/stream".format(sid)) as ws:
+    with client.websocket_connect("/api/sessions/{0}/stream".format(sid), subprotocols=ws_subprotocols) as ws:
         assert ws.receive_json()["type"] == "state"
     # Client context exited -> disconnect. The receiver must notice and unsubscribe.
     deadline = time.time() + 5
@@ -131,9 +142,9 @@ def test_idle_stream_detects_disconnect_and_unsubscribes(client_manager):
 # --- Fix 5: deleting a session closes its streams --------------------------
 
 
-def test_delete_session_closes_stream(client):
+def test_delete_session_closes_stream(client, ws_subprotocols):
     sid = _create_mock(client)
-    with client.websocket_connect("/api/sessions/{0}/stream".format(sid)) as ws:
+    with client.websocket_connect("/api/sessions/{0}/stream".format(sid), subprotocols=ws_subprotocols) as ws:
         assert ws.receive_json()["type"] == "state"
         assert client.delete("/api/sessions/{0}".format(sid)).status_code == 204
         closed_seen = False

@@ -30,6 +30,20 @@ def ollama_sdk(capabilities=("completion", "tools")):
         yield fake, cls
 
 
+@pytest.fixture()
+def gateway_auth(tmp_path):
+    """(token_store, headers, raw_token) for an authenticated gateway test client.
+
+    raw_token is needed by WebSocket tests: default client headers do not apply
+    to the handshake, which authenticates via subprotocol instead.
+    """
+    from scpi_control.server.auth import TokenStore
+
+    store = TokenStore(str(tmp_path / "tokens.json"))
+    raw = store.mint("tester")
+    return store, {"Authorization": "Bearer {0}".format(raw)}, raw
+
+
 @pytest.fixture
 def bursty_waveform():
     """A sine carrying 20 multi-sample spikes -- more real transients than the
