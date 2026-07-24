@@ -24,6 +24,7 @@ fastapi = pytest.importorskip("fastapi")
 pytest.importorskip("httpx")
 from fastapi.routing import APIRoute, APIWebSocketRoute  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
+from starlette.websockets import WebSocketDisconnect  # noqa: E402
 
 from scpi_control.server.app import create_app  # noqa: E402
 from scpi_control.server.auth import EXEMPT_PATHS, TokenStore  # noqa: E402
@@ -161,8 +162,13 @@ def test_every_api_route_rejects_anonymous(enumerated_app):
 
 
 def test_every_ws_route_rejects_anonymous(enumerated_app):
+    # Assert the 1008 policy-violation code specifically. A bare
+    # pytest.raises(Exception) passes vacuously here: an unknown session id
+    # closes with 4404 regardless of auth, so the test would stay green with
+    # the WebSocket guard entirely removed.
     with TestClient(enumerated_app) as test_client:
         for path in _ws_routes(enumerated_app):
-            with pytest.raises(Exception):
+            with pytest.raises(WebSocketDisconnect) as excinfo:
                 with test_client.websocket_connect(_concrete(path)):
                     pass
+            assert excinfo.value.code == 1008, "{0} closed {1}, not a policy violation".format(path, excinfo.value.code)
