@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.1.1] - 2026-07-24
+
+### Fixed
+
+- Packaging: the six screenshots in the README are now absolute URLs, so they render on the PyPI
+  project page. They used repository-relative paths, which PyPI cannot resolve because it renders
+  the README with no repository context — the images showed as broken there while displaying
+  correctly on GitHub.
+
 ## [4.1.0] - 2026-07-23
 
 ### Added
