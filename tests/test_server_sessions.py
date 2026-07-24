@@ -102,6 +102,26 @@ def test_open_failure_raises_and_leaves_no_thread():
     assert threading.active_count() <= before + 1
 
 
+class GatedConnection(MockConnection):
+    """A mock whose connect() blocks on a shared gate until the test releases it.
+
+    Lets a test hold every concurrent InstrumentSession.open() call inside
+    connect() at once, so a check-then-register race in SessionManager.create
+    can be reproduced deterministically (every worker guaranteed to be
+    "inside the window") instead of relying on unlucky thread scheduling.
+    """
+
+    def __init__(self, *args, gate, on_enter, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._gate = gate
+        self._on_enter = on_enter
+
+    def connect(self):
+        self._on_enter()
+        self._gate.wait(timeout=10.0)
+        super().connect()
+
+
 class KillableMock(MockConnection):
     """A mock whose connection can be pulled mid-session, as if the wire dropped."""
 
@@ -233,3 +253,76 @@ class TestSessionManager:
         with pytest.raises(SiglentError):
             manager.create("bad", mock=True, _connection=conn)
         assert manager.list() == []
+
+    def test_failed_create_releases_its_reservation(self):
+        # A failed attempt must not leak its cap reservation -- otherwise the
+        # cap permanently shrinks by one per failure until restart.
+        manager = SessionManager(max_sessions=2)
+        for _ in range(3):
+            conn = FailingMock("mock", idn=LEGACY_IDN)
+            with pytest.raises(SiglentError):
+                manager.create("bad", mock=True, _connection=conn)
+        try:
+            for i in range(2):
+                conn = MockConnection("mock", idn=LEGACY_IDN, channel_states={1: True}, trigger_status=["Stop"], sample_rate=1_000.0, timebase=1e-3)
+                assert manager.create("ok-{0}".format(i), mock=True, _connection=conn) is not None
+            with pytest.raises(SessionError):
+                manager.create("over", mock=True, _connection=MockConnection("mock", idn=LEGACY_IDN))
+        finally:
+            manager.close_all()
+
+    def test_concurrent_create_never_exceeds_the_cap(self):
+        # TOCTOU regression: SessionManager.create used to check the cap and
+        # release the lock before InstrumentSession.open() ran, so N
+        # concurrent callers could all observe room and all proceed. Force
+        # the race deterministically by gating every connect() behind a
+        # threading.Event: no create() call can register a session until the
+        # gate opens, so every worker is guaranteed to have made (or been
+        # denied) its cap check before any of them can succeed -- regardless
+        # of scheduling order.
+        cap = 3
+        workers = 9
+        manager = SessionManager(max_sessions=cap)
+        gate = threading.Event()
+        state_lock = threading.Lock()
+        counters = {"entered": 0, "finished": 0}
+
+        def on_enter():
+            with state_lock:
+                counters["entered"] += 1
+
+        def make_conn():
+            return GatedConnection("mock", idn=LEGACY_IDN, channel_states={1: True}, trigger_status=["Stop"], sample_rate=1_000.0, timebase=1e-3, gate=gate, on_enter=on_enter)
+
+        outcomes = []
+        outcomes_lock = threading.Lock()
+
+        def worker(i):
+            try:
+                session = manager.create("bench-{0}".format(i), mock=True, _connection=make_conn())
+                with outcomes_lock:
+                    outcomes.append(session)
+            except SessionError:
+                pass
+            finally:
+                with state_lock:
+                    counters["finished"] += 1
+
+        try:
+            with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as pool:
+                futures = [pool.submit(worker, i) for i in range(workers)]
+                # Quiescence point: every worker is either blocked in connect()
+                # (having already passed the cap check) or has already been
+                # rejected by it. No thread can register while the gate is
+                # shut, so this condition is reachable regardless of whether
+                # the fix is present -- it never depends on beating a race.
+                reached = _wait_for(lambda: counters["entered"] + counters["finished"] >= workers, timeout=5.0)
+                gate.set()  # always release, even on a timed-out wait, to avoid hanging workers
+                assert reached, "workers did not reach the gate/rejection quiescence point in time"
+                done, not_done = concurrent.futures.wait(futures, timeout=10.0)
+                assert not not_done, "a worker did not finish after the gate opened"
+
+            assert len(outcomes) <= cap, "successful creations ({0}) exceeded the cap ({1})".format(len(outcomes), cap)
+        finally:
+            gate.set()
+            manager.close_all()

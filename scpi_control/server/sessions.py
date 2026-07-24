@@ -423,16 +423,38 @@ class SessionManager:
         self._lock = threading.Lock()
         self.allowed_ports = allowed_ports
         self.max_sessions = max_sessions
+        # Slots claimed by an in-flight create() that hasn't registered yet.
+        # Counted alongside len(self._sessions) under the same lock as the
+        # cap check so the check and the reservation are one atomic step --
+        # see create() for why that matters.
+        self._pending = 0
 
     def create(self, label: str, *, address: Optional[str] = None, port: int = 5025, mock: bool = False, model: Optional[str] = None, owner: str = "", _connection=None) -> InstrumentSession:
         # Checked BEFORE InstrumentSession.open: opening spawns a worker thread
         # and blocks on a connect with a 30s timeout, so checking the cap after
         # the fact would let concurrent requests past the cap occupy every
         # threadpool worker anyway -- the exact exhaustion this guards against.
+        #
+        # The check alone isn't enough under concurrency: the lock used to be
+        # released between the check and registration, so N concurrent callers
+        # could all observe room and all proceed (TOCTOU) -- with a cap of 8
+        # and 100 concurrent requests, all 100 pass. Reserving a slot in
+        # self._pending under the SAME lock acquisition as the check closes
+        # that window: each successful check immediately claims capacity, so
+        # the next concurrent caller sees it. The reservation is always
+        # released -- via `finally` -- whether open() succeeds, raises from a
+        # connect timeout, or raises from validate_target's policy rejection,
+        # so a failed attempt can never leak a slot and permanently shrink
+        # the cap.
         with self._lock:
-            if len(self._sessions) >= self.max_sessions:
+            if len(self._sessions) + self._pending >= self.max_sessions:
                 raise SessionError("session limit reached ({0}); close a session first".format(self.max_sessions))
-        session = InstrumentSession.open(label, address=address, port=port, mock=mock, model=model, owner=owner, allowed_ports=self.allowed_ports, _connection=_connection)
+            self._pending += 1
+        try:
+            session = InstrumentSession.open(label, address=address, port=port, mock=mock, model=model, owner=owner, allowed_ports=self.allowed_ports, _connection=_connection)
+        finally:
+            with self._lock:
+                self._pending -= 1
         with self._lock:
             self._sessions[session.id] = session
         return session
