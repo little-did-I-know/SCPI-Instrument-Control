@@ -46,6 +46,11 @@ export function TokenGate({ children }: { children: React.ReactNode }) {
         setHasStoredToken(false);
         setError(UNAUTHORIZED);
       } else {
+        // Identity is deliberately left alone here, mirroring the token: an
+        // unreachable server says nothing about who you are. That is safe only
+        // because check() runs once on mount and never again after "ready", so
+        // a stale identity can't coexist with this error screen. If periodic
+        // re-validation is ever added, clear the identity here too.
         setHasStoredToken(true);
         setError(UNREACHABLE);
       }
