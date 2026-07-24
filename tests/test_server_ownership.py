@@ -1,5 +1,7 @@
 """Session ownership: the creating identity owns the session."""
 
+import time
+
 import pytest
 
 fastapi = pytest.importorskip("fastapi")
@@ -75,6 +77,7 @@ _BODIES = {
     ("POST", "/sessions/{session_id}/scope/command"): {"command": "*RST"},
     ("PUT", "/sessions/{session_id}/scope/measurements"): [{"channel": 1, "mtype": "PKPK"}],
     ("POST", "/sessions/{session_id}/scope/references"): {"name": "ref", "channel": 1},
+    ("POST", "/sessions/{session_id}/owner"): {"name": "carol"},
 }
 
 
@@ -100,6 +103,13 @@ def test_write_route_rejects_non_owner(two_users, method, path):
 _QUERY_OVERRIDES = {"/api/discover": {"cidr": "127.0.0.1/32"}}
 _BODY_OVERRIDES = {("POST", "/api/sessions"): {"label": "s2", "mock": True}}
 
+# /claim is deliberately excluded from the scan below: unlike WRITE_ROUTES,
+# a non-owner's request is its normal success path, and it 409s only when the
+# owner is still active -- a different conflict than "not the owner", so it
+# is neither a WRITE_ROUTES entry nor an always-open read route (see the note
+# next to WRITE_ROUTES in ownership.py).
+_OWNERSHIP_CONFLICT_EXEMPT = {("POST", "/api/sessions/{session_id}/claim")}
+
 
 def test_non_write_routes_stay_open_to_non_owner(two_users):
     """Walk the live route table for every (method, path) NOT in WRITE_ROUTES
@@ -116,7 +126,7 @@ def test_non_write_routes_stay_open_to_non_owner(two_users):
         if not isinstance(route, APIRoute) or not route.path.startswith("/api/"):
             continue
         for method in sorted(route.methods - {"HEAD", "OPTIONS"}):
-            if (method, route.path) in write_paths:
+            if (method, route.path) in write_paths or (method, route.path) in _OWNERSHIP_CONFLICT_EXEMPT:
                 continue
             checked += 1
             url = _concrete(route.path, sid)
@@ -128,3 +138,126 @@ def test_non_write_routes_stay_open_to_non_owner(two_users):
     # verified to be checking real routes, not an accidentally-empty set.
     assert checked >= 15
     assert not gated, "non-owner unexpectedly got 409 on: {0}".format(gated)
+
+
+# --- Claim and handoff --------------------------------------------------
+
+
+def test_claim_is_refused_while_owner_is_active(two_users):
+    client, owner, other = two_users
+    sid = _make_session(client, owner)["id"]
+    response = client.post("/api/sessions/{0}/claim".format(sid), headers=other)
+    assert response.status_code == 409
+    assert response.json()["detail"]
+
+
+def test_claim_succeeds_once_owner_is_idle(two_users, monkeypatch):
+    client, owner, other = two_users
+    sid = _make_session(client, owner)["id"]
+    # Make the idle threshold trivially small rather than sleeping.
+    client.app.state.abandon_after = 0.0
+    response = client.post("/api/sessions/{0}/claim".format(sid), headers=other)
+    assert response.status_code == 200
+    # two_users mints identities "alice" (owner) / "bob" (other) -- not the
+    # local variable names "owner"/"other" used for readability here.
+    assert response.json()["owner"] == "bob"
+    assert client.patch("/api/sessions/{0}/scope/timebase".format(sid), json={"timebase": 1e-3}, headers=other).status_code == 200
+
+
+def test_owner_can_hand_off_explicitly(two_users):
+    client, owner, other = two_users
+    sid = _make_session(client, owner)["id"]
+    response = client.post("/api/sessions/{0}/owner".format(sid), json={"name": "other"}, headers=owner)
+    assert response.status_code == 200
+    assert response.json()["owner"] == "other"
+
+
+def test_non_owner_cannot_hand_off(two_users):
+    client, owner, other = two_users
+    sid = _make_session(client, owner)["id"]
+    assert client.post("/api/sessions/{0}/owner".format(sid), json={"name": "other"}, headers=other).status_code == 409
+
+
+def test_claim_succeeds_immediately_on_unowned_session():
+    """An unowned session (owner == "") is claimable regardless of
+    owner_last_active -- require_owner touches that timer even with no owner
+    (see ownership.require_owner), so claim() must not read a fresh
+    owner_last_active on an unowned session as "owner activity".
+    """
+    from scpi_control.server.ownership import claim
+    from scpi_control.server.sessions import SessionManager
+
+    manager = SessionManager()
+    try:
+        session = manager.create("s", mock=True)
+        assert session.owner == ""
+        session.owner_last_active = time.monotonic()  # as fresh as possible
+        assert claim(session, "someone", 300.0) is None
+        assert session.owner == "someone"
+    finally:
+        manager.close_all()
+
+
+def test_owner_activity_on_read_route_resets_idle_claim_window(two_users):
+    """A read route (require_session) must count as owner activity, or a
+    watching-but-not-writing owner (the normal case while a capture runs)
+    looks idle and can be claimed out from under them.
+    """
+    client, owner, other = two_users
+    sid = _make_session(client, owner)["id"]
+    session = client.app.state.manager.get(sid)
+    session.owner_last_active -= 1000.0  # simulate a long-idle owner
+    client.app.state.abandon_after = 1.0
+    assert client.get("/api/sessions/{0}/scope/state".format(sid), headers=owner).status_code == 200
+    response = client.post("/api/sessions/{0}/claim".format(sid), headers=other)
+    assert response.status_code == 409
+
+
+@pytest.fixture()
+def two_users_ws(tmp_path):
+    """Like ``two_users``, but also exposes raw tokens as WS subprotocols.
+
+    WebSocket handshakes ignore default client headers; auth is via
+    subprotocol instead (see tests/test_server_stream_ws.py).
+    """
+    from scpi_control.server.auth import TokenStore
+
+    store = TokenStore(str(tmp_path / "tokens.json"))
+    alice_raw = store.mint("alice")
+    bob_raw = store.mint("bob")
+    alice = {"Authorization": "Bearer {0}".format(alice_raw)}
+    bob = {"Authorization": "Bearer {0}".format(bob_raw)}
+    alice_ws = ["scpi-token.{0}".format(alice_raw), "scpi"]
+    bob_ws = ["scpi-token.{0}".format(bob_raw), "scpi"]
+    manager = SessionManager()
+    app = create_app(manager, token_store=store)
+    with TestClient(app) as client:
+        yield client, alice, bob, alice_ws, bob_ws
+    manager.close_all()
+
+
+def test_claim_is_refused_while_owner_is_watching_stream(two_users_ws):
+    """The owner-watching flag must block a claim even when the idle
+    threshold alone would allow it -- without the flag, this would 200.
+    """
+    client, alice, bob, alice_ws, _bob_ws = two_users_ws
+    sid = _make_session(client, alice)["id"]
+    client.app.state.abandon_after = 0.0  # threshold alone would allow the claim
+    with client.websocket_connect("/api/sessions/{0}/stream".format(sid), subprotocols=alice_ws) as ws:
+        assert ws.receive_json()["type"] == "state"
+        response = client.post("/api/sessions/{0}/claim".format(sid), headers=bob)
+        assert response.status_code == 409
+        assert response.json()["detail"]
+
+
+def test_claim_succeeds_after_owner_stream_disconnects(two_users_ws):
+    """The owner-watching flag must clear on disconnect, or an owner who
+    closed their stream tab stays permanently unclaimable.
+    """
+    client, alice, bob, alice_ws, _bob_ws = two_users_ws
+    sid = _make_session(client, alice)["id"]
+    client.app.state.abandon_after = 0.0
+    with client.websocket_connect("/api/sessions/{0}/stream".format(sid), subprotocols=alice_ws) as ws:
+        assert ws.receive_json()["type"] == "state"
+    response = client.post("/api/sessions/{0}/claim".format(sid), headers=bob)
+    assert response.status_code == 200

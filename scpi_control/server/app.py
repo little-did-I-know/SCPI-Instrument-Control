@@ -20,7 +20,7 @@ def _error_response(status: int, exc: BaseException) -> JSONResponse:
     return JSONResponse(status_code=status, content={"error": type(exc).__name__, "detail": str(exc)})
 
 
-def create_app(manager: Optional[SessionManager] = None, references_dir: Optional[str] = None, token_store: Optional[TokenStore] = None) -> FastAPI:
+def create_app(manager: Optional[SessionManager] = None, references_dir: Optional[str] = None, token_store: Optional[TokenStore] = None, abandon_after: float = 300.0) -> FastAPI:
     manager = manager if manager is not None else SessionManager()
 
     @asynccontextmanager
@@ -42,6 +42,10 @@ def create_app(manager: Optional[SessionManager] = None, references_dir: Optiona
     # mkdirs its storage directory, and most requests never need it.
     app.state.references_dir = references_dir
     app.state.references = None
+    # Seconds of owner inactivity before another identity may claim a session
+    # (scpi_control.server.ownership.claim); mutable at runtime so tests can
+    # drive it to 0 instead of sleeping for a real timeout.
+    app.state.abandon_after = abandon_after
 
     from scpi_control.server.api import discovery as discovery_api
     from scpi_control.server.api import scope as scope_api

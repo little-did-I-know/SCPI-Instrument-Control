@@ -91,6 +91,10 @@ class ReferencePut(BaseModel):
     name: Optional[str] = None
 
 
+class OwnerPut(BaseModel):
+    name: str
+
+
 class ModelOut(BaseModel):
     model_name: str
     series: str

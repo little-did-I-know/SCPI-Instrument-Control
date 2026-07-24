@@ -84,6 +84,14 @@ async def stream(websocket: WebSocket, session_id: str):
         loop.call_soon_threadsafe(_enqueue, outbox, message)
 
     unsubscribe = session.subscribe(on_message)
+    # A live stream is one long-lived connection, so require_session's
+    # per-request touch() never fires here -- an owner who is watching a
+    # capture would otherwise look idle to the claim rule. Mark the owner as
+    # watching for the lifetime of the connection instead (no-op if this
+    # identity isn't the owner); unmark unconditionally in finally so an
+    # abnormal disconnect releases it just like a clean close does.
+    identity = getattr(websocket.state, "identity", "")
+    unmark_owner_watching = session.mark_owner_watching(identity)
     receiver = None
     sender = None
     try:
@@ -100,6 +108,7 @@ async def stream(websocket: WebSocket, session_id: str):
         # Any failure on the send/receive path tears down quietly (no ASGI noise).
         pass
     finally:
+        unmark_owner_watching()
         unsubscribe()
         for task in (receiver, sender):
             if task is not None:

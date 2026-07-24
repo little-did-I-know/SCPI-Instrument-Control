@@ -128,10 +128,42 @@ class InstrumentSession:
         self.recorder = TrendRecorder()  # internally locked: worker appends, request threads control/read
         self.owner = ""
         self.owner_last_active = time.monotonic()
+        self._owner_watchers = 0
 
     def touch(self) -> None:
         """Record owner activity; feeds the abandoned-session claim rule."""
         self.owner_last_active = time.monotonic()
+
+    def owner_watching(self) -> bool:
+        """True while at least one live stream opened by the current owner is connected.
+
+        A watching owner is never idle even though only writes touch()
+        owner_last_active -- the claim rule refuses outright while this is
+        true, regardless of the idle threshold.
+        """
+        return self._owner_watchers > 0
+
+    def mark_owner_watching(self, identity: str) -> Callable[[], None]:
+        """Register that ``identity`` opened the live stream; returns an unmark callback.
+
+        Only counts when ``identity`` is the current owner, so a non-owner's
+        stream never blocks a claim. The returned callback decrements exactly
+        once no matter how many times it is called, so it is safe to invoke
+        unconditionally from a ``finally`` block on any disconnect path
+        (clean close, error, or cancellation).
+        """
+        is_owner = bool(self.owner) and identity == self.owner
+        if is_owner:
+            self._owner_watchers += 1
+        released = False
+
+        def unmark() -> None:
+            nonlocal released
+            if is_owner and not released:
+                released = True
+                self._owner_watchers -= 1
+
+        return unmark
 
     @classmethod
     def open(

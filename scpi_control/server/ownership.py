@@ -4,11 +4,14 @@ Reads are open to any authenticated identity; writes belong to the session's
 owner. NotOwnerError subclasses SessionError so the app's existing handler maps
 it to 409 -- the code already used for session-state conflicts.
 
-Claim/handoff for abandoned sessions is a later feature; this module only
-enforces the boundary between the current owner and everyone else.
+Beyond the write boundary, this module also covers the escape hatch for a
+session whose owner walked away: claim() lets another identity take over an
+abandoned session, and the /owner route (api/sessions.py) lets the current
+owner hand off explicitly.
 """
 
 import time
+from typing import Optional
 
 from fastapi import Request
 
@@ -43,8 +46,16 @@ WRITE_ROUTES = frozenset(
         ("POST", "/sessions/{session_id}/scope/log/start"),
         ("POST", "/sessions/{session_id}/scope/log/stop"),
         ("POST", "/sessions/{session_id}/scope/{op}"),
+        ("POST", "/sessions/{session_id}/owner"),
     }
 )
+
+# Note: POST /sessions/{session_id}/claim is deliberately NOT in this set.
+# It is gated on ownership too, but a non-owner's request is its normal,
+# successful path (claiming) rather than something require_owner rejects --
+# it only 409s when the current owner is still active, a different kind of
+# conflict than "you are not the owner". tests/test_server_ownership.py's
+# bidirectional WRITE_ROUTES scan excludes it explicitly for that reason.
 
 
 class NotOwnerError(SessionError):
@@ -61,3 +72,37 @@ def require_owner(request: Request, session_id: str) -> InstrumentSession:
         raise NotOwnerError(session.owner, time.monotonic() - session.owner_last_active)
     session.touch()
     return session
+
+
+def abandon_after(request: Request) -> float:
+    """Seconds of owner inactivity before another identity may claim a session."""
+    return request.app.state.abandon_after
+
+
+def claim(session: InstrumentSession, identity: str, threshold: float) -> Optional[float]:
+    """Attempt to claim ``session`` for ``identity``.
+
+    An unowned session, or one already owned by ``identity``, claims
+    immediately -- note this ignores owner_last_active entirely for an
+    unowned session (owner == ""), since require_owner() touches that timer
+    even when there is no owner to attribute the activity to.
+
+    Otherwise the claim is refused while the owner is actively watching the
+    live stream (owner_watching()), regardless of the idle threshold, and
+    also refused if the owner has been active more recently than
+    ``threshold`` seconds ago. owner_last_active is time.monotonic()-based;
+    ``threshold`` must be compared against a monotonic delta, never wall time.
+
+    Returns None on success (session.owner is now ``identity``), or the
+    number of seconds remaining before the session becomes claimable.
+    """
+    if session.owner and session.owner != identity:
+        if session.owner_watching():
+            return threshold
+        idle = time.monotonic() - session.owner_last_active
+        remaining = threshold - idle
+        if remaining > 0:
+            return remaining
+    session.owner = identity
+    session.touch()
+    return None

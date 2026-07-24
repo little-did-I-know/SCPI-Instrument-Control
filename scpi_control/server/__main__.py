@@ -34,6 +34,7 @@ def main(argv=None) -> None:
     parser = argparse.ArgumentParser(prog="scpi-web", description="SCPI Instrument Control web gateway")
     parser.add_argument("--host", default="127.0.0.1", help="bind address (use 0.0.0.0 to expose on the LAN)")
     parser.add_argument("--port", type=int, default=8765)
+    parser.add_argument("--abandon-after", type=float, default=300.0, help="seconds of owner inactivity before another user may claim a session")
     _add_config_dir(parser)
 
     sub = parser.add_subparsers(dest="command")
@@ -69,7 +70,7 @@ def main(argv=None) -> None:
     if store.is_empty():
         raw = store.mint("default")
         print("\nGateway ready. Open:\n\n    http://{0}:{1}/?token={2}\n".format(args.host, args.port, raw))
-    uvicorn.run(create_app(token_store=store), host=args.host, port=args.port)
+    uvicorn.run(create_app(token_store=store, abandon_after=args.abandon_after), host=args.host, port=args.port)
 
 
 if __name__ == "__main__":
