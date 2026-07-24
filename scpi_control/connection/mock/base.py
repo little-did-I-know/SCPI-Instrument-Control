@@ -754,6 +754,16 @@ class MockConnection(BaseConnection):
                 payload = siglent.build_waveform_data(self)
                 return payload[:size] if size is not None else payload
 
+        # v5.0.0: the legacy C<n>:WF? DAT2/DESC block was answered on modern
+        # dialects as a back-compat shim "until v5.0.0" (Task 18). That date
+        # has arrived -- the modern programming guide documents no such
+        # command, so a modern instance must no longer serve it. Real modern
+        # hardware gives no response at all to an unrecognized/legacy
+        # waveform read; model that honestly, same as the query() timeout
+        # path above.
+        if self.scope_dialect == "modern":
+            raise exceptions.TimeoutError(f"MockConnection ({self.scope_dialect}) has no response for read_raw() after writes={self.writes!r}")
+
         personality = _PERSONALITIES.get(self.scope_vendor, siglent)
         payload = personality.build_waveform_response(self)
         return payload[:size] if size is not None else payload
