@@ -1,22 +1,32 @@
 # tests/test_server_auth_coverage.py
 """Regression coverage for review findings against the auth boundary.
 
-Two things live here that the other auth test modules don't cover:
+Three things live here that the other auth test modules don't cover:
 
 - Critical 1: a proxy-mounted deployment (``uvicorn --root-path /gw``) must not
   let ``scope["path"]`` still carrying the mount prefix slip an ``/api/*``
   request past the guard.
 - Important 2: the OpenAPI schema and HTML doc UIs must sit behind the same
   guard as the rest of the instrument-control surface, not float outside it.
+- Critical 3: this is the load-bearing test of the whole sub-project. It walks
+  the *real* route table -- rather than a hand-maintained list -- so a new
+  router mounted under /api/ is covered by this guard the day it is added,
+  instead of silently slipping through anonymous. Note that /api/openapi.json
+  is registered by FastAPI as a plain ``starlette.routing.Route``, not an
+  ``APIRoute`` (it is added via ``add_route``, not a decorator), so the
+  enumeration below never sees it -- that path is exercised separately by
+  ``test_guarded_openapi_requires_a_token`` above.
 """
 
 import pytest
 
 fastapi = pytest.importorskip("fastapi")
 pytest.importorskip("httpx")
+from fastapi.routing import APIRoute, APIWebSocketRoute  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 
 from scpi_control.server.app import create_app  # noqa: E402
+from scpi_control.server.auth import EXEMPT_PATHS, TokenStore  # noqa: E402
 from scpi_control.server.sessions import SessionManager  # noqa: E402
 
 
@@ -97,3 +107,62 @@ def test_guarded_openapi_serves_the_schema_with_a_token(client):
     response = test_client.get("/api/openapi.json", headers=headers)
     assert response.status_code == 200
     assert _looks_like_openapi_schema(response)
+
+
+# --- Critical 3: every route in the real table rejects anonymous access ----
+
+PLACEHOLDERS = {"session_id": "nope", "channel": "1", "n": "1", "name": "ref", "op": "run"}
+
+
+def _concrete(path):
+    for key, value in PLACEHOLDERS.items():
+        path = path.replace("{" + key + "}", value)
+    return path
+
+
+def _http_routes(app):
+    for route in app.routes:
+        if isinstance(route, APIRoute) and route.path.startswith("/api/") and route.path not in EXEMPT_PATHS:
+            for method in sorted(route.methods - {"HEAD", "OPTIONS"}):
+                yield method, route.path
+
+
+def _ws_routes(app):
+    for route in app.routes:
+        if isinstance(route, APIWebSocketRoute) and route.path.startswith("/api/"):
+            yield route.path
+
+
+@pytest.fixture(scope="module")
+def enumerated_app(tmp_path_factory):
+    store = TokenStore(str(tmp_path_factory.mktemp("cfg") / "tokens.json"))
+    store.mint("tester")
+    manager = SessionManager()
+    application = create_app(manager, token_store=store)
+    yield application
+    manager.close_all()
+
+
+def test_route_table_is_not_empty(enumerated_app):
+    # A guard on an empty table would pass vacuously; pin a floor so the
+    # enumeration itself is verified to be finding real routes.
+    assert len(list(_http_routes(enumerated_app))) >= 30
+    assert len(list(_ws_routes(enumerated_app))) >= 1
+
+
+def test_every_api_route_rejects_anonymous(enumerated_app):
+    with TestClient(enumerated_app) as test_client:
+        unguarded = []
+        for method, path in _http_routes(enumerated_app):
+            response = test_client.request(method, _concrete(path))
+            if response.status_code != 401:
+                unguarded.append("{0} {1} -> {2}".format(method, path, response.status_code))
+        assert not unguarded, "unauthenticated access reached: {0}".format(unguarded)
+
+
+def test_every_ws_route_rejects_anonymous(enumerated_app):
+    with TestClient(enumerated_app) as test_client:
+        for path in _ws_routes(enumerated_app):
+            with pytest.raises(Exception):
+                with test_client.websocket_connect(_concrete(path)):
+                    pass
