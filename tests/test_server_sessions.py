@@ -225,6 +225,39 @@ def test_open_connect_timeout_raises_connection_error(monkeypatch):
 from scpi_control.server.sessions import SessionManager
 
 
+class _StallingLock:
+    """Wraps a real threading.Lock; on its Nth release, blocks the releasing
+    thread until a gate opens.
+
+    Lets a test stall SessionManager.create() at an exact lock hand-off
+    (rather than relying on sleep-based timing) so a gap between two
+    separate ``with self._lock:`` blocks can be reproduced deterministically.
+    The real lock is released before the stall, so other threads are free to
+    acquire it while the stalled thread is paused -- exactly the residual
+    over-admission window under test.
+    """
+
+    def __init__(self, stall_after_release, on_stall, proceed_gate):
+        self._real = threading.Lock()
+        self._release_count = 0
+        self._stall_after_release = stall_after_release
+        self._on_stall = on_stall
+        self._proceed_gate = proceed_gate
+        self._stalled_once = False
+
+    def __enter__(self):
+        self._real.acquire()
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        self._real.release()
+        self._release_count += 1
+        if self._release_count == self._stall_after_release and not self._stalled_once:
+            self._stalled_once = True
+            self._on_stall()
+            self._proceed_gate.wait(timeout=10.0)
+
+
 class TestSessionManager:
     def _manager_with_one(self):
         manager = SessionManager()
@@ -322,7 +355,76 @@ class TestSessionManager:
                 done, not_done = concurrent.futures.wait(futures, timeout=10.0)
                 assert not not_done, "a worker did not finish after the gate opened"
 
-            assert len(outcomes) <= cap, "successful creations ({0}) exceeded the cap ({1})".format(len(outcomes), cap)
+            assert len(outcomes) == cap, "successful creations ({0}) did not match the cap ({1})".format(len(outcomes), cap)
         finally:
             gate.set()
             manager.close_all()
+
+    def test_no_over_admission_window_between_pending_release_and_registration(self):
+        # MEDIUM 1: the reservation used to be decremented (under the lock),
+        # the lock released, and only then re-acquired to register the
+        # session -- a gap during which the slot is counted by neither
+        # self._sessions nor self._pending. Stall a creator exactly there
+        # (after the pending-decrement release, before the register
+        # acquire) via a lock wrapper that blocks on its Nth release, and
+        # prove a concurrent create() is wrongly admitted while cap=1.
+        manager = SessionManager(max_sessions=1)
+        stalled = threading.Event()
+        proceed = threading.Event()
+        # Release #1 is the initial check+reserve block; release #2 is the
+        # pending-decrement block that runs right after InstrumentSession.open
+        # returns. Stalling there -- before the registration block's own
+        # acquire -- lands the stalled thread exactly in the window under test.
+        manager._lock = _StallingLock(stall_after_release=2, on_stall=stalled.set, proceed_gate=proceed)
+
+        result = {}
+
+        def first():
+            conn = MockConnection("mock", idn=LEGACY_IDN, channel_states={1: True}, trigger_status=["Stop"], sample_rate=1_000.0, timebase=1e-3)
+            result["first"] = manager.create("first", mock=True, _connection=conn)
+
+        t = threading.Thread(target=first)
+        t.start()
+        try:
+            assert stalled.wait(timeout=5.0), "first creator never reached the post-decrement window"
+            conn2 = MockConnection("mock", idn=LEGACY_IDN, channel_states={1: True}, trigger_status=["Stop"], sample_rate=1_000.0, timebase=1e-3)
+            with pytest.raises(SessionError):
+                manager.create("second", mock=True, _connection=conn2)
+        finally:
+            proceed.set()
+            t.join(timeout=5.0)
+            manager.close_all()
+
+    def test_open_never_called_when_cap_already_full(self, monkeypatch):
+        # MEDIUM 2: the cap check must run BEFORE InstrumentSession.open --
+        # open() spawns a worker thread and blocks on a 30s connect, so
+        # checking afterwards would let a full-cap caller pay that cost (and
+        # tie up a threadpool worker) anyway. Only ordering in create()
+        # enforces this; spy on open() to prove it is never reached once the
+        # cap is full, rather than just checking the resulting session count.
+        manager = SessionManager(max_sessions=1)
+        conn = MockConnection("mock", idn=LEGACY_IDN, channel_states={1: True}, trigger_status=["Stop"], sample_rate=1_000.0, timebase=1e-3)
+        manager.create("first", mock=True, _connection=conn)
+
+        calls = []
+        original_open = InstrumentSession.open
+
+        def spy(*args, **kwargs):
+            calls.append((args, kwargs))
+            return original_open(*args, **kwargs)
+
+        monkeypatch.setattr(InstrumentSession, "open", spy)
+        try:
+            conn2 = MockConnection("mock", idn=LEGACY_IDN, channel_states={1: True}, trigger_status=["Stop"], sample_rate=1_000.0, timebase=1e-3)
+            with pytest.raises(SessionError):
+                manager.create("second", mock=True, _connection=conn2)
+            assert calls == [], "InstrumentSession.open must not be called once the cap is already full"
+        finally:
+            manager.close_all()
+
+    @pytest.mark.parametrize("max_sessions", [0, -1])
+    def test_rejects_non_positive_max_sessions(self, max_sessions):
+        # LOW 5: max_sessions < 1 yields a gateway that refuses every create()
+        # with a 409 -- a footgun that looks like a crash. Reject it eagerly.
+        with pytest.raises(ValueError):
+            SessionManager(max_sessions=max_sessions)

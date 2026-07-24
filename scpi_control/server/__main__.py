@@ -90,6 +90,15 @@ def main(argv=None) -> None:
             print("revoked {0!r}".format(args.name))
         return
 
+    # Checked before anything else in the server-start path (ahead of minting
+    # a token or touching the config dir): SessionManager itself rejects
+    # max_sessions < 1, but that raw ValueError would surface after "Gateway
+    # ready" has already printed and a token has already been minted, reading
+    # like a crash rather than a configuration mistake. parser.error() prints
+    # a clear message and exits before any of that happens.
+    if args.max_sessions < 1:
+        parser.error("--max-sessions must be at least 1 (got {0})".format(args.max_sessions))
+
     store = _store(args)
     if store.is_empty():
         raw = store.mint("default")

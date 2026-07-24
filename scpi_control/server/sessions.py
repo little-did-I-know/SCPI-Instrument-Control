@@ -419,6 +419,14 @@ class SessionManager:
     """Registry of live sessions. create() connects before registering."""
 
     def __init__(self, allowed_ports: Optional[frozenset] = None, max_sessions: int = 8) -> None:
+        if max_sessions < 1:
+            # A cap below 1 doesn't disable the gateway -- it silently makes
+            # every create() a 409 "session limit reached (0)", which reads
+            # like a bug rather than a configuration mistake. Reject eagerly
+            # here (the library boundary) rather than relying solely on the
+            # CLI to catch it, since SessionManager is also constructed
+            # directly by embedders and tests.
+            raise ValueError("max_sessions must be at least 1 (got {0})".format(max_sessions))
         self._sessions: Dict[str, InstrumentSession] = {}
         self._lock = threading.Lock()
         self.allowed_ports = allowed_ports
@@ -441,22 +449,37 @@ class SessionManager:
         # and 100 concurrent requests, all 100 pass. Reserving a slot in
         # self._pending under the SAME lock acquisition as the check closes
         # that window: each successful check immediately claims capacity, so
-        # the next concurrent caller sees it. The reservation is always
-        # released -- via `finally` -- whether open() succeeds, raises from a
-        # connect timeout, or raises from validate_target's policy rejection,
+        # the next concurrent caller sees it.
+        #
+        # The reservation is released and the session registered in a SINGLE
+        # lock acquisition (below), not two: releasing the lock after
+        # decrementing self._pending and only later re-acquiring it to insert
+        # into self._sessions would reopen the same race one step later -- in
+        # that gap the slot is counted by neither self._pending nor
+        # self._sessions, so a concurrent caller's check can pass when it
+        # shouldn't. The `registered` flag lets the `finally` tell success
+        # from failure: on success the reservation was already released
+        # inside the try (alongside registration), so `finally` must not
+        # double-decrement; on any failure -- open() raising from a connect
+        # timeout, validate_target's policy rejection, or anything else --
+        # `registered` is still False and `finally` releases the reservation,
         # so a failed attempt can never leak a slot and permanently shrink
         # the cap.
         with self._lock:
             if len(self._sessions) + self._pending >= self.max_sessions:
                 raise SessionError("session limit reached ({0}); close a session first".format(self.max_sessions))
             self._pending += 1
+        registered = False
         try:
             session = InstrumentSession.open(label, address=address, port=port, mock=mock, model=model, owner=owner, allowed_ports=self.allowed_ports, _connection=_connection)
-        finally:
             with self._lock:
                 self._pending -= 1
-        with self._lock:
-            self._sessions[session.id] = session
+                self._sessions[session.id] = session
+                registered = True
+        finally:
+            if not registered:
+                with self._lock:
+                    self._pending -= 1
         return session
 
     def list(self) -> List[InstrumentSession]:

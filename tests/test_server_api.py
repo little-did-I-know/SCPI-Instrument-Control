@@ -350,6 +350,19 @@ def test_cli_parses_defaults(tmp_path, monkeypatch):
     assert captured == {"host": "0.0.0.0", "port": 9000}
 
 
+@pytest.mark.parametrize("max_sessions", ["0", "-1"])
+def test_cli_rejects_non_positive_max_sessions(tmp_path, max_sessions, capsys):
+    # LOW 5: --max-sessions 0 (or negative) must not silently start a gateway
+    # that refuses every session with a confusing 409; reject it at the CLI
+    # with a clear message and a nonzero exit, before create_app/uvicorn run.
+    import scpi_control.server.__main__ as cli
+
+    with pytest.raises(SystemExit) as exc_info:
+        cli.main(["--config-dir", str(tmp_path), "--max-sessions", max_sessions])
+    assert exc_info.value.code != 0
+    assert "--max-sessions" in capsys.readouterr().err
+
+
 class TestScreenshot:
     def test_screenshot_returns_png(self, client):
         sid = create_mock_session(client)["id"]
