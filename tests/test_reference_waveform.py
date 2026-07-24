@@ -6,11 +6,13 @@ changed -- that is the signal they exist to give.
 """
 
 import sys
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import numpy as np
 import pytest
 
+import scpi_control.reference_waveform as reference_waveform_module
 from scpi_control.reference_waveform import ReferenceWaveform
 
 
@@ -38,6 +40,16 @@ def test_save_returns_a_path_that_exists(store):
     assert Path(saved).exists()
 
 
+def test_save_none_waveform_raises_value_error(store):
+    with pytest.raises(ValueError):
+        store.save_reference(None, "baseline")
+
+
+def test_save_empty_name_raises_value_error(store):
+    with pytest.raises(ValueError):
+        store.save_reference(_Waveform(), "")
+
+
 def test_round_trip_preserves_samples(store):
     waveform = _Waveform()
     store.save_reference(waveform, "baseline")
@@ -57,6 +69,20 @@ def test_metadata_carries_name_and_derived_stats(store):
         assert key in metadata
 
 
+def test_caller_supplied_metadata_survives_round_trip_alongside_derived_fields(store):
+    store.save_reference(_Waveform(), "with-extra", metadata={"custom_key": "custom_value", "author": "tester"})
+    metadata = store.load_reference("with-extra")["metadata"]
+
+    # Caller-supplied keys survive.
+    assert metadata["custom_key"] == "custom_value"
+    assert metadata["author"] == "tester"
+
+    # Derived keys are still present alongside them.
+    assert metadata["name"] == "with-extra"
+    assert metadata["num_samples"] == 32
+    assert metadata["channel"] == 1
+
+
 def test_unknown_name_loads_as_none(store):
     assert store.load_reference("never-saved") is None
 
@@ -69,6 +95,41 @@ def test_list_references_reports_saved_entries(store):
     for entry in listed:
         for key in ("name", "channel", "timestamp", "num_samples", "time_span"):
             assert key in entry
+
+
+def test_list_references_sorted_by_timestamp_descending(store, monkeypatch):
+    """list_references() documents sorting by timestamp, descending.
+
+    Timestamps come from datetime.now().isoformat() at save time, so two real
+    saves in a fast test run can land in the same resolution tick and make a
+    strict-ordering assertion flaky. To pin the sort behaviour deterministically
+    without touching production code, the `datetime` name imported into
+    reference_waveform.py is monkeypatched with a stand-in whose now() always
+    advances, guaranteeing each save gets a strictly later timestamp than the
+    last -- everything else (real datetime instances, fromtimestamp) is left
+    untouched.
+    """
+
+    class _StepDatetime:
+        _current = [datetime(2024, 1, 1, 0, 0, 0)]
+
+        @classmethod
+        def now(cls):
+            cls._current[0] += timedelta(seconds=1)
+            return cls._current[0]
+
+        @staticmethod
+        def fromtimestamp(*args, **kwargs):
+            return datetime.fromtimestamp(*args, **kwargs)
+
+    monkeypatch.setattr(reference_waveform_module, "datetime", _StepDatetime)
+
+    store.save_reference(_Waveform(), "first")
+    store.save_reference(_Waveform(), "second")
+    store.save_reference(_Waveform(), "third")
+
+    listed = store.list_references()
+    assert [entry["name"] for entry in listed] == ["third", "second", "first"]
 
 
 def test_list_is_empty_for_a_fresh_store(store):
