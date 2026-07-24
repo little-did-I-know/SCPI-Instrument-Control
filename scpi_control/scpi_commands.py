@@ -83,8 +83,13 @@ class SCPICommandSet:
         "get_coupling": "C{ch}:CPL?",
         "set_probe_ratio": "C{ch}:ATTN {ratio}",
         "get_probe_ratio": "C{ch}:ATTN?",
-        "set_bandwidth_limit": "C{ch}:BWL {limit}",  # limit: ON, OFF
-        "get_bandwidth_limit": "C{ch}:BWL?",
+        # BWL is global -- BWL keyword first, comma-separated channel/mode
+        # pairs, not a colon-prefixed per-channel command like VDIV/OFST/CPL
+        # above (RC01020-E01C p.27; task 14, audit L3 -- the previous
+        # "C{ch}:BWL {limit}"/"C{ch}:BWL?" forms were invented, never
+        # documented anywhere in this manual).
+        "set_bandwidth_limit": "BWL C{ch},{limit}",  # limit: ON, OFF
+        "get_bandwidth_limit": "BWL?",  # returns "BWL C1,OFF,C2,ON,..." pairs for ALL channels
         # Timebase control
         "set_time_div": "TDIV {tdiv}",
         "get_time_div": "TDIV?",
@@ -100,16 +105,18 @@ class SCPICommandSet:
         "get_trigger_slope": "{src}:TRSL?",
         "set_trigger_coupling": "{src}:TRCP {coupling}",
         "get_trigger_coupling": "{src}:TRCP?",
-        # Waveform acquisition (transfer path unchanged until the waveform
-        # sub-project; the DAT2 path works on both scope generations)
+        # Waveform acquisition -- legacy-only, unchanged by Task 18. DAT2/DESC
+        # are documented for this dialect (RC01020-E01C p.141); the modern
+        # dialect's equivalent moved to the :WAVeform: subsystem below.
         "get_waveform": "C{ch}:WF? DAT2",
         "get_waveform_preamble": "C{ch}:WF? DESC",
         # Measurements
-        # NOTE: get_parameter_value's wire form is "PAVA? {param},C{ch}" (mtype
-        # first, then a C-prefixed channel) -- this is what measurement.py
-        # actually sent pre-refactor and what the legacy mock's PAVA? regex
-        # parses; do not "correct" it to "C{ch}:PAVA? {param}".
-        "get_parameter_value": "PAVA? {param},C{ch}",
+        # RC01020-E01C p.88: QUERY SYNTAX <trace>:PArameter_VAlue? <parameter>,
+        # <trace> = {C1..C4}. The trace prefix is mandatory. A previous NOTE here
+        # pinned the headerless "PAVA? {param},C{ch}" form on the grounds that it
+        # was "what the legacy mock's PAVA? regex parses" -- the mock was wrong,
+        # and the comment made the defect load-bearing (audit H7/H30).
+        "get_parameter_value": "C{ch}:PAVA? {param}",
         "add_measurement": "PACU {mtype},C{ch}",
         "set_statistics": "PAST {state}",
         "clear_measurements": "PACL",
@@ -177,9 +184,43 @@ class SCPICommandSet:
         "get_trigger_slope": ":TRIGger:EDGE:SLOPe?",
         "set_trigger_coupling": ":TRIGger:EDGE:COUPling {coupling}",
         "get_trigger_coupling": ":TRIGger:EDGE:COUPling?",
-        # Waveform acquisition — unchanged until the waveform sub-project
-        "get_waveform": "C{ch}:WF? DAT2",
-        "get_waveform_preamble": "C{ch}:WF? DESC",
+        # Waveform acquisition (Task 18, audit H9 fix): the modern guide has
+        # ZERO occurrences of "WF?" anywhere -- "C{ch}:WF? DAT2"/"DESC" were
+        # invented. The documented transfer is the :WAVeform: subsystem
+        # (SOURce p.749, STARt p.750, INTerval p.751, POINt p.752, MAXPoint
+        # p.753, WIDTh p.754, PREamble p.755, DATA p.757/758). ModernTransfer
+        # (waveform_transfer.py) is the only caller of get_waveform_preamble/
+        # get_waveform_data/set_waveform_source/set_waveform_width below; the
+        # generic "get_waveform" key is kept (repointed, not removed) purely
+        # for symmetry with the other three dialect tables and any direct
+        # get_command("get_waveform") caller.
+        "get_waveform": ":WAVeform:DATA?",  # p.757
+        "get_waveform_preamble": ":WAVeform:PREamble?",  # p.755
+        "get_waveform_data": ":WAVeform:DATA?",  # p.757 (ModernTransfer's own name for the DATA? leaf)
+        # Waveform transfer-parameter scalars (Task 17, audit H9): the
+        # documented :WAVeform: subsystem's SOURce/STARt/INTerval/POINt
+        # commands, verified against the SDS800XHD guide.
+        "set_waveform_source": ":WAVeform:SOURce C{ch}",  # p.749
+        "get_waveform_source": ":WAVeform:SOURce?",  # p.749
+        "set_waveform_start": ":WAVeform:STARt {value}",  # p.750
+        "get_waveform_start": ":WAVeform:STARt?",  # p.750
+        "set_waveform_interval": ":WAVeform:INTerval {value}",  # p.751
+        "get_waveform_interval": ":WAVeform:INTerval?",  # p.751
+        "set_waveform_point": ":WAVeform:POINt {value}",  # p.752
+        "get_waveform_point": ":WAVeform:POINt?",  # p.752
+        # Transfer width (Task 18, audit H9): selects BYTE/WORD samples,
+        # which the WAVEDESC's COMM_TYPE field (offset 32-33) then echoes.
+        "set_waveform_width": ":WAVeform:WIDTh {value}",  # p.754
+        "get_waveform_width": ":WAVeform:WIDTh?",  # p.754
+        # Deep-memory chunking (Task 19, audit H9 follow-up): p.753 documents
+        # :WAVeform:MAXPoint as "Query" ONLY -- unlike WIDTh/POINt/etc. above,
+        # its own DESCRIPTION/COMMAND-SYNTAX/QUERY-SYNTAX layout has no
+        # COMMAND SYNTAX section at all, so there is no set_waveform_maxpoint;
+        # a scope tells the controller its own per-transfer cap, the
+        # controller does not set it. ModernTransfer.acquire reads this once
+        # to learn how many :WAVeform:STARt-driven DATA? windows a full
+        # record needs.
+        "get_waveform_maxpoint": ":WAVeform:MAXPoint?",  # p.753
         # Measurements — get_parameter_value stays available (measure() keeps
         # working on modern, a documented gap); statistics/cursors/holdoff/unit
         # are legacy-only and intentionally absent so they gate cleanly.

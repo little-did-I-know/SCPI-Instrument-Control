@@ -15,10 +15,32 @@ def _format_nr3(value: float) -> str:
     return f"{value:.2E}"
 
 
+def _format_si_sample_rate(value: float) -> str:
+    """Format a sample rate the way legacy Siglent scopes do (RC01020-E01C p.117).
+
+    1e9 -> "SARA 1.00GSa", 500e3 -> "SARA 500.00kSa", 1000 -> "SARA 1.00kSa".
+    """
+    for threshold, letter in ((1e9, "G"), (1e6, "M"), (1e3, "k")):
+        if value >= threshold:
+            return f"SARA {value / threshold:.2f}{letter}Sa"
+    return f"SARA {value:.2f}Sa"
+
+
 def _build_ieee_block(payload: bytes) -> bytes:
     """Wrap payload in an IEEE-488.2 definite-length block: #<ndigits><length><payload>."""
     length_str = str(len(payload)).encode()
     return b"#" + str(len(length_str)).encode() + length_str + payload
+
+
+def _build_ieee_block_9digit(payload: bytes) -> bytes:
+    """Wrap payload in the modern Siglent ":WAVeform:" block: "#9<9-digit-length><payload>".
+
+    SDS Series Programming Guide EN11G p.757 (:WAVeform:DATA? example): the
+    header is always "#9" + nine ASCII digits, e.g. "#9000001000" -- a FIXED
+    9-digit length field, unlike the general IEEE-488.2 form (_build_ieee_block
+    above) whose digit count varies with payload size.
+    """
+    return b"#9" + f"{len(payload):09d}".encode() + payload
 
 
 # Minimal valid 1x1 24bpp BMP, so a mock SCDP? screenshot decodes as a real image.

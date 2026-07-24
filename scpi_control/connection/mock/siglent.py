@@ -4,9 +4,13 @@ write/query dialects, plus the waveform-response builder."""
 from __future__ import annotations
 
 import re
+import struct
 from typing import Dict, Optional, Tuple
 
-from scpi_control.connection.mock.helpers import _build_ieee_block, _format_nr3, _format_scientific
+import numpy as np
+
+from scpi_control import exceptions
+from scpi_control.connection.mock.helpers import _build_ieee_block, _build_ieee_block_9digit, _format_nr3, _format_scientific, _format_si_sample_rate
 from scpi_control.connection.mock import synth as mock_synth
 
 # Canonical PAVA? measurement values for the legacy dialect (mirrors real
@@ -81,6 +85,26 @@ def handle_write(conn, command: str) -> bool:
         if match := re.match(r":TRIGger:EDGE:COUPling\s+(\w+)", command, re.IGNORECASE):
             conn.trigger_coupling = match.group(1)
             return True
+        # Waveform transfer-parameter scalars (Task 17, audit H9; guide
+        # pp.749-752). SOURce stores the bare source token verbatim (e.g.
+        # "C2"); STARt/INTerval/POINt are NR1 integers.
+        if match := re.match(r":WAVeform:SOURce\s+(\S+)", command, re.IGNORECASE):
+            conn.waveform_source = match.group(1).upper()
+            return True
+        if match := re.match(r":WAVeform:STARt\s+(-?\d+)", command, re.IGNORECASE):
+            conn.waveform_start = int(match.group(1))
+            return True
+        if match := re.match(r":WAVeform:INTerval\s+(-?\d+)", command, re.IGNORECASE):
+            conn.waveform_interval = int(match.group(1))
+            return True
+        if match := re.match(r":WAVeform:POINt\s+(-?\d+)", command, re.IGNORECASE):
+            conn.waveform_point = int(match.group(1))
+            return True
+        # Transfer width (Task 18, audit H9; guide p.754): selects the
+        # COMM_TYPE the PREamble?/DATA? responses use.
+        if match := re.match(r":WAVeform:WIDTh\s+(BYTE|WORD)", command, re.IGNORECASE):
+            conn.waveform_width = match.group(1).upper()
+            return True
         # Unknown modern writes fall through and are merely recorded,
         # mirroring real scopes which silently drop unknown commands
 
@@ -109,6 +133,17 @@ def handle_write(conn, command: str) -> bool:
         return True
     elif match := re.match(r"C(\d+):CPL\s+(\w+)", command, re.IGNORECASE):
         conn._channel_coupling[int(match.group(1))] = match.group(2).upper()
+        return True
+    elif match := re.match(r"C(\d+):ATTN\s+(.+)", command, re.IGNORECASE):
+        # ATTENUATION (ATTN) -- RC01020-E01C p.22 (task 14, audit L3).
+        conn.probe_ratios[int(match.group(1))] = float(match.group(2))
+        return True
+    elif match := re.match(r"BWL\s+(C\d+,(?:ON|OFF)(?:,C\d+,(?:ON|OFF))*)", command, re.IGNORECASE):
+        # BANDWIDTH_LIMIT (BWL) -- global, comma-separated channel/mode pairs,
+        # not a per-channel colon-prefixed command (RC01020-E01C p.27; task 14).
+        pairs = match.group(1).split(",")
+        for i in range(0, len(pairs), 2):
+            conn.bandwidth_limits[int(pairs[i][1:])] = pairs[i + 1].upper()
         return True
     elif command.upper().startswith("TRIG_MODE "):
         conn.trigger_mode = command.split(" ", 1)[1].upper()
@@ -172,6 +207,18 @@ def handle_query(conn, command: str) -> Optional[str]:
             return _format_nr3(conn.timebase)
         if upper == ":ACQUIRE:SRATE?":  # bare NR3, p.46
             return _format_nr3(conn.sample_rate)
+        if upper == ":WAVEFORM:SOURCE?":  # bare source token, e.g. "C2", p.749
+            return conn.waveform_source
+        if upper == ":WAVEFORM:START?":  # bare NR1, p.750
+            return str(conn.waveform_start)
+        if upper == ":WAVEFORM:INTERVAL?":  # bare NR1, p.751
+            return str(conn.waveform_interval)
+        if upper == ":WAVEFORM:POINT?":  # bare NR1, p.752
+            return str(conn.waveform_point)
+        if upper == ":WAVEFORM:WIDTH?":  # BYTE|WORD, p.754
+            return conn.waveform_width
+        if upper == ":WAVEFORM:MAXPOINT?":  # bare NR1, p.753 (query-only, no setter)
+            return str(conn.max_points)
 
     if conn.scope_dialect == "legacy":
         if match := re.match(r"C(\d+):VDIV\?", command, re.IGNORECASE):
@@ -191,6 +238,22 @@ def handle_query(conn, command: str) -> Optional[str]:
         if match := re.match(r"C(\d+):CPL\?", command, re.IGNORECASE):
             return conn._channel_coupling.get(int(match.group(1)), "D1M")
 
+        if match := re.match(r"C(\d+):ATTN\?", command, re.IGNORECASE):
+            # RC01020-E01C p.22: RESPONSE FORMAT "<channel>:ATTeNuation
+            # <attenuation>" -- header-echoed, collapsed to the short form.
+            channel = int(match.group(1))
+            value = conn.probe_ratios.get(channel, 1.0)
+            return f"C{channel}:ATTN {value:g}"
+
+        if upper == "BWL?":
+            # RC01020-E01C p.27: bare query; RESPONSE FORMAT echoes the "BWL"
+            # header followed by ALL-channel <channel>,<mode> pairs (task 14,
+            # audit L3 -- replaces the invented per-channel "C{ch}:BWL?" form
+            # this mock never actually answered). channel.py's bandwidth_limit
+            # getter strips the header before parsing the pairs.
+            pairs = ",".join(f"C{ch},{conn.bandwidth_limits.get(ch, 'OFF')}" for ch in sorted(conn._channel_enabled))
+            return f"BWL {pairs}"
+
         if match := re.match(r"C(\d+):TRLV\?", command, re.IGNORECASE):
             channel = int(match.group(1))
             return _format_scientific(conn.trigger_level.get(channel, 0.0), "V")
@@ -205,7 +268,8 @@ def handle_query(conn, command: str) -> Optional[str]:
             return _format_scientific(conn.timebase, "S")
 
         if upper == "SARA?":
-            return _format_scientific(conn.sample_rate, "Sa/s")
+            # RC01020-E01C p.117: "SARA <value>" with an SI magnitude letter.
+            return _format_si_sample_rate(conn.sample_rate)
 
         if upper == "SAST?":
             if len(conn.trigger_status) > 1:
@@ -218,19 +282,175 @@ def handle_query(conn, command: str) -> Optional[str]:
         if upper == "TRIG_SELECT?":
             return f"{conn.trigger_type},SR,{conn.trigger_source}"
 
-        if match := re.match(r"PAVA\?\s*(\w+)\s*,\s*C?(\d+)", command, re.IGNORECASE):
-            mtype = match.group(1).upper()
-            channel = match.group(2)
+        # RC01020-E01C p.88: request "C<n>:PAVA? <param>",
+        # response "<trace>:PAVA <parameter>,<value>" -- two comma fields.
+        if match := re.match(r"C(\d+):PAVA\?\s*(\w+)", command, re.IGNORECASE):
+            channel = match.group(1)
+            mtype = match.group(2).upper()
             entry = _MOCK_PAVA_VALUES.get(mtype)
             if entry is not None:
                 value, unit = entry
-                return f"PAVA {mtype},C{channel},{value}{unit}"
+                return f"C{channel}:PAVA {mtype},{value}{unit}"
 
     return None
 
 
 def build_waveform_response(conn) -> bytes:
-    """Construct a minimal Siglent-style waveform block response."""
+    """Construct a minimal Siglent-style waveform block response.
+
+    Legacy-dialect "C{ch}:WF? DAT2"/"DESC" only (Task 18 deprecation: kept
+    answering until v5.0.0, but the modern-dialect driver capture path no
+    longer sends it -- see build_waveform_preamble/build_waveform_data below).
+    """
     channel = conn._last_waveform_channel or next(iter(conn._waveform_payloads), 1)
     payload = mock_synth.payload_for(conn, channel, include_offset=True)
     return b"DESC," + _build_ieee_block(payload)
+
+
+# ---- Modern :WAVeform:PREamble?/:WAVeform:DATA? binary responses ----------
+# SDS Series Programming Guide EN11G p.755-756 (Table 1: "Explanation of the
+# descriptor block"). Field offsets are from the first byte AFTER the
+# "#9<9-digits>" header. wave_desc_length is fixed at 346 bytes; fields not
+# read by ModernTransfer (Reserved, instrument/template name beyond the fixed
+# prefix, the model-dependent Timebase enum, etc.) are left zeroed.
+_MODERN_WAVEDESC_LEN = 346
+_MODERN_COMM_TYPE = 32  # short: 0=byte, 1=word (p.755)
+_MODERN_COMM_ORDER = 34  # short: 0=LSB, 1=MSB (p.755) -- mock always writes 0 (little-endian)
+_MODERN_WAVE_DESC_LENGTH = 36  # long (p.755)
+_MODERN_WAVE_ARRAY_1 = 60  # long: bytes in the transmitted array (p.755)
+_MODERN_WAVE_ARRAY_COUNT = 116  # long: number of data points (p.755)
+_MODERN_FIRST_POINT = 132  # long: = :WAVeform:STARt (p.755)
+_MODERN_DATA_INTERVAL = 136  # long: = :WAVeform:INTerval (p.755)
+_MODERN_VERTICAL_GAIN = 156  # float: V/div, no probe attenuation (p.756)
+_MODERN_VERTICAL_OFFSET = 160  # float (p.756)
+_MODERN_CODE_PER_DIV = 164  # float (p.756)
+_MODERN_HORIZ_INTERVAL = 176  # float: 1/sample_rate (p.756)
+_MODERN_HORIZ_OFFSET = 180  # double: trigger offset, seconds (p.756)
+
+# code_per_div the mock encodes with. BYTE mirrors WAVEFORM_CODE_PER_DIV_8BIT
+# (waveform.py); WORD is that value left-shifted 8 bits (256x), matching
+# p.758's note that >8-bit models transmit word samples "left aligned, and
+# the lower bit is zero filled" -- i.e. WAVEFORM_CODE_PER_DIV_16BIT is
+# WAVEFORM_CODE_PER_DIV_8BIT * 256. Restated here (not imported) to avoid a
+# waveform.py <-> connection.mock import edge; kept numerically identical.
+_MODERN_CODE_PER_DIV_BYTE = 25.0
+_MODERN_CODE_PER_DIV_WORD = 25.0 * 256
+
+
+def _modern_source_channel(conn) -> int:
+    """Extract the analog channel number from the stored :WAVeform:SOURce token."""
+    match = re.fullmatch(r"C(\d+)", conn.waveform_source, re.IGNORECASE)
+    if not match:
+        raise exceptions.CommandError(f"Mock :WAVeform:SOURce {conn.waveform_source!r} is not an analog channel (only C<n> sources are modeled)")
+    return int(match.group(1))
+
+
+def _effective_record_length(conn, channel: int) -> int:
+    """Total logical record length behind a modern-dialect capture.
+
+    Task 19 (deep-memory chunking, guide p.753): `conn.record_length` is None
+    by default, which defers to the existing single-shot formula
+    (mock_synth.point_count -- an explicit payload's length, or the
+    timebase/sample-rate window). Tests set `conn.record_length` explicitly,
+    larger than `conn.max_points`, to model a record that does not fit in one
+    :WAVeform:DATA? transfer.
+    """
+    if conn.record_length is not None:
+        return conn.record_length
+    return mock_synth.point_count(conn, channel)
+
+
+def _synthesize_modern_codes(conn, channel: int, record_length: int, word: bool) -> np.ndarray:
+    """Build the FULL record's code array once per acquisition.
+
+    Cached by build_waveform_preamble (below) so that repeated windowed
+    :WAVeform:DATA? reads (Task 19 chunking) slice ONE consistent waveform
+    instead of each independently re-synthesizing -- which would also each
+    advance mock_synth's acquisition count (free-run drift / RNG reseed) and
+    desync the windows from one another.
+    """
+    explicit = conn._waveform_payloads.get(channel)
+    if explicit is not None:
+        return np.frombuffer(explicit, dtype="<i2" if word else np.int8)
+    code_per_div = _MODERN_CODE_PER_DIV_WORD if word else _MODERN_CODE_PER_DIV_BYTE
+    vdiv = conn._voltage_scales.get(channel, 1.0)
+    voffset = conn._voltage_offsets.get(channel, 0.0)
+    volts = mock_synth.raw_volts(conn, channel, n_override=record_length)
+    codes = np.rint((volts + voffset) * code_per_div / vdiv)
+    if word:
+        return np.clip(codes, -32768, 32767).astype("<i2")
+    return np.clip(codes, -128, 127).astype(np.int8)
+
+
+def build_waveform_preamble(conn) -> bytes:
+    """Build the modern :WAVeform:PREamble? response: "#9<9-digits>" + a 346-byte WAVEDESC.
+
+    SDS Series Programming Guide EN11G p.755 (Table 1). The scaling fields
+    (vertical_gain/vertical_offset/code_per_div/horizontal_interval) are
+    exactly what build_waveform_data below encodes samples with, so the
+    driver's parser recovers the mock's true volts (audit H9, Task 18).
+
+    Task 19: wave_array_count is the FULL record length (guide p.756:
+    "Number of data points in the data array"), even when that record exceeds
+    max_points and will need several :WAVeform:DATA? windows to read -- on
+    real hardware the preamble describes the whole record, only DATA?
+    transfers are capped. This also (re)populates the per-channel code cache
+    that build_waveform_data slices from, since PREamble? is read exactly
+    once per capture, before the STARt-driven DATA? loop begins.
+    """
+    channel = _modern_source_channel(conn)
+    word = conn.waveform_width == "WORD"
+    bytes_per_point = 2 if word else 1
+    code_per_div = _MODERN_CODE_PER_DIV_WORD if word else _MODERN_CODE_PER_DIV_BYTE
+    record_length = _effective_record_length(conn, channel)
+    conn._modern_waveform_codes[channel] = _synthesize_modern_codes(conn, channel, record_length, word)
+
+    desc = bytearray(_MODERN_WAVEDESC_LEN)
+    desc[0:8] = b"WAVEDESC"
+    desc[16:23] = b"WAVEACE"
+    struct.pack_into("<h", desc, _MODERN_COMM_TYPE, 1 if word else 0)
+    struct.pack_into("<h", desc, _MODERN_COMM_ORDER, 0)
+    struct.pack_into("<i", desc, _MODERN_WAVE_DESC_LENGTH, _MODERN_WAVEDESC_LEN)
+    struct.pack_into("<i", desc, _MODERN_WAVE_ARRAY_1, record_length * bytes_per_point)
+    struct.pack_into("<i", desc, _MODERN_WAVE_ARRAY_COUNT, record_length)
+    struct.pack_into("<i", desc, _MODERN_FIRST_POINT, conn.waveform_start)
+    struct.pack_into("<i", desc, _MODERN_DATA_INTERVAL, conn.waveform_interval)
+    struct.pack_into("<f", desc, _MODERN_VERTICAL_GAIN, conn._voltage_scales.get(channel, 1.0))
+    struct.pack_into("<f", desc, _MODERN_VERTICAL_OFFSET, conn._voltage_offsets.get(channel, 0.0))
+    struct.pack_into("<f", desc, _MODERN_CODE_PER_DIV, code_per_div)
+    struct.pack_into("<f", desc, _MODERN_HORIZ_INTERVAL, (1.0 / conn.sample_rate) if conn.sample_rate else 0.0)
+    struct.pack_into("<d", desc, _MODERN_HORIZ_OFFSET, 0.0)  # mock triggers at the first sample
+    return _build_ieee_block_9digit(bytes(desc))
+
+
+def build_waveform_data(conn) -> bytes:
+    """Build the modern :WAVeform:DATA? response: "#9<9-digits>" + raw sample codes.
+
+    SDS Series Programming Guide EN11G p.757-758. Codes are encoded with the
+    INVERSE of the guide's own p.758 voltage formula (code = (volts+voffset)
+    * code_per_div / vdiv), so waveform_transfer.ModernTransfer's forward
+    formula recovers the original volts (the round-trip this sub-project
+    exists to make trustworthy -- see wavedesc-reference.md).
+
+    Task 19 (deep-memory chunking, guide p.753): window-aware. Returns only
+    codes[start : start + window], where window is capped by BOTH
+    :WAVeform:POINt (when set) and :WAVeform:MAXPoint, and never reads past
+    the record's end -- exactly the "read the waveform data in pieces" the
+    guide's own MAXPoint description names. A single-shot capture (record
+    length <= max_points, the common case and every Task 18 test) still
+    returns the whole record in one call, unchanged.
+    """
+    channel = _modern_source_channel(conn)
+    word = conn.waveform_width == "WORD"
+    codes = conn._modern_waveform_codes.get(channel)
+    if codes is None:
+        # DATA? without a preceding PREamble? read is not the order the
+        # driver uses, but tolerate it (one-shot synthesis, not cached)
+        # rather than raising, matching this mock's general leniency.
+        codes = _synthesize_modern_codes(conn, channel, _effective_record_length(conn, channel), word)
+    record_length = len(codes)
+    start = max(0, conn.waveform_start)
+    remaining = max(0, record_length - start)
+    requested = conn.waveform_point if conn.waveform_point else conn.max_points
+    window = max(0, min(requested, conn.max_points, remaining))
+    return _build_ieee_block_9digit(codes[start : start + window].tobytes())

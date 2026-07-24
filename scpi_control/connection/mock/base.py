@@ -13,6 +13,8 @@ from scpi_control.connection.mock import lecroy, siglent, tektronix
 from scpi_control.models import detect_model_from_idn
 
 if TYPE_CHECKING:
+    import numpy as np
+
     from scpi_control.signal_synth import SignalSpec
 
 _PERSONALITIES = {
@@ -20,6 +22,12 @@ _PERSONALITIES = {
     "tektronix": tektronix,
     "lecroy": lecroy,
 }
+
+# QS0503X-E01B p.40: OUTPut:TRACK's wire argument is NUMERIC ({0|1|2}); this
+# maps it back to the INDEPENDENT/SERIES/PARALLEL words psu_tracking_mode
+# stores internally, so the OUTP:TRACK? handler (still a documented-mismatch
+# query, audit H19) keeps answering the same shape it always has.
+_TRACKING_NUMERIC_TO_WORD = {"0": "INDEPENDENT", "1": "SERIES", "2": "PARALLEL"}
 
 
 class MockConnection(BaseConnection):
@@ -62,6 +70,10 @@ class MockConnection(BaseConnection):
         daq_idn: str = "Keysight Technologies,34970A,MY12345678,A.01.02",
         daq_readings: str = "1.234,2.345,3.456",
         tek_badges: Optional[Dict[int, Dict[str, str]]] = None,
+        # strict: When True, unmatched PSU/AWG/DAQ queries raise TimeoutError
+        # instead of returning "", matching real instruments. Default False
+        # in 4.1.0 for compatibility; becomes the default in v5.0.0.
+        strict: bool = False,
     ):
         super().__init__(host, port, timeout)
         channels = channel_states.keys() if channel_states else range(1, 3)
@@ -80,6 +92,44 @@ class MockConnection(BaseConnection):
         self._signals: Dict[int, "SignalSpec"] = dict(signals) if signals else {}
         self._acquisition_counts: Dict[int, int] = {}
         self._channel_coupling: Dict[int, str] = {ch: "D1M" for ch in channels}
+        # Legacy scope probe attenuation / bandwidth-limit state (Task 14,
+        # audit L3): the GUI's channel refresh reads both on every poll.
+        self.probe_ratios: Dict[int, float] = {ch: 1.0 for ch in channels}
+        self.bandwidth_limits: Dict[int, str] = {ch: "OFF" for ch in channels}
+        # Modern :WAVeform: transfer-parameter state (Task 17, audit H9): the
+        # SOURce/STARt/INTerval/POINt scalars set ahead of a
+        # :WAVeform:DATA?/:WAVeform:PREamble? transfer (not implemented until
+        # Task 18). Defaults match the guide's own enum ("C1" is a valid
+        # <source> token) and NR1-zero starting points.
+        self.waveform_source: str = "C1"
+        self.waveform_start: int = 0
+        self.waveform_interval: int = 1
+        self.waveform_point: int = 0
+        # :WAVeform:WIDTh state (Task 18, audit H9; guide p.754): BYTE is the
+        # documented default (COMM_TYPE=0). Drives the PREamble?/DATA?
+        # binary responses built in connection/mock/siglent.py.
+        self.waveform_width: str = "BYTE"
+        # Deep-memory chunking (Task 19, guide p.753 ":WAVeform:MAXPoint?",
+        # query-only): max_points is the per-:WAVeform:DATA?-transfer cap a
+        # real scope reports. Default is the guide's own worked EXAMPLE value
+        # for SDS2000X Plus (10,000,000) -- far larger than any single-shot
+        # test's synthesized record (connection/mock/synth.py's MAX_POINTS is
+        # 14,000), so unmodified single-shot captures are unaffected.
+        # record_length is the FULL logical record backing a capture; None
+        # (default) defers to the existing single-shot point-count formula.
+        # Tests set it explicitly, larger than max_points, to model a
+        # deep-memory record that forces ModernTransfer.acquire to loop
+        # :WAVeform:STARt across multiple windows.
+        self.max_points: int = 10_000_000
+        self.record_length: Optional[int] = None
+        # Per-channel cache of the FULL synthesized/explicit code array for a
+        # modern-dialect capture (Task 19). Populated once by
+        # siglent.build_waveform_preamble so that repeated windowed
+        # :WAVeform:DATA? reads slice ONE consistent waveform instead of each
+        # independently re-synthesizing -- which would also each advance the
+        # acquisition count (free-run drift / RNG reseed) and desync the
+        # windows from each other.
+        self._modern_waveform_codes: Dict[int, "np.ndarray"] = {}
 
         self.sample_rate = sample_rate
         self.timebase = timebase
@@ -169,6 +219,9 @@ class MockConnection(BaseConnection):
         self.daq_idn = daq_idn
         self.daq_readings = daq_readings
         self.daq_scan_list = []
+        self.daq_trigger_source = "IMM"
+
+        self.strict = strict
 
     def connect(self) -> None:
         """Mark the connection as established."""
@@ -212,9 +265,12 @@ class MockConnection(BaseConnection):
                     self.psu_outputs[ch]["enabled"] = enabled
                 return
 
-            # Tracking mode: OUTP:TRACK SERIES
-            if match := re.match(r"OUTP(?:UT)?:TRACK\s+(INDEPENDENT|SERIES|PARALLEL)", command, re.IGNORECASE):
-                self.psu_tracking_mode = match.group(1).upper()
+            # Tracking mode: OUTP:TRACK 1 (QS0503X-E01B p.40: NUMERIC
+            # {0|1|2} -- 0=independent, 1=series, 2=parallel). Stored
+            # internally as the word so existing readers (psu_tracking_mode,
+            # the OUTP:TRACK? handler below) are unaffected.
+            if match := re.match(r"OUTP(?:UT)?:TRACK\s+([012])", command, re.IGNORECASE):
+                self.psu_tracking_mode = _TRACKING_NUMERIC_TO_WORD[match.group(1)]
                 return
 
             # Timer enable: TIMEr CH1,ON
@@ -224,8 +280,8 @@ class MockConnection(BaseConnection):
                 self.psu_timer_enabled[ch] = enabled
                 return
 
-            # Waveform enable: WAVE CH1,ON
-            if match := re.match(r"WAVE\s+CH(\d+),(ON|OFF)", command, re.IGNORECASE):
+            # Waveform display enable: OUTPut:WAVE CH1,ON (QS0503X-E01B p.40)
+            if match := re.match(r"OUTP(?:UT)?:WAVE\s+CH(\d+),(ON|OFF)", command, re.IGNORECASE):
                 ch = int(match.group(1))
                 enabled = match.group(2).upper() == "ON"
                 self.psu_waveform_enabled[ch] = enabled
@@ -359,6 +415,22 @@ class MockConnection(BaseConnection):
                     self.awg_channels[ch]["enabled"] = enabled
                 return
 
+        # Data acquisition (DAQ) commands
+        if self.daq_mode:
+            # Scan list: ROUT:SCAN (@101,102). Previously dropped entirely
+            # (audit M8), so get_scan_list()/ROUT:SCAN? never reflected a
+            # write and round-trip verification of a healthy instrument
+            # reported failure.
+            if match := re.match(r"ROUT:SCAN\s+\(@([\d,]*)\)", command, re.IGNORECASE):
+                raw = match.group(1)
+                self.daq_scan_list = [int(ch) for ch in raw.split(",") if ch]
+                return
+
+            # Trigger source: TRIG:SOUR IMM/BUS/EXT/TIM.
+            if match := re.match(r"TRIG:SOUR\s+(\w+)", command, re.IGNORECASE):
+                self.daq_trigger_source = match.group(1).upper()
+                return
+
         # Oscilloscope commands: C{n}:WF? channel recording is shared across every
         # scope dialect/vendor (Tek's CURVe? uses data_source instead - Task 9), so
         # it is recorded here before personality dispatch rather than inside a
@@ -407,9 +479,14 @@ class MockConnection(BaseConnection):
 
         # Data acquisition (DAQ) queries
         if self.daq_mode:
-            # Return configured readings for any measurement/read/fetch query
-            if any(kw in upper for kw in ["READ?", "FETC?", "MEAS:", "R?"]):
-                return self.daq_readings
+            # Specific queries first -- the old readings matcher used
+            # `"R?" in upper`, which is a substring test and swallowed
+            # SYST:ERR? and TRIG:SOUR? (both end in "R?") before they ever
+            # reached their own handlers (audit M7).
+
+            # Error query
+            if "SYST:ERR?" in upper:
+                return '+0,"No error"'
 
             # Scan list query
             if "ROUT:SCAN?" in upper:
@@ -421,89 +498,89 @@ class MockConnection(BaseConnection):
             if "DATA:POIN?" in upper:
                 return str(len(self.daq_readings.split(",")))
 
-            # Error query
-            if "SYST:ERR?" in upper:
-                return '+0,"No error"'
+            # Trigger source query
+            if "TRIG:SOUR?" in upper:
+                return self.daq_trigger_source
+
+            # Return configured readings for any measurement/read/fetch query.
+            # Anchored to the START of the command (not a bare substring
+            # test), so "R?" only matches a command that begins with it --
+            # not the tail of SYST:ERR?/TRIG:SOUR? (M7). Deliberately NOT
+            # anchored at the end: MEAS:*? and read_remove's "R?" commands
+            # carry trailing arguments (e.g. "MEAS:VOLT:DC? AUTO,AUTO,(@101)"
+            # or "R? 10"), which a full-string anchor would reject.
+            if re.match(r"^(READ\?|FETC\??|MEAS:[\w:]*\?|R\?)", upper):
+                return self.daq_readings
 
         # Function generator (AWG) queries
         if self.awg_mode:
-            # Function queries: C1:BSWV? WVTP (Siglent) or SOUR1:FUNC? (generic)
-            if match := re.match(r"C(\d+):BSWV\?\s*WVTP", upper):
+            # Basic-wave query: C1:BSWV? (SDG_ProgrammingGuide PG02-E05B
+            # p.31). QUERY SYNTAX is bare -- there is no per-field selector --
+            # and RESPONSE FORMAT is function-conditional: "<parameter> :=
+            # {All the parameters of the current basic waveform}". The p.31
+            # worked SINE example is WVTP,FRQ,PERI,AMP,OFST,HLEV,LLEV,PHSE
+            # with no DUTY/SYM; DUTY is only settable for SQUARE/PULSE and SYM
+            # only for RAMP (p.29-30 parameter table), so this handler only
+            # appends them when the channel's current function calls for them
+            # (H5 follow-up: the mock used to always emit DUTY,SYM and never
+            # HLEV,LLEV, a shape the manual never shows for any waveform type).
+            if match := re.match(r"C(\d+):BSWV\?$", upper):
                 ch = int(match.group(1))
-                if ch in self.awg_channels:
-                    return self.awg_channels[ch]["function"]
-                return "SINE"
+                c = self.awg_channels.get(ch, {})
+                function = c.get("function", "SINE")
+                frequency = c.get("frequency", 1000.0)
+                period = 1.0 / frequency if frequency else 0.0
+                amplitude = c.get("amplitude", 1.0)
+                offset = c.get("offset", 0.0)
+                hlev = offset + amplitude / 2
+                llev = offset - amplitude / 2
+                response = (
+                    f"C{ch}:BSWV WVTP,{function},"
+                    f"FRQ,{frequency:.10g}HZ,"
+                    f"PERI,{period:.10g}S,"
+                    f"AMP,{amplitude:.10g}V,"
+                    f"OFST,{offset:.10g}V,"
+                    f"HLEV,{hlev:.10g}V,"
+                    f"LLEV,{llev:.10g}V,"
+                    f"PHSE,{c.get('phase', 0.0):.10g}"
+                )
+                if function in ("SQUARE", "PULSE"):
+                    response += f",DUTY,{c.get('pulse_duty', 50.0):.10g}"
+                elif function == "RAMP":
+                    response += f",SYM,{c.get('ramp_symmetry', 50.0):.10g}"
+                return response
+
+            # Generic SCPI-99 per-field fallbacks (unaffected by H5, which is
+            # a Siglent-selector-grammar defect only): SOUR1:FUNC?, SOUR1:FREQ?, etc.
             if match := re.match(r"SOUR(\d+):FUNC\?", upper):
                 ch = int(match.group(1))
                 if ch in self.awg_channels:
                     return self.awg_channels[ch]["function"]
                 return "SINE"
-
-            # Frequency queries: C1:BSWV? FRQ (Siglent) or SOUR1:FREQ? (generic)
-            if match := re.match(r"C(\d+):BSWV\?\s*FRQ", upper):
-                ch = int(match.group(1))
-                if ch in self.awg_channels:
-                    return f"{self.awg_channels[ch]['frequency']:.6f}"
-                return "1000.0"
             if match := re.match(r"SOUR(\d+):FREQ\?", upper):
                 ch = int(match.group(1))
                 if ch in self.awg_channels:
                     return f"{self.awg_channels[ch]['frequency']:.6f}"
                 return "1000.0"
-
-            # Amplitude queries: C1:BSWV? AMP (Siglent) or SOUR1:VOLT? (generic)
-            if match := re.match(r"C(\d+):BSWV\?\s*AMP", upper):
-                ch = int(match.group(1))
-                if ch in self.awg_channels:
-                    return f"{self.awg_channels[ch]['amplitude']:.3f}"
-                return "1.0"
             if match := re.match(r"SOUR(\d+):VOLT\?", upper):
                 ch = int(match.group(1))
                 if ch in self.awg_channels:
                     return f"{self.awg_channels[ch]['amplitude']:.3f}"
                 return "1.0"
-
-            # Offset queries: C1:BSWV? OFST (Siglent) or SOUR1:VOLT:OFFS? (generic)
-            if match := re.match(r"C(\d+):BSWV\?\s*OFST", upper):
-                ch = int(match.group(1))
-                if ch in self.awg_channels:
-                    return f"{self.awg_channels[ch]['offset']:.3f}"
-                return "0.0"
             if match := re.match(r"SOUR(\d+):VOLT:OFFS\?", upper):
                 ch = int(match.group(1))
                 if ch in self.awg_channels:
                     return f"{self.awg_channels[ch]['offset']:.3f}"
-                return "0.0"
-
-            # Phase queries: C1:BSWV? PHSE (Siglent) or SOUR1:PHAS? (generic)
-            if match := re.match(r"C(\d+):BSWV\?\s*PHSE", upper):
-                ch = int(match.group(1))
-                if ch in self.awg_channels:
-                    return f"{self.awg_channels[ch]['phase']:.1f}"
                 return "0.0"
             if match := re.match(r"SOUR(\d+):PHAS\?", upper):
                 ch = int(match.group(1))
                 if ch in self.awg_channels:
                     return f"{self.awg_channels[ch]['phase']:.1f}"
                 return "0.0"
-
-            # Pulse duty cycle queries
-            if match := re.match(r"C(\d+):BSWV\?\s*DUTY", upper):
-                ch = int(match.group(1))
-                if ch in self.awg_channels:
-                    return f"{self.awg_channels[ch]['pulse_duty']:.1f}"
-                return "50.0"
             if match := re.match(r"SOUR(\d+):FUNC:PULS:DCYC\?", upper):
                 ch = int(match.group(1))
                 if ch in self.awg_channels:
                     return f"{self.awg_channels[ch]['pulse_duty']:.1f}"
-                return "50.0"
-
-            # Ramp symmetry queries
-            if match := re.match(r"C(\d+):BSWV\?\s*SYM", upper):
-                ch = int(match.group(1))
-                if ch in self.awg_channels:
-                    return f"{self.awg_channels[ch]['ramp_symmetry']:.1f}"
                 return "50.0"
             if match := re.match(r"SOUR(\d+):FUNC:RAMP:SYMM\?", upper):
                 ch = int(match.group(1))
@@ -511,12 +588,23 @@ class MockConnection(BaseConnection):
                     return f"{self.awg_channels[ch]['ramp_symmetry']:.1f}"
                 return "50.0"
 
-            # Output state queries: C1:OUTP? (Siglent) or OUTP1? (generic)
-            if match := re.match(r"C(\d+):OUTP\?", upper):
+            # Arbitrary waveform query: C1:ARWV? (PG02-E05B p.62). Bare query;
+            # RESPONSE FORMAT always returns INDEX and NAME together. Static --
+            # arb waveform selection isn't tracked in awg_channels state
+            # (get_arb_waveform has no caller anywhere in this repo).
+            if match := re.match(r"C(\d+):ARWV\?$", upper):
                 ch = int(match.group(1))
-                if ch in self.awg_channels:
-                    return "ON" if self.awg_channels[ch]["enabled"] else "OFF"
-                return "OFF"
+                return f"C{ch}:ARWV INDEX,2,NAME,StairUp"
+
+            # Output state query: C1:OUTP? (PG02-E05B p.27-28, worked EXAMPLE).
+            # RESPONSE FORMAT is the state PLUS LOAD/PLRT -- not just "ON"/
+            # "OFF" (H5, fixed Task 10). LOAD/PLRT aren't tracked in
+            # awg_channels state, so they are reported as the manual's own
+            # worked-example values.
+            if match := re.match(r"C(\d+):OUTP\?$", upper):
+                ch = int(match.group(1))
+                state = "ON" if self.awg_channels.get(ch, {}).get("enabled") else "OFF"
+                return f"C{ch}:OUTP {state},LOAD,HZ,PLRT,NOR"
             if match := re.match(r"OUTP(\d+)\?", upper):
                 ch = int(match.group(1))
                 if ch in self.awg_channels:
@@ -539,6 +627,21 @@ class MockConnection(BaseConnection):
                     return f"{self.psu_outputs[ch]['current']:.3f}"
                 return "0.000"
 
+            # Status word query: SYSTem:STATus? (QS0503X-E01B p.41-42). This is
+            # the ONLY documented way to read CH1/CH2 output state on the
+            # SPD3303X (audit H20, Task 8) -- bit 4 = CH1 on, bit 5 = CH2 on.
+            # The 0x0204 baseline reproduces the manual's own bits {2, 9}
+            # (independent tracking mode, CH2 waveform display) so that with
+            # ch1=off/ch2=on this handler answers the manual's own Typical
+            # Return "0x0224" verbatim.
+            if match := re.match(r"SYST(?:EM)?:STAT(?:US)?\?", upper):
+                bits = 0x0204
+                if self.psu_outputs.get(1, {}).get("enabled"):
+                    bits |= 1 << 4
+                if self.psu_outputs.get(2, {}).get("enabled"):
+                    bits |= 1 << 5
+                return f"0x{bits:04X}"
+
             # Output state queries: OUTPut? CH1 (Siglent) or OUTP1? (generic)
             # Matches: OUTP1?, OUTPUT1?, OUTP? CH1, OUTPUT? CH1
             if match := re.match(r"OUTP(?:UT)?(\d+)\?|OUTP(?:UT)?\?\s*(?:CH\s*)?(\d+)", upper):
@@ -548,8 +651,9 @@ class MockConnection(BaseConnection):
                 return "OFF"
 
             # Measurements - simulate with slight noise
-            # MEAS1:VOLT? (generic) or MEASure1:VOLTage? (Siglent)
-            if match := re.match(r"MEAS(?:URE)?(\d+):VOLT(?:AGE)?\?", upper):
+            # MEASure:VOLTage? CH1 (Siglent, QS0503X-E01B p.38; channel is an
+            # argument, not fused to the keyword -- audit H6)
+            if match := re.match(r"MEAS(?:URE)?:VOLT(?:AGE)?\?\s*CH(\d+)", upper):
                 ch = int(match.group(1))
                 if ch in self.psu_outputs:
                     v = self.psu_outputs[ch]["voltage"]
@@ -558,7 +662,7 @@ class MockConnection(BaseConnection):
                     return f"{v + noise:.3f}"
                 return "0.000"
 
-            if match := re.match(r"MEAS(?:URE)?(\d+):CURR(?:ENT)?\?", upper):
+            if match := re.match(r"MEAS(?:URE)?:CURR(?:ENT)?\?\s*CH(\d+)", upper):
                 ch = int(match.group(1))
                 if ch in self.psu_outputs:
                     i = self.psu_outputs[ch]["current"]
@@ -567,7 +671,7 @@ class MockConnection(BaseConnection):
                     return f"{i + noise:.3f}"
                 return "0.000"
 
-            if match := re.match(r"MEAS(?:URE)?(\d+):POW(?:ER)?\?", upper):
+            if match := re.match(r"MEAS(?:URE)?:POW(?:ER)?\?\s*CH(\d+)", upper):
                 ch = int(match.group(1))
                 if ch in self.psu_outputs:
                     v = self.psu_outputs[ch]["voltage"]
@@ -614,6 +718,8 @@ class MockConnection(BaseConnection):
             return response
 
         if self.psu_mode or self.awg_mode or self.daq_mode:
+            if self.strict:
+                raise exceptions.TimeoutError(f"MockConnection (strict) has no response for query: {command!r}")
             return ""
 
         # Real scopes produce no response at all for unknown or wrong-dialect
@@ -632,7 +738,21 @@ class MockConnection(BaseConnection):
         if self.writes and self.writes[-1].upper() == "SCDP?":
             # Bare IEEE 488.2 block (no "DESC," prefix), matching how a real
             # scope's SCDP? reply is parsed in screen_capture.py.
-            return _build_ieee_block(MOCK_SCREENSHOT_BMP)
+            payload = _build_ieee_block(MOCK_SCREENSHOT_BMP)
+            return payload[:size] if size is not None else payload
+
+        # Modern :WAVeform:PREamble?/:WAVeform:DATA? binary blocks (Task 18,
+        # audit H9): which one read_raw() returns is determined by the last
+        # write, exactly like the SCDP? branch above.
+        if self.scope_dialect == "modern" and self.writes:
+            last_write = self.writes[-1].upper()
+            if last_write == ":WAVEFORM:PREAMBLE?":
+                payload = siglent.build_waveform_preamble(self)
+                return payload[:size] if size is not None else payload
+            if last_write == ":WAVEFORM:DATA?":
+                payload = siglent.build_waveform_data(self)
+                return payload[:size] if size is not None else payload
 
         personality = _PERSONALITIES.get(self.scope_vendor, siglent)
-        return personality.build_waveform_response(self)
+        payload = personality.build_waveform_response(self)
+        return payload[:size] if size is not None else payload

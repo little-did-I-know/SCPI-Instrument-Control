@@ -8,6 +8,7 @@ import re
 from typing import TYPE_CHECKING, Dict, Literal
 
 from scpi_control import exceptions
+from scpi_control.awg_scpi_commands import parse_key_value_response
 
 if TYPE_CHECKING:
     from scpi_control.function_generator import FunctionGenerator
@@ -49,9 +50,7 @@ class AWGOutput:
         Returns:
             Waveform type: 'SINE', 'SQUARE', 'RAMP', 'PULSE', 'NOISE', 'ARB', 'DC'
         """
-        cmd = self._awg._get_command("get_function", ch=self._channel_num)
-        response = self._awg.query(cmd)
-        return self._parse_string(response).upper()
+        return self._parse_string(self._read_basic_wave("WVTP")).upper()
 
     @function.setter
     def function(self, waveform: WaveformType) -> None:
@@ -90,9 +89,7 @@ class AWGOutput:
         Returns:
             Frequency in Hz
         """
-        cmd = self._awg._get_command("get_frequency", ch=self._channel_num)
-        response = self._awg.query(cmd)
-        return self._parse_float(response)
+        return self._parse_float(self._read_basic_wave("FRQ"))
 
     @frequency.setter
     def frequency(self, freq_hz: float) -> None:
@@ -128,9 +125,7 @@ class AWGOutput:
         Returns:
             Amplitude in Vpp
         """
-        cmd = self._awg._get_command("get_amplitude", ch=self._channel_num)
-        response = self._awg.query(cmd)
-        return self._parse_float(response)
+        return self._parse_float(self._read_basic_wave("AMP"))
 
     @amplitude.setter
     def amplitude(self, vpp: float) -> None:
@@ -166,9 +161,7 @@ class AWGOutput:
         Returns:
             DC offset in volts
         """
-        cmd = self._awg._get_command("get_offset", ch=self._channel_num)
-        response = self._awg.query(cmd)
-        return self._parse_float(response)
+        return self._parse_float(self._read_basic_wave("OFST"))
 
     @offset.setter
     def offset(self, volts: float) -> None:
@@ -204,9 +197,7 @@ class AWGOutput:
         Returns:
             Phase in degrees (0-360)
         """
-        cmd = self._awg._get_command("get_phase", ch=self._channel_num)
-        response = self._awg.query(cmd)
-        return self._parse_float(response)
+        return self._parse_float(self._read_basic_wave("PHSE"))
 
     @phase.setter
     def phase(self, degrees: float) -> None:
@@ -244,8 +235,20 @@ class AWGOutput:
         """
         cmd = self._awg._get_command("get_output", ch=self._channel_num)
         response = self._awg.query(cmd)
-        # Response may be "ON", "OFF", or include echo
-        return "ON" in response.upper()
+
+        if self._awg._scpi_commands.variant != "siglent_sdg":
+            # Generic SCPI-99 OUTP{ch}? answers a bare "ON"/"OFF", possibly
+            # with an echo prefix.
+            return "ON" in response.upper()
+
+        # PG02-E05B p.27-28: QUERY SYNTAX "<channel>:OUTPut?" is bare and its
+        # RESPONSE FORMAT always returns "ON|OFF,LOAD,<load>,PLRT,<polarity>"
+        # together -- not just the bare state (H5, fixed Task 10).
+        fields = parse_key_value_response(response)
+        state = fields.get("STATE")
+        if state is None:
+            raise exceptions.CommandError(f"SDG response has no STATE field: {fields!r}")
+        return state == "ON"
 
     @enabled.setter
     def enabled(self, state: bool) -> None:
@@ -282,9 +285,7 @@ class AWGOutput:
         if self.function != "PULSE":
             logger.warning("Duty cycle only applicable to PULSE waveform, " f"current: {self.function}")
 
-        cmd = self._awg._get_command("get_pulse_duty", ch=self._channel_num)
-        response = self._awg.query(cmd)
-        return self._parse_float(response)
+        return self._parse_float(self._read_basic_wave("DUTY"))
 
     @pulse_duty_cycle.setter
     def pulse_duty_cycle(self, percent: float) -> None:
@@ -318,9 +319,7 @@ class AWGOutput:
         if self.function != "RAMP":
             logger.warning("Symmetry only applicable to RAMP waveform, " f"current: {self.function}")
 
-        cmd = self._awg._get_command("get_ramp_symmetry", ch=self._channel_num)
-        response = self._awg.query(cmd)
-        return self._parse_float(response)
+        return self._parse_float(self._read_basic_wave("SYM"))
 
     @ramp_symmetry.setter
     def ramp_symmetry(self, percent: float) -> None:
@@ -414,6 +413,64 @@ class AWGOutput:
         logger.info(f"Channel {self._channel_num} configured: " f"RAMP {frequency}Hz, {amplitude}Vpp, {symmetry}% symmetry, {offset}V offset")
 
     # --- Helper Methods ---
+
+    #: Which basic-wave getter renders the query for each documented field.
+    #: On the "siglent_sdg" variant every entry here renders the identical
+    #: bare "C{ch}:BSWV?" (PG02-E05B p.27-28, p.29-30 for DUTY/SYM) -- the
+    #: "C{ch}:BSWV? <FIELD>" selector grammar previously used was invented
+    #: (audit H5, fixed Task 10). Generic SCPI-99 variants still send one
+    #: distinct per-field query (e.g. "SOUR{ch}:FREQ?"), so the mapping keeps
+    #: each field pointed at its own op rather than collapsing them.
+    _BASIC_WAVE_FIELD_OPS: Dict[str, str] = {
+        "WVTP": "get_function",
+        "FRQ": "get_frequency",
+        "AMP": "get_amplitude",
+        "OFST": "get_offset",
+        "PHSE": "get_phase",
+        "DUTY": "get_pulse_duty",
+        "SYM": "get_ramp_symmetry",
+    }
+
+    def _read_basic_wave(self, field: str) -> str:
+        """Query the getter for `field` and return its raw value.
+
+        On the "siglent_sdg" variant, QUERY SYNTAX for BSWV is bare (no
+        parameter selector) and RESPONSE FORMAT always returns every basic-
+        wave parameter as one comma-joined "KEY,value,..." reply
+        (PG02-E05B p.27-28; DUTY/SYM are independently documented BSWV
+        parameters, p.29-30, folded into the same reply). The response is
+        parsed with `parse_key_value_response` and the requested field pulled
+        out of the whole list.
+
+        Non-Siglent (generic SCPI-99) variants still send one query per field
+        that answers a single bare value (e.g. "SOUR{ch}:FREQ?" -> "1000.0");
+        for those the raw response is returned unchanged so callers can keep
+        applying `_parse_float`/`_parse_string`'s own echo-stripping to it,
+        exactly as before this method existed.
+
+        Units are not stripped here (e.g. "1000HZ", "1V") -- `_parse_float`'s
+        existing `re.sub(r"[VvHhZz%]", ...)` already tolerates the documented
+        unit suffixes, confirmed against every field used above.
+
+        Args:
+            field: Documented parameter key, e.g. "FRQ", "AMP", "OFST", "PHSE".
+
+        Returns:
+            The raw value string.
+
+        Raises:
+            CommandError: If the instrument's response omits `field` (siglent_sdg only).
+        """
+        cmd = self._awg._get_command(self._BASIC_WAVE_FIELD_OPS[field], ch=self._channel_num)
+        response = self._awg.query(cmd)
+
+        if self._awg._scpi_commands.variant != "siglent_sdg":
+            return response
+
+        fields = parse_key_value_response(response)
+        if field not in fields:
+            raise exceptions.CommandError(f"SDG response has no {field} field: {fields!r}")
+        return fields[field]
 
     def _parse_float(self, response: str) -> float:
         """Parse float value from SCPI response.

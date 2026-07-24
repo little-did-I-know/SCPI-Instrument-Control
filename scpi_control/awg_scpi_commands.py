@@ -10,6 +10,45 @@ from typing import Dict
 logger = logging.getLogger(__name__)
 
 
+def parse_key_value_response(response: str) -> Dict[str, str]:
+    """Parse an SDG key-value response into a dict.
+
+    PG02-E05B p.27-28. Responses look like
+    "C1:BSWV WVTP,SINE,FRQ,1000HZ,..." or "C1:OUTP ON,LOAD,HZ,PLRT,NOR".
+    The "C<n>:<CMD> " header is always present -- CHDR is unavailable on
+    SDG1000X/SDG2000X, so it cannot be switched off (availability table p.27).
+
+    The OUTP response leads with a bare state token rather than a key; it is
+    returned under the synthetic key "STATE".
+
+    Args:
+        response: Raw instrument response.
+
+    Returns:
+        Mapping of parameter name to raw value string (units not stripped).
+
+    Raises:
+        ValueError: If `response` is empty or carries no payload.
+    """
+    text = response.strip()
+    if not text:
+        raise ValueError("empty SDG response")
+    if " " in text:
+        text = text.split(" ", 1)[1]
+    tokens = [t.strip() for t in text.split(",")]
+    if not tokens or not tokens[0]:
+        raise ValueError(f"no payload in SDG response: {response!r}")
+
+    fields: Dict[str, str] = {}
+    start = 0
+    if tokens[0].upper() in {"ON", "OFF"}:
+        fields["STATE"] = tokens[0].upper()
+        start = 1
+    for i in range(start, len(tokens) - 1, 2):
+        fields[tokens[i].upper()] = tokens[i + 1]
+    return fields
+
+
 class AWGSCPICommandSet:
     """SCPI command abstraction for function generators and arbitrary waveform generators.
 
@@ -61,49 +100,56 @@ class AWGSCPICommandSet:
     }
 
     # Siglent SDG series command overrides
+    #
+    # PG02-E05B p.27-28, p.62: every "get_*" QUERY SYNTAX below is bare -- none
+    # of BSWV/OUTP/ARWV/MDWV/BTWV/SWWV documents a per-field selector query.
+    # RESPONSE FORMAT always returns the WHOLE parameter list for the
+    # subsystem as one comma-joined "KEY,value,KEY,value,..." reply, parsed by
+    # `parse_key_value_response`. The "C{ch}:<CMD>? <FIELD>" selector grammar
+    # previously used here was invented (audit H5, fixed Task 10).
     SIGLENT_SDG_OVERRIDES: Dict[str, str] = {
         # SDG series uses C{ch} prefix for basic commands
         "set_function": "C{ch}:BSWV WVTP,{function}",
-        "get_function": "C{ch}:BSWV? WVTP",
+        "get_function": "C{ch}:BSWV?",
         # Frequency using Basic Wave command
         "set_frequency": "C{ch}:BSWV FRQ,{frequency}",
-        "get_frequency": "C{ch}:BSWV? FRQ",
+        "get_frequency": "C{ch}:BSWV?",
         # Amplitude using Basic Wave command (in Vpp)
         "set_amplitude": "C{ch}:BSWV AMP,{amplitude}",
-        "get_amplitude": "C{ch}:BSWV? AMP",
+        "get_amplitude": "C{ch}:BSWV?",
         # Offset using Basic Wave command
         "set_offset": "C{ch}:BSWV OFST,{offset}",
-        "get_offset": "C{ch}:BSWV? OFST",
+        "get_offset": "C{ch}:BSWV?",
         # Phase using Basic Wave command (in degrees)
         "set_phase": "C{ch}:BSWV PHSE,{phase}",
-        "get_phase": "C{ch}:BSWV? PHSE",
+        "get_phase": "C{ch}:BSWV?",
         # Pulse duty cycle
         "set_pulse_duty": "C{ch}:BSWV DUTY,{duty}",
-        "get_pulse_duty": "C{ch}:BSWV? DUTY",
+        "get_pulse_duty": "C{ch}:BSWV?",
         # Ramp symmetry
         "set_ramp_symmetry": "C{ch}:BSWV SYM,{symmetry}",
-        "get_ramp_symmetry": "C{ch}:BSWV? SYM",
+        "get_ramp_symmetry": "C{ch}:BSWV?",
         # Output control
         "set_output": "C{ch}:OUTP {state}",
         "get_output": "C{ch}:OUTP?",
         # Output load
         "set_output_load": "C{ch}:OUTP LOAD,{load}",
-        "get_output_load": "C{ch}:OUTP? LOAD",
+        "get_output_load": "C{ch}:OUTP?",
         # Output polarity
         "set_output_polarity": "C{ch}:OUTP PLRT,{polarity}",
-        "get_output_polarity": "C{ch}:OUTP? PLRT",
+        "get_output_polarity": "C{ch}:OUTP?",
         # Arbitrary waveform specific (SDG)
         "set_arb_waveform": "C{ch}:ARWV NAME,{name}",
-        "get_arb_waveform": "C{ch}:ARWV? NAME",
+        "get_arb_waveform": "C{ch}:ARWV?",
         # Modulation commands (for future expansion)
         "set_modulation": "C{ch}:MDWV STATE,{state}",
-        "get_modulation": "C{ch}:MDWV? STATE",
+        "get_modulation": "C{ch}:MDWV?",
         # Burst mode commands (for future expansion)
         "set_burst_state": "C{ch}:BTWV STATE,{state}",
-        "get_burst_state": "C{ch}:BTWV? STATE",
+        "get_burst_state": "C{ch}:BTWV?",
         # Sweep mode commands (for future expansion)
         "set_sweep_state": "C{ch}:SWWV STATE,{state}",
-        "get_sweep_state": "C{ch}:SWWV? STATE",
+        "get_sweep_state": "C{ch}:SWWV?",
     }
 
     def __init__(self, variant: str = "generic"):

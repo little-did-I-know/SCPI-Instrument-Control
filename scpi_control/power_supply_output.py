@@ -5,9 +5,11 @@ Represents a single power supply output with voltage, current, and enable contro
 
 import logging
 import re
+import warnings
 from typing import TYPE_CHECKING, Dict
 
 from scpi_control import exceptions
+from scpi_control.psu_scpi_commands import decode_spd_status
 
 if TYPE_CHECKING:
     from scpi_control.power_supply import PowerSupply
@@ -122,6 +124,22 @@ class PowerSupplyOutput:
         Returns:
             True if output is enabled, False otherwise
         """
+        scpi_commands = self._psu._scpi_commands
+        if scpi_commands is not None and scpi_commands.supports_command("get_status"):
+            # QS0503X-E01B p.36/p.40-41: the SPD3303X has no output-state
+            # query at all -- state is decoded from the bit-encoded
+            # SYSTem:STATus? response instead (audit H20, Task 8).
+            cmd = self._psu._get_command("get_status")
+            response = self._psu.query(cmd)
+            state = decode_spd_status(response)
+            key = f"ch{self._output_num}_output"
+            if key in state:
+                return state[key]
+            # No documented status bit covers this channel (e.g. SPD3303X's
+            # fixed CH3 -- p.42's bit table only defines CH1/CH2). Fall
+            # through to the generic query below for lack of anything better
+            # documented for it.
+
         cmd = self._psu._get_command("get_output", ch=self._output_num)
         response = self._psu.query(cmd)
         # Response may be "ON", "OFF", or include echo like "OUTPUT CH1,ON"
@@ -226,6 +244,19 @@ class PowerSupplyOutput:
         Raises:
             NotImplementedError: If OVP is not supported by this model
         """
+        if self._psu.model_capability.scpi_variant == "siglent_spd":
+            # QS0503X-E01B p.36 lists the full SPD3303X command set; it has no
+            # protection subsystem, so this command is silently discarded by the
+            # instrument. FutureWarning (not DeprecationWarning) because the latter
+            # is hidden by default outside __main__, and a user who believes OVP is
+            # armed must see this. Capability flips to False and this raises in
+            # v5.0.0 (audit H18).
+            warnings.warn(
+                "SPD3303X has no protection subsystem; this call arms nothing. " "It will raise NotImplementedError in v5.0.0.",
+                FutureWarning,
+                stacklevel=2,
+            )
+
         if not self._psu.model_capability.has_ovp:
             raise NotImplementedError(f"Over-voltage protection not supported on {self._psu.model_capability.model_name}")
 
@@ -260,6 +291,19 @@ class PowerSupplyOutput:
         Raises:
             NotImplementedError: If OCP is not supported by this model
         """
+        if self._psu.model_capability.scpi_variant == "siglent_spd":
+            # QS0503X-E01B p.36 lists the full SPD3303X command set; it has no
+            # protection subsystem, so this command is silently discarded by the
+            # instrument. FutureWarning (not DeprecationWarning) because the latter
+            # is hidden by default outside __main__, and a user who believes OCP is
+            # armed must see this. Capability flips to False and this raises in
+            # v5.0.0 (audit H18).
+            warnings.warn(
+                "SPD3303X has no protection subsystem; this call arms nothing. " "It will raise NotImplementedError in v5.0.0.",
+                FutureWarning,
+                stacklevel=2,
+            )
+
         if not self._psu.model_capability.has_ocp:
             raise NotImplementedError(f"Over-current protection not supported on {self._psu.model_capability.model_name}")
 

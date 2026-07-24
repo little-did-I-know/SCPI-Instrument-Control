@@ -187,12 +187,12 @@ class TestBandwidthLimit:
     def test_set_bandwidth_limit_on(self, channel, mock_scope):
         """Test enabling bandwidth limit."""
         channel.bandwidth_limit = "ON"
-        mock_scope.write.assert_called_once_with("C1:BWL ON")
+        mock_scope.write.assert_called_once_with("BWL C1,ON")
 
     def test_set_bandwidth_limit_off(self, channel, mock_scope):
         """Test disabling bandwidth limit."""
         channel.bandwidth_limit = "OFF"
-        mock_scope.write.assert_called_once_with("C1:BWL OFF")
+        mock_scope.write.assert_called_once_with("BWL C1,OFF")
 
     def test_set_bandwidth_limit_invalid(self, channel, mock_scope):
         """Test setting invalid bandwidth limit."""
@@ -202,11 +202,13 @@ class TestBandwidthLimit:
     def test_bandwidth_limit_property_setter(self, channel, mock_scope):
         """Test bandwidth_limit property setter."""
         channel.bandwidth_limit = "ON"
-        mock_scope.write.assert_called_once_with("C1:BWL ON")
+        mock_scope.write.assert_called_once_with("BWL C1,ON")
 
     def test_bandwidth_limit_property_getter(self, channel, mock_scope):
         """Test bandwidth_limit property getter."""
-        mock_scope.query.return_value = "ON"
+        # Documented response is the global, header-echoed "BWL <ch>,<mode>"
+        # pairs form (RC01020-E01C p.27) -- not a per-channel bare token.
+        mock_scope.query.return_value = "BWL C1,ON"
         assert channel.bandwidth_limit == "ON"
 
 
@@ -222,7 +224,7 @@ class TestChannelConfiguration:
             "1.000E+00V",  # voltage_scale
             "0.000E+00V",  # voltage_offset
             "10",  # probe_ratio
-            "OFF",  # bandwidth_limit
+            "BWL C1,OFF",  # bandwidth_limit
             "V",  # unit
         ]
 
@@ -245,7 +247,7 @@ class TestChannelConfiguration:
             "2.000E+00V",  # voltage_scale
             "1.000E+00V",  # voltage_offset
             "1",  # probe_ratio
-            "ON",  # bandwidth_limit
+            "BWL C1,ON",  # bandwidth_limit
             "V",  # unit
         ]
 

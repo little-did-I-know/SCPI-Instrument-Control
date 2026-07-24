@@ -91,6 +91,8 @@ class VISAConnection(BaseConnection):
             ImportError: If pyvisa is not installed
             SiglentConnectionError: If backend initialization fails
         """
+        super().__init__(host=resource_string, port=0, timeout=timeout)
+
         if not PYVISA_AVAILABLE:
             raise ImportError(
                 "PyVISA is required for USB/VISA connections.\n" "Install with: pip install 'SCPI-Instrument-Control[usb]'\n" "For pure Python backend (no NI-VISA): pip install pyvisa-py"
@@ -248,6 +250,43 @@ class VISAConnection(BaseConnection):
                 error_msg = f"VISA query error on {self.resource_string}: {e}"
                 logger.error(error_msg)
                 raise SiglentConnectionError(error_msg)
+
+    def read(self) -> str:
+        """Read a response string from the instrument.
+
+        Returns:
+            The response with trailing whitespace/terminators stripped.
+
+        Raises:
+            SiglentConnectionError: If not connected
+        """
+        if not self.is_connected:
+            raise SiglentConnectionError("Not connected to VISA resource")
+
+        logger.debug("VISA Read")
+        response = self._resource.read()
+        logger.debug(f"VISA Response: {response!r}")
+        return response.strip()
+
+    def read_raw(self, size: Optional[int] = None) -> bytes:
+        """Read raw bytes from the instrument (e.g. a waveform or screenshot block).
+
+        Args:
+            size: Maximum number of bytes to read. None reads until the terminator.
+
+        Returns:
+            The raw bytes read from the instrument.
+
+        Raises:
+            SiglentConnectionError: If not connected
+        """
+        if not self.is_connected:
+            raise SiglentConnectionError("Not connected to VISA resource")
+
+        logger.debug(f"VISA Read Raw: size={size}")
+        if size is None:
+            return self._resource.read_raw()
+        return self._resource.read_bytes(size)
 
     def query_binary(self, command: str, max_bytes: int = 1000000) -> bytes:
         """Send a SCPI query and read binary response.

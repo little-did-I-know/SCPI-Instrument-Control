@@ -10,6 +10,50 @@ from typing import Dict
 logger = logging.getLogger(__name__)
 
 
+def decode_spd_status(word: str) -> Dict[str, bool]:
+    """Decode an SPD3303X ``SYSTem:STATus?`` response into named flags.
+
+    QS0503X-E01B p.41-42: the SPD3303X has no dedicated output-state query
+    (audit H20) -- output (and other) state is instead packed into a single
+    hexadecimal status word (e.g. ``"0x0224"``), decoded bit-by-bit per the
+    state-correspondence table on p.42:
+
+        Bit  | Meaning
+        -----|--------------------------------------------
+        0    | CH1 mode: 0 = CV (constant voltage), 1 = CC (constant current)
+        1    | CH2 mode: 0 = CV, 1 = CC
+        2,3  | Output tracking: 01 = Independent, 10 = Parallel
+        4    | CH1 output: 0 = OFF, 1 = ON
+        5    | CH2 output: 0 = OFF, 1 = ON
+        6    | TIMER1: 0 = OFF, 1 = ON
+        7    | TIMER2: 0 = OFF, 1 = ON
+        8    | CH1 display: 0 = digital, 1 = waveform
+        9    | CH2 display: 0 = digital, 1 = waveform
+
+    Only the two bits this driver currently has a caller for (CH1/CH2 output
+    state) are decoded into named flags; extend this mapping if a caller for
+    the other documented bits appears.
+
+    Args:
+        word: The raw response, e.g. ``"0x0224"``.
+
+    Returns:
+        Mapping of flag name to bool. Currently: ``ch1_output``, ``ch2_output``.
+
+    Raises:
+        ValueError: If `word` is not a hexadecimal status word.
+    """
+    try:
+        bits = int(word.strip(), 16)
+    except (AttributeError, ValueError) as exc:
+        raise ValueError(f"Not a hexadecimal SPD3303X status word: {word!r}") from exc
+
+    return {
+        "ch1_output": bool(bits & (1 << 4)),
+        "ch2_output": bool(bits & (1 << 5)),
+    }
+
+
 class PSUSCPICommandSet:
     """SCPI command abstraction for power supplies.
 
@@ -53,13 +97,21 @@ class PSUSCPICommandSet:
         "get_voltage": "CH{ch}:VOLT?",
         "set_current": "CH{ch}:CURR {current}",
         "get_current": "CH{ch}:CURR?",
-        # Measurements use MEASure subsystem
-        "measure_voltage": "MEASure{ch}:VOLTage?",
-        "measure_current": "MEASure{ch}:CURRent?",
-        "measure_power": "MEASure{ch}:POWer?",
+        # Measurements use the MEASure subsystem with the channel as an ARGUMENT
+        # (QS0503X-E01B p.38). "MEASure{ch}:VOLTage?" was invented and is not in
+        # the SPD3303X command list (p.36) -- audit H6.
+        "measure_voltage": "MEASure:VOLTage? CH{ch}",
+        "measure_current": "MEASure:CURRent? CH{ch}",
+        "measure_power": "MEASure:POWEr? CH{ch}",
         # Output control uses specific format
         "set_output": "OUTPut CH{ch},{state}",
-        "get_output": "OUTPut? CH{ch}",
+        # QS0503X-E01B p.36 (Chapter 3.2 command list), p.40 (OUTPut Subsystem):
+        # there is NO output-state query on this instrument -- "OUTPut? CH{ch}"
+        # was invented and does not exist in the SPD3303X command set (audit
+        # H20, Task 8). The only documented way to read output state is to
+        # decode the bit-encoded "SYSTem:STATus?" response (p.41-42) via
+        # decode_spd_status() below.
+        "get_status": "SYSTem:STATus?",
         # Advanced Siglent-specific features
         # Timer functionality
         "set_timer_enable": "TIMEr CH{ch},{state}",
@@ -69,7 +121,9 @@ class PSUSCPICommandSet:
         "set_timer_current": "TIMEr:CURR CH{ch},{current}",
         "get_timer_current": "TIMEr:CURR? CH{ch}",
         # Waveform generation
-        "set_wave_enable": "WAVE CH{ch},{state}",
+        # QS0503X-E01B p.40: "OUTPut:WAVE {CH1|CH2},{ON|OFF}" -- the "OUTPut:"
+        # prefix is required (audit H19, Task 7); the code previously omitted it.
+        "set_wave_enable": "OUTPut:WAVE CH{ch},{state}",
         "get_wave_enable": "WAVE? CH{ch}",
         "set_wave_type": "WAVE:TYPE CH{ch},{wave_type}",  # SINE, SQUARE, etc.
         "get_wave_type": "WAVE:TYPE? CH{ch}",
@@ -77,13 +131,24 @@ class PSUSCPICommandSet:
         "get_wave_freq": "WAVE:FREQ? CH{ch}",
         "set_wave_amplitude": "WAVE:AMPL CH{ch},{amplitude}",
         "get_wave_amplitude": "WAVE:AMPL? CH{ch}",
-        # Tracking modes (series/parallel)
-        "set_tracking": "OUTP:TRACK {mode}",  # INDEPENDENT, SERIES, PARALLEL
+        # Tracking modes (series/parallel). QS0503X-E01B p.40: "OUTPut:TRACK
+        # {0|1|2}" is a NUMERIC parameter on the wire (0=independent,
+        # 1=series, 2=parallel) -- the template keeps the documented "OUTP:"
+        # abbreviation used elsewhere in this table; get_command() below maps
+        # the public word enum (INDEPENDENT/SERIES/PARALLEL) to that number
+        # right before formatting (audit H19, Task 7).
+        "set_tracking": "OUTP:TRACK {mode}",
         "get_tracking": "OUTP:TRACK?",
         # Remote sensing
         "set_remote_sense": "SYST:SENS CH{ch},{state}",
         "get_remote_sense": "SYST:SENS? CH{ch}",
     }
+
+    # QS0503X-E01B p.40: OUTPut:TRACK's argument is the NUMERIC {0|1|2}, not
+    # the INDEPENDENT/SERIES/PARALLEL words power_supply.py's public
+    # `tracking_mode` property uses. This is the wire-encoding boundary
+    # get_command() consults for "set_tracking" (audit H19, Task 7).
+    SPD_TRACKING_WIRE: Dict[str, int] = {"INDEPENDENT": 0, "SERIES": 1, "PARALLEL": 2}
 
     def __init__(self, variant: str = "generic"):
         """Initialize SCPI command set with variant.
@@ -121,6 +186,15 @@ class PSUSCPICommandSet:
         if self.variant == "siglent_spd":
             if command_name in self.SIGLENT_SPD_OVERRIDES:
                 template = self.SIGLENT_SPD_OVERRIDES[command_name]
+                if command_name == "set_tracking" and isinstance(kwargs.get("mode"), str):
+                    # QS0503X-E01B p.40: wire wants NUMERIC {0|1|2}; the
+                    # caller (power_supply.py's tracking_mode setter) passes
+                    # the public word enum. Translate right before formatting.
+                    word = kwargs["mode"].upper()
+                    try:
+                        kwargs = {**kwargs, "mode": self.SPD_TRACKING_WIRE[word]}
+                    except KeyError:
+                        raise ValueError(f"Unknown tracking mode '{kwargs['mode']}'; expected one of {sorted(self.SPD_TRACKING_WIRE)}")
                 try:
                     return template.format(**kwargs)
                 except KeyError as e:

@@ -112,18 +112,16 @@ class Measurement:
             except (ValueError, IndexError) as e:
                 raise exceptions.CommandError(f"Failed to parse measurement: {e}")
 
-        # Parse response (format typically: "PAVA PKPK,C1,1.23V")
+        # RC01020-E01C p.88: "<trace>:PAVA <parameter>,<value>" -- the value is
+        # the last comma field. Only one parameter is ever requested.
         try:
-            # Extract value from response
             parts = response.split(",")
-            if len(parts) >= 3:
-                value_str = parts[2].strip()
-                # Remove units (V, s, Hz, %, etc.)
-                for unit in ["V", "S", "HZ", "%", "A"]:
-                    value_str = value_str.replace(unit, "").replace(unit.lower(), "")
-                return float(value_str)
-            else:
+            if len(parts) < 2:
                 raise ValueError(f"Unexpected response format: {response}")
+            value_str = parts[-1].strip()
+            for unit in ["V", "S", "HZ", "%", "A"]:
+                value_str = value_str.replace(unit, "").replace(unit.lower(), "")
+            return float(value_str)
         except (ValueError, IndexError) as e:
             raise exceptions.CommandError(f"Failed to parse measurement: {e}")
 

@@ -7,6 +7,60 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.1.0] - 2026-07-23
+
+### Added
+
+- Testing: a vendor-example conformance corpus (`tests/wire_forms.py`) pins every command in the
+  covered SCPI tables to a request/response pair transcribed from the vendor's programming guide,
+  with document and page citations. A coverage test (`tests/test_wire_conformance.py`) fails the
+  suite if any command in those tables (the legacy and modern scope dialects, the SPD power-supply
+  overrides, and the SDG function-generator overrides — 159 commands) has no cited corpus entry, so
+  an invented command can no longer be added silently to a covered table. (The IEEE-488.2 base, the
+  generic fallbacks, and the Tektronix/LeCroy/DAQ tables are not yet enforced — see
+  `docs/development/wire-form-inventory.md`, which records the full audit.)
+- Oscilloscope: modern-dialect deep-memory waveform capture is chunked over `:WAVeform:MAXPoint`
+  windows using `:WAVeform:STARt`, so records larger than a single transfer are reassembled correctly.
+- Oscilloscope: modern-dialect (SDS800X HD / SDS5000X) waveform capture now goes over the documented
+  `:WAVeform:SOURce`/`:WAVeform:PREamble?`/`:WAVeform:DATA?` subsystem instead of the legacy
+  `C<n>:WF? DAT2`/`DESC` forms, which have zero occurrences anywhere in the modern programming guide
+  (audit H9). Voltage and time reconstruction use the guide's own documented formulas (p.758/p.759).
+
+### Fixed
+
+- Oscilloscope (legacy Siglent): measurements use the documented `C<n>:PAVA? <param>` form and parse
+  its two-field response, and sample-rate responses carrying an SI magnitude letter (`SARA 500.0kSa`)
+  now parse. The previous `PAVA? <param>,C<n>` form and scientific-only sample-rate parsing failed on
+  real hardware (audit H7/H30/H8/H34).
+- Power supply (SPD3303X/-E): measurement queries use the documented `MEASure:VOLTage? CH<n>` form
+  (channel as an argument), tracking mode uses the documented numeric `OUTPut:TRACK {0|1|2}`, and
+  output state is read by decoding the `SYSTem:STATus?` word — the instrument documents no output-state
+  query (audit H6/H19/H20).
+- Function generator (SDG): parameter readback uses the documented bare `C<n>:BSWV?` / `C<n>:OUTP?`
+  queries and parses the returned key-value list; the previous per-field selector grammar
+  (`C<n>:BSWV? FRQ`) does not exist on the instrument (audit H5).
+- USB/GPIB/serial: `VISAConnection` can now be instantiated — it implemented neither `read` nor
+  `read_raw`, so it raised `TypeError` at construction and every documented VISA example failed
+  (audit H10).
+- Testing (mock fidelity): the mock now answers documented legacy probe (`C<n>:ATTN?`) and
+  bandwidth-limit (`BWL?`) queries instead of timing out; the DAQ dispatch no longer matches `R?` as a
+  substring (which hijacked `SYST:ERR?`/`TRIG:SOUR?`) and interprets scan-list/trigger writes; and
+  `MockConnection.read_raw` honors the requested byte count.
+
+### Deprecated
+
+- Power supply: setting `ovp_level`/`ocp_level` on an SPD3303X/-E now emits a `FutureWarning`. The
+  SPD3303X command set contains no protection subsystem, so these calls have never armed anything on
+  real hardware. In v5.0.0 the model's `has_ovp`/`has_ocp` capabilities become `False` and the calls
+  raise `NotImplementedError`.
+- Testing: `MockConnection` gained `strict=True`, which makes unmatched PSU/AWG/DAQ queries raise
+  `TimeoutError` like real instruments instead of returning `""`. Strict becomes the default in v5.0.0 —
+  pass `strict=False` explicitly to keep the old behavior past that release.
+- Testing: `MockConnection` still answers legacy `C<n>:WF?` writes on a modern-dialect (`SDS8xx HD`/
+  `SDS5000X`) instance, even though the driver's modern capture path no longer sends it (audit H9,
+  Task 18). This is a backward-compatibility shim for anything still issuing that form by hand; the
+  modern guide documents no such command, and the mock handler is removed in v5.0.0.
+
 ## [4.0.0] - 2026-07-22
 
 ### ⚠️ Breaking Changes

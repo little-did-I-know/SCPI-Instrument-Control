@@ -212,12 +212,23 @@ class Channel:
         Returns:
             Bandwidth limit: 'ON', 'OFF', or frequency limit
         """
-        if self._dialect == "lecroy":
-            # BWL? is global: "C1,OFF,C2,20MHZ,..." pairs (MAUI p.7-18). The
-            # real LeCroy <mode> vocabulary is {OFF,20MHZ,200MHZ,...} -- there
-            # is no "ON" token, so any non-OFF wire token maps to the public
-            # "ON" (mirrors the modern/tektronix ON/OFF normalization below).
-            tokens = [t.strip().upper() for t in self._scope.query(self._cmd("get_bandwidth_limit")).split(",")]
+        if self._dialect in ("lecroy", "legacy"):
+            # BWL? is global on both dialects: RESPONSE FORMAT is all-channel
+            # <channel>,<mode> pairs (RC01020-E01C p.27 legacy: "BWL C1,OFF,
+            # C2,ON,..."; MAUI p.7-18 LeCroy: "C1,OFF,C2,20MHZ,..."). Legacy's
+            # response echoes the "BWL " header, like every other legacy query
+            # in this driver; LeCroy's CHDR OFF connect-time setup suppresses
+            # response headers entirely (scpi_commands.py CONNECT_SETUP), so
+            # its reply has none -- strip a leading "BWL " only for legacy.
+            # The real LeCroy <mode> vocabulary is {OFF,20MHZ,200MHZ,...} --
+            # there is no "ON" token, so any non-OFF wire token maps to the
+            # public "ON" (mirrors the modern/tektronix ON/OFF normalization
+            # below); legacy's own vocabulary is a literal {ON,OFF} that the
+            # same rule handles for free.
+            raw = self._scope.query(self._cmd("get_bandwidth_limit"))
+            if self._dialect == "legacy" and raw.strip().upper().startswith("BWL "):
+                raw = raw.strip().split(" ", 1)[1]
+            tokens = [t.strip().upper() for t in raw.split(",")]
             try:
                 wire = tokens[tokens.index(f"C{self._channel}") + 1]
             except (ValueError, IndexError):
