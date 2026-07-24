@@ -3,6 +3,7 @@
 import numpy as np
 import pytest
 
+from scpi_control.report_generator.utils.waveform_loader import WaveformLoader
 from scpi_control.waveform_io import load_waveform
 
 MARKER = []
@@ -49,3 +50,32 @@ def test_ordinary_npz_still_round_trips(tmp_path):
     np.savez(path, time=np.arange(4, dtype=float), voltage=np.ones(4), channel=np.array(1))
     loaded = load_waveform(str(path))
     assert len(loaded.voltage) == 4
+
+
+def _write_malicious_npz_for_report_loader(path):
+    # report_generator.utils.waveform_loader.WaveformLoader._load_npz is a
+    # SEPARATE implementation from waveform_io._load_npz above -- it does not
+    # read meta_-prefixed keys at all. It first checks (by key name only,
+    # ws.TIME/ws.VOLTAGE/ws.CHANNEL/ws.SAMPLE_RATE) whether the file "looks
+    # like ours"; if so it delegates to waveform_io.load_waveform, i.e. the
+    # site already covered above. Omitting one of those four keys forces the
+    # OTHER branch, _npz_heuristic, which is this loader's own code and is
+    # what we need to exercise here.
+    #
+    # _npz_heuristic builds its voltage-key list with:
+    #   [k for k in data.files if k != time_key and np.asarray(data[k])...]
+    # That touches data[k] -- triggering deserialization -- for every key
+    # other than the chosen time key, unconditionally, before it ever checks
+    # whether the key looks like voltage data. So a payload under any
+    # non-time key (no meta_ prefix needed) is read on every load attempt.
+    with open(path, "wb") as handle:
+        np.savez(handle, time=np.arange(4, dtype=float), evil=np.array(_Payload(), dtype=object))
+
+
+def test_report_loader_does_not_execute_pickle_payload(tmp_path):
+    MARKER.clear()
+    path = tmp_path / "evil_report.npz"
+    _write_malicious_npz_for_report_loader(path)
+    with pytest.raises(ValueError):
+        WaveformLoader.load(path)
+    assert MARKER == [], "pickle payload executed during report-generator load"
