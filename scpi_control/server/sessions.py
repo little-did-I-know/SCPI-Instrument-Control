@@ -126,6 +126,12 @@ class InstrumentSession:
         self.active_reference: Optional[Dict[str, Any]] = None  # {"name", "channel", "data": {"time","voltage",...}}
         self._shown: set = set()  # trace keys (M1/M2/F1/F2/SPEC) live on subscribers' canvases; worker-thread-only
         self.recorder = TrendRecorder()  # internally locked: worker appends, request threads control/read
+        self.owner = ""
+        self.owner_last_active = time.monotonic()
+
+    def touch(self) -> None:
+        """Record owner activity; feeds the abandoned-session claim rule."""
+        self.owner_last_active = time.monotonic()
 
     @classmethod
     def open(
@@ -137,6 +143,7 @@ class InstrumentSession:
         mock: bool = False,
         model: Optional[str] = None,
         poll_interval: float = 0.25,
+        owner: str = "",
         _connection=None,
     ) -> "InstrumentSession":
         if mock:
@@ -147,6 +154,7 @@ class InstrumentSession:
                 raise ValueError("address is required for a non-mock session")
             scope = Oscilloscope(address, port=port)
         session = cls(label, scope, mock, address, poll_interval)
+        session.owner = owner
         session._thread.start()
         try:
             session.submit(session._connect_job).result(timeout=30)
@@ -363,8 +371,8 @@ class SessionManager:
         self._sessions: Dict[str, InstrumentSession] = {}
         self._lock = threading.Lock()
 
-    def create(self, label: str, *, address: Optional[str] = None, port: int = 5025, mock: bool = False, model: Optional[str] = None, _connection=None) -> InstrumentSession:
-        session = InstrumentSession.open(label, address=address, port=port, mock=mock, model=model, _connection=_connection)
+    def create(self, label: str, *, address: Optional[str] = None, port: int = 5025, mock: bool = False, model: Optional[str] = None, owner: str = "", _connection=None) -> InstrumentSession:
+        session = InstrumentSession.open(label, address=address, port=port, mock=mock, model=model, owner=owner, _connection=_connection)
         with self._lock:
             self._sessions[session.id] = session
         return session
