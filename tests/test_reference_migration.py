@@ -102,6 +102,10 @@ def test_failed_conversion_leaves_original_file_intact(tmp_path, monkeypatch):
     # A conversion that dies partway through must not leave a truncated
     # replacement -- the original, still-readable-as-legacy file must remain.
     assert target.read_bytes() == before_bytes
+    # Byte-identity alone would also hold for a file that was never readable
+    # in the first place, so prove the survivor is still a loadable archive.
+    with np.load(target, allow_pickle=True) as survivor:
+        assert survivor["metadata"].item()["name"] == "old"
     assert target.exists()
     # No leftover temp file should linger in the storage directory either.
     assert sorted(p.name for p in storage.iterdir()) == ["ref_old.npz"]
