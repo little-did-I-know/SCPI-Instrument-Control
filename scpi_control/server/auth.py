@@ -85,8 +85,14 @@ class TokenStore:
         candidate = _hash(raw)
         for entry in self._tokens:
             if hmac.compare_digest(entry["hash"], candidate):
+                # In-memory only -- do NOT add self._save() back here. verify()
+                # runs inline on the event loop for every authenticated request;
+                # last_used is audit-flavoured metadata, not security state, and
+                # is not worth a synchronous tokens.json rewrite (+ chmod) plus an
+                # unsynchronized read-modify-write race on that hot path. The
+                # value still reaches disk whenever the store is next saved for a
+                # real reason (mint/revoke).
                 entry["last_used"] = _now()
-                self._save()
                 return str(entry["name"])
         return None
 
@@ -108,6 +114,28 @@ class TokenStore:
 EXEMPT_PATHS = frozenset({"/api/health"})
 WS_SUBPROTOCOL_PREFIX = "scpi-token."
 WS_ACCEPT_SUBPROTOCOL = "scpi"
+
+
+def _route_path(scope) -> str:
+    """``scope["path"]`` with any ASGI ``root_path`` prefix stripped.
+
+    Starlette's router matches routes on the path with ``root_path`` removed
+    (see ``starlette._utils.get_route_path``), not on the raw ``scope["path"]``.
+    Under a proxy-mounted deployment (``uvicorn --root-path /gw``) the raw path
+    for a request to /api/sessions is "/gw/api/sessions"; comparing that raw
+    value against ``/api/`` never matches, so the guard would wave the request
+    through and the router would then strip "/gw" and serve it anyway. Mirror
+    Starlette's own stripping here so the guard sees what the router sees.
+    """
+    path = scope.get("path", "")
+    root_path = scope.get("root_path", "")
+    if not root_path or not path.startswith(root_path):
+        return path
+    if path == root_path:
+        return ""
+    if path[len(root_path)] == "/":
+        return path[len(root_path) :]
+    return path
 
 
 def _bearer(headers) -> str:
@@ -136,7 +164,7 @@ class AuthMiddleware:
         if scope["type"] not in ("http", "websocket"):
             await self.app(scope, receive, send)
             return
-        path = scope.get("path", "")
+        path = _route_path(scope)
         # Only /api/* is guarded; the SPA and its assets are served anonymously
         # so the browser can load the page that then asks for a token.
         if path in self.exempt or not path.startswith("/api/"):

@@ -29,7 +29,10 @@ def create_app(manager: Optional[SessionManager] = None, references_dir: Optiona
         # close_all() joins worker threads, so keep it off the event loop.
         await run_in_threadpool(app.state.manager.close_all)
 
-    app = FastAPI(title="SCPI Instrument Control Gateway", lifespan=lifespan)
+    # docs_url/redoc_url off and openapi_url moved under /api/ so the schema and
+    # HTML doc UIs sit behind AuthMiddleware like the rest of the instrument
+    # surface, instead of being served to anyone who reaches the port.
+    app = FastAPI(title="SCPI Instrument Control Gateway", lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url="/api/openapi.json")
     app.state.manager = manager
     # A malformed token store must fail loudly (TokenStore.__init__ raises
     # ValueError) rather than be caught here and silently degrade to an empty

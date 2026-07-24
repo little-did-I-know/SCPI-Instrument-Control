@@ -13,6 +13,7 @@ from starlette.websockets import WebSocketDisconnect  # noqa: E402
 
 from scpi_control.server.api.stream import _enqueue  # noqa: E402
 from scpi_control.server.app import create_app  # noqa: E402
+from scpi_control.server.auth import WS_ACCEPT_SUBPROTOCOL  # noqa: E402
 from scpi_control.server.sessions import SessionManager  # noqa: E402
 
 
@@ -87,6 +88,26 @@ def test_stream_unknown_session_closes(client, ws_subprotocols):
     with pytest.raises(Exception):
         with client.websocket_connect("/api/sessions/nope/stream", subprotocols=ws_subprotocols) as ws:
             ws.receive_json()
+
+
+# --- Important 5: the accepted subprotocol must be negotiated, not silent --
+
+
+def test_stream_negotiates_the_accept_subprotocol_when_offered(client, ws_subprotocols):
+    # A real browser fails the handshake if it offered Sec-WebSocket-Protocol
+    # and the 101 response echoes none, so the accept must select one back.
+    sid = _create_mock(client)
+    with client.websocket_connect("/api/sessions/{0}/stream".format(sid), subprotocols=ws_subprotocols) as ws:
+        assert ws.accepted_subprotocol == WS_ACCEPT_SUBPROTOCOL
+
+
+def test_stream_does_not_echo_a_subprotocol_the_client_never_offered(client, gateway_auth):
+    # Echoing WS_ACCEPT_SUBPROTOCOL when the client didn't offer it is equally
+    # invalid, so a client authenticating without the "scpi" offer gets none.
+    _store, _headers, raw = gateway_auth
+    sid = _create_mock(client)
+    with client.websocket_connect("/api/sessions/{0}/stream".format(sid), subprotocols=["scpi-token.{0}".format(raw)]) as ws:
+        assert ws.accepted_subprotocol is None
 
 
 # --- Fix 1: bounded outbox with drop-oldest --------------------------------

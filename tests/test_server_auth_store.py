@@ -84,6 +84,21 @@ def test_entry_missing_hash_is_rejected(tmp_path):
         TokenStore(str(path))
 
 
+def test_verify_does_not_write_to_disk(tmp_path):
+    # last_used is audit-flavoured metadata, updated in memory only: a
+    # synchronous rewrite of tokens.json (plus chmod) on every authenticated
+    # request would put blocking disk I/O, and an unsynchronized
+    # read-modify-write race, on the hot path of every API call.
+    path = tmp_path / "tokens.json"
+    store = TokenStore(str(path))
+    raw = store.mint("robin")
+    before_mtime = path.stat().st_mtime_ns
+    before_contents = path.read_bytes()
+    assert store.verify(raw) == "robin"
+    assert path.stat().st_mtime_ns == before_mtime
+    assert path.read_bytes() == before_contents
+
+
 def test_names_lists_without_secrets(tmp_path):
     store = TokenStore(str(tmp_path / "tokens.json"))
     store.mint("robin")

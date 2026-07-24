@@ -5,6 +5,7 @@ import pytest
 fastapi = pytest.importorskip("fastapi")
 pytest.importorskip("httpx")
 from fastapi.testclient import TestClient  # noqa: E402
+from starlette.websockets import WebSocketDisconnect  # noqa: E402
 
 from scpi_control.server.app import create_app  # noqa: E402
 from scpi_control.server.auth import TokenStore  # noqa: E402
@@ -78,12 +79,17 @@ def test_identity_is_attached(client, token):
 
 
 def test_websocket_without_subprotocol_is_rejected(client):
-    with pytest.raises(Exception):
+    # session id "nope" would 4404 regardless of auth (stream.py:71), so the
+    # session must never be reached: assert the specific 1008 the middleware
+    # sends on unauthenticated WS scopes, not just "closed somehow".
+    with pytest.raises(WebSocketDisconnect) as exc_info:
         with client.websocket_connect("/api/sessions/nope/stream"):
             pass
+    assert exc_info.value.code == 1008
 
 
 def test_websocket_with_a_bad_token_is_rejected(client):
-    with pytest.raises(Exception):
+    with pytest.raises(WebSocketDisconnect) as exc_info:
         with client.websocket_connect("/api/sessions/nope/stream", subprotocols=["scpi-token.scpi_bogus", "scpi"]):
             pass
+    assert exc_info.value.code == 1008

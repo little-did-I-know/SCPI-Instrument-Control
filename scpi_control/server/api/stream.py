@@ -4,6 +4,7 @@ import contextlib
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
+from scpi_control.server.auth import WS_ACCEPT_SUBPROTOCOL
 from scpi_control.server.sessions import read_state
 
 router = APIRouter(tags=["stream"])
@@ -70,7 +71,11 @@ async def stream(websocket: WebSocket, session_id: str):
     if session is None:
         await websocket.close(code=4404)
         return
-    await websocket.accept()
+    # Echo the accept subprotocol back only when the client actually offered
+    # it: echoing an unoffered subprotocol is invalid per RFC 6455 and browsers
+    # fail the handshake either way -- offered-and-unechoed, or echoed-unoffered.
+    subprotocol = WS_ACCEPT_SUBPROTOCOL if WS_ACCEPT_SUBPROTOCOL in websocket.scope.get("subprotocols", []) else None
+    await websocket.accept(subprotocol=subprotocol)
 
     loop = asyncio.get_running_loop()
     outbox: "asyncio.Queue" = asyncio.Queue(maxsize=OUTBOX_MAXSIZE)
