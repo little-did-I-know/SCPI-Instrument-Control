@@ -43,6 +43,7 @@ function json(method: string, body: unknown): RequestInit {
 const scope = (id: string) => `/api/sessions/${id}/scope`;
 
 export const api = {
+  whoami: () => request<{ identity: string }>("/api/whoami"),
   models: () => request<ModelInfo[]>("/api/models"),
   discover: (cidr?: string) => request<DiscoveredDevice[]>(cidr ? `/api/discover?cidr=${encodeURIComponent(cidr)}` : "/api/discover"),
   createSession: (body: SessionCreate) => request<SessionInfo>("/api/sessions", json("POST", body)),
