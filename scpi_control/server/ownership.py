@@ -11,7 +11,6 @@ owner hand off explicitly.
 """
 
 import time
-from typing import Optional
 
 from fastapi import Request
 
@@ -79,8 +78,8 @@ def abandon_after(request: Request) -> float:
     return request.app.state.abandon_after
 
 
-def claim(session: InstrumentSession, identity: str, threshold: float) -> Optional[float]:
-    """Attempt to claim ``session`` for ``identity``.
+def claim(session: InstrumentSession, identity: str, threshold: float) -> bool:
+    """Attempt to claim ``session`` for ``identity``. Returns True on success.
 
     An unowned session, or one already owned by ``identity``, claims
     immediately -- note this ignores owner_last_active entirely for an
@@ -93,16 +92,16 @@ def claim(session: InstrumentSession, identity: str, threshold: float) -> Option
     ``threshold`` seconds ago. owner_last_active is time.monotonic()-based;
     ``threshold`` must be compared against a monotonic delta, never wall time.
 
-    Returns None on success (session.owner is now ``identity``), or the
-    number of seconds remaining before the session becomes claimable.
+    On success, session.owner is now ``identity``. On failure the caller is
+    expected to report the current owner and idle time itself (via
+    NotOwnerError) rather than rely on a return value here.
     """
     if session.owner and session.owner != identity:
         if session.owner_watching():
-            return threshold
+            return False
         idle = time.monotonic() - session.owner_last_active
-        remaining = threshold - idle
-        if remaining > 0:
-            return remaining
+        if idle < threshold:
+            return False
     session.owner = identity
     session.touch()
-    return None
+    return True

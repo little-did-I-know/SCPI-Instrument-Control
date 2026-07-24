@@ -151,7 +151,7 @@ def test_claim_is_refused_while_owner_is_active(two_users):
     assert response.json()["detail"]
 
 
-def test_claim_succeeds_once_owner_is_idle(two_users, monkeypatch):
+def test_claim_succeeds_once_owner_is_idle(two_users):
     client, owner, other = two_users
     sid = _make_session(client, owner)["id"]
     # Make the idle threshold trivially small rather than sleeping.
@@ -167,15 +167,41 @@ def test_claim_succeeds_once_owner_is_idle(two_users, monkeypatch):
 def test_owner_can_hand_off_explicitly(two_users):
     client, owner, other = two_users
     sid = _make_session(client, owner)["id"]
-    response = client.post("/api/sessions/{0}/owner".format(sid), json={"name": "other"}, headers=owner)
+    response = client.post("/api/sessions/{0}/owner".format(sid), json={"name": "bob"}, headers=owner)
     assert response.status_code == 200
-    assert response.json()["owner"] == "other"
+    assert response.json()["owner"] == "bob"
+    # Functional check, not just the echoed field: bob can now write, alice cannot.
+    assert client.patch("/api/sessions/{0}/scope/timebase".format(sid), json={"timebase": 1e-3}, headers=other).status_code == 200
+    assert client.patch("/api/sessions/{0}/scope/timebase".format(sid), json={"timebase": 1e-3}, headers=owner).status_code == 409
 
 
 def test_non_owner_cannot_hand_off(two_users):
     client, owner, other = two_users
     sid = _make_session(client, owner)["id"]
     assert client.post("/api/sessions/{0}/owner".format(sid), json={"name": "other"}, headers=other).status_code == 409
+
+
+def test_hand_off_to_unknown_identity_is_rejected(two_users):
+    """name must be a real token-store identity; a typo must not silently
+    write-lock the session for everyone until abandon_after elapses.
+    """
+    client, owner, _other = two_users
+    sid = _make_session(client, owner)["id"]
+    response = client.post("/api/sessions/{0}/owner".format(sid), json={"name": "carol"}, headers=owner)
+    assert response.status_code == 400
+    assert client.get("/api/sessions/{0}".format(sid), headers=owner).json()["owner"] == "alice"
+
+
+def test_hand_off_to_empty_name_releases_ownership(two_users):
+    """An empty name is the documented explicit release: it unowns the
+    session so it becomes immediately claimable, with no named recipient.
+    """
+    client, owner, other = two_users
+    sid = _make_session(client, owner)["id"]
+    response = client.post("/api/sessions/{0}/owner".format(sid), json={"name": ""}, headers=owner)
+    assert response.status_code == 200
+    assert response.json()["owner"] == ""
+    assert client.post("/api/sessions/{0}/claim".format(sid), headers=other).status_code == 200
 
 
 def test_claim_succeeds_immediately_on_unowned_session():
@@ -192,7 +218,7 @@ def test_claim_succeeds_immediately_on_unowned_session():
         session = manager.create("s", mock=True)
         assert session.owner == ""
         session.owner_last_active = time.monotonic()  # as fresh as possible
-        assert claim(session, "someone", 300.0) is None
+        assert claim(session, "someone", 300.0) is True
         assert session.owner == "someone"
     finally:
         manager.close_all()
@@ -259,5 +285,76 @@ def test_claim_succeeds_after_owner_stream_disconnects(two_users_ws):
     client.app.state.abandon_after = 0.0
     with client.websocket_connect("/api/sessions/{0}/stream".format(sid), subprotocols=alice_ws) as ws:
         assert ws.receive_json()["type"] == "state"
+    response = client.post("/api/sessions/{0}/claim".format(sid), headers=bob)
+    assert response.status_code == 200
+
+
+# --- Owner-watching must track identity, not a connect-time snapshot -------
+
+
+def test_claim_while_watching_protects_new_owner_from_reclaim(two_users_ws):
+    """Bob opens the stream while alice still owns the session, then claims
+    it -- the natural "Claim" button flow in a UI that already has the
+    stream open. A boolean snapshot computed at connect time (before bob
+    was owner) never flips true for him, so alice could reclaim mid-capture.
+    Watching must be evaluated against the *current* owner at claim time.
+    """
+    client, alice, bob, _alice_ws, bob_ws = two_users_ws
+    sid = _make_session(client, alice)["id"]
+    client.app.state.abandon_after = 0.0  # idle threshold alone would allow either claim
+    with client.websocket_connect("/api/sessions/{0}/stream".format(sid), subprotocols=bob_ws) as ws:
+        assert ws.receive_json()["type"] == "state"
+        response = client.post("/api/sessions/{0}/claim".format(sid), headers=bob)
+        assert response.status_code == 200
+        assert response.json()["owner"] == "bob"
+        # bob is now owner and already watching -- alice must not be able to
+        # reclaim out from under him.
+        response = client.post("/api/sessions/{0}/claim".format(sid), headers=alice)
+        assert response.status_code == 409
+
+
+def test_handoff_with_stale_watcher_stays_claimable(two_users_ws):
+    """Alice watches, then explicitly hands off to bob. Alice's browser tab
+    stays open (a stale watcher). owner_watching() must key off bob -- the
+    current owner -- not alice's lingering socket, or the session becomes
+    permanently unclaimable despite bob (the actual owner) never watching.
+    """
+    client, alice, bob, alice_ws, _bob_ws = two_users_ws
+    sid = _make_session(client, alice)["id"]
+    client.app.state.abandon_after = 0.0
+    with client.websocket_connect("/api/sessions/{0}/stream".format(sid), subprotocols=alice_ws) as ws:
+        assert ws.receive_json()["type"] == "state"
+        response = client.post("/api/sessions/{0}/owner".format(sid), json={"name": "bob"}, headers=alice)
+        assert response.status_code == 200
+        assert response.json()["owner"] == "bob"
+        # bob (the current owner) isn't watching -- alice's stale socket must
+        # not block a claim.
+        response = client.post("/api/sessions/{0}/claim".format(sid), headers=alice)
+        assert response.status_code == 200
+
+
+def test_watcher_released_on_abnormal_disconnect(two_users_ws, monkeypatch):
+    """The finally block in the stream route must release the watcher slot
+    even when the connection tears down abnormally -- the handler raises
+    before ever sending a frame -- rather than via a clean client close.
+    """
+    from scpi_control.server.api import stream as stream_module
+
+    client, alice, bob, alice_ws, _bob_ws = two_users_ws
+    sid = _make_session(client, alice)["id"]
+    client.app.state.abandon_after = 0.0
+
+    def _boom(_scope):
+        raise RuntimeError("simulated mid-stream failure")
+
+    monkeypatch.setattr(stream_module, "read_state", _boom)
+    # No receive_json here: the handler crashes before it ever sends a
+    # frame, so waiting on one would hang forever waiting for a message
+    # that never arrives.
+    with client.websocket_connect("/api/sessions/{0}/stream".format(sid), subprotocols=alice_ws):
+        pass
+
+    # If the watcher slot leaked, alice would still read as "watching" and
+    # this claim (owner idle, threshold 0) would be wrongly refused.
     response = client.post("/api/sessions/{0}/claim".format(sid), headers=bob)
     assert response.status_code == 200

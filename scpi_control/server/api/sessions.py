@@ -68,17 +68,27 @@ async def claim_session(session_id: str, request: Request):
 
     session = require_session(request, session_id)
     identity = getattr(request.state, "identity", "")
-    retry_after = claim(session, identity, abandon_after(request))
-    if retry_after is not None:
+    if not claim(session, identity, abandon_after(request)):
         raise NotOwnerError(session.owner, time.monotonic() - session.owner_last_active)
     return session_out(session)
 
 
 @router.post("/sessions/{session_id}/owner")
 async def set_owner(session_id: str, body: OwnerPut, request: Request):
+    """Hand off ownership to ``body.name``, or release it with ``""``.
+
+    ``name`` must be a name registered in the token store; an unknown name
+    is rejected with 400 and ownership is left unchanged. An empty string
+    is an explicit release: it unowns the session, making it immediately
+    claimable by anyone. That is the only way an owner can let go of a
+    session without handing it to a specific person.
+    """
     from scpi_control.server.ownership import require_owner
 
     session = require_owner(request, session_id)
-    session.owner = body.name
+    name = body.name
+    if name and name not in request.app.state.tokens.names():
+        raise HTTPException(status_code=400, detail="unknown identity {0!r}".format(name))
+    session.owner = name
     session.touch()
     return session_out(session)

@@ -10,6 +10,7 @@ import queue
 import threading
 import time
 import uuid
+from collections import Counter
 from concurrent.futures import Future
 from concurrent.futures import TimeoutError as FuturesTimeoutError
 from typing import Any, Callable, Dict, List, Optional, Tuple
@@ -128,7 +129,11 @@ class InstrumentSession:
         self.recorder = TrendRecorder()  # internally locked: worker appends, request threads control/read
         self.owner = ""
         self.owner_last_active = time.monotonic()
-        self._owner_watchers = 0
+        # Live stream watchers, keyed by identity (not by "is this the
+        # owner"): a Counter rather than a set because the same identity may
+        # open two tabs and close one, so a plain membership test would drop
+        # the identity on the first close while the second tab is still live.
+        self._watchers: "Counter[str]" = Counter()
 
     def touch(self) -> None:
         """Record owner activity; feeds the abandoned-session claim rule."""
@@ -137,31 +142,42 @@ class InstrumentSession:
     def owner_watching(self) -> bool:
         """True while at least one live stream opened by the current owner is connected.
 
+        Evaluated at check time against the *current* owner and the live
+        per-identity watcher counts (see mark_owner_watching) -- never a
+        snapshot taken when some stream connected. Ownership can change
+        mid-stream via claim() or an explicit handoff, so "is the owner
+        watching" must always be asked fresh: a snapshot fails open (a
+        non-owner who claims the session while already watching would not
+        be protected) and also sticks stale (a former owner's lingering
+        socket would keep blocking claims after handoff).
+
         A watching owner is never idle even though only writes touch()
         owner_last_active -- the claim rule refuses outright while this is
         true, regardless of the idle threshold.
         """
-        return self._owner_watchers > 0
+        return bool(self.owner) and self._watchers[self.owner] > 0
 
     def mark_owner_watching(self, identity: str) -> Callable[[], None]:
         """Register that ``identity`` opened the live stream; returns an unmark callback.
 
-        Only counts when ``identity`` is the current owner, so a non-owner's
-        stream never blocks a claim. The returned callback decrements exactly
-        once no matter how many times it is called, so it is safe to invoke
-        unconditionally from a ``finally`` block on any disconnect path
-        (clean close, error, or cancellation).
+        Tracks the watching identity itself, not whether it happened to be
+        the owner at connect time -- owner_watching() does that comparison
+        later, at check time, against whoever owns the session *then*. The
+        returned callback decrements exactly once no matter how many times
+        it is called, so it is safe to invoke unconditionally from a
+        ``finally`` block on any disconnect path (clean close, error, or
+        cancellation).
         """
-        is_owner = bool(self.owner) and identity == self.owner
-        if is_owner:
-            self._owner_watchers += 1
+        self._watchers[identity] += 1
         released = False
 
         def unmark() -> None:
             nonlocal released
-            if is_owner and not released:
+            if not released:
                 released = True
-                self._owner_watchers -= 1
+                self._watchers[identity] -= 1
+                if self._watchers[identity] <= 0:
+                    del self._watchers[identity]
 
         return unmark
 
