@@ -1,4 +1,5 @@
 import type { ChannelPatch, DiscoveredDevice, FilterConfig, LogData, LogInfo, MeasurementValue, ModelInfo, ReferenceInfo, ReferenceOverlay, RunOp, ScopeState, SessionCreate, SessionInfo, SpectrumConfig, TriggerPatch } from "./types";
+import { getToken } from "./token";
 
 export class ApiError extends Error {
   status: number;
@@ -15,7 +16,10 @@ export class ApiError extends Error {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(path, init);
+  const token = getToken();
+  const headers = new Headers(init?.headers);
+  if (token) headers.set("Authorization", `Bearer ${token}`);
+  const response = await fetch(path, { ...init, headers });
   if (!response.ok) {
     let error = "Error";
     let detail = "request failed";

@@ -1,5 +1,6 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError, api } from "./client";
+import { clearToken, setToken } from "./token";
 
 function mockFetch(body: unknown, init: { status?: number } = {}) {
   const status = init.status ?? 200;
@@ -12,6 +13,8 @@ function mockFetch(body: unknown, init: { status?: number } = {}) {
   vi.stubGlobal("fetch", fetchMock);
   return fetchMock;
 }
+
+beforeEach(() => clearToken());
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -46,5 +49,32 @@ describe("api client", () => {
     const [url, init] = fetchMock.mock.calls[0];
     expect(url).toBe("/api/sessions/abc/scope/single");
     expect(init.method).toBe("POST");
+  });
+
+  it("attaches the stored token as a bearer header", async () => {
+    setToken("scpi_abc123");
+    const fetchMock = mockFetch({ run_state: "TRIGD", timebase: 0.001, channels: {}, trigger: { mode: "AUTO", source: null, level: null, slope: null, coupling: null } });
+    await api.runOp("abc", "single");
+    const [, init] = fetchMock.mock.calls[0];
+    const headers = new Headers(init.headers);
+    expect(headers.get("Authorization")).toBe("Bearer scpi_abc123");
+  });
+
+  it("omits the Authorization header when no token is stored", async () => {
+    const fetchMock = mockFetch({ run_state: "TRIGD", timebase: 0.001, channels: {}, trigger: { mode: "AUTO", source: null, level: null, slope: null, coupling: null } });
+    await api.runOp("abc", "single");
+    const [, init] = fetchMock.mock.calls[0];
+    const headers = new Headers(init.headers);
+    expect(headers.has("Authorization")).toBe(false);
+  });
+
+  it("preserves the JSON Content-Type header alongside the bearer token", async () => {
+    setToken("scpi_abc123");
+    const fetchMock = mockFetch({ id: "abc", label: "Mock scope", mock: true, address: null, state: "connected", idn: "x", model: "SDS1104X-E", dialect: "legacy", num_channels: 4, viewers: 0 }, { status: 201 });
+    await api.createSession({ mock: true });
+    const [, init] = fetchMock.mock.calls[0];
+    const headers = new Headers(init.headers);
+    expect(headers.get("Content-Type")).toBe("application/json");
+    expect(headers.get("Authorization")).toBe("Bearer scpi_abc123");
   });
 });
