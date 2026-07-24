@@ -178,7 +178,7 @@ def test_owner_can_hand_off_explicitly(two_users):
 def test_non_owner_cannot_hand_off(two_users):
     client, owner, other = two_users
     sid = _make_session(client, owner)["id"]
-    assert client.post("/api/sessions/{0}/owner".format(sid), json={"name": "other"}, headers=other).status_code == 409
+    assert client.post("/api/sessions/{0}/owner".format(sid), json={"name": "bob"}, headers=other).status_code == 409
 
 
 def test_hand_off_to_unknown_identity_is_rejected(two_users):
@@ -222,6 +222,35 @@ def test_claim_succeeds_immediately_on_unowned_session():
         assert session.owner == "someone"
     finally:
         manager.close_all()
+
+
+def test_non_owner_read_does_not_refresh_owner_last_active(two_users):
+    """require_session only touches owner_last_active for the owner's own
+    reads. A non-owner polling a read route (e.g. GET /scope/state during a
+    capture) must never extend the owner's claim-protection window, or an
+    authenticated non-owner could keep a session permanently unclaimable
+    just by reading it -- defeating the claim mechanism entirely.
+    """
+    client, owner, other = two_users
+    sid = _make_session(client, owner)["id"]
+    session = client.app.state.manager.get(sid)
+    session.owner_last_active -= 1000.0
+    stale = session.owner_last_active
+    assert client.get("/api/sessions/{0}/scope/state".format(sid), headers=other).status_code == 200
+    assert session.owner_last_active == stale
+
+
+def test_owner_read_refreshes_owner_last_active(two_users):
+    """Paired with the non-owner test above: the owner's own read must still
+    count as activity, or a watching-but-not-writing owner looks idle.
+    """
+    client, owner, _other = two_users
+    sid = _make_session(client, owner)["id"]
+    session = client.app.state.manager.get(sid)
+    session.owner_last_active -= 1000.0
+    stale = session.owner_last_active
+    assert client.get("/api/sessions/{0}/scope/state".format(sid), headers=owner).status_code == 200
+    assert session.owner_last_active > stale
 
 
 def test_owner_activity_on_read_route_resets_idle_claim_window(two_users):
@@ -344,7 +373,15 @@ def test_watcher_released_on_abnormal_disconnect(two_users_ws, monkeypatch):
     sid = _make_session(client, alice)["id"]
     client.app.state.abandon_after = 0.0
 
+    raised = []
+
     def _boom(_scope):
+        # Recording the call is inside the same body as the raise, so if a
+        # future edit swaps this helper for a non-raising stand-in (e.g.
+        # ``return {}``), the whole body -- including this append -- goes
+        # with it, and the assertion below catches the decay into a
+        # duplicate of the clean-close test.
+        raised.append(True)
         raise RuntimeError("simulated mid-stream failure")
 
     monkeypatch.setattr(stream_module, "read_state", _boom)
@@ -354,7 +391,67 @@ def test_watcher_released_on_abnormal_disconnect(two_users_ws, monkeypatch):
     with client.websocket_connect("/api/sessions/{0}/stream".format(sid), subprotocols=alice_ws):
         pass
 
+    assert raised, "abnormal path never exercised -- read_state must raise, not return"
+
     # If the watcher slot leaked, alice would still read as "watching" and
     # this claim (owner idle, threshold 0) would be wrongly refused.
     response = client.post("/api/sessions/{0}/claim".format(sid), headers=bob)
     assert response.status_code == 200
+
+
+# --- A Counter, not a set: same identity, two tabs --------------------------
+
+
+def test_owner_watching_survives_one_of_two_tabs_closing(two_users_ws):
+    """The owner opens the live stream in two tabs. Closing one tab must not
+    clear the watching flag while the other is still open -- this is the
+    exact scenario a Counter was chosen over a set to handle: a plain
+    membership set would drop the identity on the first close even though a
+    second tab from the same identity is still live.
+    """
+    client, alice, bob, alice_ws, _bob_ws = two_users_ws
+    sid = _make_session(client, alice)["id"]
+    client.app.state.abandon_after = 0.0  # idle threshold alone would allow the claim
+    with client.websocket_connect("/api/sessions/{0}/stream".format(sid), subprotocols=alice_ws) as ws1:
+        assert ws1.receive_json()["type"] == "state"
+        with client.websocket_connect("/api/sessions/{0}/stream".format(sid), subprotocols=alice_ws) as ws2:
+            assert ws2.receive_json()["type"] == "state"
+        # ws2 (second tab) just closed; ws1 (same identity) is still open,
+        # so the owner must still read as watching.
+        response = client.post("/api/sessions/{0}/claim".format(sid), headers=bob)
+        assert response.status_code == 409
+    # Both tabs are now closed -- no longer watching.
+    response = client.post("/api/sessions/{0}/claim".format(sid), headers=bob)
+    assert response.status_code == 200
+
+
+def test_release_owner_watching_callback_is_idempotent():
+    """The unmark callback returned by mark_owner_watching must decrement at
+    most once even if invoked twice (e.g. a duplicate release on some
+    disconnect path). Without the idempotency latch, a second call on one
+    tab's callback would wrongly clear a still-live second tab from the same
+    identity, and the per-identity count would be able to go negative.
+    """
+    from scpi_control.server.sessions import SessionManager
+
+    manager = SessionManager()
+    try:
+        session = manager.create("s", mock=True)
+        session.owner = "alice"
+        unmark_tab1 = session.mark_owner_watching("alice")
+        unmark_tab2 = session.mark_owner_watching("alice")  # a second open tab
+        assert session._watchers["alice"] == 2
+
+        unmark_tab1()
+        assert session._watchers["alice"] == 1
+        unmark_tab1()  # duplicate release of the same tab's callback
+        assert session._watchers["alice"] >= 0
+        assert session._watchers["alice"] == 1  # unchanged: idempotent, tab2 still live
+        # tab2 never released its slot -- the owner must still read as watching.
+        assert session.owner_watching() is True
+
+        unmark_tab2()
+        assert session._watchers["alice"] >= 0
+        assert session.owner_watching() is False
+    finally:
+        manager.close_all()

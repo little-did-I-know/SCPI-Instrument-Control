@@ -91,10 +91,10 @@ async def stream(websocket: WebSocket, session_id: str):
     # identity isn't the owner); unmark unconditionally in finally so an
     # abnormal disconnect releases it just like a clean close does.
     identity = getattr(websocket.state, "identity", "")
-    unmark_owner_watching = session.mark_owner_watching(identity)
     receiver = None
     sender = None
     try:
+        unmark_owner_watching = session.mark_owner_watching(identity)
         initial = await asyncio.wrap_future(session.submit(read_state))
         await websocket.send_json({"type": "state", "state": initial})
         # Run the receiver (disconnect detection) and sender concurrently; whichever
