@@ -146,7 +146,12 @@ def handle_write(conn, command: str) -> bool:
             conn.trigger_source = match.group(1).upper()
             return True
         if match := re.match(r":TRIGger:EDGE:LEVel\s+(.+)", command, re.IGNORECASE):
-            conn.trigger_level[1] = float(match.group(1))
+            value = float(match.group(1))
+            # Trigger level may legitimately be negative or zero (e.g. a signal
+            # centered below/at ground), so it is not gated on positivity.
+            if conn.reject_if_invalid(value, name="TRIGger:EDGE:LEVel", positive=False):
+                return True
+            conn.trigger_level[1] = value
             return True
         if match := re.match(r":TRIGger:EDGE:SLOPe\s+(\w+)", command, re.IGNORECASE):
             conn.trigger_slope = match.group(1)  # wire token, e.g. "RISing" (guide p.494)
@@ -215,7 +220,12 @@ def handle_write(conn, command: str) -> bool:
         return True
     elif match := re.match(r"C(\d+):ATTN\s+(.+)", command, re.IGNORECASE):
         # ATTENUATION (ATTN) -- RC01020-E01C p.22 (task 14, audit L3).
-        conn.probe_ratios[int(match.group(1))] = float(match.group(2))
+        channel = int(match.group(1))
+        value = float(match.group(2))
+        # An attenuation ratio is a magnitude, so it is gated on positivity.
+        if conn.reject_if_invalid(value, name="ATTN"):
+            return True
+        conn.probe_ratios[channel] = value
         return True
     elif match := re.match(r"BWL\s+(C\d+,(?:ON|OFF)(?:,C\d+,(?:ON|OFF))*)", command, re.IGNORECASE):
         # BANDWIDTH_LIMIT (BWL) -- global, comma-separated channel/mode pairs,
@@ -247,7 +257,12 @@ def handle_write(conn, command: str) -> bool:
         return True
     elif match := re.match(r"C(\d+):TRLV\s+(.+)", command, re.IGNORECASE):
         channel = int(match.group(1))
-        conn.trigger_level[channel] = float(match.group(2))
+        value = float(match.group(2))
+        # Trigger level may legitimately be negative or zero, so it is not
+        # gated on positivity.
+        if conn.reject_if_invalid(value, name="TRLV", positive=False):
+            return True
+        conn.trigger_level[channel] = value
         return True
 
     return False

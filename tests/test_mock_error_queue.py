@@ -90,6 +90,81 @@ def test_valid_voltage_scale_is_accepted_and_queues_nothing():
     assert conn.error_queue == []
 
 
+MODERN_IDN = "Siglent Technologies,SDS824X HD,MOCK0002,3.8.12"
+
+
+@pytest.mark.parametrize(
+    "value",
+    [-5.0, 0.0, float("nan"), float("inf")],
+    ids=["negative", "zero", "nan", "inf"],
+)
+def test_invalid_probe_attenuation_is_rejected_and_queued(value):
+    conn = _conn(idn=LEGACY_IDN)
+    before = conn.probe_ratios.get(1)
+
+    conn.write("C1:ATTN {0}".format(value))
+
+    assert conn.probe_ratios.get(1) == before, "a rejected command must not change state"
+    assert conn.error_queue == [(-222, "Data out of range")]
+
+
+def test_valid_probe_attenuation_is_accepted_and_queues_nothing():
+    conn = _conn(idn=LEGACY_IDN)
+    conn.write("C1:ATTN 10")
+    assert conn.probe_ratios[1] == 10.0
+    assert conn.error_queue == []
+
+
+@pytest.mark.parametrize(
+    "value",
+    [float("nan"), float("inf")],
+    ids=["nan", "inf"],
+)
+def test_invalid_legacy_trigger_level_is_rejected_and_queued(value):
+    conn = _conn(idn=LEGACY_IDN)
+    before = conn.trigger_level.get(1)
+
+    conn.write("C1:TRLV {0}".format(value))
+
+    assert conn.trigger_level.get(1) == before, "a rejected command must not change state"
+    assert conn.error_queue == [(-222, "Data out of range")]
+
+
+def test_valid_negative_legacy_trigger_level_is_accepted_and_queues_nothing():
+    """positive=False must still be honored -- a legitimately negative trigger
+    level must NOT be rejected. Getting this backwards would be a worse bug
+    than the one being fixed."""
+    conn = _conn(idn=LEGACY_IDN)
+    conn.write("C1:TRLV -0.5")
+    assert conn.trigger_level[1] == -0.5
+    assert conn.error_queue == []
+
+
+@pytest.mark.parametrize(
+    "value",
+    [float("nan"), float("inf")],
+    ids=["nan", "inf"],
+)
+def test_invalid_modern_trigger_level_is_rejected_and_queued(value):
+    conn = _conn(idn=MODERN_IDN)
+    before = conn.trigger_level.get(1)
+
+    conn.write(":TRIGger:EDGE:LEVel {0}".format(value))
+
+    assert conn.trigger_level.get(1) == before, "a rejected command must not change state"
+    assert conn.error_queue == [(-222, "Data out of range")]
+
+
+def test_valid_negative_modern_trigger_level_is_accepted_and_queues_nothing():
+    """positive=False must still be honored -- a legitimately negative trigger
+    level must NOT be rejected. Getting this backwards would be a worse bug
+    than the one being fixed."""
+    conn = _conn(idn=MODERN_IDN)
+    conn.write(":TRIGger:EDGE:LEVel -0.5")
+    assert conn.trigger_level[1] == -0.5
+    assert conn.error_queue == []
+
+
 def test_unimplemented_command_still_times_out_rather_than_queueing():
     """The strict-mode boundary. An UNIMPLEMENTED command must keep failing
     loudly -- that is what forces every new command to earn a wire-form corpus
