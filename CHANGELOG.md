@@ -18,6 +18,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   is detectable — rather than a value that shrank as the gate widened.
 - GUI: the DAQ "Suggest Thresholds" action no longer errors on success; the analysis-result signal
   now carries the structured suggestion instead of rejecting it.
+- `scpi_control.gui.widgets` now imports its widgets lazily, so importing a Qt-free submodule (such
+  as the measurement-marker math) no longer pulls in PyQt6. Importing those modules previously
+  failed outright wherever the optional `gui` extra was not installed.
+  `from scpi_control.gui.widgets import ChannelControl` is unchanged.
 
 ## [5.0.0] - 2026-07-24
 

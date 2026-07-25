@@ -1,10 +1,47 @@
 """GUI measurement markers: shared period estimator and duty-cycle calc."""
 
+import subprocess
+import sys
+import textwrap
+
 import numpy as np
 import pytest
 
 from scpi_control.gui.widgets.measurement_markers.period import estimate_period
 from scpi_control.gui.widgets.measurement_markers.timing_marker import TimingMarker
+
+
+def test_marker_math_imports_without_pyqt6():
+    """The period/duty math must import with no Qt installed.
+
+    CI installs `.[dev,web]` (no `gui` extra), so PyQt6 is absent there while it
+    is present on a dev machine -- which is how an eager
+    `scpi_control/gui/widgets/__init__.py` made this whole module uncollectable
+    in CI while every local run stayed green. These marker modules are pure
+    numpy/matplotlib; nothing here may drag in Qt.
+
+    Runs in a subprocess with PyQt6 blocked so the guarantee holds even on a
+    machine that has PyQt6 installed.
+    """
+    program = textwrap.dedent("""
+        import importlib.abc
+        import sys
+
+        class BlockPyQt6(importlib.abc.MetaPathFinder):
+            def find_spec(self, fullname, path=None, target=None):
+                if fullname == "PyQt6" or fullname.startswith("PyQt6."):
+                    raise ModuleNotFoundError("No module named " + repr(fullname))
+                return None
+
+        sys.meta_path.insert(0, BlockPyQt6())
+
+        from scpi_control.gui.widgets.measurement_markers.period import estimate_period
+        from scpi_control.gui.widgets.measurement_markers.timing_marker import TimingMarker
+
+        assert "PyQt6" not in sys.modules
+        """)
+    result = subprocess.run([sys.executable, "-c", program], capture_output=True, text=True)
+    assert result.returncode == 0, "marker math must import without PyQt6:\n{0}".format(result.stderr)
 
 
 def _square(periods, duty=0.5, n=2000, period=1e-3, start_high=True):
