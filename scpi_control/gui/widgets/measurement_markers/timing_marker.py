@@ -6,6 +6,7 @@ from typing import Optional, Tuple
 import numpy as np
 
 from scpi_control.gui.widgets.measurement_marker import MeasurementMarker
+from scpi_control.gui.widgets.measurement_markers.period import estimate_period
 from scpi_control.waveform import WaveformData
 
 logger = logging.getLogger(__name__)
@@ -317,30 +318,19 @@ class TimingMarker(MeasurementMarker):
         return float(t_rising_next - t_falling)
 
     def _calculate_duty_cycle(self, time: np.ndarray, voltage: np.ndarray) -> Optional[float]:
-        """Calculate duty cycle.
+        """Calculate duty cycle as a percentage (0-100), or None if unmeasurable.
 
-        Args:
-            time: Time array
-            voltage: Voltage array
-
-        Returns:
-            Duty cycle as percentage (0-100)
+        Divides the positive pulse width by the signal's true period (estimated
+        with the shared edge detector), NOT by the gate span -- dividing by the
+        gate made duty depend on how wide the user drew the gate (audit H13).
         """
-        # Calculate positive width and period
         positive_width = self._calculate_positive_width(time, voltage)
-
         if positive_width is None:
             return None
-
-        # Estimate period
-        total_time = time[-1] - time[0]
-
-        if total_time <= 0:
+        period = estimate_period(time, voltage)
+        if period is None or period <= 0:
             return None
-
-        duty_cycle = (positive_width / total_time) * 100
-
-        return float(duty_cycle)
+        return float(positive_width / period * 100)
 
     def _find_threshold_crossing(self, time: np.ndarray, voltage: np.ndarray, threshold: float, rising: bool = True) -> Optional[float]:
         """Find time when waveform crosses threshold.
