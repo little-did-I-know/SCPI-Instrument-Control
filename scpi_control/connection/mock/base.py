@@ -4,7 +4,7 @@ and personality dispatch to the vendor-specific scope write/query/waveform modul
 from __future__ import annotations
 
 import re
-from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Set, Union
+from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Set, Tuple, Union
 
 from scpi_control import exceptions
 from scpi_control.connection.base import BaseConnection
@@ -175,6 +175,12 @@ class MockConnection(BaseConnection):
                 self.trigger_status = ["SAVE"]
 
         self.custom_responses = custom_responses or {}
+        # SCPI error queue. Real instruments accept a bad command, ignore it, and
+        # queue an error for collection via SYST:ERR?; they do not fail the
+        # transport. Empty queue answers '+0,"No error"', which is exactly what
+        # the old hardcoded stub returned -- so nothing changes until something
+        # actually queues an error.
+        self.error_queue: List[Tuple[int, str]] = []
         self.writes: List[str] = []
         self.queries: List[str] = []
         self.timebase_updates: List[float] = []
@@ -240,6 +246,17 @@ class MockConnection(BaseConnection):
         """Mark the connection as closed."""
         self._connected = False
 
+    def push_error(self, code: int, message: str) -> None:
+        """Queue a SCPI error for later collection via SYST:ERR?."""
+        self.error_queue.append((code, message))
+
+    def _pop_error(self) -> str:
+        """The SYST:ERR? response: oldest queued error, or '+0,"No error"'."""
+        if self.error_queue:
+            code, message = self.error_queue.pop(0)
+            return f'{code:+d},"{message}"'
+        return '+0,"No error"'
+
     def write(self, command: str) -> None:
         """Record the command and update simple internal state."""
         if not self._connected:
@@ -247,6 +264,10 @@ class MockConnection(BaseConnection):
 
         command = command.strip()
         self.writes.append(command)
+
+        if command.strip().upper() == "*CLS":
+            self.error_queue.clear()
+            return
 
         # Power supply commands
         if self.psu_mode:
@@ -486,16 +507,20 @@ class MockConnection(BaseConnection):
             else:
                 return self.idn
 
+        # SYST:ERR? for the three instrument classes that expose get_error()
+        # (psu_scpi_commands.py:70, awg_scpi_commands.py:65,
+        # daq_scpi_commands.py:59). Scopes deliberately have no get_error, so
+        # scope mode falls through to the strict-mode timeout -- adding an
+        # accessor there would quietly undo that gating.
+        if "SYST:ERR?" in upper and (self.psu_mode or self.awg_mode or self.daq_mode):
+            return self._pop_error()
+
         # Data acquisition (DAQ) queries
         if self.daq_mode:
             # Specific queries first -- the old readings matcher used
             # `"R?" in upper`, which is a substring test and swallowed
             # SYST:ERR? and TRIG:SOUR? (both end in "R?") before they ever
             # reached their own handlers (audit M7).
-
-            # Error query
-            if "SYST:ERR?" in upper:
-                return '+0,"No error"'
 
             # Scan list query
             if "ROUT:SCAN?" in upper:
