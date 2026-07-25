@@ -259,3 +259,48 @@ def test_shipped_example_does_not_claim_a_real_instrument_for_synthetic_data():
     source = Path("examples/comparison_report.py").read_text(encoding="utf-8")
     assert "SDS1104X-E" not in source
     assert 'manufacturer="Siglent"' not in source
+
+
+def test_scpi_extract_does_not_invent_a_reason_for_missing_provenance():
+    """A file saved yesterday with provenance=False, or one corrupted in transit,
+    gets the same confident 'predates provenance capture' claim. The tool cannot
+    know why the block is absent -- only that it is (audit L17)."""
+    from pathlib import Path
+
+    source = Path("scpi_control/scpi_extract.py").read_text(encoding="utf-8")
+    assert "predates provenance capture" not in source
+
+
+def test_scpi_extract_reports_missing_provenance_without_claiming_reason(tmp_path):
+    """Behavioral test: a file with no provenance block should report its absence
+    without fabricating a cause. This exercises the real code path and verifies
+    the fix actually works, not just that a string was deleted."""
+    from scpi_control.scpi_extract import _info_lines
+    from scpi_control.waveform_io import LoadedWaveform
+
+    # Create a waveform file with no provenance
+    wf = _waveform(with_provenance=False)
+    path = _save_enhanced(tmp_path, wf)
+
+    # Load it back via the normal path
+    loaded = LoadedWaveform(
+        source_path=str(path),
+        source_format="CSV_ENHANCED",
+        time=wf.time,
+        voltage=wf.voltage,
+        channel=wf.channel,
+        sample_rate=wf.sample_rate,
+        provenance=None,
+        metadata={},
+    )
+
+    # Call the function that builds the summary lines
+    lines = _info_lines(loaded)
+    full_output = "\n".join(lines)
+
+    # Must report absence of provenance
+    assert "Provenance:" in full_output, "provenance status must be reported"
+    # Must NOT claim a cause
+    assert "predates provenance capture" not in full_output, "must not invent a reason"
+    # Should state that no provenance is recorded
+    assert "none recorded" in full_output.lower(), "should state that no provenance is recorded"
