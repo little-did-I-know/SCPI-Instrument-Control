@@ -551,6 +551,28 @@ class TestReport:
             return "Computed automatically from measurements"
         return None
 
+    def apply_ai_content(self, ai_content: Dict[str, Any]) -> None:
+        """Copy AI-generated narrative into this report, marking each field's source.
+
+        Text and attribution are set together so a caller cannot transfer one
+        without the other -- copying the text while dropping the flag is what made
+        AI-written findings ship unlabelled in exported reports (Task 4 review, C1).
+
+        ai_content keys are all optional: "executive_summary", "key_findings",
+        "recommendations". Only keys present with truthy values are applied.
+        """
+        if ai_content.get("executive_summary"):
+            self.executive_summary = ai_content["executive_summary"]
+            self.summary_source = SUMMARY_SOURCE_AI
+
+        if ai_content.get("key_findings"):
+            self.key_findings = ai_content["key_findings"]
+            self.findings_source = SUMMARY_SOURCE_AI
+
+        if ai_content.get("recommendations"):
+            self.recommendations = ai_content["recommendations"]
+            self.recommendations_source = SUMMARY_SOURCE_AI
+
     def add_section(self, section: TestSection) -> None:
         """Add a section to the report."""
         self.sections.append(section)
