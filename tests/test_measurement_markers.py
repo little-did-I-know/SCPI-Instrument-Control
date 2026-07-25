@@ -1,0 +1,38 @@
+"""GUI measurement markers: shared period estimator and duty-cycle calc."""
+
+import numpy as np
+import pytest
+
+from scpi_control.gui.widgets.measurement_markers.period import estimate_period
+
+
+def _square(periods, duty=0.5, n=2000, period=1e-3):
+    """periods full cycles of a duty-fraction square wave over `periods*period` seconds."""
+    t = np.linspace(0, periods * period, n, endpoint=False)
+    phase = (t % period) / period
+    v = np.where(phase < duty, 1.0, -1.0)
+    return t, v
+
+
+def test_estimate_period_of_a_clean_square_wave():
+    t, v = _square(periods=5, period=1e-3)
+    period = estimate_period(t, v)
+    assert period == pytest.approx(1e-3, rel=0.05)
+
+
+def test_estimate_period_returns_none_on_a_flat_signal():
+    t = np.linspace(0, 1e-3, 500)
+    v = np.zeros_like(t)  # no edges at all
+    assert estimate_period(t, v) is None
+
+
+def test_estimate_period_returns_none_below_one_cycle():
+    # Three quarters of a cycle: one falling transition, no rising zero-crossing
+    # and no detectable peak -> not enough to measure a period.
+    #
+    # (A naive half-cycle slice at duty=0.5 lands entirely within the initial
+    # high plateau -- a flat array indistinguishable from the "no edges at
+    # all" case above. 0.75 cycles guarantees the slice actually contains an
+    # edge while still falling short of the two crossings a period needs.)
+    t, v = _square(periods=0.75, period=1e-3)
+    assert estimate_period(t, v) is None
