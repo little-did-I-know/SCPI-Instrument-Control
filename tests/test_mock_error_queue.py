@@ -57,3 +57,44 @@ def test_scope_mode_still_has_no_error_query():
     conn = _conn()  # default = scope mode
     with pytest.raises(exceptions.SiglentTimeoutError):
         conn.query("SYST:ERR?")
+
+
+import math
+
+from scpi_control import exceptions
+
+LEGACY_IDN = "Siglent Technologies,SDS1104X-E,MOCK0001,1.0.0.0"
+
+
+@pytest.mark.parametrize(
+    "value",
+    [1e9, -5.0, 0.0, float("nan"), float("inf")],
+    ids=["absurd", "negative", "zero", "nan", "inf"],
+)
+def test_invalid_voltage_scale_is_rejected_and_queued(value):
+    conn = _conn(idn=LEGACY_IDN)
+    before = conn._voltage_scales.get(1)
+
+    conn.write("C1:VDIV {0}".format(value))
+
+    assert conn._voltage_scales.get(1) == before, "a rejected command must not change state"
+    # Scope mode has no SYST:ERR? accessor (scopes expose no get_error), so assert
+    # on the queue attribute directly rather than over the wire.
+    assert conn.error_queue == [(-222, "Data out of range")]
+
+
+def test_valid_voltage_scale_is_accepted_and_queues_nothing():
+    conn = _conn(idn=LEGACY_IDN)
+    conn.write("C1:VDIV 0.5")
+    assert conn._voltage_scales[1] == 0.5
+    assert conn.error_queue == []
+
+
+def test_unimplemented_command_still_times_out_rather_than_queueing():
+    """The strict-mode boundary. An UNIMPLEMENTED command must keep failing
+    loudly -- that is what forces every new command to earn a wire-form corpus
+    entry. Only IMPLEMENTED commands with bad parameters queue an error."""
+    conn = _conn(idn=LEGACY_IDN)
+    with pytest.raises(exceptions.SiglentTimeoutError):
+        conn.query("C1:NOSUCHQUERY?")
+    assert conn.error_queue == [], "a timeout must not also queue an error"

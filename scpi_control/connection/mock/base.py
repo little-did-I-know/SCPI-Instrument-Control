@@ -3,6 +3,7 @@ and personality dispatch to the vendor-specific scope write/query/waveform modul
 
 from __future__ import annotations
 
+import math
 import re
 from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Set, Tuple, Union
 
@@ -249,6 +250,26 @@ class MockConnection(BaseConnection):
     def push_error(self, code: int, message: str) -> None:
         """Queue a SCPI error for later collection via SYST:ERR?."""
         self.error_queue.append((code, message))
+
+    # Broad plausibility bounds. These are deliberately NOT per-model limits --
+    # they reject what is wrong for any oscilloscope (non-finite, non-positive,
+    # absurd magnitude), which is what catches the failure that actually happens:
+    # a typo'd or unit-confused value. Per-model ranges belong in the model
+    # registry (models.py already carries max_sample_rate) and can tighten this
+    # later without changing any caller.
+    _ABSURD_MAGNITUDE = 1e6
+
+    def reject_if_invalid(self, value: float, *, name: str, positive: bool = True) -> bool:
+        """Queue -222 and return True when `value` is unusable on any instrument.
+
+        Callers skip their assignment when this returns True, so the command is
+        accepted by the transport, ignored, and reported on the next SYST:ERR? --
+        which is how real hardware behaves for a bad parameter.
+        """
+        if not math.isfinite(value) or (positive and value <= 0) or abs(value) > self._ABSURD_MAGNITUDE:
+            self.push_error(-222, "Data out of range")
+            return True
+        return False
 
     def _pop_error(self) -> str:
         """The SYST:ERR? response: oldest queued error, or '+0,"No error"'."""

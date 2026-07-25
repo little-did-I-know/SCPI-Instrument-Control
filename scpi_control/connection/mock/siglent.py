@@ -79,17 +79,29 @@ def handle_write(conn, command: str) -> bool:
             return True
         if match := re.match(r":CHANnel(\d+):SCALe\s+(.+)", command, re.IGNORECASE):
             ch = int(match.group(1))
-            conn._voltage_scales[ch] = float(match.group(2))
-            conn.scale_updates.setdefault(ch, []).append(float(match.group(2)))
+            value = float(match.group(2))
+            if conn.reject_if_invalid(value, name="SCALe"):
+                return True  # consumed, ignored, error queued
+            conn._voltage_scales[ch] = value
+            conn.scale_updates.setdefault(ch, []).append(value)
             return True
         if match := re.match(r":CHANnel(\d+):OFFSet\s+(.+)", command, re.IGNORECASE):
-            conn._voltage_offsets[int(match.group(1))] = float(match.group(2))
+            ch = int(match.group(1))
+            value = float(match.group(2))
+            # Offset may legitimately be negative or zero (e.g. p.56 EXAMPLE
+            # "CHAN2:OFFS -3.8E+00"), so it is not gated on positivity.
+            if conn.reject_if_invalid(value, name="OFFSet", positive=False):
+                return True
+            conn._voltage_offsets[ch] = value
             return True
         if match := re.match(r":CHANnel(\d+):COUPling\s+(\w+)", command, re.IGNORECASE):
             conn._channel_coupling[int(match.group(1))] = match.group(2).upper()
             return True
         if match := re.match(r":TIMebase:SCALe\s+(.+)", command, re.IGNORECASE):
-            conn.timebase = float(match.group(1))
+            value = float(match.group(1))
+            if conn.reject_if_invalid(value, name="TIMebase:SCALe"):
+                return True
+            conn.timebase = value
             conn.timebase_updates.append(conn.timebase)
             return True
         # :MEASure <ON|OFF> (p.337). Matched before the :MEASure:SIMPle forms
@@ -166,22 +178,32 @@ def handle_write(conn, command: str) -> bool:
         # mirroring real scopes which silently drop unknown commands
 
     if command.upper().startswith("TDIV "):
-        value = command.split(" ", 1)[1]
+        raw = command.split(" ", 1)[1]
         try:
-            conn.timebase = float(value)
+            value = float(raw)
         except ValueError:
-            conn.timebase = conn.timebase
+            value = conn.timebase
+        else:
+            if conn.reject_if_invalid(value, name="TDIV"):
+                value = conn.timebase
+        conn.timebase = value
         conn.timebase_updates.append(conn.timebase)
         return True
     elif match := re.match(r"C(\d+):VDIV\s+(.+)", command, re.IGNORECASE):
         channel = int(match.group(1))
         value = float(match.group(2))
+        if conn.reject_if_invalid(value, name="VDIV"):
+            return True  # consumed, ignored, error queued
         conn._voltage_scales[channel] = value
         conn.scale_updates.setdefault(channel, []).append(value)
         return True
     elif match := re.match(r"C(\d+):OFST\s+(.+)", command, re.IGNORECASE):
         channel = int(match.group(1))
         value = float(match.group(2))
+        # Offset may legitimately be negative or zero (p.83 EXAMPLE
+        # "C2: OFST -3V"), so it is not gated on positivity.
+        if conn.reject_if_invalid(value, name="OFST", positive=False):
+            return True
         conn._voltage_offsets[channel] = value
         return True
     elif match := re.match(r"C(\d+):TRA\s+(ON|OFF)", command, re.IGNORECASE):
