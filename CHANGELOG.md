@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- GUI: the Measurements tab now works for all 15 measurement types. Top, Base, Max, Min, Positive
+  Width, and Negative Width previously showed `---` (indistinguishable from an instrument fault)
+  because the panel called core methods that didn't exist; it now routes every type through the
+  instrument's measurement dispatch.
+- GUI: the duty-cycle marker divides the pulse width by the signal's actual period instead of the
+  gate span, so a marker spanning several cycles reads the true duty cycle — or N/A when no period
+  is detectable — rather than a value that shrank as the gate widened.
+- GUI: the DAQ "Suggest Thresholds" action no longer errors on success; the analysis-result signal
+  now carries the structured suggestion instead of rejecting it.
+
 ## [5.0.0] - 2026-07-24
 
 ### ⚠️ Breaking Changes
