@@ -86,3 +86,37 @@ def test_mock_answers_value_query_without_prior_setup():
     conn = MockConnection(idn=MODERN_IDN)
     conn.connect()
     assert conn.query(":MEASure:SIMPle:VALue? PKPK") == "2.000E+00"
+
+
+def test_measure_returns_a_real_value_for_every_type_on_modern():
+    """The load-bearing net. Before this change every one of these raised
+    SiglentTimeoutError because measure() sent legacy PAVA? on modern."""
+    scope = _modern_scope()
+    for mtype in get_args(MeasurementType):
+        value = scope.measurement.measure(mtype, 1)
+        assert isinstance(value, float), "{0} returned {1!r}".format(mtype, value)
+
+
+def test_measure_on_modern_emits_the_documented_sequence():
+    """Also the "did we enable the item" check -- the mock deliberately does not
+    require enablement (it would break the corpus), so the sequence is asserted here."""
+    scope = _modern_scope()
+    conn = scope._connection
+    conn.writes.clear()
+    scope.measurement.measure("WID", 2)
+    written = [c for c in conn.writes if "MEAS" in c.upper()]
+    assert written == [
+        ":MEASure ON",
+        ":MEASure:SIMPle:SOURce C2",
+        ":MEASure:SIMPle:ITEM PWID,ON",
+    ], written
+
+
+def test_measure_agrees_across_dialects_for_the_same_signal():
+    """Legacy and modern mocks describe the same synthesized signal, so a fix
+    that silently swapped a token (e.g. WID -> burst width) would show up here."""
+    legacy = Oscilloscope("mock", connection=MockConnection(idn="Siglent Technologies,SDS1104X-E,MOCK0001,1.0.0.0"))
+    legacy.connect()
+    modern = _modern_scope()
+    for mtype in ("PKPK", "FREQ", "WID", "NWID", "DUTY"):
+        assert modern.measurement.measure(mtype, 1) == pytest.approx(legacy.measurement.measure(mtype, 1)), mtype
