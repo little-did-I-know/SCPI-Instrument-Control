@@ -112,18 +112,16 @@ def test_modern_mock_still_times_out_on_legacy_pava():
     directly against the connection rather than through measure()."""
     import pytest as _pytest
 
-    from scpi_control import Oscilloscope
     from scpi_control.connection.mock import MockConnection
     from scpi_control.exceptions import SiglentTimeoutError
 
     conn = MockConnection("mock", idn="Siglent Technologies,SDS824X HD,MOCK0002,3.8.12", channel_states={1: True}, trigger_status=["Stop"], sample_rate=1_000.0, timebase=1e-3)
-    scope = Oscilloscope("mock", connection=conn)
-    scope.connect()
+    conn.connect()
     try:
         with _pytest.raises(SiglentTimeoutError):
             conn.query("C1:PAVA? PKPK")
     finally:
-        scope.disconnect()
+        conn.disconnect()
 
 
 def test_mock_answers_scdp_with_a_valid_image():
