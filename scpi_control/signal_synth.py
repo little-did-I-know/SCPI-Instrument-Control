@@ -122,6 +122,18 @@ def _validate(spec: SignalSpec, sample_rate: float, n_points: int) -> None:
         raise exceptions.InvalidParameterError(f"ringing_damping must be non-negative: {spec.ringing_damping}")
 
 
+def _impairment_rng(seed: Optional[int], stream_index: int) -> np.random.Generator:
+    """An independent, seed-reproducible generator per impairment.
+
+    Drawing impairments from synthesize()'s shared `rng` would make enabling one
+    impairment change another's samples and the base noise, so a test asserting on
+    noise would break merely because drift was switched on.
+    """
+    if seed is None:
+        return np.random.default_rng()
+    return np.random.default_rng([seed, stream_index])
+
+
 def synthesize(spec: SignalSpec, sample_rate: float, n_points: int, t0: float = 0.0) -> np.ndarray:
     """Generate voltage samples for a signal spec.
 
@@ -138,6 +150,23 @@ def synthesize(spec: SignalSpec, sample_rate: float, n_points: int, t0: float = 
     rng = np.random.default_rng(spec.seed)
     t = t0 + np.arange(n_points) / sample_rate
     samples = _GENERATORS[spec.kind](spec, t, rng) + spec.offset
+    if spec.drift_amplitude > 0:
+        # Time-based, NOT a random walk: stream() re-seeds per chunk, so a walk
+        # would reset at every chunk boundary and a live view would show sawtooth
+        # jumps. Deriving drift from absolute time keeps it continuous for free.
+        samples = samples + spec.drift_amplitude * np.sin(2 * np.pi * spec.drift_frequency * t)
+    if spec.glitch_rate > 0 and spec.glitch_amplitude > 0:
+        glitch_rng = _impairment_rng(spec.seed, 1)
+        expected = spec.glitch_rate * n_points / sample_rate
+        count = glitch_rng.poisson(expected)
+        if count:
+            positions = glitch_rng.integers(0, n_points, size=count)
+            signs = glitch_rng.choice(np.array([-1.0, 1.0]), size=count)
+            samples = samples.copy()
+            # np.add.at, NOT samples[positions] += ... -- fancy-index += applies
+            # only ONCE per repeated index, so duplicate glitch positions would be
+            # silently dropped and the glitch rate would come out low.
+            np.add.at(samples, positions, signs * spec.glitch_amplitude)
     if spec.noise_rms > 0:
         samples = samples + rng.normal(0.0, spec.noise_rms, n_points)
     return samples
