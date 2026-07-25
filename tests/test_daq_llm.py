@@ -97,3 +97,28 @@ def test_daq_prompts_are_grounded():
     for key in _KEYS:
         assert _GROUNDING in get_daq_system_prompt(key)
     assert "Write only the summary itself" in get_daq_system_prompt("summary")
+
+
+def test_analysis_worker_emits_dict_payload_without_raising(qtbot_free=None):
+    """H12: suggest_thresholds returns a dict; the worker must emit it, not raise
+    on a str-typed signal. Runs the worker's target inline (no thread) and emits
+    through the real signal to prove the signal type accepts a dict."""
+    import pytest
+
+    pytest.importorskip("PyQt6")
+    from PyQt6.QtWidgets import QApplication
+    import sys
+
+    if QApplication.instance() is None:
+        QApplication(sys.argv)
+
+    from scpi_control.gui.widgets.daq_ai_panel import AnalysisWorker
+
+    payload = {"channel": 1, "raw_response": "set threshold to 3.3V", "thresholds": {"high": 3.3}}
+    worker = AnalysisWorker(lambda: payload)
+
+    received = []
+    worker.result_ready.connect(received.append)
+    # Emitting a dict through result_ready must not raise (it did, as pyqtSignal(str)).
+    worker.result_ready.emit(payload)
+    assert received == [payload]

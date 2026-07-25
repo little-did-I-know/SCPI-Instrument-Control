@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 class AnalysisWorker(QThread):
     """Background worker for LLM analysis operations."""
 
-    result_ready = pyqtSignal(str)  # analysis result
+    result_ready = pyqtSignal(object)  # analysis result (str, or dict from suggest_thresholds)
     error_occurred = pyqtSignal(str)  # error message
 
     def __init__(
@@ -358,7 +358,7 @@ class DAQAIPanel(QWidget):
         self.worker.finished.connect(self._on_analysis_finished)
         self.worker.start()
 
-    def _on_analysis_result(self, result: str):
+    def _on_analysis_result(self, result: object):
         """Handle analysis result."""
         # Format threshold suggestions specially
         if isinstance(result, dict) and "raw_response" in result:
