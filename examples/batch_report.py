@@ -41,7 +41,11 @@ def _save_capture(name: str, amplitude: float, seed: int) -> Path:
     waveform.provenance is set -- see scpi_control/waveform.py.
     """
     waveform = make_waveform(SignalSpec(kind="sine", frequency=1_000.0, amplitude=amplitude, noise_rms=0.02, seed=seed), sample_rate=100_000.0, n_points=2_000)
-    waveform.provenance = AcquisitionProvenance(instrument=InstrumentInfo(manufacturer="Siglent", model="SDS1104X-E"))
+    # Honest synthetic identity. This waveform came from make_waveform(), not an
+    # instrument -- claiming a real Siglent model here put fabricated hardware into
+    # a signed report's manifest and sign-off block (audit M1). Provenance itself
+    # stays, because plain CSV needs it to write the channel header (see docstring).
+    waveform.provenance = AcquisitionProvenance(instrument=InstrumentInfo(manufacturer="Synthetic", model="make_waveform (no instrument)"))
     path = OUTPUT_DIR / name
     Waveform(Mock()).save_waveform(waveform, str(path), format="CSV")
     return path
@@ -78,7 +82,7 @@ def main() -> None:
         title="Production Batch Test",
         technician="Lab Tech",
         test_date=datetime.now(),
-        equipment_model="SDS1104X-E",
+        equipment_model=None,  # No real equipment -- fully synthetic data
     )
     # build_comparison_report() includes the raw-data appendix (SHA-256
     # manifest) and a sign-off block by default -- pass include_appendix=False

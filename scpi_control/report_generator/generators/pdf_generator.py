@@ -351,6 +351,20 @@ class PDFReportGenerator(BaseReportGenerator):
 
         return text
 
+    def _literal_cell_text(self, text: str) -> str:
+        """Escape text for reportlab's mini-XML without interpreting it as markdown.
+
+        File paths and digests are literals. Routing them through
+        _markdown_to_reportlab treats underscores as emphasis, so
+        scope_capture_ch1.npz rendered as scope*capture*ch1.npz with the middle
+        segment italicised -- corrupting the very identifier the manifest exists to
+        make verifiable (audit M34). Escaping is required so an unescaped & or < in
+        a path can't corrupt reportlab's mini-XML parse.
+        """
+        from xml.sax.saxutils import escape
+
+        return escape(text or "")
+
     def generate(self, report: TestReport, output_path: Path) -> bool:
         """
         Generate PDF report.
@@ -602,6 +616,11 @@ class PDFReportGenerator(BaseReportGenerator):
             # Convert markdown to ReportLab XML
             finding_text = self._markdown_to_reportlab(finding)
             story.append(Paragraph(f"• {finding_text}", self.styles["Normal"]))
+
+        findings_attribution = report.findings_attribution()
+        if findings_attribution:
+            story.append(Spacer(1, 0.1 * inch))
+            story.append(Paragraph(f"<i>{findings_attribution}</i>", self.styles["Normal"]))
 
         story.append(Spacer(1, 0.2 * inch))
 
@@ -1258,7 +1277,7 @@ class PDFReportGenerator(BaseReportGenerator):
         small_style = ParagraphStyle("ManifestSmall", parent=self.styles["Normal"], fontSize=6.5, leading=8)
 
         def _cell(text: str) -> Paragraph:
-            return Paragraph(self._markdown_to_reportlab(text) if text else "—", small_style)
+            return Paragraph(self._literal_cell_text(text) if text else "—", small_style)
 
         data = [["Run", "File", "Size", "SHA-256", "Captured", "Instrument"]]
         for entry in manifest.entries:
@@ -1268,7 +1287,7 @@ class PDFReportGenerator(BaseReportGenerator):
                     _cell(entry.file_path),
                     str(entry.size_bytes),
                     _cell(entry.sha256),
-                    entry.capture_timestamp or "—",
+                    entry.capture_timestamp or "unknown",
                     entry.instrument or "—",
                 ]
             )
@@ -1330,6 +1349,11 @@ class PDFReportGenerator(BaseReportGenerator):
             # Convert markdown to ReportLab XML
             rec_text = self._markdown_to_reportlab(rec)
             story.append(Paragraph(f"{i}. {rec_text}", self.styles["Normal"]))
+
+        recommendations_attribution = report.recommendations_attribution()
+        if recommendations_attribution:
+            story.append(Spacer(1, 0.1 * inch))
+            story.append(Paragraph(f"<i>{recommendations_attribution}</i>", self.styles["Normal"]))
 
         story.append(Spacer(1, 0.2 * inch))
 

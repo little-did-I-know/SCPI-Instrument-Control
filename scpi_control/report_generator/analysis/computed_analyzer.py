@@ -59,6 +59,8 @@ class ComputedAnalyzer:
         report.key_findings = self._key_findings(report)
         report.recommendations = self._recommendations(report)
         report.summary_source = SUMMARY_SOURCE_COMPUTED
+        report.findings_source = SUMMARY_SOURCE_COMPUTED
+        report.recommendations_source = SUMMARY_SOURCE_COMPUTED
 
     def _executive_summary(self, report: TestReport) -> str:
         waveforms = report.get_all_waveforms()

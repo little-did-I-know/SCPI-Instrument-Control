@@ -40,7 +40,7 @@ def test_manifest_entry_has_size_hash_identity(tmp_path):
     assert entry.capture_timestamp == "2026-07-22T10:00:00+00:00"
 
 
-def test_manifest_without_provenance_uses_mtime_and_dash_free_fields(tmp_path):
+def test_manifest_without_provenance_leaves_capture_timestamp_none(tmp_path):
     wf = make_waveform(SignalSpec(kind="sine", seed=1), 100_000.0, 500)
     path = tmp_path / "bare.csv"
     Waveform(Mock()).save_waveform(wf, str(path), format="CSV", bare=True)
@@ -48,8 +48,8 @@ def test_manifest_without_provenance_uses_mtime_and_dash_free_fields(tmp_path):
     run.waveforms = WaveformLoader.load(path)
     entry = build_manifest([run]).entries[0]
     assert entry.instrument is None
-    # mtime fallback still yields a parseable ISO timestamp
-    datetime.fromisoformat(entry.capture_timestamp)
+    # No mtime fallback: a file's mtime is not an acquisition time (audit M30).
+    assert entry.capture_timestamp is None
 
 
 def test_signoff_roles_with_prefilled_names():

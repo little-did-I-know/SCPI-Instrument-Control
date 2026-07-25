@@ -25,7 +25,10 @@ def _info_lines(loaded: LoadedWaveform) -> List[str]:
     ]
     prov = loaded.provenance
     if prov is None:
-        lines.append("Provenance:  (none - file predates provenance capture)")
+        # State only what is observable. The block may be absent because the file
+        # predates provenance, because it was saved with provenance=False, or
+        # because it was corrupted -- this tool cannot tell which (audit L17).
+        lines.append("Provenance:  (none recorded in this file)")
     else:
         if prov.instrument is not None:
             lines.append(f"Instrument:  {prov.instrument.manufacturer} {prov.instrument.model} (serial {prov.instrument.serial}, firmware {prov.instrument.firmware})")

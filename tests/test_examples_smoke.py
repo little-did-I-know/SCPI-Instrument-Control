@@ -32,7 +32,14 @@ import pytest
 EXAMPLES_DIR = Path(__file__).resolve().parent.parent / "examples"
 
 # Strings that must never appear under examples/ again.
-FORBIDDEN = ["Siglent-Oscilloscope", ".time_interval", 'format="NPZ"']
+# Note: a bare "SDS1104X-E" token would also hit dialect_override_example.py,
+# synthetic_signals.py, and waveform_provenance_and_extract.py, which legitimately
+# use that model number inside a mock *IDN? string (idn="Siglent Technologies,
+# SDS1104X-E,...") to exercise dialect detection -- not the M1 defect (stamping a
+# real instrument identity onto synthetic report/waveform provenance). The
+# narrower `="SDS1104X-E"` matches only the kwarg-assignment shape the M1 fixes
+# actually removed (model="SDS1104X-E", equipment_model="SDS1104X-E").
+FORBIDDEN = ["Siglent-Oscilloscope", ".time_interval", 'format="NPZ"', '="SDS1104X-E"']
 
 # (filename, module-that-must-import-or-skip). Only examples that run to
 # completion headless with no instrument belong here. report_generation_example.py's

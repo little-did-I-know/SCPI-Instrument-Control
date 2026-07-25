@@ -145,8 +145,15 @@ TestReport(
     key_findings: List[str] = [],
     recommendations: List[str] = [],
     overall_result: Optional[str] = None,  # "PASS", "FAIL", "INCONCLUSIVE"
+    findings_source: str = "manual",  # "manual", "ai", or "computed"
+    recommendations_source: str = "manual",  # "manual", "ai", or "computed"
 )
 ```
+
+`findings_source` and `recommendations_source` mirror `summary_source`, but for
+`key_findings` and `recommendations` respectively: whichever code path fills
+that content is responsible for setting the matching `*_source` field so
+report renderers can label it (never fabricate the label at render time).
 
 **Methods:**
 
@@ -154,6 +161,10 @@ TestReport(
 - `get_all_measurements()` - Get measurements from all sections
 - `get_all_waveforms()` - Get waveforms from all sections
 - `calculate_overall_result()` - Determine PASS/FAIL
+- `summary_attribution()` - Attribution note for the executive summary, or `None` if hand-authored
+- `findings_attribution()` - Attribution note for key findings, or `None` if hand-authored
+- `recommendations_attribution()` - Attribution note for recommendations, or `None` if hand-authored
+- `apply_ai_content(ai_content)` - Copy AI-generated narrative (`executive_summary`, `key_findings`, `recommendations` keys, all optional) into the report, setting each text field and its matching `*_source` flag together so the two cannot diverge. Use this instead of assigning the text fields directly.
 - `to_dict()` - Convert to dictionary
 
 ### `scpi_control.report_generator.utils.waveform_loader`

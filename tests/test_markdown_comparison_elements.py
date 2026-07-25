@@ -66,7 +66,8 @@ def test_manifest_rendered(tmp_path):
 
 
 def test_manifest_rendered_with_null_fields(tmp_path):
-    """Test that manifest renders null fields as em-dashes."""
+    """Test that manifest renders a null capture_timestamp as 'unknown' (never a
+    fabricated stand-in like file mtime) and other null fields as em-dashes."""
     section = TestSection(title="Raw Data Appendix")
     entry = ManifestEntry(
         run_label="after",
@@ -83,8 +84,8 @@ def test_manifest_rendered_with_null_fields(tmp_path):
     expected_header = "| Run | File | Size (bytes) | SHA-256 | Captured | Instrument |"
     assert expected_header in text, f"Expected header not found. Got:\n{text}"
 
-    # Assert data row with em-dashes for null fields
-    expected_row = f"| after | b.csv | 5678 | `{'cd' * 32}` | — | — |"
+    # Assert data row: 'unknown' for the missing capture time, em-dash for instrument
+    expected_row = f"| after | b.csv | 5678 | `{'cd' * 32}` | unknown | — |"
     assert expected_row in text, f"Expected data row with null fields not found. Got:\n{text}"
 
 

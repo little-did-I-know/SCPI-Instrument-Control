@@ -107,6 +107,10 @@ class MarkdownReportGenerator(BaseReportGenerator):
             lines.append("")
             for finding in report.key_findings:
                 lines.append(f"- {finding}")
+            findings_attribution = report.findings_attribution()
+            if findings_attribution:
+                lines.append("")
+                lines.append(f"*{findings_attribution}*")
             lines.append("")
 
         # Sections
@@ -120,6 +124,10 @@ class MarkdownReportGenerator(BaseReportGenerator):
             lines.append("")
             for i, rec in enumerate(report.recommendations, 1):
                 lines.append(f"{i}. {rec}")
+            recommendations_attribution = report.recommendations_attribution()
+            if recommendations_attribution:
+                lines.append("")
+                lines.append(f"*{recommendations_attribution}*")
             lines.append("")
 
         # Footer
@@ -595,7 +603,7 @@ class MarkdownReportGenerator(BaseReportGenerator):
         lines.append("| Run | File | Size (bytes) | SHA-256 | Captured | Instrument |")
         lines.append("|---|---|---|---|---|---|")
         for entry in manifest.entries:
-            lines.append(f"| {entry.run_label} | {entry.file_path} | {entry.size_bytes} | `{entry.sha256}` | {entry.capture_timestamp or '—'} | {entry.instrument or '—'} |")
+            lines.append(f"| {entry.run_label} | {entry.file_path} | {entry.size_bytes} | `{entry.sha256}` | {entry.capture_timestamp or 'unknown'} | {entry.instrument or '—'} |")
         return "\n".join(lines)
 
     def _generate_signoff(self, signoff) -> str:

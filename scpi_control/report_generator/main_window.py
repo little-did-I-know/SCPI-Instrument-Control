@@ -41,7 +41,7 @@ from scpi_control.report_generator.comparison_report_builder import append_signo
 from scpi_control.report_generator.generators.markdown_generator import MarkdownReportGenerator
 from scpi_control.report_generator.models.app_settings import AppSettings
 from scpi_control.report_generator.models.plot_style import PlotStyle
-from scpi_control.report_generator.models.report_data import SUMMARY_SOURCE_AI, TestReport, TestSection, WaveformData
+from scpi_control.report_generator.models.report_data import TestReport, TestSection, WaveformData
 from scpi_control.report_generator.models.report_options import ReportOptions
 from scpi_control.report_generator.models.template import BrandingTemplate, ReportTemplate
 from scpi_control.report_generator.utils.waveform_loader import WaveformLoader
@@ -635,16 +635,7 @@ class MainWindow(QMainWindow):
         # Add AI-generated content if available
         if self.ai_analysis_panel.has_generated_content():
             ai_content = self.ai_analysis_panel.get_generated_content()
-
-            if ai_content.get("executive_summary"):
-                report.executive_summary = ai_content["executive_summary"]
-                report.summary_source = SUMMARY_SOURCE_AI
-
-            if ai_content.get("key_findings"):
-                report.key_findings = ai_content["key_findings"]
-
-            if ai_content.get("recommendations"):
-                report.recommendations = ai_content["recommendations"]
+            report.apply_ai_content(ai_content)
 
         # Deterministic analysis: always enrich per-waveform data; fill the
         # report-level summary/findings/recommendations only if the LLM did not.
