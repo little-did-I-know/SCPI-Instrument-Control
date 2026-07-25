@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.3.0] - 2026-07-25
+
 ### Fixed
 
 - Provenance and report output no longer state things the software cannot know. Enhanced CSV
@@ -15,9 +17,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   modification time off as a capture time; AI-generated Key Findings and Recommendations are
   labelled as such in both Markdown and PDF output, so machine-written text is distinguishable
   from engineering judgement in a signed report; manifest file paths render verbatim instead of
-  being italicised and stripped of underscores by the markdown converter; the shipped comparison
-  example no longer stamps synthetic waveforms with a real instrument identity; and `scpi-extract`
-  reports missing provenance without inventing a reason for it.
+  being italicised and stripped of underscores by the markdown converter; the shipped comparison and
+  batch examples no longer stamp synthetic waveforms with a real instrument identity; and
+  `scpi-extract` reports missing provenance without inventing a reason for it.
 
 ## [5.2.0] - 2026-07-25
 
