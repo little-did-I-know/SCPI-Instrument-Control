@@ -150,6 +150,33 @@ def synthesize(spec: SignalSpec, sample_rate: float, n_points: int, t0: float = 
     rng = np.random.default_rng(spec.seed)
     t = t0 + np.arange(n_points) / sample_rate
     samples = _GENERATORS[spec.kind](spec, t, rng) + spec.offset
+    if spec.ringing_frequency > 0:
+        # A damped sinusoid triggered at each edge. Real probe/scope front-ends
+        # ring after a fast transition; this is what gives overshoot/preshoot
+        # measurements something real to measure. Deterministic and edge-local,
+        # so it needs no generator and is automatically continuous across
+        # stream() chunks. Applied to the base signal BEFORE drift and glitches:
+        # ringing is part of the signal's own edge response, not a baseline
+        # wander or an additive event.
+        edges = np.flatnonzero(np.diff(samples))
+        if edges.size:
+            # 5 time constants of decay, in samples. `max(spec.ringing_damping, 1e-9)`
+            # only guards the division against damping == 0 (undamped ringing) --
+            # it must NOT clamp small-but-nonzero damping up to some larger floor,
+            # or slow decay would be truncated before it actually decays, showing
+            # up as a discontinuity where the kernel window ends. `max(1, ...)`
+            # then guards int() truncating to 0 for very heavy damping. Both are
+            # capped by n_points, since the kernel can never need to run longer
+            # than the buffer itself.
+            decay_len = min(n_points, max(1, int(sample_rate / max(spec.ringing_damping, 1e-9) * 5)))
+            tail = np.arange(decay_len) / sample_rate
+            kernel = np.sin(2 * np.pi * spec.ringing_frequency * tail) * np.exp(-spec.ringing_damping * tail)
+            response = np.zeros(n_points)
+            for edge in edges:
+                step = samples[edge + 1] - samples[edge]
+                end = min(n_points, edge + 1 + decay_len)
+                response[edge + 1 : end] += 0.5 * step * kernel[: end - edge - 1]
+            samples = samples + response
     if spec.drift_amplitude > 0:
         # Time-based, NOT a random walk: stream() re-seeds per chunk, so a walk
         # would reset at every chunk boundary and a live view would show sawtooth

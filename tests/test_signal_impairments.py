@@ -99,3 +99,55 @@ def test_enabling_drift_does_not_change_the_noise_samples():
     t = np.arange(N) / RATE
     recovered = noisy_drifted - 1.0 * np.sin(2 * np.pi * 0.5 * t)
     np.testing.assert_allclose(recovered, noisy, atol=1e-9)
+
+
+def test_default_spec_produces_exactly_the_clean_signal():
+    """The real default-off guarantee. A DC spec at zero offset with no noise must
+    return EXACTLY zeros, so ANY nonzero default impairment -- drift, glitch or
+    ringing, at any magnitude or timescale -- breaks this immediately. The
+    envelope-based test above cannot see a slow drift; this one can."""
+    out = synthesize(SignalSpec(kind="dc", offset=0.0, seed=1), RATE, N)
+    np.testing.assert_array_equal(out, np.zeros(N))
+
+
+def test_glitches_at_colliding_positions_sum_via_add_at_not_overwrite():
+    """np.add.at accumulates every glitch landing on a repeated sample index;
+    fancy-index += would silently keep only the last write to a repeated index,
+    dropping the rest. At the glitch densities used elsewhere in this file,
+    duplicate positions are too rare to tell the two apart (0/200 trials in the
+    Task 6 review). Here n_points is tiny and glitch_rate is deliberately huge --
+    about 100 glitches land on only 20 positions -- so multiple same-sign
+    collisions on one sample are certain. fancy-index += can never push a sample
+    past 1x glitch_amplitude no matter how many glitches land there; np.add.at
+    can and does."""
+    spec = SignalSpec(kind="dc", offset=0.0, glitch_rate=5000.0, glitch_amplitude=1.0, seed=0)
+    out = synthesize(spec, 1000.0, 20)
+    assert np.max(np.abs(out)) >= 2.0, "same-sign glitch collisions should stack past 1x glitch_amplitude"
+
+
+def test_ringing_produces_overshoot_above_the_flat_top():
+    """Exercises the overshoot measurement the audit caught fabricating values for
+    signals without flat tops (M42) -- now there is a signal that genuinely has
+    overshoot to measure."""
+    base = dict(kind="square", frequency=1_000.0, amplitude=1.0, seed=2)
+    clean = synthesize(SignalSpec(**base), RATE, N)
+    rung = synthesize(SignalSpec(ringing_frequency=20_000.0, ringing_damping=5_000.0, **base), RATE, N)
+
+    assert np.max(rung) > np.max(clean) * 1.05, "ringing should overshoot the flat top"
+    # And it must decay: the late part of a held level should be flatter than the
+    # part right after the triggering edge. NOTE: comparing the first vs last 200
+    # samples of the whole 4000-sample array (as originally drafted) does not test
+    # this -- at these parameters the decay window is 5/ringing_damping seconds =
+    # 100 samples, longer than the 50-sample half-period between edges, so
+    # consecutive edges' ringing overlaps into a steady state and the start and
+    # end of the array read as statistically indistinguishable (verified: it
+    # fails, 1.052 vs 1.041). Scoping to one held level (the first one, which
+    # starts from an unrung baseline) isolates the actual decay behaviour.
+    edges = np.flatnonzero(np.diff(clean))
+    held = rung[edges[0] + 1 : edges[1] + 1]
+    assert np.std(held[-20:]) < np.std(held[:20]), "ringing should decay within a held level"
+
+
+def test_ringing_is_off_by_default_for_a_square_wave():
+    clean = synthesize(SignalSpec(kind="square", frequency=1_000.0, amplitude=1.0, seed=2), RATE, N)
+    assert np.max(clean) == pytest.approx(1.0)
