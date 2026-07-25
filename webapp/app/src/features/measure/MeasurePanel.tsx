@@ -57,8 +57,8 @@ export function MeasurePanel() {
         useSession.getState().applyMeasurementConfig(result.measurements);
       }
     }).catch(() => {
-      // no server truth available yet (e.g. modern-dialect scope) — fall through to the
-      // measurementConfig broadcast / default-empty precedence below.
+      // no server truth available yet (e.g. request failed before the session was ready) —
+      // fall through to the measurementConfig broadcast / default-empty precedence below.
     });
     return () => { cancelled = true; };
   }, [session?.id]);
@@ -137,12 +137,6 @@ export function MeasurePanel() {
       {selected.length === 0 && (
         <div style={{ color: "var(--lc-muted)", fontSize: "var(--text-sm)" }}>
           Select a measurement above to see live values.
-        </div>
-      )}
-
-      {session?.dialect === "modern" && (
-        <div style={{ color: "var(--lc-muted)", fontSize: "var(--text-sm)" }}>
-          Measurements are unavailable on modern-dialect scopes.
         </div>
       )}
 
