@@ -30,6 +30,12 @@ class SignalSpec:
         duty: High fraction of a "square" period, 0 < duty < 1 (pulse/PWM).
         noise_rms: Std-dev of additive Gaussian noise laid on any kind.
         seed: None for fresh randomness per call; an int for reproducibility.
+        drift_amplitude: Volts of slow baseline wander (0 = off).
+        drift_frequency: Hz of that wander; only used when drift_amplitude > 0.
+        glitch_rate: Mean glitches per second (0 = off).
+        glitch_amplitude: Volts, peak height of a glitch.
+        ringing_frequency: Hz of post-edge oscillation (0 = off).
+        ringing_damping: Decay rate per second of that oscillation.
     """
 
     kind: str = "sine"
@@ -40,6 +46,15 @@ class SignalSpec:
     duty: float = 0.5
     noise_rms: float = 0.0
     seed: Optional[int] = None
+    # Impairments, all default-off. Appended at the END of the dataclass
+    # deliberately: inserting them next to noise_rms, where they read better,
+    # would reorder positional construction and break callers.
+    drift_amplitude: float = 0.0  # volts of slow baseline wander (0 = off)
+    drift_frequency: float = 0.1  # Hz of that wander; only used when drift_amplitude > 0
+    glitch_rate: float = 0.0  # mean glitches per second (0 = off)
+    glitch_amplitude: float = 0.0  # volts, peak height of a glitch
+    ringing_frequency: float = 0.0  # Hz of post-edge oscillation (0 = off)
+    ringing_damping: float = 0.0  # decay rate per second of that oscillation
 
 
 def _cycle_fraction(spec: SignalSpec, t: np.ndarray) -> np.ndarray:
@@ -95,6 +110,16 @@ def _validate(spec: SignalSpec, sample_rate: float, n_points: int) -> None:
         raise exceptions.InvalidParameterError(f"duty must be strictly between 0 and 1: {spec.duty}")
     if spec.noise_rms < 0:
         raise exceptions.InvalidParameterError(f"noise_rms must be non-negative: {spec.noise_rms}")
+    if spec.drift_amplitude < 0:
+        raise exceptions.InvalidParameterError(f"drift_amplitude must be non-negative: {spec.drift_amplitude}")
+    if spec.glitch_rate < 0:
+        raise exceptions.InvalidParameterError(f"glitch_rate must be non-negative: {spec.glitch_rate}")
+    if spec.glitch_amplitude < 0:
+        raise exceptions.InvalidParameterError(f"glitch_amplitude must be non-negative: {spec.glitch_amplitude}")
+    if spec.ringing_frequency < 0:
+        raise exceptions.InvalidParameterError(f"ringing_frequency must be non-negative: {spec.ringing_frequency}")
+    if spec.ringing_damping < 0:
+        raise exceptions.InvalidParameterError(f"ringing_damping must be non-negative: {spec.ringing_damping}")
 
 
 def synthesize(spec: SignalSpec, sample_rate: float, n_points: int, t0: float = 0.0) -> np.ndarray:
