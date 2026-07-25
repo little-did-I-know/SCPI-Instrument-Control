@@ -105,7 +105,11 @@ def test_legacy_mock_answers_pava_measurements():
         scope.disconnect()
 
 
-def test_modern_mock_still_times_out_on_pava():
+def test_modern_mock_still_times_out_on_legacy_pava():
+    """measure() no longer sends PAVA? on modern scopes (it goes through
+    :MEASure:SIMPle instead), but the legacy PAVA? command itself must still
+    have no answer on a modern-dialect mock -- that invariant is asserted
+    directly against the connection rather than through measure()."""
     import pytest as _pytest
 
     from scpi_control import Oscilloscope
@@ -117,7 +121,7 @@ def test_modern_mock_still_times_out_on_pava():
     scope.connect()
     try:
         with _pytest.raises(SiglentTimeoutError):
-            scope.measurement.measure("PKPK", 1)
+            conn.query("C1:PAVA? PKPK")
     finally:
         scope.disconnect()
 
