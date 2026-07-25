@@ -721,7 +721,33 @@ def _from_wire(table, dialect: str, raw: str, what: str) -> str:
 _MEASUREMENT_TYPES = {"PKPK", "MAX", "MIN", "AMPL", "TOP", "BASE", "CMEAN", "MEAN", "RMS", "CRMS", "FREQ", "PER", "RISE", "FALL", "WID", "NWID", "DUTY"}
 _MEASUREMENT_TO_WIRE = {
     "legacy": {m: m for m in _MEASUREMENT_TYPES},
-    "modern": {m: m for m in _MEASUREMENT_TYPES},
+    # Modern :MEASure:SIMPle:ITEM / :VALue? vocabulary, verbatim from the
+    # SDS800X HD guide p.367 (ITEM) and p.369 (VALue?). NOT an identity map:
+    # per the parameter table at p.345, modern WID is the positive BURST width
+    # (first rising edge to last falling edge) while the positive PULSE width
+    # -- which is what our public WID means, cf. "WID": "PWIdth" in the
+    # tektronix map below -- is PWID. Mapping WID -> WID would silently return
+    # burst width. NWID is the negative PULSE width on both sides (NBWID is the
+    # burst form and we never send it).
+    "modern": {
+        "PKPK": "PKPK",
+        "MAX": "MAX",
+        "MIN": "MIN",
+        "AMPL": "AMPL",
+        "TOP": "TOP",
+        "BASE": "BASE",
+        "CMEAN": "CMEAN",
+        "MEAN": "MEAN",
+        "RMS": "RMS",
+        "CRMS": "CRMS",
+        "FREQ": "FREQ",
+        "PER": "PER",
+        "RISE": "RISE",
+        "FALL": "FALL",
+        "WID": "PWID",
+        "NWID": "NWID",
+        "DUTY": "DUTY",
+    },
     # LeCroy PARAMETER_VALUE (PAVA) parameter names -- identity, the ancestor
     # of the Siglent legacy vocabulary (MAUI p.7-70).
     "lecroy": {m: m for m in _MEASUREMENT_TYPES},
