@@ -33,3 +33,24 @@ def test_every_measurement_type_has_a_modern_token():
     for mtype in get_args(MeasurementType):
         token = measurement_to_wire("modern", mtype)
         assert token, "{0} has no modern token".format(mtype)
+
+
+def _modern_scope():
+    scope = Oscilloscope("mock", connection=MockConnection(idn=MODERN_IDN))
+    scope.connect()
+    return scope
+
+
+def test_modern_table_renders_the_simple_measure_commands():
+    scope = _modern_scope()
+    assert scope._get_command("set_measure_state", state="ON") == ":MEASure ON"
+    assert scope._get_command("set_simple_source", ch=2) == ":MEASure:SIMPle:SOURce C2"
+    assert scope._get_command("set_simple_item", param="PKPK", state="ON") == ":MEASure:SIMPle:ITEM PKPK,ON"
+    assert scope._get_command("get_simple_value", param="PKPK") == ":MEASure:SIMPle:VALue? PKPK"
+
+
+def test_modern_table_no_longer_offers_legacy_pava():
+    """PAVA appears zero times in the modern guide; keeping it in the table is
+    what let measure() send a nonexistent command."""
+    scope = _modern_scope()
+    assert not scope._has_command("get_parameter_value")
