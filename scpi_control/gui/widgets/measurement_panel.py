@@ -14,23 +14,25 @@ logger = logging.getLogger(__name__)
 class MeasurementPanel(QWidget):
     """Widget for displaying and controlling measurements."""
 
-    # Available measurements
+    # (display label, MeasurementType wire code). The wire code is passed
+    # straight to Measurement.measure(); do NOT reintroduce measure_{name}
+    # wrapper strings -- that drift is what broke six of these (audit H14).
     MEASUREMENTS = [
-        ("Frequency", "frequency"),
-        ("Period", "period"),
-        ("Peak-to-Peak", "vpp"),
-        ("Amplitude", "amplitude"),
-        ("Top", "top"),
-        ("Base", "base"),
-        ("Max", "maximum"),
-        ("Min", "minimum"),
-        ("Mean", "mean"),
-        ("RMS", "rms"),
-        ("Rise Time", "rise_time"),
-        ("Fall Time", "fall_time"),
-        ("Positive Width", "positive_width"),
-        ("Negative Width", "negative_width"),
-        ("Duty Cycle", "duty_cycle"),
+        ("Frequency", "FREQ"),
+        ("Period", "PER"),
+        ("Peak-to-Peak", "PKPK"),
+        ("Amplitude", "AMPL"),
+        ("Top", "TOP"),
+        ("Base", "BASE"),
+        ("Max", "MAX"),
+        ("Min", "MIN"),
+        ("Mean", "MEAN"),
+        ("RMS", "RMS"),
+        ("Rise Time", "RISE"),
+        ("Fall Time", "FALL"),
+        ("Positive Width", "WID"),
+        ("Negative Width", "NWID"),
+        ("Duty Cycle", "DUTY"),
     ]
 
     # Channels
@@ -252,28 +254,18 @@ class MeasurementPanel(QWidget):
         self._refresh_table()
 
     def _get_measurement_value(self, channel: int, meas_type: str) -> Optional[float]:
-        """Get a measurement value from the oscilloscope.
+        """Get a measurement value from the oscilloscope, or None on error.
 
-        Args:
-            channel: Channel number (1-4)
-            meas_type: Measurement type
-
-        Returns:
-            Measurement value or None if error
+        Routes through Measurement.measure() with the MeasurementType wire code
+        from MEASUREMENTS -- the instrument computes every type. The old code
+        built measure_{meas_type} wrapper names and used a hasattr guard, so six
+        types (top/base/max/min/positive_width/negative_width) silently returned
+        None because no such wrapper existed (audit H14).
         """
         if not self.scope:
             return None
-
         try:
-            # Map measurement type to method
-            method_name = f"measure_{meas_type}"
-            if hasattr(self.scope.measurement, method_name):
-                method = getattr(self.scope.measurement, method_name)
-                return method(channel)
-            else:
-                logger.warning(f"Unknown measurement type: {meas_type}")
-                return None
-
+            return self.scope.measurement.measure(meas_type, channel)
         except Exception as e:
             logger.debug(f"Measurement error: {e}")
             return None
@@ -292,7 +284,7 @@ class MeasurementPanel(QWidget):
             return "---"
 
         # Format based on measurement type
-        if meas_type in ["frequency"]:
+        if meas_type == "FREQ":
             if value >= 1e6:
                 return f"{value/1e6:.3f} MHz"
             elif value >= 1e3:
@@ -300,7 +292,7 @@ class MeasurementPanel(QWidget):
             else:
                 return f"{value:.3f} Hz"
 
-        elif meas_type in ["period", "rise_time", "fall_time", "positive_width", "negative_width"]:
+        elif meas_type in ["PER", "RISE", "FALL", "WID", "NWID"]:
             if value >= 1.0:
                 return f"{value:.3f} s"
             elif value >= 1e-3:
@@ -310,10 +302,10 @@ class MeasurementPanel(QWidget):
             else:
                 return f"{value*1e9:.3f} ns"
 
-        elif meas_type in ["duty_cycle"]:
+        elif meas_type == "DUTY":
             return f"{value:.2f} %"
 
-        else:  # Voltage measurements
+        else:  # Voltage measurements: PKPK, MAX, MIN, AMPL, TOP, BASE, MEAN, CMEAN, RMS, CRMS
             if abs(value) >= 1.0:
                 return f"{value:.3f} V"
             else:
