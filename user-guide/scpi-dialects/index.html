@@ -3806,9 +3806,7 @@ raw commands in whichever dialect the connected scope speaks.</p>
 <h2 id="known-dialect-gaps">Known dialect gaps<a class="headerlink" href="#known-dialect-gaps" title="Permanent link">&para;</a></h2>
 <p>Not every dialect implements every feature the public API exposes. Where a
 dialect lacks a command, calling the corresponding property or method raises
-<code>FeatureNotSupportedError</code> (or, for the two gaps noted below that involve
-timeouts rather than gating, the appropriate timeout/parse error) —
-<code>scpi_control.exceptions</code>.</p>
+<code>FeatureNotSupportedError</code> — <code>scpi_control.exceptions</code>.</p>
 <table>
 <thead>
 <tr>
@@ -3850,8 +3848,8 @@ timeouts rather than gating, the appropriate timeout/parse error) —
 </tr>
 <tr>
 <td><code>measure()</code> automated measurements</td>
-<td>legacy, lecroy, tektronix (all families)</td>
-<td><strong>Modern (Siglent):</strong> <code>measure()</code> calls still time out and raise <code>SiglentTimeoutError</code> — a longstanding, unchanged gap. <strong>Tektronix:</strong> the TBS1000C uses the <code>MEASUrement:IMMed</code> subsystem; the 2/&#8536;/6 Series MSO families have no <code>IMMed</code> subsystem and use stateful "badges" instead (<code>MEASUrement:MEAS&lt;n&gt;</code>) — see <a href="#measurement-badges">Measurement badges</a> below. This closes the previous MSO 2-Series gap: <code>measure()</code> now works there too.</td>
+<td>legacy, modern, lecroy, tektronix (all families)</td>
+<td><strong>Modern (Siglent):</strong> uses the documented <code>:MEASure:SIMPle</code> subsystem — enables the measurement function, points it at the channel, switches the requested item on, then reads it back. Not side-effect-free: the enabled item and the simple-measurement source stay set on the instrument (and visible on its display) after the call returns; see the note below the table. <strong>Tektronix:</strong> the TBS1000C uses the <code>MEASUrement:IMMed</code> subsystem; the 2/&#8536;/6 Series MSO families have no <code>IMMed</code> subsystem and use stateful "badges" instead (<code>MEASUrement:MEAS&lt;n&gt;</code>) — see <a href="#measurement-badges">Measurement badges</a> below.</td>
 </tr>
 <tr>
 <td>Badge measurement types <code>CMEAN</code>, <code>CRMS</code></td>
@@ -3880,10 +3878,15 @@ timeouts rather than gating, the appropriate timeout/parse error) —
 </tr>
 </tbody>
 </table>
-<p>Automated measurements (<code>PAVA?</code>) on <strong>Siglent modern</strong> scopes remain a
-documented, unchanged gap: <code>scope.measurement.measure(...)</code> calls time out
-and raise <code>SiglentTimeoutError</code>. The web gateway catches this internally and
-shows measurements as unavailable in its UI.</p>
+<p>A modern-dialect <code>measure()</code> call is not side-effect-free: it sends
+<code>:MEASure ON</code>, <code>:MEASure:SIMPle:SOURce</code>, and <code>:MEASure:SIMPle:ITEM
+{param},ON</code> before reading <code>:MEASure:SIMPle:VALue?</code>, all of which are visible
+on the instrument display afterwards. These are deliberately left in place
+rather than cleared, because the instrument's own clear command
+(<code>:MEASure:SIMPle:CLEar</code>) is all-or-nothing and would remove measurements you
+configured yourself from the front panel. Enabled items accumulate across
+repeated calls rather than being switched off. The web gateway streams these
+values the same way it does for every other dialect.</p>
 <h2 id="measurement-badges">Measurement badges<a class="headerlink" href="#measurement-badges" title="Permanent link">&para;</a></h2>
 <p>The 2/&#8536;/6 Series MSO families have no <code>MEASUrement:IMMed</code> subsystem. A
 measurement is a stateful "badge" — added to the instrument, configured with

@@ -3913,13 +3913,6 @@ printed footer number -- which was never true of how the entries below, or
 <td>EN11G p.51</td>
 </tr>
 <tr>
-<td><code>get_parameter_value</code></td>
-<td><code>C{ch}:PAVA? {param}</code></td>
-<td>absent from manual entirely (zero hits for PAVA); modern measurement path is a separate concern</td>
-<td>MISMATCH_DEFERRED</td>
-<td>EN11G p.784</td>
-</tr>
-<tr>
 <td><code>get_probe_ratio</code></td>
 <td><code>:CHANnel{ch}:PROBe?</code></td>
 <td><code>:CHANnel&lt;n&gt;:PROBe?</code> (not mocked)</td>
@@ -3932,6 +3925,13 @@ printed footer number -- which was never true of how the entries below, or
 <td>same; response bare NR3, matches</td>
 <td>VERIFIED</td>
 <td>EN11G p.46</td>
+</tr>
+<tr>
+<td><code>get_simple_value</code></td>
+<td><code>:MEASure:SIMPle:VALue? {param}</code></td>
+<td><code>:MEASure:SIMPle:VALue? &lt;parameter&gt;</code>; response bare number, matches</td>
+<td>VERIFIED</td>
+<td>EN11G p.369</td>
 </tr>
 <tr>
 <td><code>get_time_div</code></td>
@@ -4116,11 +4116,39 @@ printed footer number -- which was never true of how the entries below, or
 <td>EN11G p.33</td>
 </tr>
 <tr>
+<td><code>set_measure_mode</code></td>
+<td><code>:MEASure:MODE {mode}</code></td>
+<td><code>:MEASure:MODE &lt;type&gt;</code>, <code>{SIMPle\|ADVanced}</code></td>
+<td>VERIFIED</td>
+<td>EN11G p.365</td>
+</tr>
+<tr>
+<td><code>set_measure_state</code></td>
+<td><code>:MEASure {state}</code></td>
+<td><code>:MEASure &lt;state&gt;</code></td>
+<td>VERIFIED</td>
+<td>EN11G p.337</td>
+</tr>
+<tr>
 <td><code>set_probe_ratio</code></td>
 <td><code>:CHANnel{ch}:PROBe VALue,{ratio}</code></td>
 <td><code>:CHANnel&lt;n&gt;:PROBe &lt;attenuation&gt;[,&lt;value&gt;]</code> (not mocked)</td>
 <td>VERIFIED</td>
 <td>EN11G p.57</td>
+</tr>
+<tr>
+<td><code>set_simple_item</code></td>
+<td><code>:MEASure:SIMPle:ITEM {param},{state}</code></td>
+<td><code>:MEASure:SIMPle:ITEM &lt;parameter&gt;,&lt;state&gt;</code></td>
+<td>VERIFIED</td>
+<td>EN11G p.367</td>
+</tr>
+<tr>
+<td><code>set_simple_source</code></td>
+<td><code>:MEASure:SIMPle:SOURce C{ch}</code></td>
+<td><code>:MEASure:SIMPle:SOURce &lt;source&gt;</code></td>
+<td>VERIFIED</td>
+<td>EN11G p.368</td>
 </tr>
 <tr>
 <td><code>set_time_div</code></td>
@@ -4236,7 +4264,21 @@ printed footer number -- which was never true of how the entries below, or
 </tr>
 </tbody>
 </table>
-<p><strong>Tally: 47 VERIFIED, 5 MISMATCH_DEFERRED, 0 UNCITED (52 total).</strong></p>
+<p><strong>Tally: 52 VERIFIED, 4 MISMATCH_DEFERRED, 0 UNCITED (56 total).</strong></p>
+<p>The four <code>:MEASure:</code> rows above (<code>set_measure_state</code>, <code>set_simple_source</code>,
+<code>set_simple_item</code>, <code>get_simple_value</code>) replaced an earlier stale corpus entry,
+<code>get_parameter_value</code>, that was mis-cited to EN11G p.784. That page documents
+the external <strong>Digital Multimeter</strong> subsystem (<code>MEASure:CONTinuity</code>,
+<code>MEASure:CURRent</code>, <code>MEASure:RESistance</code>, etc.), not oscilloscope waveform
+measurements. The oscilloscope measurement subsystem (<code>:MEASure:</code> / <code>:MEASure:SIMPle:</code>)
+is documented at EN11G p.335-373. The four rows are VERIFIED against those pages
+in <code>tests/wire_forms.py</code>.</p>
+<p>A fifth row, <code>set_measure_mode</code> (<code>:MEASure:MODE {mode}</code>, EN11G p.365), was added
+alongside a review of this fix: <code>measure()</code> now sends it right after
+<code>:MEASure ON</code> to pin the instrument in <code>SIMPle</code> mode, because p.369's <code>VALue?</code>
+reads "the specified measurement value that appears on the simple measurement"
+-- a read against an instrument left in <code>ADVanced</code> mode (the table's other
+enum member) is not guaranteed to answer the same way.</p>
 <p>Task 17 (audit H9) added eight rows with a <code>get_waveform_</code>/<code>set_waveform_</code>
 prefix: the documented <code>:WAVeform:SOURce</code>/<code>STARt</code>/<code>INTerval</code>/<code>POINt</code>
 transfer-parameter scalars (EN11G p.749-752), verified against a fresh
