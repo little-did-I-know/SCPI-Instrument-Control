@@ -216,6 +216,11 @@ class ReportAnalyzer:
         """
         Suggest next steps based on test results.
 
+        Side effect: on success, sets report.recommendations_source to
+        SUMMARY_SOURCE_AI (audit M31), exactly as generate_recommendations does --
+        this method is the other AI-producing path into report.recommendations
+        (see examples/report_generation_example.py's create_report_with_ai()).
+
         Args:
             report: Test report
 
@@ -240,11 +245,18 @@ class ReportAnalyzer:
             temperature=0.7,
         )
 
+        if suggestions:
+            # The producer marks its own output so no caller can forget to (audit M31).
+            report.recommendations_source = SUMMARY_SOURCE_AI
+
         return suggestions
 
     def generate_key_findings(self, report: TestReport, max_findings: int = 5) -> Optional[List[str]]:
         """
         Generate a list of key findings from the report.
+
+        Side effect: on success, sets report.findings_source to SUMMARY_SOURCE_AI
+        (audit M31) so downstream renderers label this content as AI-generated.
 
         Args:
             report: Test report
@@ -280,6 +292,10 @@ class ReportAnalyzer:
     def generate_recommendations(self, report: TestReport, max_recommendations: int = 5) -> Optional[List[str]]:
         """
         Generate actionable recommendations based on the test results.
+
+        Side effect: on success, sets report.recommendations_source to
+        SUMMARY_SOURCE_AI (audit M31) so downstream renderers label this
+        content as AI-generated.
 
         Args:
             report: Test report
