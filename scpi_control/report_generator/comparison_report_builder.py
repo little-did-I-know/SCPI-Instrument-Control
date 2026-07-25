@@ -4,7 +4,6 @@ shared with the single-run report path."""
 import hashlib
 import logging
 from dataclasses import replace
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
@@ -54,8 +53,9 @@ def _instrument_string(provenance) -> Optional[str]:
 
 
 def build_manifest(runs: List[Run]) -> DataManifest:
-    """One entry per source file per run. Timestamp: provenance acquired_at,
-    else waveform capture_timestamp, else file mtime (ISO, UTC)."""
+    """One entry per source file per run. Timestamp: provenance acquired_at, else
+    waveform capture_timestamp, else None -- a file's mtime is when it was written
+    or copied, not when the signal was acquired, so it is never substituted."""
     entries: List[ManifestEntry] = []
     for run in runs:
         by_source: Dict[str, object] = {}
@@ -71,8 +71,9 @@ def build_manifest(runs: List[Run]) -> DataManifest:
                 timestamp = provenance.acquired_at
             elif wf is not None and getattr(wf, "capture_timestamp", None):
                 timestamp = wf.capture_timestamp.isoformat()
-            elif path.exists():
-                timestamp = datetime.fromtimestamp(path.stat().st_mtime, tz=timezone.utc).isoformat()
+            # No mtime fallback: a file's modification time is when it was written or
+            # copied, not when the signal was acquired. Leaving this None renders as
+            # "unknown", which is honest (audit M30).
             entries.append(
                 ManifestEntry(
                     run_label=run.label,

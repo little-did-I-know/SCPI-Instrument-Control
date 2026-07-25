@@ -59,3 +59,19 @@ def test_csv_header_omits_captured_when_there_is_no_provenance(tmp_path):
     substituting the save time (the honesty rule: never a fabricated stand-in)."""
     text = _save_enhanced(tmp_path, _waveform(with_provenance=False))
     assert "# Captured:" not in text
+
+
+def test_manifest_does_not_report_file_mtime_as_a_capture_time(tmp_path):
+    """A capture copied off a scope's USB stick onto a NAS carries the COPY time as
+    mtime. Rendering that under 'Captured' makes it indistinguishable from a real
+    acquisition timestamp (audit M30)."""
+    from scpi_control.report_generator.comparison_report_builder import build_manifest
+    from scpi_control.report_generator.models.comparison import Run
+
+    path = tmp_path / "legacy_capture.csv"
+    path.write_text("0.0,0.0\n1e-3,1.0\n")
+
+    manifest = build_manifest([Run(label="legacy", files=[path])])
+
+    assert manifest.entries, "expected one manifest entry per source file"
+    assert manifest.entries[0].capture_timestamp is None, "mtime must not stand in for an acquisition time"

@@ -1268,7 +1268,7 @@ class PDFReportGenerator(BaseReportGenerator):
                     _cell(entry.file_path),
                     str(entry.size_bytes),
                     _cell(entry.sha256),
-                    entry.capture_timestamp or "—",
+                    entry.capture_timestamp or "unknown",
                     entry.instrument or "—",
                 ]
             )

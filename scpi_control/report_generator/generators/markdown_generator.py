@@ -595,7 +595,7 @@ class MarkdownReportGenerator(BaseReportGenerator):
         lines.append("| Run | File | Size (bytes) | SHA-256 | Captured | Instrument |")
         lines.append("|---|---|---|---|---|---|")
         for entry in manifest.entries:
-            lines.append(f"| {entry.run_label} | {entry.file_path} | {entry.size_bytes} | `{entry.sha256}` | {entry.capture_timestamp or '—'} | {entry.instrument or '—'} |")
+            lines.append(f"| {entry.run_label} | {entry.file_path} | {entry.size_bytes} | `{entry.sha256}` | {entry.capture_timestamp or 'unknown'} | {entry.instrument or '—'} |")
         return "\n".join(lines)
 
     def _generate_signoff(self, signoff) -> str:
