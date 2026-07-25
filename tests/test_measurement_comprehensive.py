@@ -99,13 +99,6 @@ class TestRMSMeasurement:
         rms = measurement.measure_rms(1)
         assert rms == 1.0
 
-    def test_measure_rms_ac(self, measurement, mock_scope):
-        """Test measuring AC RMS voltage."""
-        if hasattr(measurement, "measure_rms_ac"):
-            mock_scope.query.return_value = "C1:PAVA CRMS,7.071E-01V"
-            rms_ac = measurement.measure_rms_ac(1)
-            assert abs(rms_ac - 0.7071) < 0.0001
-
 
 class TestAmplitudeMeasurement:
     """Test amplitude measurement."""
@@ -224,35 +217,10 @@ class TestMeasureAll:
 class TestMeasurementParameterSetup:
     """Test setting up measurement parameters."""
 
-    def test_setup_measurement_parameter(self, measurement, mock_scope):
-        """Test setting up a measurement parameter."""
-        if hasattr(measurement, "setup_parameter"):
-            measurement.setup_parameter(1, "FREQ")
-            assert mock_scope.write.called
-
     def test_clear_measurements(self, measurement, mock_scope):
         """Test clearing all measurements."""
-        if hasattr(measurement, "clear_measurements"):
-            measurement.clear_measurements()
-            assert mock_scope.write.called
-
-
-class TestCursorMeasurements:
-    """Test cursor-based measurements."""
-
-    def test_measure_with_cursors(self, measurement, mock_scope):
-        """Test measurement using cursors."""
-        if hasattr(measurement, "measure_cursor_delta_time"):
-            mock_scope.query.return_value = "DT: 1.000E-03S"
-            dt = measurement.measure_cursor_delta_time()
-            assert isinstance(dt, float)
-
-    def test_measure_cursor_delta_voltage(self, measurement, mock_scope):
-        """Test voltage delta measurement using cursors."""
-        if hasattr(measurement, "measure_cursor_delta_voltage"):
-            mock_scope.query.return_value = "DV: 2.500E+00V"
-            dv = measurement.measure_cursor_delta_voltage()
-            assert isinstance(dv, float)
+        measurement.clear_measurements()
+        assert mock_scope.write.called
 
 
 class TestStatisticalMeasurements:
@@ -260,15 +228,13 @@ class TestStatisticalMeasurements:
 
     def test_enable_statistics(self, measurement, mock_scope):
         """Test enabling statistics."""
-        if hasattr(measurement, "enable_statistics"):
-            measurement.enable_statistics()
-            assert mock_scope.write.called
+        measurement.enable_statistics()
+        assert mock_scope.write.called
 
     def test_disable_statistics(self, measurement, mock_scope):
         """Test disabling statistics."""
-        if hasattr(measurement, "disable_statistics"):
-            measurement.disable_statistics()
-            assert mock_scope.write.called
+        measurement.disable_statistics()
+        assert mock_scope.write.called
 
     def test_get_statistics(self, measurement, mock_scope):
         """Test getting statistics for a measurement."""
@@ -276,26 +242,6 @@ class TestStatisticalMeasurements:
             mock_scope.query.return_value = "MEAN:1.0,STDEV:0.1,MIN:0.9,MAX:1.1"
             stats = measurement.get_statistics(1, "FREQ")
             assert isinstance(stats, dict)
-
-
-class TestMeasurementUtilities:
-    """Test measurement utility functions."""
-
-    def test_parse_measurement_response(self, measurement):
-        """Test parsing measurement response."""
-        # Test various response formats
-        responses = [
-            ("FREQ: 1.000E+03HZ", 1000.0),
-            ("C1:PAVA PKPK,3.300E+00V", 3.3),
-            ("C1:PAVA DUTY,50.0%", 50.0),
-            ("C1:PAVA FREQ,1.234E+03HZ", 1234.0),
-        ]
-
-        for response, expected in responses:
-            # Assume there's a parse method
-            if hasattr(measurement, "_parse_measurement"):
-                result = measurement._parse_measurement(response)
-                assert abs(result - expected) < 0.01
 
 
 class TestMeasurementErrorHandling:

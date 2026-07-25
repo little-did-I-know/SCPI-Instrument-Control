@@ -4,9 +4,9 @@ import logging
 from typing import Optional
 
 import numpy as np
-from scipy import signal
 
 from scpi_control.gui.widgets.measurement_marker import MeasurementMarker
+from scpi_control.gui.widgets.measurement_markers.period import estimate_period
 from scpi_control.waveform import WaveformData
 
 logger = logging.getLogger(__name__)
@@ -168,50 +168,15 @@ class FrequencyMarker(MeasurementMarker):
             return None
 
     def _estimate_period(self, time: np.ndarray, voltage: np.ndarray) -> Optional[float]:
-        """Estimate period from time and voltage data.
+        """Estimate period from the gated data.
 
-        Args:
-            time: Time array
-            voltage: Voltage array
-
-        Returns:
-            Estimated period in seconds, or None if estimation fails
+        Uses the shared edge detector; if it cannot find a period, falls back to
+        the gate width (unchanged frequency-marker behaviour -- the duty marker
+        deliberately does NOT take this fallback, see period.estimate_period).
         """
-        # Method 1: Zero-crossing detection
-        try:
-            # Remove DC offset
-            voltage_ac = voltage - np.mean(voltage)
-
-            # Find zero crossings with positive slope
-            zero_crossings = []
-            for i in range(len(voltage_ac) - 1):
-                if voltage_ac[i] <= 0 and voltage_ac[i + 1] > 0:
-                    # Linear interpolation for more accurate crossing time
-                    t_cross = time[i] - voltage_ac[i] * (time[i + 1] - time[i]) / (voltage_ac[i + 1] - voltage_ac[i])
-                    zero_crossings.append(t_cross)
-
-            if len(zero_crossings) >= 2:
-                # Average period between crossings
-                periods = np.diff(zero_crossings)
-                return float(np.mean(periods))
-
-        except Exception as e:
-            logger.debug(f"Zero-crossing method failed: {e}")
-
-        # Method 2: Peak detection
-        try:
-            peaks, _ = signal.find_peaks(voltage, distance=len(voltage) // 10)
-
-            if len(peaks) >= 2:
-                peak_times = time[peaks]
-                periods = np.diff(peak_times)
-                return float(np.mean(periods))
-
-        except Exception as e:
-            logger.debug(f"Peak detection method failed: {e}")
-
-        # Method 3: Simple estimate from gate width
-        # Assume user set gates to span one cycle
+        period = estimate_period(time, voltage)
+        if period is not None:
+            return period
         return float(time[-1] - time[0])
 
     def auto_place(self, waveform: WaveformData, x_hint: Optional[float] = None) -> None:
