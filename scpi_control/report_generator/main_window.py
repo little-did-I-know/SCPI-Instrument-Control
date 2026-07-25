@@ -642,9 +642,11 @@ class MainWindow(QMainWindow):
 
             if ai_content.get("key_findings"):
                 report.key_findings = ai_content["key_findings"]
+                report.findings_source = SUMMARY_SOURCE_AI
 
             if ai_content.get("recommendations"):
                 report.recommendations = ai_content["recommendations"]
+                report.recommendations_source = SUMMARY_SOURCE_AI
 
         # Deterministic analysis: always enrich per-waveform data; fill the
         # report-level summary/findings/recommendations only if the LLM did not.
