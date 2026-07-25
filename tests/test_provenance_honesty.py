@@ -280,11 +280,9 @@ def test_scpi_extract_reports_missing_provenance_without_claiming_reason(tmp_pat
 
     # Create a waveform file with no provenance
     wf = _waveform(with_provenance=False)
-    path = _save_enhanced(tmp_path, wf)
 
-    # Load it back via the normal path
     loaded = LoadedWaveform(
-        source_path=str(path),
+        source_path="cap.csv",
         source_format="CSV_ENHANCED",
         time=wf.time,
         voltage=wf.voltage,
