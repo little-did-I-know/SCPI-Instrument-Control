@@ -169,6 +169,7 @@ addopts = [
 markers = [
     "hardware: tests that require actual oscilloscope hardware",
     "gui: tests that require GUI dependencies (PyQt6)",
+    "slow: tests that run examples as subprocesses (deselect with -m 'not slow')",
 ]
 filterwarnings = [
     "ignore::DeprecationWarning",

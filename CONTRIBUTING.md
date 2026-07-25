@@ -186,14 +186,53 @@ multiple worker processes:
 python -m pytest -n auto
 ```
 
-`-n auto` spawns one worker per CPU core; on a multi-core machine this cuts
-full-suite wall time substantially. Prefer `--testmon` for tight edit loops
-where only a handful of tests need to rerun, and `-n auto` when you want the
-whole suite fast (e.g. before committing) — run one or the other per
-invocation rather than combining them. (In local testing with pytest-testmon
-2.2.0 and pytest-xdist 3.8.0, `--testmon -n auto` together did not error and
-testmon's change detection still worked correctly across workers, but this
-combination isn't a primary supported workflow, so keep them separate.)
+`-n auto` spawns one worker per CPU core. Note that more workers is not always
+faster: every worker pays the full import cost of numpy/scipy/matplotlib and
+friends, so on a high-core machine that startup overhead can eat most of the
+gain. Measured on a 32-core Windows box (1616 tests):
+
+| Invocation | Wall clock |
+| ---------- | ---------- |
+| serial     | ~117s      |
+| `-n auto` (32 workers) | ~95s |
+| `-n 8`     | ~69s       |
+
+If `-n auto` disappoints, try a fixed, smaller worker count. Prefer `--testmon`
+for tight edit loops where only a handful of tests need to rerun, and a parallel
+run when you want the whole suite fast (e.g. before committing) — run one or the
+other per invocation rather than combining them. (In local testing with
+pytest-testmon 2.2.0 and pytest-xdist 3.8.0, `--testmon -n auto` together did not
+error and testmon's change detection still worked correctly across workers, but
+this combination isn't a primary supported workflow, so keep them separate.)
+
+### Deselecting the Slow Example Runs
+
+`tests/test_examples_smoke.py` executes each no-hardware example as a real
+subprocess. That is the only guard that catches **API drift** in the published
+examples — a call to a method that no longer exists compiles fine and fails only
+at runtime, so the compile check cannot see it. It is also the slowest thing in
+the suite, and `report_ai_qa.py` does live inference wherever a local Ollama is
+running (~26s there, near-instant everywhere else, since the example exits
+cleanly when no Ollama is reachable).
+
+Those runs are marked `slow`, so you can drop them while iterating:
+
+```bash
+python -m pytest -m "not slow"          # skip the example subprocesses
+python -m pytest -m "not slow" -n 8     # ...and parallelise the rest
+```
+
+On the same 32-core box as the table above, the second form runs 1603 tests in
+~10s, against ~117s for a full serial run — the example subprocesses dominate
+local wall time far more than the remaining 1603 tests combined.
+
+The cheap guards in that file (stale-token scan, compile check, notebook JSON)
+are unmarked and always run.
+
+Deliberately **not** added to `addopts`: CI invokes a bare `pytest` and reads the
+same `pyproject.toml`, so a default `-m "not slow"` would silently strip example
+coverage from CI while looking green locally. Always finish with a full run
+before committing.
 
 ### Writing Tests
 

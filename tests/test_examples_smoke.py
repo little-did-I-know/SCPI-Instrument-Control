@@ -8,6 +8,15 @@ examples as subprocesses.
 Limitation: hardware-bound examples (e.g. simple_capture.py, advanced_analysis.py)
 cannot be executed headless, so their fixes are covered by the token scan and the
 compile check, not by running them.
+
+The execution guard is the expensive one -- each example is a real subprocess, and
+report_ai_qa.py additionally does live inference wherever a local Ollama is running.
+It is marked `slow` so tight edit loops can deselect it with `-m "not slow"`; the
+scan/compile guards stay cheap and always run. Do not deselect it by default in
+pyproject `addopts`: CI invokes a bare `pytest` and reads the same config, so that
+would silently strip example coverage from CI. Execution is what catches API drift
+that a compile check cannot -- a call to a method that no longer exists compiles
+perfectly and fails only at runtime.
 """
 
 import importlib.util
@@ -89,6 +98,7 @@ def test_notebook_is_valid_json():
     json.loads(nb.read_text(encoding="utf-8"))
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize("filename, module", EXECUTE, ids=[f for f, _ in EXECUTE])
 def test_no_hardware_example_runs(filename, module, tmp_path):
     if not _available(module):
