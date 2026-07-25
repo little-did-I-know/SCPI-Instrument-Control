@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Measurements now work on modern-dialect Siglent oscilloscopes (SDS800X HD, SDS5000X and
+  siblings). `measure()` previously sent the legacy `PAVA?` command, which does not exist on
+  those instruments, so every measurement failed — including the whole GUI Measurements tab and
+  the web gateway's measurement calls. It now uses the documented `:MEASure:SIMPle` subsystem.
+  Note that a modern measurement is not side-effect-free: it enables the measurement function,
+  sets the simple-measurement source, and switches the requested item on, which is visible on the
+  instrument display. These are left in place rather than cleared, because the instrument's clear
+  command is all-or-nothing and would remove measurements you configured yourself.
+
 ## [5.1.0] - 2026-07-25
 
 ### Changed
