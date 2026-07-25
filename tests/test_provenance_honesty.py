@@ -204,6 +204,7 @@ def test_manifest_paths_are_not_mangled_by_the_markdown_converter():
     """The manifest exists to make provenance verifiable, so the path must survive
     verbatim. Underscores are markdown emphasis: scope_capture_ch1.npz was rendering
     as scope*capture*ch1.npz with 'capture' italicised (audit M34)."""
+    pytest.importorskip("reportlab")
     from scpi_control.report_generator.generators.pdf_generator import PDFReportGenerator
 
     path = r"C:\data\scope_capture_ch1.npz"
@@ -218,6 +219,7 @@ def test_manifest_literal_cells_escape_xml():
     escapes for reportlab's mini-XML without interpreting emphasis. Escaping is
     still required of that literal renderer: an unescaped & or < in a path would
     corrupt reportlab's mini-XML parse."""
+    pytest.importorskip("reportlab")
     from scpi_control.report_generator.generators.pdf_generator import PDFReportGenerator
 
     rendered = PDFReportGenerator()._literal_cell_text("a&b<c.npz")
