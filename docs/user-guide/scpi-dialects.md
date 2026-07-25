@@ -116,9 +116,7 @@ raw commands in whichever dialect the connected scope speaks.
 
 Not every dialect implements every feature the public API exposes. Where a
 dialect lacks a command, calling the corresponding property or method raises
-`FeatureNotSupportedError` (or, for the two gaps noted below that involve
-timeouts rather than gating, the appropriate timeout/parse error) —
-`scpi_control.exceptions`.
+`FeatureNotSupportedError` — `scpi_control.exceptions`.
 
 | Feature | Supported on | Notes |
 |---|---|---|
@@ -128,17 +126,22 @@ timeouts rather than gating, the appropriate timeout/parse error) —
 | Trigger holdoff | legacy, tektronix | On legacy, the wire command (`TRIG_DELAY`) is really *trigger delay*, not holdoff — an existing honesty note kept as-is pending a trigger-rework follow-up. Modern has no holdoff command at all. LeCroy holdoff lives in `TRIG_SELECT HT/HV`, a different shape not yet implemented (follow-up). |
 | `GND` channel coupling | legacy, modern, lecroy | Not supported on Tektronix: neither the TBS1000C (`AC`\|`DC`) nor the 2 Series MSO (`AC`\|`DC`\|`DCREJect`) command set has a ground-coupling mode. The MSO2's `DCREJect` coupling readback is normalized to the public `AC` token rather than surfaced as a Tek-specific value. |
 | Channel vertical unit (`C{ch}:UNIT`) | legacy only | No equivalent command in the modern, Tektronix, or LeCroy tables. |
-| `measure()` automated measurements | legacy, lecroy, tektronix (all families) | **Modern (Siglent):** `measure()` calls still time out and raise `SiglentTimeoutError` — a longstanding, unchanged gap. **Tektronix:** the TBS1000C uses the `MEASUrement:IMMed` subsystem; the 2/4/5/6 Series MSO families have no `IMMed` subsystem and use stateful "badges" instead (`MEASUrement:MEAS<n>`) — see [Measurement badges](#measurement-badges) below. This closes the previous MSO 2-Series gap: `measure()` now works there too. |
+| `measure()` automated measurements | legacy, modern, lecroy, tektronix (all families) | **Modern (Siglent):** uses the documented `:MEASure:SIMPle` subsystem — enables the measurement function, points it at the channel, switches the requested item on, then reads it back. Not side-effect-free: the enabled item and the simple-measurement source stay set on the instrument (and visible on its display) after the call returns; see the note below the table. **Tektronix:** the TBS1000C uses the `MEASUrement:IMMed` subsystem; the 2/4/5/6 Series MSO families have no `IMMed` subsystem and use stateful "badges" instead (`MEASUrement:MEAS<n>`) — see [Measurement badges](#measurement-badges) below. |
 | Badge measurement types `CMEAN`, `CRMS` | not available on badge families (2/4/5/6 Series MSO) | Both raise `FeatureNotSupportedError`. `CMEAN`: neither manual's `MEASUrement:MEAS<x>:TYPe` argument list (MSO2 PM 077-1776-07 p.2-468; 4/5/6 PM 077-1305-11 p.2-702) lists a cycle-mean badge token. `CRMS`: the badge vocabulary's `ACRMS` is AC-coupled RMS, a different measurement than cycle RMS — mapping it would misrepresent what's measured. **`TOP` and `BASE` are supported** on badge families (both manuals list `TOP`/`BASE` tokens; see the model table above) — they are not a gap. |
 | `LINE` trigger source | not available on the `tektronix` dialect (gated for all families) | TBS1000C (PM 077-1691-01 p.152) and the 4/5/6 Series (PM 077-1305-11 p.2-1406) both support a `LINE` edge-trigger source; only the 2 Series MSO (PM 077-1776-07 p.2-663) lacks it. That divergence runs *inside* the shared `tek_mso` variant (2 Series vs. 4/5/6), which the current `channel_token(dialect, source)` signature — it branches on dialect only — cannot express, so `LINE` is gated dialect-wide rather than risk sending a token the 2 Series would reject. A deliberate, conservative gap; adding `LINE` for the families that do have it is a follow-up (needs a `tek_mso` split or a per-model capability flag). `EX` passes through as `AUX` (the SCPI short form of `AUXiliary`, present on every Tek family); `EX5` has no token on any Tek family and is also gated. |
 | Waveform transfer bit depth | 8-bit only, all dialects | Tektronix's `DATa:WIDth` is pinned to `1` (8-bit) for now; 16-bit transfer is a follow-up. |
 | LeCroy waveform transfer format | lecroy | Uses `C{ch}:WF? ALL` (descriptor + data in one block), scaled from the `WAVEDESC` descriptor's vertical gain/offset and horizontal interval/offset fields, with `CFMT DEF9,{BYTE\|WORD},BIN` and `CORD LO` (LSB-first) pinning the wire encoding — a different transfer path from the Siglent-style `WF? DAT2` used by legacy and modern. |
 | LeCroy bandwidth limit token | lecroy | The public `ON` token maps to the wire value `20MHZ`; LeCroy's `BWL` vocabulary (`OFF`, `20MHZ`, `200MHZ`, ...) has no `ON` token of its own to map onto. |
 
-Automated measurements (`PAVA?`) on **Siglent modern** scopes remain a
-documented, unchanged gap: `scope.measurement.measure(...)` calls time out
-and raise `SiglentTimeoutError`. The web gateway catches this internally and
-shows measurements as unavailable in its UI.
+A modern-dialect `measure()` call is not side-effect-free: it sends
+`:MEASure ON`, `:MEASure:SIMPle:SOURce`, and `:MEASure:SIMPle:ITEM
+{param},ON` before reading `:MEASure:SIMPle:VALue?`, all of which are visible
+on the instrument display afterwards. These are deliberately left in place
+rather than cleared, because the instrument's own clear command
+(`:MEASure:SIMPle:CLEar`) is all-or-nothing and would remove measurements you
+configured yourself from the front panel. Enabled items accumulate across
+repeated calls rather than being switched off. The web gateway streams these
+values the same way it does for every other dialect.
 
 ## Measurement badges
 

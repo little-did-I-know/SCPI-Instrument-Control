@@ -49,9 +49,9 @@ The side rail holds one tab per feature area:
 - **Log** — start/stop trend recording, watch a live row counter, and
   download the result as CSV. **The measurement selection locks while a
   recording is active**, so you can't change what's being recorded mid-run.
-- **Measure** — per-channel measurement checkboxes with live values.
-  Unavailable on modern-dialect scopes (see
-  [SCPI Dialects](../user-guide/scpi-dialects.md) for why).
+- **Measure** — per-channel measurement checkboxes with live values, on every
+  supported dialect (see [SCPI Dialects](../user-guide/scpi-dialects.md) for
+  how each one is wired up).
 - **Terminal** — send raw SCPI commands. A trailing `?` sends it as a query
   and shows the response; anything else is a bare write.
 
