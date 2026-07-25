@@ -155,12 +155,50 @@ def test_manifest_paths_are_not_mangled_by_the_markdown_converter():
 
 
 def test_manifest_literal_cells_escape_xml():
-    """_markdown_to_reportlab does no XML escaping, so the literal renderer must --
-    an unescaped & or < in a path would corrupt reportlab's mini-XML parse."""
+    """_markdown_to_reportlab converts underscores and asterisks as markdown
+    emphasis, which corrupts file paths -- that is why paths need a renderer that
+    escapes for reportlab's mini-XML without interpreting emphasis. Escaping is
+    still required of that literal renderer: an unescaped & or < in a path would
+    corrupt reportlab's mini-XML parse."""
     from scpi_control.report_generator.generators.pdf_generator import PDFReportGenerator
 
     rendered = PDFReportGenerator()._literal_cell_text("a&b<c.npz")
     assert "&amp;" in rendered and "&lt;" in rendered
+
+
+def test_manifest_table_renders_paths_literally():
+    """Regression for M34's actual integration point: _generate_manifest_table
+    (via its _cell helper) must render the manifest's file path through the
+    literal renderer, not through _markdown_to_reportlab. The two tests above
+    only exercise _literal_cell_text directly -- they would keep passing even if
+    a future refactor silently un-routed _cell back to the markdown converter.
+    This test renders a real manifest table and inspects the Paragraph reportlab
+    actually built, so it fails if that routing regresses."""
+    pytest.importorskip("reportlab")
+    from reportlab.platypus import Paragraph
+
+    from scpi_control.report_generator.generators.pdf_generator import PDFReportGenerator
+    from scpi_control.report_generator.models.report_elements import DataManifest, ManifestEntry
+
+    path = r"C:\data\scope_capture_ch1.npz"
+    manifest = DataManifest(
+        entries=[
+            ManifestEntry(
+                run_label="run-a",
+                file_path=path,
+                size_bytes=1024,
+                sha256="deadbeef",
+            )
+        ]
+    )
+
+    table = PDFReportGenerator()._generate_manifest_table(manifest)
+
+    # Row 0 is the header; row 1, column 1 ("File") is the path cell.
+    file_cell = table._cellvalues[1][1]
+    assert isinstance(file_cell, Paragraph)
+    assert "scope_capture_ch1.npz" in file_cell.text
+    assert "<i>" not in file_cell.text
 
 
 def test_pdf_labels_ai_findings(tmp_path):
