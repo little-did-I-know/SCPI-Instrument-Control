@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.2.0] - 2026-07-25
+
 ### Fixed
 
 - Measurements now work on modern-dialect Siglent oscilloscopes (SDS800X HD, SDS5000X and
