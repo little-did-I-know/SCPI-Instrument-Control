@@ -603,6 +603,11 @@ class PDFReportGenerator(BaseReportGenerator):
             finding_text = self._markdown_to_reportlab(finding)
             story.append(Paragraph(f"• {finding_text}", self.styles["Normal"]))
 
+        findings_attribution = report.findings_attribution()
+        if findings_attribution:
+            story.append(Spacer(1, 0.1 * inch))
+            story.append(Paragraph(f"<i>{findings_attribution}</i>", self.styles["Normal"]))
+
         story.append(Spacer(1, 0.2 * inch))
 
         return story
@@ -1330,6 +1335,11 @@ class PDFReportGenerator(BaseReportGenerator):
             # Convert markdown to ReportLab XML
             rec_text = self._markdown_to_reportlab(rec)
             story.append(Paragraph(f"{i}. {rec_text}", self.styles["Normal"]))
+
+        recommendations_attribution = report.recommendations_attribution()
+        if recommendations_attribution:
+            story.append(Spacer(1, 0.1 * inch))
+            story.append(Paragraph(f"<i>{recommendations_attribution}</i>", self.styles["Normal"]))
 
         story.append(Spacer(1, 0.2 * inch))
 

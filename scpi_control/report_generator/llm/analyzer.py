@@ -12,7 +12,7 @@ from scpi_control.report_generator.llm.client import LLMClient
 from scpi_control.report_generator.llm.context_builder import ContextBuilder
 from scpi_control.report_generator.llm.prompts import get_system_prompt
 from scpi_control.report_generator.llm.tools import ReportTools
-from scpi_control.report_generator.models.report_data import MeasurementResult, TestReport
+from scpi_control.report_generator.models.report_data import SUMMARY_SOURCE_AI, MeasurementResult, TestReport
 
 logger = logging.getLogger(__name__)
 
@@ -271,7 +271,11 @@ class ReportAnalyzer:
             temperature=0.7,
         )
 
-        return _parse_numbered_list(response, max_findings)
+        findings = _parse_numbered_list(response, max_findings)
+        if findings:
+            # The producer marks its own output so no caller can forget to (audit M31).
+            report.findings_source = SUMMARY_SOURCE_AI
+        return findings
 
     def generate_recommendations(self, report: TestReport, max_recommendations: int = 5) -> Optional[List[str]]:
         """
@@ -303,4 +307,8 @@ class ReportAnalyzer:
             temperature=0.7,
         )
 
-        return _parse_numbered_list(response, max_recommendations)
+        recommendations = _parse_numbered_list(response, max_recommendations)
+        if recommendations:
+            # The producer marks its own output so no caller can forget to (audit M31).
+            report.recommendations_source = SUMMARY_SOURCE_AI
+        return recommendations
