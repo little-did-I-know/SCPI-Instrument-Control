@@ -4,7 +4,7 @@ and personality dispatch to the vendor-specific scope write/query/waveform modul
 from __future__ import annotations
 
 import re
-from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Union
+from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Set, Union
 
 from scpi_control import exceptions
 from scpi_control.connection.base import BaseConnection
@@ -146,6 +146,14 @@ class MockConnection(BaseConnection):
         self.trigger_coupling = "DC"
         self.trigger_level: Dict[int, float] = {ch: 0.0 for ch in channels}
         self.trigger_status: List[str] = trigger_status[:] if trigger_status else ["Stop"]
+
+        # Modern :MEASure:SIMPle state (guide p.335-373). measure() on the modern
+        # dialect sets a source and enables items; per the design decision these
+        # are deliberately NOT cleared after a read, mirroring the instrument.
+        self.measure_enabled: bool = False
+        self.simple_mode: str = "SIMPle"
+        self.simple_source: str = "C1"
+        self.simple_items: Set[str] = set()
 
         # Tektronix wire-vocabulary state (shared across tek_tbs/tek_mso variants)
         self.tek_stop_after = "RUNSTOP"

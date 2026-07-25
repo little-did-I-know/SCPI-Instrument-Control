@@ -97,6 +97,34 @@ class Measurement:
                 return self._badge_pool.value(badge_type_to_wire(self._dialect, mtype), channel)
             raise exceptions.FeatureNotSupportedError(f"measure({mtype!r}) is not supported: this Tektronix family/configuration has neither the MEASUrement:IMMed subsystem nor measurement badges")
 
+        if self._dialect == "modern":
+            # Modern instruments have no PARAMETER_VALUE command -- PAVA appears
+            # zero times in the SDS800X HD guide. Measurements come from the
+            # :MEASure:SIMPle subsystem (guide p.335-373): enable the function,
+            # point it at the channel, switch the item on, then read it.
+            #
+            # Unlike legacy PAVA?, this MUTATES instrument state -- the source is
+            # global to simple measurements and enabled items show on the display.
+            # We deliberately do not clear them: :SIMPle:CLEar is all-or-nothing
+            # and would wipe measurements the user configured by hand.
+            wire_type = measurement_to_wire(self._dialect, mtype)
+            self._scope.write(self._scope._get_command("set_measure_state", state="ON"))
+            # p.369: VALue? "returns the specified measurement value that appears on
+            # the simple measurement" -- if the instrument is left in ADVanced mode
+            # (p.365) that read may fail or return something stale, so pin SIMPle
+            # mode every time rather than trusting whatever mode it was already in.
+            self._scope.write(self._scope._get_command("set_measure_mode", mode="SIMPle"))
+            self._scope.write(self._scope._get_command("set_simple_source", ch=channel))
+            self._scope.write(self._scope._get_command("set_simple_item", param=wire_type, state="ON"))
+            response = self._scope.query(self._scope._get_command("get_simple_value", param=wire_type))
+            # p.369: RESPONSE FORMAT is a bare <value> in NR3 ("2.000E+00") -- no
+            # parameter name and no unit suffix, so the legacy comma-splitting
+            # parser below cannot be reused.
+            try:
+                return float(response.strip())
+            except ValueError as e:
+                raise exceptions.CommandError(f"Failed to parse measurement: {e}")
+
         wire_type = measurement_to_wire(self._dialect, mtype)
 
         # Query parameter value

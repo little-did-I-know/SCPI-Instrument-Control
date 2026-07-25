@@ -49,3 +49,22 @@ def test_formatter_labels_each_kind(qapp):
     assert panel._format_measurement_value("DUTY", 50.0).endswith("%")
     assert panel._format_measurement_value("PKPK", 2.0).endswith("V")
     assert panel._format_measurement_value("WID", 5e-3).endswith("ms")
+
+
+MODERN_IDN = "Siglent Technologies,SDS814X HD,MOCK0001,1.0.0.0"
+
+
+def _modern_mock_scope():
+    scope = Oscilloscope("mock", connection=MockConnection(idn=MODERN_IDN))
+    scope.connect()
+    return scope
+
+
+def test_every_offered_type_returns_a_real_value_on_modern(qapp):
+    """PR #102's net used a default (legacy) mock, so a modern-dialect break was
+    invisible to it -- every one of these raised SiglentTimeoutError."""
+    panel = MeasurementPanel()
+    panel.scope = _modern_mock_scope()
+    for _display, key in MeasurementPanel.MEASUREMENTS:
+        value = panel._get_measurement_value(1, key)
+        assert isinstance(value, float), "{0} returned {1!r} on the modern dialect".format(key, value)

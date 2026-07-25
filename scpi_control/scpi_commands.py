@@ -221,10 +221,18 @@ class SCPICommandSet:
         # to learn how many :WAVeform:STARt-driven DATA? windows a full
         # record needs.
         "get_waveform_maxpoint": ":WAVeform:MAXPoint?",  # p.753
-        # Measurements — get_parameter_value stays available (measure() keeps
-        # working on modern, a documented gap); statistics/cursors/holdoff/unit
-        # are legacy-only and intentionally absent so they gate cleanly.
-        "get_parameter_value": "C{ch}:PAVA? {param}",
+        # Measurements — the :MEASure:SIMPle subsystem (p.335 index). The legacy
+        # PAVA? command is deliberately ABSENT: it appears zero times in this
+        # guide (exhaustive full-text search), so offering it here made measure()
+        # send a command modern instruments do not implement. Statistics, cursors,
+        # holdoff and unit remain legacy-only and intentionally absent so they
+        # gate cleanly as FeatureNotSupportedError; they need the :MEASure:ADVanced
+        # slot subsystem, which is a separate project.
+        "set_measure_state": ":MEASure {state}",  # {ON|OFF}, p.337
+        "set_measure_mode": ":MEASure:MODE {mode}",  # {SIMPle|ADVanced}, p.365
+        "set_simple_source": ":MEASure:SIMPle:SOURce C{ch}",  # p.368
+        "set_simple_item": ":MEASure:SIMPle:ITEM {param},{state}",  # p.367
+        "get_simple_value": ":MEASure:SIMPle:VALue? {param}",  # bare NR3 reply, p.369
         # Screen capture (legacy strings accepted on modern scopes today; revisit with screen-capture overhaul)
         "screen_dump": "SCDP",
         "set_hardcopy_format": "HCSU DEV,FORMAT,{format}",
@@ -721,7 +729,33 @@ def _from_wire(table, dialect: str, raw: str, what: str) -> str:
 _MEASUREMENT_TYPES = {"PKPK", "MAX", "MIN", "AMPL", "TOP", "BASE", "CMEAN", "MEAN", "RMS", "CRMS", "FREQ", "PER", "RISE", "FALL", "WID", "NWID", "DUTY"}
 _MEASUREMENT_TO_WIRE = {
     "legacy": {m: m for m in _MEASUREMENT_TYPES},
-    "modern": {m: m for m in _MEASUREMENT_TYPES},
+    # Modern :MEASure:SIMPle:ITEM / :VALue? vocabulary, verbatim from the
+    # SDS800X HD guide p.367 (ITEM) and p.369 (VALue?). NOT an identity map:
+    # per the parameter table at p.345, modern WID is the positive BURST width
+    # (first rising edge to last falling edge) while the positive PULSE width
+    # -- which is what our public WID means, cf. "WID": "PWIdth" in the
+    # tektronix map below -- is PWID. Mapping WID -> WID would silently return
+    # burst width. NWID is the negative PULSE width on both sides (NBWID is the
+    # burst form and we never send it).
+    "modern": {
+        "PKPK": "PKPK",
+        "MAX": "MAX",
+        "MIN": "MIN",
+        "AMPL": "AMPL",
+        "TOP": "TOP",
+        "BASE": "BASE",
+        "CMEAN": "CMEAN",
+        "MEAN": "MEAN",
+        "RMS": "RMS",
+        "CRMS": "CRMS",
+        "FREQ": "FREQ",
+        "PER": "PER",
+        "RISE": "RISE",
+        "FALL": "FALL",
+        "WID": "PWID",
+        "NWID": "NWID",
+        "DUTY": "DUTY",
+    },
     # LeCroy PARAMETER_VALUE (PAVA) parameter names -- identity, the ancestor
     # of the Siglent legacy vocabulary (MAUI p.7-70).
     "lecroy": {m: m for m in _MEASUREMENT_TYPES},

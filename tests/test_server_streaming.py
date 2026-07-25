@@ -1,13 +1,15 @@
 """Streaming poll + state snapshot. No FastAPI dependency."""
 
 import time
+from unittest.mock import patch
 
 import numpy as np
 import pytest
 
 from scpi_control import Oscilloscope
 from scpi_control.connection.mock import MockConnection
-from scpi_control.exceptions import InvalidParameterError
+from scpi_control.exceptions import InvalidParameterError, SiglentTimeoutError
+from scpi_control.measurement import Measurement
 from scpi_control.server.sessions import MAX_FRAME_POINTS, InstrumentSession, SessionError, _waveform_frame, read_state
 from scpi_control.waveform import WaveformData
 
@@ -79,19 +81,22 @@ def test_no_poll_without_subscribers():
 
 
 def test_measurement_poll_reports_none_on_timeout():
-    # PAVA? is legacy-only; on a modern-dialect mock it still has no response ->
-    # SiglentTimeoutError -> value None. (The legacy mock now answers PAVA?, so a
-    # modern scope is used here to keep exercising the graceful-timeout path.)
-    session = make_session(idn=MODERN_IDN)
-    try:
-        session.set_measurements([(1, "PKPK")])
-        msgs = collect(session, "measurements", n=1, timeout=8.0)
-        assert msgs, "expected a measurements message"
-        entry = msgs[0]["values"][0]
-        assert entry["channel"] == 1 and entry["mtype"] == "PKPK"
-        assert entry["value"] is None
-    finally:
-        session.close()
+    # measure() now succeeds on modern-dialect mocks (it goes through
+    # :MEASure:SIMPle), so the graceful-timeout path can no longer be
+    # provoked by dialect alone. Force it deterministically instead by
+    # patching Measurement.measure to raise; _poll_tick must still degrade
+    # to value: None rather than propagating the error.
+    with patch.object(Measurement, "measure", side_effect=SiglentTimeoutError("forced")):
+        session = make_session(idn=MODERN_IDN)
+        try:
+            session.set_measurements([(1, "PKPK")])
+            msgs = collect(session, "measurements", n=1, timeout=8.0)
+            assert msgs, "expected a measurements message"
+            entry = msgs[0]["values"][0]
+            assert entry["channel"] == 1 and entry["mtype"] == "PKPK"
+            assert entry["value"] is None
+        finally:
+            session.close()
 
 
 def test_user_job_still_runs_promptly_while_streaming():
