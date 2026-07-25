@@ -109,6 +109,11 @@ class Measurement:
             # and would wipe measurements the user configured by hand.
             wire_type = measurement_to_wire(self._dialect, mtype)
             self._scope.write(self._scope._get_command("set_measure_state", state="ON"))
+            # p.369: VALue? "returns the specified measurement value that appears on
+            # the simple measurement" -- if the instrument is left in ADVanced mode
+            # (p.365) that read may fail or return something stale, so pin SIMPle
+            # mode every time rather than trusting whatever mode it was already in.
+            self._scope.write(self._scope._get_command("set_measure_mode", mode="SIMPle"))
             self._scope.write(self._scope._get_command("set_simple_source", ch=channel))
             self._scope.write(self._scope._get_command("set_simple_item", param=wire_type, state="ON"))
             response = self._scope.query(self._scope._get_command("get_simple_value", param=wire_type))

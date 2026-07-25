@@ -30,6 +30,10 @@ def test_negative_width_maps_to_nwid_not_nbwid():
 
 
 def test_every_measurement_type_has_a_modern_token():
+    """measurement_to_wire raises FeatureNotSupportedError for an unmapped type
+    (see _to_wire in scpi_commands.py), so it can never return a falsy token --
+    this just checks that every one of the 17 public MeasurementType values
+    resolves without raising, i.e. the modern map has no missing entries."""
     for mtype in get_args(MeasurementType):
         token = measurement_to_wire("modern", mtype)
         assert token, "{0} has no modern token".format(mtype)
@@ -107,14 +111,19 @@ def test_measure_on_modern_emits_the_documented_sequence():
     written = [c for c in conn.writes if "MEAS" in c.upper()]
     assert written == [
         ":MEASure ON",
+        ":MEASure:MODE SIMPle",
         ":MEASure:SIMPle:SOURce C2",
         ":MEASure:SIMPle:ITEM PWID,ON",
     ], written
 
 
 def test_measure_agrees_across_dialects_for_the_same_signal():
-    """Legacy and modern mocks describe the same synthesized signal, so a fix
-    that silently swapped a token (e.g. WID -> burst width) would show up here."""
+    """Guarantees only that legacy and modern mocks describe the same synthesized
+    signal -- the mock fixtures for both dialects were authored to mirror each
+    other, so this does NOT catch a token swap (e.g. WID <-> NWID): both are
+    "5.000E-04" here, so a swap would silently agree instead of failing. That
+    class of regression is what test_measure_on_modern_emits_the_documented_
+    sequence checks, by asserting the literal wire tokens sent."""
     legacy = Oscilloscope("mock", connection=MockConnection(idn="Siglent Technologies,SDS1104X-E,MOCK0001,1.0.0.0"))
     legacy.connect()
     modern = _modern_scope()

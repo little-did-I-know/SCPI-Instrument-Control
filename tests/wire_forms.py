@@ -1044,6 +1044,18 @@ WIRE_FORMS: List[WireForm] = [
         source=f"{MODERN_GUIDE} p.337",
         mock_kwargs={"idn": MODERN_IDN},
     ),
+    # p.365: <type>:={SIMPle|ADVanced}. measure() pins SIMPle right after
+    # :MEASure ON -- p.369's VALue? reads "the value that appears on the simple
+    # measurement", which an instrument left in ADVanced mode may not serve.
+    WireForm(
+        table="scope",
+        dialect="modern",
+        op="set_measure_mode",
+        params={"mode": "SIMPle"},
+        request=":MEASure:MODE SIMPle",
+        source=f"{MODERN_GUIDE} p.365",
+        mock_kwargs={"idn": MODERN_IDN},
+    ),
     WireForm(
         table="scope",
         dialect="modern",

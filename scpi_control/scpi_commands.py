@@ -229,6 +229,7 @@ class SCPICommandSet:
         # gate cleanly as FeatureNotSupportedError; they need the :MEASure:ADVanced
         # slot subsystem, which is a separate project.
         "set_measure_state": ":MEASure {state}",  # {ON|OFF}, p.337
+        "set_measure_mode": ":MEASure:MODE {mode}",  # {SIMPle|ADVanced}, p.365
         "set_simple_source": ":MEASure:SIMPle:SOURce C{ch}",  # p.368
         "set_simple_item": ":MEASure:SIMPle:ITEM {param},{state}",  # p.367
         "get_simple_value": ":MEASure:SIMPle:VALue? {param}",  # bare NR3 reply, p.369

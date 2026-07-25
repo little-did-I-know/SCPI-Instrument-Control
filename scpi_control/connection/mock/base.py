@@ -151,6 +151,7 @@ class MockConnection(BaseConnection):
         # dialect sets a source and enables items; per the design decision these
         # are deliberately NOT cleared after a read, mirroring the instrument.
         self.measure_enabled: bool = False
+        self.simple_mode: str = "SIMPle"
         self.simple_source: str = "C1"
         self.simple_items: Set[str] = set()
 

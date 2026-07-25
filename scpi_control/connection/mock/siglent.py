@@ -61,6 +61,12 @@ _MOCK_SIMPLE_VALUES: Dict[str, str] = {
     "FALL": "3.500E-05",
     "PWID": "5.000E-04",
     "NWID": "5.000E-04",
+    # ASSUMPTION, not a manual fact: the guide gives exactly one bare-NR3 response
+    # example (p.369, MAX -> "2.000E+00") and no worked example for DUTY, so there is
+    # no documented confirmation this reply is percent-scaled rather than a 0-1
+    # fraction. "5.000E+01" is inherited from the legacy dialect's unit-suffixed
+    # fixture (_MOCK_PAVA_VALUES["DUTY"] above) purely so both dialects describe the
+    # same synthesized signal -- do not cite this value as verified against EN11G.
     "DUTY": "5.000E+01",
 }
 
@@ -91,6 +97,9 @@ def handle_write(conn, command: str) -> bool:
         # cannot swallow ":MEASure:SIMPle:..." (next char there is ":").
         if match := re.match(r":MEAS(?:ure)?\s+(ON|OFF)\s*$", command, re.IGNORECASE):
             conn.measure_enabled = match.group(1).upper() == "ON"
+            return True
+        if match := re.match(r":MEAS(?:ure)?:MODE\s+(SIMP(?:le)?|ADV(?:anced)?)\s*$", command, re.IGNORECASE):
+            conn.simple_mode = match.group(1)  # stored as wire token, e.g. "SIMPle" (guide p.365)
             return True
         if match := re.match(r":MEAS(?:ure)?:SIMP(?:le)?:SOUR(?:ce)?\s+(\w+)\s*$", command, re.IGNORECASE):
             conn.simple_source = match.group(1).upper()  # p.368
