@@ -259,14 +259,20 @@ class MockConnection(BaseConnection):
     # later without changing any caller.
     _ABSURD_MAGNITUDE = 1e6
 
-    def reject_if_invalid(self, value: float, *, name: str, positive: bool = True) -> bool:
+    def reject_if_invalid(self, value: float, *, name: str, positive: bool = True, max_magnitude: Optional[float] = None) -> bool:
         """Queue -222 and return True when `value` is unusable on any instrument.
 
         Callers skip their assignment when this returns True, so the command is
         accepted by the transport, ignored, and reported on the next SYST:ERR? --
         which is how real hardware behaves for a bad parameter.
+
+        `max_magnitude` overrides `_ABSURD_MAGNITUDE` (default 1e6) for callers
+        whose quantity legitimately exceeds it in normal use -- e.g. AWG
+        frequency, where registered models go up to 120e6 Hz (awg_models.py)
+        and the scope-calibrated 1e6 bound would reject a real value.
         """
-        if not math.isfinite(value) or (positive and value <= 0) or abs(value) > self._ABSURD_MAGNITUDE:
+        bound = self._ABSURD_MAGNITUDE if max_magnitude is None else max_magnitude
+        if not math.isfinite(value) or (positive and value <= 0) or abs(value) > bound:
             self.push_error(-222, "Data out of range")
             return True
         return False
@@ -296,6 +302,11 @@ class MockConnection(BaseConnection):
             if match := re.match(r"(?:CH|SOUR)(\d+):VOLT\s+([\d.]+)", command, re.IGNORECASE):
                 ch = int(match.group(1))
                 voltage = float(match.group(2))
+                # A voltage setpoint of 0.0 (output at rest) is legitimate --
+                # power_supply_output.py's own validation allows
+                # `0 <= volts <= max_voltage` -- so it is not gated on positivity.
+                if self.reject_if_invalid(voltage, name="VOLT", positive=False):
+                    return
                 if ch in self.psu_outputs:
                     self.psu_outputs[ch]["voltage"] = voltage
                 return
@@ -304,6 +315,10 @@ class MockConnection(BaseConnection):
             if match := re.match(r"(?:CH|SOUR)(\d+):CURR\s+([\d.]+)", command, re.IGNORECASE):
                 ch = int(match.group(1))
                 current = float(match.group(2))
+                # A current limit of 0.0 is legitimate for the same reason as
+                # voltage above, so it is not gated on positivity.
+                if self.reject_if_invalid(current, name="CURR", positive=False):
+                    return
                 if ch in self.psu_outputs:
                     self.psu_outputs[ch]["current"] = current
                 return
@@ -342,6 +357,11 @@ class MockConnection(BaseConnection):
             if match := re.match(r"(?:CH|SOUR)(\d+):VOLT:PROT\s+([\d.]+)", command, re.IGNORECASE):
                 ch = int(match.group(1))
                 level = float(match.group(2))
+                # Unlike voltage/current setpoints above, an OVP level of 0V
+                # would trip immediately and is not a usable value, so it is
+                # gated on positivity.
+                if self.reject_if_invalid(level, name="VOLT:PROT"):
+                    return
                 self.psu_ovp_levels[ch] = level
                 return
 
@@ -349,6 +369,10 @@ class MockConnection(BaseConnection):
             if match := re.match(r"(?:CH|SOUR)(\d+):CURR:PROT\s+([\d.]+)", command, re.IGNORECASE):
                 ch = int(match.group(1))
                 level = float(match.group(2))
+                # Same reasoning as OVP: an OCP level of 0A is not usable, so
+                # it is gated on positivity.
+                if self.reject_if_invalid(level, name="CURR:PROT"):
+                    return
                 self.psu_ocp_levels[ch] = level
                 return
 
@@ -369,85 +393,128 @@ class MockConnection(BaseConnection):
                 return
 
             # Frequency: C1:BSWV FRQ,1000 (Siglent) or SOUR1:FREQ 1000 (generic)
+            # awg_output.py's own validation requires `0 < freq_hz`, so
+            # frequency is gated on positivity.
             if match := re.match(r"C(\d+):BSWV\s+FRQ,([\d.E+\-]+)", command, re.IGNORECASE):
                 ch = int(match.group(1))
                 freq = float(match.group(2))
+                # Registered AWG models go up to 120MHz (awg_models.py), well
+                # above the scope-calibrated 1e6 default, so this uses a
+                # frequency-appropriate bound instead.
+                if self.reject_if_invalid(freq, name="FRQ", max_magnitude=1e9):
+                    return
                 if ch in self.awg_channels:
                     self.awg_channels[ch]["frequency"] = freq
                 return
             if match := re.match(r"SOUR(\d+):FREQ\s+([\d.E+\-]+)", command, re.IGNORECASE):
                 ch = int(match.group(1))
                 freq = float(match.group(2))
+                if self.reject_if_invalid(freq, name="FREQ", max_magnitude=1e9):
+                    return
                 if ch in self.awg_channels:
                     self.awg_channels[ch]["frequency"] = freq
                 return
 
             # Amplitude: C1:BSWV AMP,5.0 (Siglent) or SOUR1:VOLT 5.0 (generic)
+            # A 0 or negative Vpp amplitude is not a usable waveform, so it is
+            # gated on positivity, same as scope V/div.
             if match := re.match(r"C(\d+):BSWV\s+AMP,([\d.E+\-]+)", command, re.IGNORECASE):
                 ch = int(match.group(1))
                 amp = float(match.group(2))
+                if self.reject_if_invalid(amp, name="AMP"):
+                    return
                 if ch in self.awg_channels:
                     self.awg_channels[ch]["amplitude"] = amp
                 return
             if match := re.match(r"SOUR(\d+):VOLT\s+([\d.E+\-]+)", command, re.IGNORECASE):
                 ch = int(match.group(1))
                 amp = float(match.group(2))
+                if self.reject_if_invalid(amp, name="VOLT"):
+                    return
                 if ch in self.awg_channels:
                     self.awg_channels[ch]["amplitude"] = amp
                 return
 
             # Offset: C1:BSWV OFST,0.5 (Siglent) or SOUR1:VOLT:OFFS 0.5 (generic)
+            # Offset may legitimately be negative or zero (awg_output.py's own
+            # validation only checks `abs(volts) > max_offset`, never sign),
+            # so it is not gated on positivity.
             if match := re.match(r"C(\d+):BSWV\s+OFST,([\d.E+\-]+)", command, re.IGNORECASE):
                 ch = int(match.group(1))
                 offset = float(match.group(2))
+                if self.reject_if_invalid(offset, name="OFST", positive=False):
+                    return
                 if ch in self.awg_channels:
                     self.awg_channels[ch]["offset"] = offset
                 return
             if match := re.match(r"SOUR(\d+):VOLT:OFFS\s+([\d.E+\-]+)", command, re.IGNORECASE):
                 ch = int(match.group(1))
                 offset = float(match.group(2))
+                if self.reject_if_invalid(offset, name="VOLT:OFFS", positive=False):
+                    return
                 if ch in self.awg_channels:
                     self.awg_channels[ch]["offset"] = offset
                 return
 
             # Phase: C1:BSWV PHSE,90 (Siglent) or SOUR1:PHAS 90 (generic)
+            # Phase 0 is legitimate (awg_output.py's own validation allows
+            # `0 <= degrees <= 360`), so it is not gated on positivity.
             if match := re.match(r"C(\d+):BSWV\s+PHSE,([\d.E+\-]+)", command, re.IGNORECASE):
                 ch = int(match.group(1))
                 phase = float(match.group(2))
+                if self.reject_if_invalid(phase, name="PHSE", positive=False):
+                    return
                 if ch in self.awg_channels:
                     self.awg_channels[ch]["phase"] = phase
                 return
             if match := re.match(r"SOUR(\d+):PHAS\s+([\d.E+\-]+)", command, re.IGNORECASE):
                 ch = int(match.group(1))
                 phase = float(match.group(2))
+                if self.reject_if_invalid(phase, name="PHAS", positive=False):
+                    return
                 if ch in self.awg_channels:
                     self.awg_channels[ch]["phase"] = phase
                 return
 
             # Pulse duty cycle: C1:BSWV DUTY,25 (Siglent) or SOUR1:FUNC:PULS:DCYC 25 (generic)
+            # awg_output.py's own validation requires `0 < percent < 100`
+            # (strictly exclusive), so duty cycle is gated on positivity --
+            # unlike ramp symmetry below, 0% is never allowed either.
             if match := re.match(r"C(\d+):BSWV\s+DUTY,([\d.E+\-]+)", command, re.IGNORECASE):
                 ch = int(match.group(1))
                 duty = float(match.group(2))
+                if self.reject_if_invalid(duty, name="DUTY"):
+                    return
                 if ch in self.awg_channels:
                     self.awg_channels[ch]["pulse_duty"] = duty
                 return
             if match := re.match(r"SOUR(\d+):FUNC:PULS:DCYC\s+([\d.E+\-]+)", command, re.IGNORECASE):
                 ch = int(match.group(1))
                 duty = float(match.group(2))
+                if self.reject_if_invalid(duty, name="FUNC:PULS:DCYC"):
+                    return
                 if ch in self.awg_channels:
                     self.awg_channels[ch]["pulse_duty"] = duty
                 return
 
             # Ramp symmetry: C1:BSWV SYM,50 (Siglent) or SOUR1:FUNC:RAMP:SYMM 50 (generic)
+            # Symmetry 0 (a pure downward sawtooth) is legitimate
+            # (awg_output.py's own validation allows `0 <= percent <= 100`
+            # inclusive, unlike duty cycle above), so it is not gated on
+            # positivity.
             if match := re.match(r"C(\d+):BSWV\s+SYM,([\d.E+\-]+)", command, re.IGNORECASE):
                 ch = int(match.group(1))
                 symm = float(match.group(2))
+                if self.reject_if_invalid(symm, name="SYM", positive=False):
+                    return
                 if ch in self.awg_channels:
                     self.awg_channels[ch]["ramp_symmetry"] = symm
                 return
             if match := re.match(r"SOUR(\d+):FUNC:RAMP:SYMM\s+([\d.E+\-]+)", command, re.IGNORECASE):
                 ch = int(match.group(1))
                 symm = float(match.group(2))
+                if self.reject_if_invalid(symm, name="FUNC:RAMP:SYMM", positive=False):
+                    return
                 if ch in self.awg_channels:
                     self.awg_channels[ch]["ramp_symmetry"] = symm
                 return

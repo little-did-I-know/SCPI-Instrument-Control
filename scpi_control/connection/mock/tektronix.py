@@ -63,26 +63,48 @@ def handle_write(conn, command: str) -> bool:
         return True
     if match := re.match(r"CH(\d+):SCALE\s+(.+)", upper):
         ch = int(match.group(1))
-        conn._voltage_scales[ch] = float(match.group(2))
-        conn.scale_updates.setdefault(ch, []).append(float(match.group(2)))
+        value = float(match.group(2))
+        # A vertical scale is a magnitude (V/div), so it is gated on positivity.
+        if conn.reject_if_invalid(value, name="SCALE"):
+            return True  # consumed, ignored, error queued
+        conn._voltage_scales[ch] = value
+        conn.scale_updates.setdefault(ch, []).append(value)
         return True
     if match := re.match(r"CH(\d+):OFFSET\s+(.+)", upper):
-        conn._voltage_offsets[int(match.group(1))] = float(match.group(2))
+        ch = int(match.group(1))
+        value = float(match.group(2))
+        # Offset may legitimately be negative or zero, so it is not gated on positivity.
+        if conn.reject_if_invalid(value, name="OFFSET", positive=False):
+            return True
+        conn._voltage_offsets[ch] = value
         return True
     if match := re.match(r"CH(\d+):COUPLING\s+(\w+)", upper):
         conn._channel_coupling[int(match.group(1))] = match.group(2)
         return True
     if match := re.match(r"CH(\d+):PROBE:GAIN\s+(.+)", upper):
-        conn.probe_gains[int(match.group(1))] = float(match.group(2))
+        ch = int(match.group(1))
+        value = float(match.group(2))
+        # A probe attenuation/gain factor is a magnitude, so it is gated on positivity.
+        if conn.reject_if_invalid(value, name="PROBE:GAIN"):
+            return True
+        conn.probe_gains[ch] = value
         return True
     if match := re.match(r"CH(\d+):PROBEFUNC:EXTATTEN\s+(.+)", upper):
         # tek_mso spelling for the same probe-gain state (tek_tbs uses PRObe:GAIN above).
-        conn.probe_gains[int(match.group(1))] = float(match.group(2))
+        ch = int(match.group(1))
+        value = float(match.group(2))
+        if conn.reject_if_invalid(value, name="PROBEFUNC:EXTATTEN"):
+            return True
+        conn.probe_gains[ch] = value
         return True
     if match := re.match(r"CH(\d+):BANDWIDTH\s+(\w+)", upper):
         return True  # accepted, not modeled
     if match := re.match(r"HORIZONTAL:SCALE\s+(.+)", upper):
-        conn.timebase = float(match.group(1))
+        value = float(match.group(1))
+        # A timebase is a magnitude, so it is gated on positivity.
+        if conn.reject_if_invalid(value, name="HORIZONTAL:SCALE"):
+            return True
+        conn.timebase = value
         conn.timebase_updates.append(conn.timebase)
         return True
     if re.match(r"HORIZONTAL:DELAY:TIME\s+", upper):
@@ -111,7 +133,13 @@ def handle_write(conn, command: str) -> bool:
         conn.trigger_source = match.group(1)
         return True
     if match := re.match(r"TRIGGER:A:LEVEL:CH(\d+)\s+(.+)", upper):
-        conn.trigger_level[int(match.group(1))] = float(match.group(2))
+        ch = int(match.group(1))
+        value = float(match.group(2))
+        # Trigger level may legitimately be negative or zero, so it is not
+        # gated on positivity.
+        if conn.reject_if_invalid(value, name="TRIGGER:A:LEVEL", positive=False):
+            return True
+        conn.trigger_level[ch] = value
         return True
     if match := re.match(r"TRIGGER:A:EDGE:SLOPE\s+(\w+)", upper):
         conn.trigger_slope = match.group(1)
@@ -120,7 +148,13 @@ def handle_write(conn, command: str) -> bool:
         conn.trigger_coupling = match.group(1)
         return True
     if match := re.match(r"TRIGGER:A:HOLDOFF:TIME\s+(.+)", upper):
-        conn.holdoff_time = float(match.group(1))
+        value = float(match.group(1))
+        # trigger.py's own validation only rejects a NEGATIVE holdoff
+        # (`if time_seconds < 0: raise`), so 0 is legitimate and this is not
+        # gated on positivity.
+        if conn.reject_if_invalid(value, name="TRIGGER:A:HOLDOFF:TIME", positive=False):
+            return True
+        conn.holdoff_time = value
         return True
     if re.match(r"AUTOSET\s+EXECUTE", upper):
         return True
