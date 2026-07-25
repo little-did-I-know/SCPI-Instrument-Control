@@ -140,9 +140,9 @@ printed footer number -- which was never true of how the entries below, or
 | `get_bandwidth_limit` | `:CHANnel{ch}:BWLimit?` | `:CHANnel<n>:BWLimit?` (not mocked) | VERIFIED | EN11G p.50 |
 | `get_channel_display` | `:CHANnel{ch}:SWITch?` | same; response `<state>` bare, matches | VERIFIED | EN11G p.60 |
 | `get_coupling` | `:CHANnel{ch}:COUPling?` | request matches; mock fixture answers the LEGACY token `D1M` (invalid modern enum member) | MISMATCH_DEFERRED | EN11G p.51 |
-| `get_simple_value` | `:MEASure:SIMPle:VALue? {param}` | `:MEASure:SIMPle:VALue? <parameter>`; response bare number, matches | VERIFIED | EN11G p.369 |
 | `get_probe_ratio` | `:CHANnel{ch}:PROBe?` | `:CHANnel<n>:PROBe?` (not mocked) | VERIFIED | EN11G p.57 |
 | `get_sample_rate` | `:ACQuire:SRATe?` | same; response bare NR3, matches | VERIFIED | EN11G p.46 |
+| `get_simple_value` | `:MEASure:SIMPle:VALue? {param}` | `:MEASure:SIMPle:VALue? <parameter>`; response bare number, matches | VERIFIED | EN11G p.369 |
 | `get_time_div` | `:TIMebase:SCALe?` | same; response bare NR3, matches | VERIFIED | EN11G p.476 |
 | `get_time_offset` | `:TIMebase:DELay?` | `:TIMebase:DELay?` (not mocked) | VERIFIED | EN11G p.473 |
 | `get_trigger_coupling` | `:TRIGger:EDGE:COUPling?` | same; response bare, matches | VERIFIED | EN11G p.486 |
@@ -169,6 +169,7 @@ printed footer number -- which was never true of how the entries below, or
 | `set_channel_display` | `:CHANnel{ch}:SWITch {state}` | `:CHANnel<n>:SWITch <state>` | VERIFIED | EN11G p.60 |
 | `set_coupling` | `:CHANnel{ch}:COUPling {coupling}` | `:CHANnel<n>:COUPling <coupling_mode>` | VERIFIED | EN11G p.51 |
 | `set_hardcopy_format` | `HCSU DEV,FORMAT,{format}` | `HCSU` absent from manual entirely; closest concept is `:PRINt?`'s `<format>:={NORMal\|INVerted}` (different axis); dead code (no caller) | MISMATCH_DEFERRED | EN11G p.33 |
+| `set_measure_mode` | `:MEASure:MODE {mode}` | `:MEASure:MODE <type>`, `{SIMPle\|ADVanced}` | VERIFIED | EN11G p.365 |
 | `set_measure_state` | `:MEASure {state}` | `:MEASure <state>` | VERIFIED | EN11G p.337 |
 | `set_probe_ratio` | `:CHANnel{ch}:PROBe VALue,{ratio}` | `:CHANnel<n>:PROBe <attenuation>[,<value>]` (not mocked) | VERIFIED | EN11G p.57 |
 | `set_simple_item` | `:MEASure:SIMPle:ITEM {param},{state}` | `:MEASure:SIMPle:ITEM <parameter>,<state>` | VERIFIED | EN11G p.367 |
@@ -190,7 +191,7 @@ printed footer number -- which was never true of how the entries below, or
 | `set_waveform_width` | `:WAVeform:WIDTh {value}` | `:WAVeform:WIDTh <type>`, `{BYTE\|WORD}` | VERIFIED | EN11G p.754 |
 | `stop` | `:TRIGger:STOP` | `:TRIGger:STOP` | VERIFIED | EN11G p.484 |
 
-**Tally: 51 VERIFIED, 4 MISMATCH_DEFERRED, 0 UNCITED (55 total).**
+**Tally: 52 VERIFIED, 4 MISMATCH_DEFERRED, 0 UNCITED (56 total).**
 
 The four `:MEASure:` rows above (`set_measure_state`, `set_simple_source`,
 `set_simple_item`, `get_simple_value`) replaced an earlier stale corpus entry,
@@ -200,6 +201,13 @@ the external **Digital Multimeter** subsystem (`MEASure:CONTinuity`,
 measurements. The oscilloscope measurement subsystem (`:MEASure:` / `:MEASure:SIMPle:`)
 is documented at EN11G p.335-373. The four rows are VERIFIED against those pages
 in `tests/wire_forms.py`.
+
+A fifth row, `set_measure_mode` (`:MEASure:MODE {mode}`, EN11G p.365), was added
+alongside a review of this fix: `measure()` now sends it right after
+`:MEASure ON` to pin the instrument in `SIMPle` mode, because p.369's `VALue?`
+reads "the specified measurement value that appears on the simple measurement"
+-- a read against an instrument left in `ADVanced` mode (the table's other
+enum member) is not guaranteed to answer the same way.
 
 Task 17 (audit H9) added eight rows with a `get_waveform_`/`set_waveform_`
 prefix: the documented `:WAVeform:SOURce`/`STARt`/`INTerval`/`POINt`
