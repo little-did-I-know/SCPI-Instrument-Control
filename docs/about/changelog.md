@@ -7,6 +7,224 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Measurements now work on modern-dialect Siglent oscilloscopes (SDS800X HD, SDS5000X and
+  siblings). `measure()` previously sent the legacy `PAVA?` command, which does not exist on
+  those instruments, so every measurement failed — including the whole GUI Measurements tab and
+  the web gateway's measurement calls. It now uses the documented `:MEASure:SIMPle` subsystem.
+  Note that a modern measurement is not side-effect-free: it enables the measurement function,
+  pins the measurement mode to simple (an instrument left in advanced mode is not guaranteed to
+  answer the simple-value query the same way), sets the simple-measurement source, and switches
+  the requested item on, which is visible on the instrument display. These are left in place
+  rather than cleared, because the instrument's clear command is all-or-nothing and would remove
+  measurements you configured yourself — so enabled measurement items accumulate on the
+  instrument display across repeated calls rather than being switched off.
+
+## [5.1.0] - 2026-07-25
+
+### Changed
+
+- Licensing metadata migrated to PEP 639: the package now declares
+  `License-Expression: MIT` and ships `License-File: LICENSE` instead of the deprecated
+  `license = { text = "MIT" }` table. **Building from source now requires `setuptools>=77`**
+  (raised from 61); installing a prebuilt wheel is unaffected.
+- PyPI summary, keywords, and classifiers rewritten to lead with the SCPI/test-automation
+  category, and the README now opens with a short pitch instead of a single dense paragraph.
+
+### Fixed
+
+- GUI: the Measurements tab now works for all 15 measurement types. Top, Base, Max, Min, Positive
+  Width, and Negative Width previously showed `---` (indistinguishable from an instrument fault)
+  because the panel called core methods that didn't exist; it now routes every type through the
+  instrument's measurement dispatch.
+- GUI: the duty-cycle marker divides the pulse width by the signal's actual period instead of the
+  gate span, so a marker spanning several cycles reads the true duty cycle — or N/A when no period
+  is detectable — rather than a value that shrank as the gate widened.
+- GUI: the DAQ "Suggest Thresholds" action no longer errors on success; the analysis-result signal
+  now carries the structured suggestion instead of rejecting it.
+- `scpi_control.gui.widgets` now imports its widgets lazily, so importing a Qt-free submodule (such
+  as the measurement-marker math) no longer pulls in PyQt6. Importing those modules previously
+  failed outright wherever the optional `gui` extra was not installed.
+  `from scpi_control.gui.widgets import ChannelControl` is unchanged.
+
+## [5.0.0] - 2026-07-24
+
+### ⚠️ Breaking Changes
+
+- Web gateway: every `/api/*` request now requires a bearer token, and the live-stream
+  WebSocket requires one too. On first run `scpi-web` mints a token and prints a
+  `http://127.0.0.1:8765/?token=…` URL; mint more with `scpi-web token add <name>`.
+  **Migration:** scripted HTTP clients must send `Authorization: Bearer <token>`; WebSocket
+  clients must offer the `scpi-token.<token>` subprotocol (alongside a plain `scpi`). A
+  query-parameter token is accepted only on the initial web-UI page load and is rejected on
+  `/api/*`. `GET /api/health` stays unauthenticated. See the
+  [gateway security guide](docs/gateway/security.md).
+- Web gateway: the interactive API docs at `/docs` and `/redoc` are removed and the OpenAPI
+  schema moved to `/api/openapi.json` (token required) — the old locations served the whole
+  control surface unauthenticated.
+- Reference waveforms: stored metadata moved from a pickled dict to a JSON string so reference
+  files load without `allow_pickle`. Files saved by 4.x raise an error naming the file until
+  converted. **Migration:** run `scpi-web references migrate` once.
+- Power supply (SPD3303X/-E): `ovp_level`/`ocp_level` now raise `NotImplementedError` — the
+  SPD3303X command set has no protection subsystem, so these calls never armed anything on real
+  hardware (they emitted a `FutureWarning` in 4.1.0). The model's `has_ovp`/`has_ocp` capabilities
+  are now `False`. **Migration:** stop calling these on an SPD3303X; gate on
+  `has_ovp`/`has_ocp` if you support multiple PSU models.
+- Testing: `MockConnection` now defaults to `strict=True`, so an unmatched PSU/AWG/DAQ query raises
+  `TimeoutError` like real hardware instead of returning `""`. **Migration:** pass `strict=False`
+  explicitly to restore the old lenient behavior.
+- Testing: `MockConnection` no longer answers the legacy `C<n>:WF?` waveform read on a
+  modern-dialect instance (SDS800X HD / SDS5000X); it now times out, matching real modern
+  hardware, which documents no such command. Legacy-dialect scopes are unaffected.
+
+### Added
+
+- Web gateway: named bearer tokens — `scpi-web token add|list|revoke <name>`, stored hashed in
+  `~/.siglent/tokens.json` (relocate with `--config-dir`).
+- Web gateway: session ownership. The identity that creates an instrument session may write to
+  it; anyone authenticated may read, stream, and export. Non-owner writes return `409`.
+  `POST /api/sessions/{id}/claim` takes over a session whose owner has been idle past
+  `--abandon-after` (default 300 s) and is not actively watching the stream;
+  `POST /api/sessions/{id}/owner` hands it over by name (or releases it with `""`). The web UI
+  shows a read-only badge and a claim button to non-owners.
+- Web gateway: `--allow-port` to permit instrument ports beyond 5025, `--max-sessions`
+  (default 8) to bound concurrent sessions, and an unauthenticated `GET /api/health` endpoint.
+- Web gateway: `scpi-web references migrate` converts pre-5.0 reference files to the new format
+  (atomic and idempotent; `--dir` to point at a non-default store).
+
+### Fixed
+
+- Security: loading a waveform or reference archive no longer unpickles it, so a crafted `.npz`
+  can no longer execute code via `scpi-extract`, the report generator's loader, or the gateway.
+  The one remaining place that reads the old pickled format is `scpi-web references migrate`,
+  which the user runs explicitly on their own files.
+- Security: reference lookup no longer honours absolute paths or `..` traversal, and listing
+  references no longer deserializes every file in the storage directory.
+- Security: session creation validates the target before connecting — hostnames are resolved
+  and every resolved address checked, loopback/link-local/cloud-metadata addresses are refused,
+  ports must be allowlisted, and a failed connect returns a generic message rather than
+  reflecting the peer's bytes (no SSRF port-scanning or banner-grabbing).
+- Web gateway: full-resolution CSV/JSON serialization of deep-memory captures runs off the
+  event loop, so one large export no longer freezes the gateway for other users; the session
+  cap holds correctly under concurrent requests.
+- Reference storage: `rename_reference` no longer leaks the source file handle (a Windows-only
+  `WinError 32` that made it fail); reference lookups now confine themselves to the storage
+  directory.
+- Web UI: file downloads (capture CSV, screenshot, waveform JSON, trend CSV) fetch with the
+  bearer token instead of bare `<a href>` links, which could not carry an `Authorization`
+  header and would have returned `401` against the authenticated gateway.
+
+## [4.1.1] - 2026-07-24
+
+### Fixed
+
+- Packaging: the six screenshots in the README are now absolute URLs, so they render on the PyPI
+  project page. They used repository-relative paths, which PyPI cannot resolve because it renders
+  the README with no repository context — the images showed as broken there while displaying
+  correctly on GitHub.
+
+## [4.1.0] - 2026-07-23
+
+### Added
+
+- Testing: a vendor-example conformance corpus (`tests/wire_forms.py`) pins every command in the
+  covered SCPI tables to a request/response pair transcribed from the vendor's programming guide,
+  with document and page citations. A coverage test (`tests/test_wire_conformance.py`) fails the
+  suite if any command in those tables (the legacy and modern scope dialects, the SPD power-supply
+  overrides, and the SDG function-generator overrides — 159 commands) has no cited corpus entry, so
+  an invented command can no longer be added silently to a covered table. (The IEEE-488.2 base, the
+  generic fallbacks, and the Tektronix/LeCroy/DAQ tables are not yet enforced — see
+  `docs/development/wire-form-inventory.md`, which records the full audit.)
+- Oscilloscope: modern-dialect deep-memory waveform capture is chunked over `:WAVeform:MAXPoint`
+  windows using `:WAVeform:STARt`, so records larger than a single transfer are reassembled correctly.
+- Oscilloscope: modern-dialect (SDS800X HD / SDS5000X) waveform capture now goes over the documented
+  `:WAVeform:SOURce`/`:WAVeform:PREamble?`/`:WAVeform:DATA?` subsystem instead of the legacy
+  `C<n>:WF? DAT2`/`DESC` forms, which have zero occurrences anywhere in the modern programming guide
+  (audit H9). Voltage and time reconstruction use the guide's own documented formulas (p.758/p.759).
+
+### Fixed
+
+- Oscilloscope (legacy Siglent): measurements use the documented `C<n>:PAVA? <param>` form and parse
+  its two-field response, and sample-rate responses carrying an SI magnitude letter (`SARA 500.0kSa`)
+  now parse. The previous `PAVA? <param>,C<n>` form and scientific-only sample-rate parsing failed on
+  real hardware (audit H7/H30/H8/H34).
+- Power supply (SPD3303X/-E): measurement queries use the documented `MEASure:VOLTage? CH<n>` form
+  (channel as an argument), tracking mode uses the documented numeric `OUTPut:TRACK {0|1|2}`, and
+  output state is read by decoding the `SYSTem:STATus?` word — the instrument documents no output-state
+  query (audit H6/H19/H20).
+- Function generator (SDG): parameter readback uses the documented bare `C<n>:BSWV?` / `C<n>:OUTP?`
+  queries and parses the returned key-value list; the previous per-field selector grammar
+  (`C<n>:BSWV? FRQ`) does not exist on the instrument (audit H5).
+- USB/GPIB/serial: `VISAConnection` can now be instantiated — it implemented neither `read` nor
+  `read_raw`, so it raised `TypeError` at construction and every documented VISA example failed
+  (audit H10).
+- Testing (mock fidelity): the mock now answers documented legacy probe (`C<n>:ATTN?`) and
+  bandwidth-limit (`BWL?`) queries instead of timing out; the DAQ dispatch no longer matches `R?` as a
+  substring (which hijacked `SYST:ERR?`/`TRIG:SOUR?`) and interprets scan-list/trigger writes; and
+  `MockConnection.read_raw` honors the requested byte count.
+
+### Deprecated
+
+- Power supply: setting `ovp_level`/`ocp_level` on an SPD3303X/-E now emits a `FutureWarning`. The
+  SPD3303X command set contains no protection subsystem, so these calls have never armed anything on
+  real hardware. In v5.0.0 the model's `has_ovp`/`has_ocp` capabilities become `False` and the calls
+  raise `NotImplementedError`.
+- Testing: `MockConnection` gained `strict=True`, which makes unmatched PSU/AWG/DAQ queries raise
+  `TimeoutError` like real instruments instead of returning `""`. Strict becomes the default in v5.0.0 —
+  pass `strict=False` explicitly to keep the old behavior past that release.
+- Testing: `MockConnection` still answers legacy `C<n>:WF?` writes on a modern-dialect (`SDS8xx HD`/
+  `SDS5000X`) instance, even though the driver's modern capture path no longer sends it (audit H9,
+  Task 18). This is a backward-compatibility shim for anything still issuing that form by hand; the
+  modern guide documents no such command, and the mock handler is removed in v5.0.0.
+
+## [4.0.0] - 2026-07-22
+
+### ⚠️ Breaking Changes
+
+- Power supply and function-generator readback (`measure_voltage`/`measure_current`/`measure_power`,
+  setpoint/OVP/OCP getters, and AWG `frequency`/`amplitude`/`offset`/`phase`) now raise
+  `CommandError` when the instrument returns an unparseable response, instead of silently returning
+  `0.0`. Callers that relied on the silent zero must handle the exception.
+
+### Added
+
+- Dev tooling: `pytest-xdist` in the `dev` extra for parallel local test runs (`python -m pytest -n auto`); complements `--testmon` (use one or the other per invocation).
+- Report generator: before/after comparison and multi-DUT batch reports — load multiple capture-file runs, overlay their waveforms, and get delta tables (comparison) or per-DUT summary with aggregates and yield (batch). Available from the Python API and the GUI's new Report → Comparison / Batch Report dialog.
+- Report generator: optional raw-data appendix (source-file manifest with SHA-256 checksums, capture timestamps, and instrument identity from provenance) and a configurable sign-off block (template-defined roles with signature/date lines). Both also work on ordinary single-run reports.
+- Report generator: `top_flatness` waveform statistic (top-plateau deviation as % of amplitude); the probe-calibration preset now evaluates overshoot/undershoot (pass/fail) and top flatness (warning).
+
+### Fixed
+
+- Report generator: the waveform loader no longer drops acquisition provenance when loading capture files.
+- Analysis: corrected THD (each harmonic is read at its own bin, robust to an off-bin fundamental),
+  noise/SNR (estimated from a signal-free residual instead of the whole-signal RMS), `vamp`
+  (Vtop − Vbase amplitude, not the vertical midpoint), overshoot/undershoot (only reported for
+  flat-topped signals), duty cycle (correct when the capture starts on the high level), DC
+  classification (no longer fooled by a large offset over real ripple), FFT peak detection (finds
+  peaks below 0 dB), and SciPy window handling for the power spectrum / spectrogram.
+- Reports and the live webapp spectrum now use a single THD engine, so they report the same number
+  for the same capture. Report-path THD now sums the first 5 harmonics (previously 10).
+- DAQ AI threshold suggestions now bind each extracted number to its label instead of grabbing the
+  first number in the sentence.
+- Comparison/batch reports: pass/fail criteria now match analyzer statistics (case-insensitive plus
+  display-name aliases) — previously the shipped criteria template produced empty verdicts. Criteria
+  that cannot be evaluated are surfaced as warnings (never silently dropped), half-open RANGE criteria
+  are enforced, verdicts are severity-aware (only `critical` criteria gate) with a distinct INCOMPLETE
+  state, and yield reports an incomplete count instead of inflating the pass rate.
+
+## [3.3.1] - 2026-07-21
+
+### Changed
+
+- README and docs now cover the full current feature set: multi-vendor scopes, DAQ, PSU/AWG models, the web gateway and `usb` extras, all four CLI tools, `load_waveform()`/`scpi-extract` usage, and API reference pages for `signal_synth`, `waveform_io`, `provenance`, and `scpi_extract`. Every example now carries a fully spelled-out docstring (what it shows, what it needs, what to expect).
+
+### Fixed
+
+- `DataCollector.save_data()`/`save_batch()` no longer raise `InvalidParameterError` with their default format — the format is now auto-detected from the filename extension (pass CSV, CSV_ENHANCED, NPY, MAT, or HDF5 explicitly to override).
+- Report-analyzer calibration guidance and example-script output are now ASCII-safe, so they no longer crash on Windows consoles with legacy codepages.
+- Documentation sweep: corrected the README's report-generator sample to the real API, fixed the default SCPI port (5025) and GUI frame-rate claims, repaired all broken links and anchors across README and the docs site, synced the docs changelog page through 3.3.0, and excluded internal planning files from the built documentation site.
+
 ## [3.3.0] - 2026-07-21
 
 ### Added
@@ -69,7 +287,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   blows up later with `AttributeError: 'str' object has no attribute
   'shape'`. Construct with keywords (`channel=`, `time=`, `voltage=`) to
   migrate safely. This is a documented public API — see
-  [`docs/report-generator/api-reference.md`](../report-generator/api-reference.md).
+  [`docs/report-generator/api-reference.md`](docs/report-generator/api-reference.md).
 - **`WaveformData.source` and `WaveformData.description` are removed**, on
   both the library and report waveform types. `WaveformData(..., source="x")`
   now raises `TypeError` instead of silently accepting the keyword.
@@ -92,7 +310,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `*IDN?` via a manufacturer-first routing step. Covers the Tektronix
   TBS1000C Series and 2 Series MSO, and the LeCroy WaveSurfer 3000z and
   WaveRunner 8000 series. See the
-  [SCPI Dialects guide](../user-guide/scpi-dialects.md) for the full
+  [SCPI Dialects guide](docs/user-guide/scpi-dialects.md) for the full
   per-vendor command tables and known gaps (e.g. LeCroy
   statistics/cursors/holdoff, Tek 16-bit waveform transfer).
 - Tektronix MSO 4/5/6 Series support (MSO44, MSO46, MSO54, MSO56, MSO58,
@@ -378,7 +596,7 @@ Users have until v2.0.0 to migrate their imports.
   - Integrated with existing `make docs-generate` automation
 - Updated PyPI documentation URL
   - Changed from README-only link to proper documentation site
-  - PyPI now links to https://little-did-I-know.github.io/SCPI-Instrument-Control/
+  - PyPI now links to https://little-did-I-know.github.io/Siglent-Oscilloscope/
   - Users can access complete API documentation and guides from PyPI
 
 **MkDocs Build System**
@@ -1377,4 +1595,4 @@ pip install "Siglent-Oscilloscope[power-supply-beta,usb]==0.4.0-beta.1"
 - Context manager support for oscilloscope connections
 - Comprehensive error handling with custom exceptions
 
-[0.1.0]: https://github.com/little-did-I-know/SCPI-Instrument-Control/releases
+[0.1.0]: https://github.com/siglent-control/siglent/releases/tag/v0.1.0

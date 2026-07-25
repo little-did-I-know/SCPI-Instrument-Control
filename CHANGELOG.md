@@ -14,9 +14,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   those instruments, so every measurement failed — including the whole GUI Measurements tab and
   the web gateway's measurement calls. It now uses the documented `:MEASure:SIMPle` subsystem.
   Note that a modern measurement is not side-effect-free: it enables the measurement function,
-  sets the simple-measurement source, and switches the requested item on, which is visible on the
-  instrument display. These are left in place rather than cleared, because the instrument's clear
-  command is all-or-nothing and would remove measurements you configured yourself.
+  pins the measurement mode to simple (an instrument left in advanced mode is not guaranteed to
+  answer the simple-value query the same way), sets the simple-measurement source, and switches
+  the requested item on, which is visible on the instrument display. These are left in place
+  rather than cleared, because the instrument's clear command is all-or-nothing and would remove
+  measurements you configured yourself — so enabled measurement items accumulate on the
+  instrument display across repeated calls rather than being switched off.
 
 ## [5.1.0] - 2026-07-25
 
