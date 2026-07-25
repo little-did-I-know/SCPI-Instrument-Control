@@ -1,7 +1,5 @@
 # SCPI Instrument Control
 
-> **📦 Package Renamed!** This project was formerly known as `Siglent-Oscilloscope`. See the [Migration Guide](#migration-guide) below for updating your code.
-
 [![CI](https://github.com/little-did-I-know/SCPI-Instrument-Control/actions/workflows/ci.yml/badge.svg)](https://github.com/little-did-I-know/SCPI-Instrument-Control/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/little-did-I-know/SCPI-Instrument-Control/branch/main/graph/badge.svg)](https://codecov.io/gh/little-did-I-know/SCPI-Instrument-Control)
 [![PyPI version](https://img.shields.io/pypi/v/SCPI-Instrument-Control.svg)](https://pypi.org/project/SCPI-Instrument-Control/)
@@ -14,7 +12,14 @@
 [![GitHub last commit](https://img.shields.io/github/last-commit/little-did-I-know/SCPI-Instrument-Control)](https://github.com/little-did-I-know/SCPI-Instrument-Control/commits/main)
 [![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-Support-yellow.svg?style=flat&logo=buy-me-a-coffee)](https://buymeacoffee.com/little.did.i.know)
 
-A universal Python library for controlling SCPI-compatible test equipment via Ethernet/LAN (plus USB, GPIB, and serial through the optional VISA backend). It drives oscilloscopes from Siglent, Tektronix, and LeCroy alongside function generators (AWGs), power supplies, and data-acquisition units through one programmatic API — with a high-performance PyQt6 GUI, a browser-based lab gateway, provenance-stamped waveform files, automated PDF/Markdown test reports with local-LLM analysis, and a realistic mock layer that synthesizes state-coupled waveforms so the whole stack can be developed and demoed without an instrument attached.
+Control SCPI-compatible test equipment from Python — oscilloscopes, function generators (AWGs), power supplies, and data-acquisition units — over Ethernet/LAN, plus USB, GPIB, and serial through the optional VISA backend.
+
+- **One API across vendors.** Siglent, Tektronix, and LeCroy oscilloscopes, auto-detected from `*IDN?`, alongside PSUs and DAQ units.
+- **Develop without hardware.** A realistic mock layer synthesizes state-coupled, trigger-aligned waveforms, so the whole stack runs — and CI passes — with nothing on your bench.
+- **See it live.** A high-performance PyQt6 GUI with interactive measurement markers, plus a browser-based lab gateway.
+- **Keep the evidence.** Provenance-stamped waveform files and automated PDF/Markdown test reports with local-LLM analysis.
+
+> **Formerly `Siglent-Oscilloscope`.** Upgrading from the old package? See the [Migration Guide](#migration-guide).
 
 <p align="center">
   <img src="docs/images/sds824x-hd-cal-square.png" alt="Live screen capture from a Siglent SDS824X HD oscilloscope" width="720">
