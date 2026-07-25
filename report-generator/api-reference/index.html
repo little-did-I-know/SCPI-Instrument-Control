@@ -4283,14 +4283,24 @@
 </span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>    <span class="n">key_findings</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">[],</span>
 </span><span id="__span-6-7"><a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>    <span class="n">recommendations</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">[],</span>
 </span><span id="__span-6-8"><a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>    <span class="n">overall_result</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>  <span class="c1"># &quot;PASS&quot;, &quot;FAIL&quot;, &quot;INCONCLUSIVE&quot;</span>
-</span><span id="__span-6-9"><a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a><span class="p">)</span>
+</span><span id="__span-6-9"><a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a>    <span class="n">findings_source</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;manual&quot;</span><span class="p">,</span>  <span class="c1"># &quot;manual&quot;, &quot;ai&quot;, or &quot;computed&quot;</span>
+</span><span id="__span-6-10"><a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a>    <span class="n">recommendations_source</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;manual&quot;</span><span class="p">,</span>  <span class="c1"># &quot;manual&quot;, &quot;ai&quot;, or &quot;computed&quot;</span>
+</span><span id="__span-6-11"><a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a><span class="p">)</span>
 </span></code></pre></div>
+<p><code>findings_source</code> and <code>recommendations_source</code> mirror <code>summary_source</code>, but for
+<code>key_findings</code> and <code>recommendations</code> respectively: whichever code path fills
+that content is responsible for setting the matching <code>*_source</code> field so
+report renderers can label it (never fabricate the label at render time).</p>
 <p><strong>Methods:</strong></p>
 <ul>
 <li><code>add_section(section)</code> - Add and sort section</li>
 <li><code>get_all_measurements()</code> - Get measurements from all sections</li>
 <li><code>get_all_waveforms()</code> - Get waveforms from all sections</li>
 <li><code>calculate_overall_result()</code> - Determine PASS/FAIL</li>
+<li><code>summary_attribution()</code> - Attribution note for the executive summary, or <code>None</code> if hand-authored</li>
+<li><code>findings_attribution()</code> - Attribution note for key findings, or <code>None</code> if hand-authored</li>
+<li><code>recommendations_attribution()</code> - Attribution note for recommendations, or <code>None</code> if hand-authored</li>
+<li><code>apply_ai_content(ai_content)</code> - Copy AI-generated narrative (<code>executive_summary</code>, <code>key_findings</code>, <code>recommendations</code> keys, all optional) into the report, setting each text field and its matching <code>*_source</code> flag together so the two cannot diverge. Use this instead of assigning the text fields directly.</li>
 <li><code>to_dict()</code> - Convert to dictionary</li>
 </ul>
 <h3 id="scpi_controlreport_generatorutilswaveform_loader"><code>scpi_control.report_generator.utils.waveform_loader</code><a class="headerlink" href="#scpi_controlreport_generatorutilswaveform_loader" title="Permanent link">&para;</a></h3>
