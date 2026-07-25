@@ -1027,41 +1027,58 @@ WIRE_FORMS: List[WireForm] = [
     ),
     # -- Measurements --
     # PAVA appears ZERO times anywhere in this 855-page guide (exhaustive
-    # full-text search, every page) -- the legacy PARAMETER_VALUE command has
-    # no modern equivalent under any header; modern measurements are a
-    # different, badge/CONFigure/MEASure-subsystem concept (guide p.774-855)
-    # this table does not touch.
+    # full-text search, every page) -- the legacy PARAMETER_VALUE command has no
+    # modern equivalent, so it is absent from MODERN_COMMANDS. Modern parameter
+    # measurements use the :MEASure:SIMPle subsystem, indexed at p.335.
+    #
+    # NOTE: an earlier revision of this file cited "p.784ff" for the modern
+    # measurement path. That was wrong -- p.774-855 is the built-in DIGITAL
+    # MULTIMETER (MEASure:CONTinuity / :RESistance / CONFigure:*), which measures
+    # external DMM inputs, not waveform parameters.
     WireForm(
         table="scope",
         dialect="modern",
-        op="get_parameter_value",
-        params={"ch": 2, "param": "RISE"},
-        request="C2:PAVA? RISE",
-        source=f"{MODERN_GUIDE} p.784",
-        status=MISMATCH_DEFERRED,
+        op="set_measure_state",
+        params={"state": "ON"},
+        request=":MEASure ON",
+        source=f"{MODERN_GUIDE} p.337",
         mock_kwargs={"idn": MODERN_IDN},
-        note=(
-            "[HIGH severity -- pull-in candidate] No manual basis: PAVA is "
-            "absent from the modern guide entirely (zero hits, full-text "
-            "search); modern measurement path (MEASure subsystem, p.784ff) is a "
-            "separate concern this table does not implement. This is not dead "
-            "code: measurement.py's measure() is dialect-agnostic and "
-            "unconditionally calls get_parameter_value regardless of dialect "
-            "(no modern-specific branch, unlike the LeCroy branch a few lines "
-            "below it in the same function) -- and measure() is itself called "
-            "from server/sessions.py (the webapp gateway) and from "
-            "examples/basic_usage.py and examples/measurements.py, all on a "
-            "default/documented-usage path. Against real modern-dialect "
-            "hardware this sends a command that does not exist; the response "
-            "parser (measurement.py, 'response.split(\",\")', expects the "
-            "legacy 2-field '<param>,<value>' shape) would then either raise "
-            "CommandError on the instrument's error response, or -- worse, if "
-            "the instrument echoes anything comma-shaped -- silently return a "
-            "wrong number (pull-in bar #1). Not fixed here per the read-only "
-            "constraint on scpi_control/; flagged for a follow-up task (the "
-            "modern MEASure/CONFigure subsystem is a substantial separate "
-            "wire-form project, not a one-line table fix)."
-        ),
+    ),
+    WireForm(
+        table="scope",
+        dialect="modern",
+        op="set_simple_source",
+        params={"ch": 1},
+        request=":MEASure:SIMPle:SOURce C1",
+        source=f"{MODERN_GUIDE} p.368",
+        mock_kwargs={"idn": MODERN_IDN},
+    ),
+    WireForm(
+        table="scope",
+        dialect="modern",
+        op="set_simple_item",
+        params={"param": "PKPK", "state": "ON"},
+        request=":MEASure:SIMPle:ITEM PKPK,ON",
+        source=f"{MODERN_GUIDE} p.367",
+        mock_kwargs={"idn": MODERN_IDN},
+    ),
+    # p.369:
+    #   QUERY SYNTAX    :MEASure:SIMPle:VALue? <type>
+    #   RESPONSE FORMAT <value> in NR3 format
+    #   EXAMPLE         MEAS:SIMP:VAL? MAX   ->   2.000E+00
+    # A bare value: no parameter echo and no unit suffix, unlike the legacy
+    # PAVA? reply. The driver parses it with float() rather than the legacy
+    # comma split.
+    WireForm(
+        table="scope",
+        dialect="modern",
+        op="get_simple_value",
+        params={"param": "PKPK"},
+        request=":MEASure:SIMPle:VALue? PKPK",
+        response="2.000E+00",
+        parsed=2.0,
+        source=f"{MODERN_GUIDE} p.369",
+        mock_kwargs={"idn": MODERN_IDN},
     ),
     # -- Waveform acquisition --
     # WF? appears ZERO times anywhere in this guide -- the legacy C{ch}:WF?
