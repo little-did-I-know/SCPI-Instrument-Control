@@ -54,3 +54,35 @@ def test_modern_table_no_longer_offers_legacy_pava():
     what let measure() send a nonexistent command."""
     scope = _modern_scope()
     assert not scope._has_command("get_parameter_value")
+
+
+def test_mock_answers_the_simple_value_query_with_bare_nr3():
+    conn = MockConnection(idn=MODERN_IDN)
+    conn.connect()
+    conn.write(":MEASure ON")
+    conn.write(":MEASure:SIMPle:SOURce C1")
+    conn.write(":MEASure:SIMPle:ITEM PKPK,ON")
+    response = conn.query(":MEASure:SIMPle:VALue? PKPK")
+    assert "," not in response, "modern replies are a bare NR3 value (p.369), not <param>,<value>"
+    assert float(response) == pytest.approx(2.0)
+
+
+def test_mock_refuses_the_burst_width_token():
+    """WID is burst width (p.345) and the driver must never send it. The mock
+    does not implement it, so a regression surfaces as a timeout rather than a
+    wrong number."""
+    from scpi_control import exceptions
+
+    conn = MockConnection(idn=MODERN_IDN)
+    conn.connect()
+    conn.write(":MEASure:SIMPle:ITEM WID,ON")
+    with pytest.raises(exceptions.SiglentTimeoutError):
+        conn.query(":MEASure:SIMPle:VALue? WID")
+
+
+def test_mock_answers_value_query_without_prior_setup():
+    """The corpus drives the mock with a bare documented request and no setup
+    writes (test_wire_conformance.py:47-51), so VALue? must answer on its own."""
+    conn = MockConnection(idn=MODERN_IDN)
+    conn.connect()
+    assert conn.query(":MEASure:SIMPle:VALue? PKPK") == "2.000E+00"

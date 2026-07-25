@@ -35,6 +35,35 @@ _MOCK_PAVA_VALUES: Dict[str, Tuple[str, str]] = {
     "DUTY": ("5.000E+01", "%"),
 }
 
+# Modern :MEASure:SIMPle:VALue? replies, keyed by the MODERN wire token and
+# holding a bare NR3 string (p.369 shows "2.000E+00" -- no parameter name, no
+# unit suffix, unlike the legacy PAVA? reply above). The numbers mirror
+# _MOCK_PAVA_VALUES so both dialects describe the same synthesized signal.
+#
+# WID and NBWID are deliberately ABSENT. Per p.345 those are the BURST widths;
+# the driver must send PWID/NWID for pulse widths. Leaving them out means a
+# driver regression that sends WID gets an unmatched query (SiglentTimeoutError
+# under strict mode) instead of a plausible-looking wrong number.
+_MOCK_SIMPLE_VALUES: Dict[str, str] = {
+    "PKPK": "2.000E+00",
+    "MAX": "1.000E+00",
+    "MIN": "-1.000E+00",
+    "AMPL": "2.000E+00",
+    "TOP": "1.000E+00",
+    "BASE": "-1.000E+00",
+    "CMEAN": "0.000E+00",
+    "MEAN": "0.000E+00",
+    "RMS": "7.070E-01",
+    "CRMS": "7.070E-01",
+    "FREQ": "1.000E+03",
+    "PER": "1.000E-03",
+    "RISE": "3.500E-05",
+    "FALL": "3.500E-05",
+    "PWID": "5.000E-04",
+    "NWID": "5.000E-04",
+    "DUTY": "5.000E+01",
+}
+
 
 def handle_write(conn, command: str) -> bool:
     """Handle a Siglent-dialect (legacy or modern) scope write. Returns True if consumed."""
@@ -56,6 +85,25 @@ def handle_write(conn, command: str) -> bool:
         if match := re.match(r":TIMebase:SCALe\s+(.+)", command, re.IGNORECASE):
             conn.timebase = float(match.group(1))
             conn.timebase_updates.append(conn.timebase)
+            return True
+        # :MEASure <ON|OFF> (p.337). Matched before the :MEASure:SIMPle forms
+        # below; the required whitespace after the mnemonic means this pattern
+        # cannot swallow ":MEASure:SIMPle:..." (next char there is ":").
+        if match := re.match(r":MEAS(?:ure)?\s+(ON|OFF)\s*$", command, re.IGNORECASE):
+            conn.measure_enabled = match.group(1).upper() == "ON"
+            return True
+        if match := re.match(r":MEAS(?:ure)?:SIMP(?:le)?:SOUR(?:ce)?\s+(\w+)\s*$", command, re.IGNORECASE):
+            conn.simple_source = match.group(1).upper()  # p.368
+            return True
+        if match := re.match(r":MEAS(?:ure)?:SIMP(?:le)?:ITEM\s+(\w+)\s*,\s*(ON|OFF)\s*$", command, re.IGNORECASE):
+            item, state = match.group(1).upper(), match.group(2).upper()  # p.367
+            if state == "ON":
+                conn.simple_items.add(item)
+            else:
+                conn.simple_items.discard(item)
+            return True
+        if re.match(r":MEAS(?:ure)?:SIMP(?:le)?:CLE(?:ar)?\s*$", command, re.IGNORECASE):
+            conn.simple_items.clear()  # p.367
             return True
         if match := re.match(r":TRIGger:MODE\s+(\w+)", command, re.IGNORECASE):
             conn.trigger_mode = match.group(1)  # stored as wire token, e.g. "NORMal" (guide p.482)
@@ -219,6 +267,20 @@ def handle_query(conn, command: str) -> Optional[str]:
             return conn.waveform_width
         if upper == ":WAVEFORM:MAXPOINT?":  # bare NR1, p.753 (query-only, no setter)
             return str(conn.max_points)
+        if match := re.match(r":MEAS(?:URE)?:SIMP(?:LE)?:VAL(?:UE)?\?\s*(\w+)", upper):
+            # Answer for any token we know, regardless of whether ITEM switched it
+            # on -- the wire-form corpus queries this directly with no setup writes.
+            # An UNKNOWN token (e.g. the burst-width WID or NBWID, p.345, which the
+            # driver must never send) falls through to None -> unmatched ->
+            # SiglentTimeoutError under strict mode, so a mis-mapped measurement
+            # type surfaces as a loud failure rather than a wrong number.
+            item = match.group(1)
+            if item in _MOCK_SIMPLE_VALUES:
+                return _MOCK_SIMPLE_VALUES[item]  # bare NR3, p.369
+        if upper == ":MEAS?" or upper == ":MEASURE?":  # p.337
+            return "ON" if conn.measure_enabled else "OFF"
+        if match := re.match(r":MEAS(?:URE)?:SIMP(?:LE)?:SOUR(?:CE)?\?", upper):  # p.368
+            return conn.simple_source
 
     if conn.scope_dialect == "legacy":
         if match := re.match(r"C(\d+):VDIV\?", command, re.IGNORECASE):
