@@ -433,7 +433,14 @@ class Waveform:
             if include_metadata:
                 # Write metadata header as comments
                 f.write(f"{ws.CSV_COMMENT} SCPI Instrument Control Waveform Data\n")
-                f.write(f"{ws.CSV_COMMENT} Captured: {datetime.now().isoformat()}\n")
+                # "Saved" is what this timestamp actually is. It used to be written
+                # as "Captured", which claimed an acquisition time the writer does
+                # not know (audit M52). A real capture time is emitted below only
+                # when provenance supplies one.
+                f.write(f"{ws.CSV_COMMENT} Saved: {datetime.now().isoformat()}\n")
+                prov = waveform.provenance
+                if prov is not None and prov.acquired_at:
+                    f.write(f"{ws.CSV_COMMENT} Captured: {prov.acquired_at}\n")
                 f.write(f"{ws.CSV_COMMENT} {ws.CSV_HEADER_CHANNEL}: {waveform.channel}\n")
                 f.write(f"{ws.CSV_COMMENT} {ws.CSV_HEADER_SAMPLE_RATE}: {waveform.sample_rate} Sa/s\n")
                 f.write(f"{ws.CSV_COMMENT} Samples: {len(waveform.time)}\n")
