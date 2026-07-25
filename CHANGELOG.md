@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Licensing metadata migrated to PEP 639: the package now declares
+  `License-Expression: MIT` and ships `License-File: LICENSE` instead of the deprecated
+  `license = { text = "MIT" }` table. **Building from source now requires `setuptools>=77`**
+  (raised from 61); installing a prebuilt wheel is unaffected.
+- PyPI summary, keywords, and classifiers rewritten to lead with the SCPI/test-automation
+  category, and the README now opens with a short pitch instead of a single dense paragraph.
+
 ### Fixed
 
 - GUI: the Measurements tab now works for all 15 measurement types. Top, Base, Max, Min, Positive

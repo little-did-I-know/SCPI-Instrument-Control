@@ -1,15 +1,19 @@
 [build-system]
-requires = ["setuptools>=61.0", "wheel"]
+# setuptools>=77 is required for the PEP 639 `license`/`license-files` fields below.
+requires = ["setuptools>=77.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "SCPI-Instrument-Control"
 version = "5.0.0"
-description = "Universal Python library for SCPI test equipment via Ethernet/LAN, USB, GPIB, or serial. Drives oscilloscopes (Siglent, Tektronix, LeCroy), AWGs, power supplies, and DAQ units. Waveform capture with acquisition provenance, raw-data extraction (load_waveform, scpi-extract), FFT analysis, a PyQt6 GUI, a browser lab gateway, PDF/Markdown reports with local-LLM analysis, and synthetic-signal mocks for development without hardware."
+# NOTE: this is the PyPI summary and has a hard 512-character cap. Check the length
+# before every release -- the v3.2.0 publish failed on exactly this.
+description = "Universal Python library for SCPI test equipment over Ethernet, USB, GPIB or serial. One API for oscilloscopes (Siglent, Tektronix, LeCroy), AWGs, power supplies and DAQ units, with waveform capture and provenance, FFT analysis, a PyQt6 GUI, a browser lab gateway, PDF/Markdown reports with local-LLM analysis, and high-fidelity mock instruments for developing with no hardware attached."
 readme = { file = "README.md", content-type = "text/markdown" }
 requires-python = ">=3.9"
-license = { text = "MIT" }
-keywords = ["SCPI", "instrument control", "test equipment", "oscilloscope", "function generator", "AWG", "power supply", "PSU", "siglent", "SDS", "SDG", "SPD", "IEEE 488.2", "waveform", "signal generator", "laboratory", "automation", "measurement", "data acquisition", "lab automation", "PyQt6", "GUI", "FFT", "protocol decoder", "I2C", "SPI", "UART", "visualization", "voltage", "current", "frequency", "waveform generator", "waveform", "test equipment", "lab equipment"]
+license = "MIT"
+license-files = ["LICENSE"]
+keywords = ["SCPI", "instrument control", "test equipment", "test automation", "lab automation", "laboratory", "lab equipment", "measurement", "data acquisition", "DAQ", "oscilloscope", "function generator", "signal generator", "AWG", "arbitrary waveform generator", "power supply", "PSU", "waveform", "IEEE 488.2", "VISA", "GPIB", "siglent", "tektronix", "lecroy", "SDS", "SDG", "SPD", "FFT", "protocol decoder", "mock instruments"]
 authors = [
     {name = "Robin Mumm"}
 ]
@@ -21,6 +25,7 @@ classifiers = [
     "Intended Audience :: Science/Research",
     "Intended Audience :: Developers",
     "Intended Audience :: Manufacturing",
+    "Intended Audience :: Education",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.9",
@@ -32,9 +37,11 @@ classifiers = [
     "Programming Language :: Python :: 3 :: Only",
     "Topic :: Scientific/Engineering",
     "Topic :: Scientific/Engineering :: Interface Engine/Protocol Translator",
+    "Topic :: Scientific/Engineering :: Visualization",
     "Topic :: System :: Hardware :: Hardware Drivers",
     "Topic :: System :: Networking :: Monitoring",
     "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Software Development :: Testing",
     "Environment :: X11 Applications :: Qt",
     "Typing :: Typed",
 ]
