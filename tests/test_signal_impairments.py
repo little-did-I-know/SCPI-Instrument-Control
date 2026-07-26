@@ -51,6 +51,25 @@ def test_negative_impairment_parameters_are_rejected(kwargs):
         synthesize(spec, RATE, N)
 
 
+@pytest.mark.parametrize("drift_frequency", [0.0, -1.0], ids=["zero", "negative"])
+def test_drift_frequency_must_be_positive_when_drift_is_enabled(drift_frequency):
+    """M3: _validate covered every new field except drift_frequency.
+    drift_amplitude=5.0, drift_frequency=0.0 used to silently produce no drift
+    at all (sin(0*t) == 0), and a negative value merely inverted phase --
+    both surprising and undocumented rather than rejected."""
+    spec = SignalSpec(kind="dc", drift_amplitude=5.0, drift_frequency=drift_frequency)
+    with pytest.raises(exceptions.InvalidParameterError):
+        synthesize(spec, RATE, N)
+
+
+def test_drift_frequency_is_unchecked_while_drift_is_disabled():
+    """drift_amplitude's default (0.0, drift off) must not make an otherwise
+    unrelated drift_frequency value (including the field's own non-positive
+    edge cases) block synthesis."""
+    out = synthesize(SignalSpec(kind="dc", offset=0.0, drift_frequency=0.0, seed=1), RATE, N)
+    np.testing.assert_array_equal(out, np.zeros(N))
+
+
 def test_drift_moves_the_baseline():
     clean = synthesize(SignalSpec(kind="dc", offset=0.0, seed=1), RATE, N)
     drifted = synthesize(SignalSpec(kind="dc", offset=0.0, drift_amplitude=0.5, drift_frequency=1.0, seed=1), RATE, N)

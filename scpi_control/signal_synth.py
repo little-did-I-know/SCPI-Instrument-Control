@@ -119,6 +119,13 @@ def _validate(spec: SignalSpec, sample_rate: float, n_points: int) -> None:
         raise exceptions.InvalidParameterError(f"noise_rms must be non-negative: {spec.noise_rms}")
     if spec.drift_amplitude < 0:
         raise exceptions.InvalidParameterError(f"drift_amplitude must be non-negative: {spec.drift_amplitude}")
+    if spec.drift_amplitude > 0 and spec.drift_frequency <= 0:
+        # M3: drift_frequency itself was never validated, so drift_frequency=0.0
+        # (with drift enabled) silently produced NO drift at all -- sin(0*t) is
+        # always 0 -- and a negative value merely inverted phase, both surprising
+        # and undocumented. Only checked when drift is actually enabled: a
+        # disabled drift_frequency default/leftover value is never used.
+        raise exceptions.InvalidParameterError(f"drift_frequency must be positive when drift_amplitude > 0: {spec.drift_frequency}")
     if spec.glitch_rate < 0:
         raise exceptions.InvalidParameterError(f"glitch_rate must be non-negative: {spec.glitch_rate}")
     if spec.glitch_amplitude < 0:
