@@ -429,10 +429,15 @@ coupling](#state-coupling) above) searches for the trigger-level crossing on
 the *unfiltered* signal, so where a capture triggers does not depend on the
 DUT's filter state -- only the sample values within the window do.
 
-**Quantization caveat:** every mock capture is quantized to int8 codes at 25
-codes/division (see [State coupling](#state-coupling) above), so a voltage
-difference smaller than one code -- 0.04 V at the default 1 V/div -- cannot
-be resolved in a capture, no matter how gently the DUT is filtering. A
+**Quantization caveat:** a legacy-dialect mock capture is quantized to int8
+codes at 25 codes/division (see [State coupling](#state-coupling) above), so a
+voltage difference smaller than one code -- 0.04 V at the default 1 V/div --
+cannot be resolved in a capture, no matter how gently the DUT is filtering. The
+modern dialect's `:WAVeform:WIDTh WORD` path is 256x finer (6400 codes/division,
+0.15625 mV/LSB), and since both paths share the same synthesis it is the WORD
+grid, not int8, that the filter's lead-in depth is sized against
+(`dut._WARMUP_TIME_CONSTANTS`, 12 time constants: `e^-12` leaves under 0.05 WORD
+LSB un-settled at the head of the window). A
 comparison that leans on fine amplitude detail (e.g. a raw sample-to-sample
 step height at a gentle cutoff) will end up measuring the code grid rather
 than the filter. Either widen the effect until it clears one code, or measure

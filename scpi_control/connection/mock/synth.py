@@ -130,9 +130,13 @@ def raw_volts(conn: "MockConnection", channel: int, n_override: Optional[int] = 
     # Note the extended t0 is computed as a subtraction rather than by shifting
     # the index range the way the ringing path does, so the sample at index
     # `warmup` can land a few ULP from `t0`. That is deliberate here: the output
-    # is low-pass filtered and then quantized to int8 at 25 codes/div, which is
-    # ~0.04 V -- a sub-femtosecond timebase difference is many orders of
-    # magnitude below the smallest representable change.
+    # is low-pass filtered and then quantized. The relevant grid is the FINER of
+    # the two this function feeds -- not the int8 path's 25 codes/div (~0.04 V at
+    # 1 V/div) but the modern dialect's WORD path at 6400 codes/div
+    # (siglent.py's _MODERN_CODE_PER_DIV_WORD), i.e. 0.15625 mV/LSB. A
+    # sub-femtosecond timebase difference is still many orders of magnitude below
+    # even that. The lead-in's DEPTH is sized against the same WORD grid rather
+    # than int8 -- see dut._WARMUP_TIME_CONSTANTS for the measured numbers.
     warmup = dut.warmup_samples(conn.sample_rate)
     extended = synthesize(per_acquisition, conn.sample_rate, n + warmup, t0=t0 - warmup / conn.sample_rate)
     return dut.apply(extended, conn.sample_rate)[warmup:]

@@ -12,10 +12,23 @@ from scipy import signal as scipy_signal
 
 from scpi_control import exceptions
 
-# After 5 time constants a first-order response has settled to within 0.7% of its
-# final value -- far below the int8 quantization the mock's scope path applies
-# afterwards, so a longer lead-in would cost samples and buy nothing.
-_WARMUP_TIME_CONSTANTS = 5
+# Lead-in depth in time constants. The un-settled residual left at the start of
+# the capture window is e^-N times the filter's initial deviation, so N is set by
+# the FINEST quantization the mock's scope path applies afterwards -- and that is
+# NOT the int8 path. connection/mock/synth.py's raw_volts also feeds the modern
+# dialect's WORD encoder (connection/mock/siglent.py's
+# _MODERN_CODE_PER_DIV_WORD = 25 * 256 = 6400 codes/div), which resolves
+# 0.15625 mV/LSB at 1 V/div -- 256x finer than int8's 0.04 V. Reachable with
+# `:WAVeform:WIDTh WORD` on a modern-dialect mock carrying a loopback DUT.
+#
+# Measured against a 40-time-constant lead-in reference (2 Vpp 1 kHz square,
+# cutoff 1 kHz, 1 MSa/s), worst case over lead-in start phase:
+#   N = 5   -> 6.153e-3 V = 0.15 int8 codes (invisible) but 39 WORD LSBs
+#   N = 12  -> 5.566e-6 V = 0.04 WORD LSB   (invisible on both paths)
+# e^-12 = 6.1e-6 is the reason: it puts the residual under 0.05 WORD LSB for a
+# unit initial deviation. The cost is 2.4x the lead-in samples, bounded by
+# _MAX_WARMUP_SAMPLES below and cheap.
+_WARMUP_TIME_CONSTANTS = 12
 
 # Backstop on the lead-in, mirroring signal_synth._MAX_RINGING_KERNEL_SAMPLES.
 # A near-zero cutoff makes tau -- and so the warmup -- unbounded otherwise.

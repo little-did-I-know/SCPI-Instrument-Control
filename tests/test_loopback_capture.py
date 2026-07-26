@@ -47,8 +47,8 @@ def _scope(source):
 def test_the_capture_is_in_steady_state_from_its_very_first_period():
     """The lead-in is what makes this true. Filtering a bare capture starts from
     y=0, so the first period would carry a settling ramp the last period does not
-    -- and at 1 kHz the RC settles in ~159 samples, well inside one 1000-sample
-    period, so the two windows would visibly disagree."""
+    -- and at 1 kHz the RC settles in ~159 samples (5 tau), well inside one
+    1000-sample period, so the two windows would visibly disagree."""
     awg = _awg(function="SQUARE", frequency=1_000.0, amplitude=2.0)
     scope = _scope(AwgLoopback(awg, dut=RCLowPass(cutoff_hz=5_000.0)))
     try:
@@ -56,8 +56,23 @@ def test_the_capture_is_in_steady_state_from_its_very_first_period():
     finally:
         scope.disconnect()
     period = 1_000  # 1 kHz at 1 MSa/s
-    # atol covers one int8 code: 25 codes/div at the mock's 1 V/div default.
-    np.testing.assert_allclose(data.voltage[:period], data.voltage[-period:], atol=0.05)
+    # atol is two int8 codes (25 codes/div at the mock's 1 V/div default), not
+    # one, because the residual this comparison sees is NOT the settling
+    # transient it is guarding against. Measured on the pre-quantization volts
+    # for this exact capture:
+    #   no lead-in at all      1.0309 V   <- the regression this test exists for
+    #   with the lead-in       0.0619 V, of which the settling part is 5.8e-6 V
+    # The 0.0619 V is one sample, smeared forward by the RC. It is the square
+    # generator's razor's-edge boundary: trigger alignment puts t0 exactly on a
+    # cycle boundary (t0 = -6.000 ms for a 1 kHz square in a 14 ms window), and
+    # signal_synth._cycle_fraction's `(f*t) % 1.0` maps the mathematically
+    # identical instant 13 periods later to 0.99999999999 rather than 0.0, so
+    # one sample of one period takes the opposite rail. It is independent of the
+    # DUT -- the same flip is present in the un-filtered capture -- and which
+    # samples it hits is a float64 lottery decided by the lead-in length, so it
+    # moved when _WARMUP_TIME_CONSTANTS went 5 -> 12. Two codes keeps an 11x
+    # margin over the no-lead-in failure mode this test is actually for.
+    np.testing.assert_allclose(data.voltage[:period], data.voltage[-period:], atol=0.09)
 
 
 def test_consecutive_captures_of_a_triggered_signal_agree():
@@ -113,10 +128,12 @@ def test_a_filtered_square_matches_the_independently_derived_exponential_kind():
     Now that RCLowPass.apply is the exact, strictly-proper zero-order-hold
     discretisation (see dut.py), the two agree to near machine precision. The
     only remaining floor is how much lead-in THIS TEST renders before the
-    comparison window -- production's `warmup_samples()` alone leaves ~0.0067 V
-    of the initial y=0 transient un-settled (fine there: it's below the mock's
-    ~0.04 V int8 quantization step), so this test renders more (see `lead_in`
-    below) to push that floor far below the precision being asserted here."""
+    comparison window -- production's `warmup_samples()` alone leaves e^-12,
+    about 6.1e-6 of the step, of the initial y=0 transient un-settled (fine
+    there: it is under 0.05 LSB of the finest grid the mock quantizes to, the
+    modern WORD path's 6400 codes/div -- see dut._WARMUP_TIME_CONSTANTS), so
+    this test renders more (see `lead_in` below) to push that floor far below
+    the precision being asserted here."""
     tau = 1e-4
     cutoff = 1.0 / (2 * np.pi * tau)
     dut = RCLowPass(cutoff_hz=cutoff)
@@ -127,12 +144,34 @@ def test_a_filtered_square_matches_the_independently_derived_exponential_kind():
     # number of the signal's own periods and rendered from t0=0.0 rather than
     # t0=-lead_in/RATE. Both matter, and skipping either reintroduces a full
     # spurious error unrelated to the filter:
-    #   - A non-whole-period lead-in can leave the square wave in the WRONG
-    #     phase relative to `closed_form` (which always starts high at t=0),
-    #     producing a phase-inverted ~2x amplitude mismatch that looks like a
-    #     total failure of the filter when it is actually a bookkeeping error
-    #     (verified: 1x and 3x warmup here are 0.5 and 1.5 periods -- both
-    #     wrong; 2x and 4x are 1 and 2 whole periods -- both fine).
+    #   - The lead-in must satisfy TWO INDEPENDENT conditions, and no raw
+    #     multiple of warmup_samples() reliably satisfies both:
+    #       (a) WHOLE PERIODS. `closed_form` always starts high at t=0, so a
+    #           fractional-period lead-in hands the filter a square wave in the
+    #           wrong phase; the comparison then picks up a phase-inversion term
+    #           of order 2 * amplitude, which looks like a total failure of the
+    #           filter but is pure bookkeeping.
+    #       (b) ENOUGH TIME CONSTANTS. Whole-period alignment removes ONLY that
+    #           ~2.0 term. What is left is the SETTLING FLOOR -- the un-decayed
+    #           remainder of the initial y=0 transient, ~e^(-lead_in*dt/tau) --
+    #           which alignment does nothing about.
+    #     Measured as max|filtered - closed_form| across multiples of
+    #     warmup_samples(), against this test's 1e-6 bound. With the older
+    #     5-time-constant warmup (500 samples = 0.5 period each):
+    #         1x 1.98        2x 4.479e-05   3x 1.973
+    #         4x 2.034e-09   5x 1.973       6x 9.27e-14
+    #     -- only 2x and 4x are whole periods (1 and 2), and 2x STILL FAILS: one
+    #     period is just 10 tau, e^-10 = 4.5e-5, 45x over the bound. Condition
+    #     (a) alone was never sufficient. With today's 12-time-constant warmup
+    #     (1200 samples = 1.2 periods each) the multiples land differently again:
+    #         1x 1.718   2x 1.950   3x 1.950
+    #         4x 1.718   5x 7.94e-15   6x 1.718
+    #     -- now only 5x is whole-period (6 periods = 60 tau) at all.
+    #     Hence rounding up to whole periods below rather than trusting any fixed
+    #     multiple: that makes (a) true by construction, and >=3x warmup (>=36
+    #     tau) makes (b) true with enormous margin. As built it comes out at 4
+    #     periods = 4000 samples = 40 tau, measuring 7.9e-15 -- machine
+    #     precision, not a settling floor at all.
     #   - Passing t0 as a pre-computed `-lead_in / RATE` looks equivalent to
     #     starting the extended array at t0=0.0 and slicing off `lead_in`
     #     samples, but is NOT bit-for-bit equivalent: synthesize() computes
@@ -152,7 +191,7 @@ def test_a_filtered_square_matches_the_independently_derived_exponential_kind():
     filtered = dut.apply(square, RATE)[lead_in:]
     closed_form = synthesize(SignalSpec(kind="exponential", frequency=1_000.0, amplitude=1.0, tau=tau), RATE, n)
 
-    # Measured 2.0e-9 with the correct construction above. For comparison,
+    # Measured 7.9e-15 with the correct construction above. For comparison,
     # against this SAME construction: backward Euler (the pre-fix discretisation)
     # measures 3.5e-3, and a tau mistuned by 2% measures 1.4e-2 -- both several
     # orders of magnitude over this bound, so this test would catch either
