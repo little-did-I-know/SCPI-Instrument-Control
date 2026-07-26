@@ -193,6 +193,38 @@ def _pulse(spec: SignalSpec, t: np.ndarray, rng: np.random.Generator) -> np.ndar
     return np.where(within < spec.edge_time, rise, np.where(within < spec.pulse_width, high, np.where(within < spec.pulse_width + spec.edge_time, fall, low)))
 
 
+def _chirp_phase(spec: SignalSpec, x: Union[float, np.ndarray]) -> Union[float, np.ndarray]:
+    """Phase accumulated from the start of a sweep to `x` seconds into it."""
+    f0 = spec.frequency
+    f1 = spec.end_frequency
+    span = spec.sweep_time
+    if spec.sweep_log:
+        ratio = f1 / f0
+        if ratio == 1.0:
+            # The limit of the log form as f1 -> f0: a constant-frequency tone.
+            # Taken here rather than raising, because log(1) == 0 would divide by
+            # zero on a spec that is degenerate but perfectly sane.
+            return 2.0 * np.pi * f0 * x
+        return 2.0 * np.pi * f0 * span / np.log(ratio) * (np.power(ratio, x / span) - 1.0)
+    return 2.0 * np.pi * (f0 * x + (f1 - f0) * x * x / (2.0 * span))
+
+
+def _chirp(spec: SignalSpec, t: np.ndarray, rng: np.random.Generator) -> np.ndarray:
+    """A repeating frequency sweep, with phase accumulated across retraces.
+
+    Phase is n * PHI(sweep_time) + PHI(position within this sweep), not merely
+    the latter: resetting phase at each retrace would put a step discontinuity
+    every sweep_time, which the ringing impairment would then treat as a real
+    edge. np.floor (not int truncation) gives the sweep index, because t is
+    routinely negative -- the mock free-runs from a negative t0 and ringing
+    renders samples before t0.
+    """
+    sweep = np.floor(t / spec.sweep_time)
+    within = t - sweep * spec.sweep_time
+    phase = sweep * _chirp_phase(spec, spec.sweep_time) + _chirp_phase(spec, within)
+    return spec.amplitude * np.sin(phase + spec.phase)
+
+
 _GENERATORS: Dict[str, Callable[[SignalSpec, np.ndarray, np.random.Generator], np.ndarray]] = {
     "sine": _sine,
     "square": _square,
@@ -203,6 +235,7 @@ _GENERATORS: Dict[str, Callable[[SignalSpec, np.ndarray, np.random.Generator], n
     "multitone": _multitone,
     "exponential": _exponential,
     "pulse": _pulse,
+    "chirp": _chirp,
 }
 
 PERIODIC_KINDS = ("sine", "square", "triangle", "ramp", "multitone", "exponential", "pulse")
@@ -243,6 +276,16 @@ def _validate(spec: SignalSpec, sample_rate: float, n_points: int) -> None:
             raise exceptions.InvalidParameterError(f"pulse_width (50%-to-50%) must exceed edge_time, or the pulse never reaches its top: {spec.pulse_width} <= {spec.edge_time}")
         if spec.pulse_width + spec.edge_time > 1.0 / spec.frequency:
             raise exceptions.InvalidParameterError(f"the trapezoid must fit in one period: pulse_width + edge_time = {spec.pulse_width + spec.edge_time} > {1.0 / spec.frequency}")
+    if spec.kind == "chirp":
+        # chirp is deliberately outside PERIODIC_KINDS (no stable period, so the
+        # mock must free-run it rather than align it to a trigger), which means
+        # the shared positive-frequency check above does not cover it.
+        if spec.frequency <= 0:
+            raise exceptions.InvalidParameterError(f"frequency must be positive for 'chirp': {spec.frequency}")
+        if spec.end_frequency <= 0:
+            raise exceptions.InvalidParameterError(f"end_frequency must be positive for 'chirp': {spec.end_frequency}")
+        if spec.sweep_time <= 0:
+            raise exceptions.InvalidParameterError(f"sweep_time must be positive for 'chirp': {spec.sweep_time}")
     if spec.noise_rms < 0:
         raise exceptions.InvalidParameterError(f"noise_rms must be non-negative: {spec.noise_rms}")
     if spec.drift_amplitude < 0:

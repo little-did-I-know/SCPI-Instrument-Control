@@ -241,3 +241,82 @@ def test_pulse_is_periodic_and_triggerable_in_the_mock():
 def test_pulse_rejects_a_trapezoid_that_cannot_exist(kwargs):
     with pytest.raises(exceptions.InvalidParameterError):
         synthesize(SignalSpec(kind="pulse", frequency=1_000.0, **kwargs), RATE, 100)
+
+
+def _zero_crossings(samples):
+    return np.count_nonzero(np.diff(np.signbit(samples)))
+
+
+def test_chirp_frequency_rises_across_a_sweep():
+    span = 0.01
+    spec = SignalSpec(kind="chirp", frequency=1_000.0, end_frequency=10_000.0, sweep_time=span)
+    samples = synthesize(spec, RATE, int(RATE * span))
+    half = len(samples) // 2
+    # First half averages ~3.25 kHz, second half ~7.75 kHz.
+    assert _zero_crossings(samples[half:]) > 2 * _zero_crossings(samples[:half])
+
+
+def test_chirp_phase_is_continuous_across_a_sweep_retrace():
+    """The reason phase accumulates (n * PHI(sweep_time) + PHI(within)) instead
+    of resetting each sweep. A reset would put a step of order the amplitude at
+    every sweep_time -- and the ringing impairment would then treat it as a real
+    edge."""
+    spec = SignalSpec(kind="chirp", frequency=1_000.0, end_frequency=5_000.0, sweep_time=1e-3)
+    samples = synthesize(spec, RATE, 3_000)  # three full sweeps
+    steepest = 2 * np.pi * 5_000.0 * 1.0 / RATE  # the fastest legitimate slope, per sample
+    assert np.max(np.abs(np.diff(samples))) < 1.5 * steepest
+
+
+def test_a_log_sweep_spends_equal_time_per_octave():
+    span = 0.02
+    spec = SignalSpec(kind="chirp", frequency=1_000.0, end_frequency=4_000.0, sweep_time=span, sweep_log=True)
+    samples = synthesize(spec, RATE, int(RATE * span))
+    half = len(samples) // 2
+    # Two octaves over 20 ms: 1->2 kHz in the first half, 2->4 kHz in the second.
+    # At double the frequency throughout, the second half has twice the crossings.
+    assert _zero_crossings(samples[half:]) == pytest.approx(2 * _zero_crossings(samples[:half]), rel=0.05)
+
+
+def test_a_log_sweep_with_equal_endpoints_degenerates_to_a_sine():
+    """The limit of the log form as end_frequency -> frequency. Taken here rather
+    than raising, because log(1) == 0 would otherwise divide by zero on a spec
+    that is degenerate but perfectly sane."""
+    spec = SignalSpec(kind="chirp", frequency=1_000.0, end_frequency=1_000.0, sweep_time=1e-3, sweep_log=True)
+    chirped = synthesize(spec, RATE, 3_000)
+    plain = synthesize(SignalSpec(kind="sine", frequency=1_000.0), RATE, 3_000)
+    np.testing.assert_allclose(chirped, plain, atol=1e-9)
+
+
+def test_chirp_handles_negative_times():
+    """t is routinely negative: the mock free-runs from a negative t0 and the
+    ringing impairment renders samples before t0. np.floor (not int truncation)
+    is what makes the sweep index correct there."""
+    spec = SignalSpec(kind="chirp", frequency=1_000.0, end_frequency=5_000.0, sweep_time=1e-3)
+    samples = synthesize(spec, RATE, 4_000, t0=-2e-3)
+    assert np.all(np.isfinite(samples))
+    steepest = 2 * np.pi * 5_000.0 * 1.0 / RATE
+    assert np.max(np.abs(np.diff(samples))) < 1.5 * steepest
+
+
+def test_chirp_is_not_treated_as_periodic():
+    """It has no stable period, so the mock must free-run rather than try to
+    align it to a trigger level."""
+    assert "chirp" not in PERIODIC_KINDS
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"frequency": 0.0},
+        {"frequency": -1_000.0},
+        {"end_frequency": 0.0},
+        {"end_frequency": -5_000.0},
+        {"sweep_time": 0.0},
+        {"sweep_time": -1e-3},
+    ],
+)
+def test_chirp_rejects_bad_parameters(kwargs):
+    params = {"kind": "chirp", "frequency": 1_000.0, "end_frequency": 5_000.0, "sweep_time": 1e-3}
+    params.update(kwargs)
+    with pytest.raises(exceptions.InvalidParameterError):
+        synthesize(SignalSpec(**params), RATE, 100)
