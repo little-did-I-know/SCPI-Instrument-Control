@@ -341,7 +341,8 @@ def test_the_breaker_defaults_on(monkeypatch):
     finally:
         dc.disconnect()
 
-    assert len(results) < 50, "the default breaker must cut a doomed run short"
+    assert len(results) == 3, "the default threshold is 3, so a doomed run stops at the third failure"
+    assert all("error" in entry for entry in results)
 
 
 @pytest.mark.parametrize("bad", [0, -1])
@@ -377,3 +378,82 @@ def test_an_interrupted_run_keeps_what_it_collected(monkeypatch):
 
     assert len(results) == 2, "the two completed captures must survive the interrupt"
     assert all(entry["waveforms"] for entry in results)
+    # Note on this test's failure mode: without the handler the KeyboardInterrupt
+    # escapes into pytest, which aborts the whole SESSION ("!!! KeyboardInterrupt
+    # !!!") rather than reporting one red test. If the handler is ever removed the
+    # signal is a dead suite, not a failing test -- worth knowing before hunting it.
+
+
+def test_a_dropped_connection_mid_run_does_not_discard_the_captures(monkeypatch):
+    """A dropped link is the other likely unattended failure. Catching only
+    SiglentTimeoutError let it propagate and discard every capture already taken
+    -- the exact loss the error-entry path exists to prevent. It counts toward
+    the breaker too: a scope that stopped answering is what a breaker is for."""
+    monkeypatch.setattr("scpi_control.automation.time", FakeTime())
+    dc, _ = _collector()
+    real_capture = dc.capture_single
+    calls = {"n": 0}
+
+    def drop_after_two(channels, **kwargs):
+        calls["n"] += 1
+        if calls["n"] > 2:
+            raise exceptions.SiglentConnectionError("connection reset by peer")
+        return real_capture(channels, **kwargs)
+
+    monkeypatch.setattr(dc, "capture_single", drop_after_two)
+    try:
+        results = dc.batch_capture(channels=[1], timebase_scales=["1us"], triggers_per_config=20, max_consecutive_failures=3)
+    finally:
+        dc.disconnect()
+
+    assert len(results) == 5, "two successes, then three failures trip the breaker"
+    assert all(entry["waveforms"] for entry in results[:2])
+    assert all("error" in entry for entry in results[2:])
+
+
+def test_an_interrupt_between_configs_also_keeps_the_captures(monkeypatch):
+    """The window the first version missed: Ctrl-C during the config-apply block
+    (set_timebase / set_scale / the settle sleep) rather than during a capture.
+    Guarding only the capture discarded the whole run for a keypress one
+    statement earlier."""
+    monkeypatch.setattr("scpi_control.automation.time", FakeTime())
+    dc, _ = _collector()
+    real_set = dc.scope.set_timebase
+    calls = {"n": 0}
+
+    def interrupt_on_second_config(value):
+        calls["n"] += 1
+        if calls["n"] == 2:
+            raise KeyboardInterrupt
+        return real_set(value)
+
+    monkeypatch.setattr(dc.scope, "set_timebase", interrupt_on_second_config)
+    try:
+        results = dc.batch_capture(channels=[1], timebase_scales=["1us", "10us"], triggers_per_config=2)
+    finally:
+        dc.disconnect()
+
+    assert len(results) == 2, "the first config's captures must survive an interrupt in the second's setup"
+
+
+def test_an_instrument_error_while_applying_a_config_keeps_the_captures(monkeypatch):
+    """Same window, non-interrupt cause: the scope stops answering between
+    configs. Previously this propagated and discarded the run."""
+    monkeypatch.setattr("scpi_control.automation.time", FakeTime())
+    dc, _ = _collector()
+    real_set = dc.scope.set_timebase
+    calls = {"n": 0}
+
+    def die_on_second_config(value):
+        calls["n"] += 1
+        if calls["n"] == 2:
+            raise exceptions.SiglentConnectionError("scope stopped answering")
+        return real_set(value)
+
+    monkeypatch.setattr(dc.scope, "set_timebase", die_on_second_config)
+    try:
+        results = dc.batch_capture(channels=[1], timebase_scales=["1us", "10us"], triggers_per_config=2)
+    finally:
+        dc.disconnect()
+
+    assert len(results) == 2, "the first config's captures must survive the instrument dying"

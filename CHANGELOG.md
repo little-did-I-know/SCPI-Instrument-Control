@@ -22,9 +22,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- `batch_capture` no longer discards the whole run when interrupted. It had no `KeyboardInterrupt`
-  handler, so an operator stopping a run they could see was doomed lost every capture already
-  taken. It now keeps and returns them, matching what `start_continuous_capture` already did.
+- `batch_capture` no longer discards the whole run when interrupted or when the instrument stops
+  answering. It had no `KeyboardInterrupt` handler at all, so an operator stopping a run they could
+  see was doomed lost every capture already taken; it now keeps and returns them, matching what
+  `start_continuous_capture` already did. The guard covers the whole per-configuration body rather
+  than only the capture, because the gap between configurations — two socket writes plus the settle
+  delay — is exactly where an impatient operator tends to press Ctrl-C.
+- `batch_capture` now records any `SiglentError` as a failed entry, not just `SiglentTimeoutError`.
+  A dropped link mid-run previously propagated and discarded every capture already taken, which is
+  the precise loss the failed-entry path exists to prevent. Connection failures count toward the
+  circuit breaker as well — an instrument that has stopped answering is exactly what it is for. A
+  failure while *applying* a configuration stops the run and returns what was collected.
 
 ## [5.6.0] - 2026-07-26
 
