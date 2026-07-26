@@ -19,6 +19,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   shortfall. Note this changes the default behaviour of a run whose captures all fail: it now stops
   early instead of attempting every planned capture. Pass `max_consecutive_failures=None` to
   restore the old behaviour; a run with genuinely sparse triggers should raise `max_wait` instead.
+- A mock AWG's output can now be captured by a mock oscilloscope: wire
+  `AwgLoopback(awg_connection, awg_channel=1)` into the scope's `signals=`, and a SCPI write to the
+  AWG changes the next capture. Previously the mock AWG was a write-only surface — you could set a
+  waveform and read it back, but nothing in the system responded to its output, which made it
+  untestable end to end without hardware. `MockConnection`'s `signals=` now accepts a callable
+  returning a `SignalSpec` as well as a static one, evaluated at every acquisition; this is a
+  general extension point, not AWG-specific, so any dynamic signal source works the same way.
+  `scpi_control.dut.RCLowPass` is a new first-order RC low-pass usable as a device under test
+  between the two instruments, or on any array on its own, using exact zero-order-hold
+  discretisation; the mock applies it with a lead-in rendered before the capture window so a
+  capture has no settling transient at its head. Two conversions are worth knowing, because
+  getting them wrong produces plausible-looking output: AWG amplitude is peak-to-peak and is
+  halved into `SignalSpec`'s peak amplitude, and phase is degrees and becomes radians — an output
+  that is off reads flat. `ARB` is captured as a sine with a logged warning, since the mock stores
+  no arbitrary sample data, and extreme duty values are clamped rather than raising. Non-breaking:
+  a static `SignalSpec` in `signals=` behaves exactly as before.
 
 ### Changed
 

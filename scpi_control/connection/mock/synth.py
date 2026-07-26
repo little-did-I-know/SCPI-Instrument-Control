@@ -66,8 +66,19 @@ def _trigger_crossing(spec: SignalSpec, level: float, rising: bool) -> Optional[
 
 
 def spec_for(conn: "MockConnection", channel: int) -> SignalSpec:
-    """The signal a channel 'sees': user-specified, else the channel default."""
-    return conn._signals.get(channel) or _DEFAULT_SPECS.get(channel, _FALLBACK_SPEC)
+    """The signal a channel 'sees': user-specified, else the channel default.
+
+    A stored value is either a SignalSpec or a zero-argument callable returning
+    one. The callable is invoked at EVERY acquisition, which is what lets a live
+    source -- an AwgLoopback reading a mock AWG's state -- change what the scope
+    captures between captures. Everything downstream (point_count, raw_volts, the
+    trigger-crossing search, the three vendor personalities) keeps receiving a
+    plain SignalSpec and never learns the difference.
+    """
+    source = conn._signals.get(channel)
+    if source is None:
+        return _DEFAULT_SPECS.get(channel, _FALLBACK_SPEC)
+    return source() if callable(source) else source
 
 
 def point_count(conn: "MockConnection", channel: int) -> int:
@@ -107,7 +118,28 @@ def raw_volts(conn: "MockConnection", channel: int, n_override: Optional[int] = 
     else:
         t0 = count * window * _DRIFT_FRACTION  # untriggerable: free-run drift
     per_acquisition = spec if spec.seed is None else replace(spec, seed=spec.seed + count)
-    return synthesize(per_acquisition, conn.sample_rate, n, t0=t0)
+    dut = getattr(conn._signals.get(channel), "dut", None)
+    if dut is None:
+        return synthesize(per_acquisition, conn.sample_rate, n, t0=t0)
+    # A DUT filter is STATEFUL, unlike every generator in signal_synth. Filtering
+    # the bare capture would start from y=0 and put a settling transient at the
+    # head of every acquisition, so render a lead-in BEFORE t0, filter across the
+    # whole extended window, then slice the lead-in off -- the same fix, for the
+    # same reason, as the ringing impairment's pre-t0 window (signal_synth.py:381).
+    #
+    # Note the extended t0 is computed as a subtraction rather than by shifting
+    # the index range the way the ringing path does, so the sample at index
+    # `warmup` can land a few ULP from `t0`. That is deliberate here: the output
+    # is low-pass filtered and then quantized. The relevant grid is the FINER of
+    # the two this function feeds -- not the int8 path's 25 codes/div (~0.04 V at
+    # 1 V/div) but the modern dialect's WORD path at 6400 codes/div
+    # (siglent.py's _MODERN_CODE_PER_DIV_WORD), i.e. 0.15625 mV/LSB. A
+    # sub-femtosecond timebase difference is still many orders of magnitude below
+    # even that. The lead-in's DEPTH is sized against the same WORD grid rather
+    # than int8 -- see dut._WARMUP_TIME_CONSTANTS for the measured numbers.
+    warmup = dut.warmup_samples(conn.sample_rate)
+    extended = synthesize(per_acquisition, conn.sample_rate, n + warmup, t0=t0 - warmup / conn.sample_rate)
+    return dut.apply(extended, conn.sample_rate)[warmup:]
 
 
 def payload_for(conn: "MockConnection", channel: int, *, include_offset: bool) -> bytes:

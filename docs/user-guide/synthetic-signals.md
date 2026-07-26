@@ -335,6 +335,120 @@ Mock sessions created through the web gateway now default to
 points long (14 divisions x 1 ms/div timebase) instead of the fixed 256-byte
 explicit ramp payloads earlier sessions served.
 
+## AWG to Scope Loopback
+
+Every example so far has one mock instrument synthesizing from its own state.
+`AwgLoopback` (`scpi_control.connection.mock.loopback`) patches a second mock
+instrument's state into that synthesis, so a mock scope can capture whatever a
+mock AWG is currently outputting -- two separate `MockConnection` objects, one
+virtual cable between them:
+
+```python
+from scpi_control.connection import MockConnection
+from scpi_control.connection.mock.loopback import AwgLoopback
+from scpi_control.dut import RCLowPass
+from scpi_control.oscilloscope import Oscilloscope
+
+awg = MockConnection("mock", awg_mode=True)
+scope_conn = MockConnection("mock", signals={1: AwgLoopback(awg, awg_channel=1, dut=RCLowPass(cutoff_hz=2_000))})
+scope = Oscilloscope("mock", connection=scope_conn)
+```
+
+### `signals=` as a callable
+
+`signals={channel: ...}` now accepts a callable that returns a `SignalSpec`,
+not just a static `SignalSpec` instance -- and unlike a static spec, which is
+read once, a callable is invoked at **every acquisition**. That is what makes
+the loopback live: `AwgLoopback` is such a callable, and each call re-reads
+the AWG connection's current channel state, so a `C1:BSWV` write on the AWG
+changes the very next scope capture. This is a general extension point, not
+specific to AWGs -- anything with a `() -> SignalSpec` signature works.
+
+### Function mapping
+
+`AwgLoopback` translates the AWG channel's live state into a `SignalSpec` on
+every call:
+
+| AWG `WVTP` | `SignalSpec.kind` |
+| --- | --- |
+| `SINE` | `sine` |
+| `SQUARE` | `square` |
+| `NOISE` | `noise` |
+| `DC` | `dc` |
+| `PULSE` | `pulse` |
+| `RAMP` | `triangle` if symmetry is within 1 percentage point of 50 (i.e. 49 to 51), otherwise `ramp` |
+| `ARB` | `sine`, with a logged warning (the mock stores no arbitrary sample data) |
+
+Two unit conversions happen on the way in, because the AWG and `SignalSpec`
+don't speak the same units for the same quantity:
+
+- **Amplitude.** An AWG's `AMP` is peak-to-peak; `SignalSpec.amplitude` is
+  peak. `AwgLoopback` halves it, so an AWG set to 2.0 Vpp arrives as a 2.0 V
+  peak-to-peak capture, not 4.0. **`NOISE` is the exception**, because
+  `SignalSpec.amplitude` is a standard deviation for that kind rather than a
+  peak: Gaussian noise has no true peak, so `AwgLoopback` maps the AWG's `AMP`
+  on the usual convention that a quoted peak-to-peak is the +/-3 sigma span
+  (99.7% of samples), i.e. `sigma = Vpp / 6`. An AWG set to 2.0 Vpp of noise
+  therefore arrives as a sigma = 0.333 V trace, and only sigma is fixed by that
+  mapping -- the measured peak-to-peak of an actual capture is not scattered
+  around 2.0 V but systematically above it, because the extreme of N Gaussian
+  samples grows with N rather than converging on the +/-3 sigma convention used
+  to set sigma. A 14,000-sample capture's expected extreme is about 7.9 sigma,
+  i.e. roughly 2.3 to 2.8 V peak-to-peak for this 2.0 Vpp request, and larger
+  still for a longer capture.
+- **Phase.** An AWG's `PHSE` is in degrees; `SignalSpec.phase` is in radians.
+  `AwgLoopback` converts.
+
+An output with `enabled=False` reads flat -- like a disconnected input, not a
+zero-amplitude waveform at some frequency.
+
+### Duty is clamped, not validated
+
+`SignalSpec` requires strictly `0 < duty < 1` and raises `InvalidParameterError`
+outside that range, but a real AWG accepts `DUTY,0` and `DUTY,100` without
+complaint. `AwgLoopback` clamps the converted duty into `SignalSpec`'s legal
+range instead of propagating the AWG's value verbatim, because a mock
+instrument should not raise where a real one would simply output something
+(a very narrow pulse, or one at the opposite rail) and keep going.
+
+### The DUT: `RCLowPass`
+
+`AwgLoopback` accepts an optional `dut=` -- a device model sitting between
+the AWG and the scope, exactly where a real device under test would
+physically sit. That's why the DUT lives on the loopback rather than on the
+scope's `MockConnection`: it belongs to the cable run connecting the two
+instruments, not to either instrument itself.
+
+`scpi_control.dut.RCLowPass(cutoff_hz=...)` is a first-order RC low-pass. It
+is stateful -- unlike every generator in `signal_synth`, which is closed-form
+specifically so consecutive captures and streamed chunks join seamlessly --
+so filtering a bare capture would start from `y = 0` and put a settling
+transient at the head of every acquisition. To avoid that, the filter is
+applied to a lead-in rendered *before* the capture window and then discarded,
+the same fix `signal_synth`'s ringing impairment uses for the same reason: a
+capture is in steady state from its very first sample, with no transient at
+the head.
+
+**Known simplification:** trigger alignment (see [State
+coupling](#state-coupling) above) searches for the trigger-level crossing on
+the *unfiltered* signal, so where a capture triggers does not depend on the
+DUT's filter state -- only the sample values within the window do.
+
+**Quantization caveat:** a legacy-dialect mock capture is quantized to int8
+codes at 25 codes/division (see [State coupling](#state-coupling) above), so a
+voltage difference smaller than one code -- 0.04 V at the default 1 V/div --
+cannot be resolved in a capture, no matter how gently the DUT is filtering. The
+modern dialect's `:WAVeform:WIDTh WORD` path is 256x finer (6400 codes/division,
+0.15625 mV/LSB), and since both paths share the same synthesis it is the WORD
+grid, not int8, that the filter's lead-in depth is sized against
+(`dut._WARMUP_TIME_CONSTANTS`, 12 time constants: `e^-12` leaves under 0.05 WORD
+LSB un-settled at the head of the window). A
+comparison that leans on fine amplitude detail (e.g. a raw sample-to-sample
+step height at a gentle cutoff) will end up measuring the code grid rather
+than the filter. Either widen the effect until it clears one code, or measure
+a time-domain property such as rise time instead, which isn't limited by the
+code grid -- see `examples/awg_scope_loopback.py`, which does exactly that.
+
 ## Extensibility
 
 Signal kinds live in a small dispatch table (`kind -> generator function`)
@@ -350,3 +464,5 @@ generator function, a table entry, and matching docs/tests -- no changes to
 - `examples/synthetic_signals.py` for a runnable, hardware-free walkthrough
   of `make_waveform()`, a mock session reacting to SCPI writes, and the
   save/reload round trip
+- `examples/awg_scope_loopback.py` for a runnable walkthrough of the AWG to
+  scope loopback, including the `RCLowPass` DUT

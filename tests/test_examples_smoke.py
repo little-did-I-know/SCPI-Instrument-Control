@@ -63,6 +63,7 @@ EXECUTE = [
     ("report_ai_qa.py", "requests"),
     ("waveform_provenance_and_extract.py", None),
     ("synthetic_signals.py", None),
+    ("awg_scope_loopback.py", None),
     ("comparison_report.py", None),
     ("batch_report.py", None),
 ]

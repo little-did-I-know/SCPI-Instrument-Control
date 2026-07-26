@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import math
 import re
-from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Set, Tuple, Union
+from typing import TYPE_CHECKING, Callable, Dict, Iterable, List, Optional, Set, Tuple, Union
 
 from scpi_control import exceptions
 from scpi_control.connection.base import BaseConnection
@@ -53,7 +53,7 @@ class MockConnection(BaseConnection):
         voltage_scales: Optional[Dict[int, float]] = None,
         voltage_offsets: Optional[Dict[int, float]] = None,
         waveform_payloads: Optional[Dict[int, bytes]] = None,
-        signals: Optional[Dict[int, "SignalSpec"]] = None,
+        signals: Optional[Dict[int, Union["SignalSpec", Callable[[], "SignalSpec"]]]] = None,
         sample_rate: float = 1_000.0,
         timebase: float = 1e-3,
         trigger_status: Optional[List[str]] = None,
@@ -91,7 +91,7 @@ class MockConnection(BaseConnection):
         # Explicit payloads only; channels without one get state-coupled synthesis
         # (connection/mock/synth.py). The old fixed 4-byte default is gone.
         self._waveform_payloads: Dict[int, bytes] = dict(waveform_payloads) if waveform_payloads else {}
-        self._signals: Dict[int, "SignalSpec"] = dict(signals) if signals else {}
+        self._signals: Dict[int, Union["SignalSpec", Callable[[], "SignalSpec"]]] = dict(signals) if signals else {}
         self._acquisition_counts: Dict[int, int] = {}
         self._channel_coupling: Dict[int, str] = {ch: "D1M" for ch in channels}
         # Legacy scope probe attenuation / bandwidth-limit state (Task 14,
