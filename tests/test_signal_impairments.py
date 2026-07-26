@@ -151,3 +151,29 @@ def test_ringing_produces_overshoot_above_the_flat_top():
 def test_ringing_is_off_by_default_for_a_square_wave():
     clean = synthesize(SignalSpec(kind="square", frequency=1_000.0, amplitude=1.0, seed=2), RATE, N)
     assert np.max(clean) == pytest.approx(1.0)
+
+
+def test_ringing_is_continuous_across_stream_chunks():
+    """I3: the doc comment used to claim ringing was 'automatically continuous
+    across stream() chunks'. It wasn't -- np.diff() only sees edges inside the
+    current buffer, so an edge landing at a chunk boundary got no ringing at
+    all, and one near a chunk's end had its ring truncated. Mirrors
+    test_drift_is_continuous_across_stream_chunks, but proves the stronger
+    claim directly: a stream() reconstruction must be bit-identical to a
+    single contiguous synthesize() call, the same way it already is for drift.
+
+    frequency=997.0 (not an exact divisor of chunk_size/sample_rate) is
+    deliberate: at a perfectly round frequency like 1000.0 Hz, some square-wave
+    edges land EXACTLY on a `cycle_fraction == duty` floating-point threshold,
+    and accumulate one ULP of rounding differently depending on whether t was
+    reached via one contiguous arange() or via a chunk's t0 + a smaller
+    arange() -- a pre-existing quantization artifact in the base generator,
+    orthogonal to this chunk-continuity fix (reproduced: it affects the plain
+    square wave with NO ringing involved at all, at frequency=1000.0 exactly).
+    """
+    from scpi_control.signal_synth import stream
+
+    spec = SignalSpec(kind="square", frequency=997.0, amplitude=1.0, ringing_frequency=20_000.0, ringing_damping=5_000.0, seed=2)
+    contiguous = synthesize(spec, RATE, N)
+    streamed = np.concatenate(list(stream(spec, RATE, 1_000, duration=N / RATE)))
+    np.testing.assert_array_equal(streamed, contiguous)

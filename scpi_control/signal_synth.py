@@ -96,6 +96,13 @@ _GENERATORS: Dict[str, Callable[[SignalSpec, np.ndarray, np.random.Generator], n
 
 PERIODIC_KINDS = ("sine", "square", "triangle", "ramp")
 
+# Hard cap on the ringing decay kernel's length in samples, independent of
+# n_points (I3) or sample_rate. This is a backstop against a user-supplied
+# ringing_damping near zero making `5 / damping` samples unboundedly long --
+# not the normal control on cost, which is ringing_damping's own sensible
+# nonzero default (M8).
+_MAX_RINGING_KERNEL_SAMPLES = 200_000
+
 
 def _validate(spec: SignalSpec, sample_rate: float, n_points: int) -> None:
     if spec.kind not in _GENERATORS:
@@ -149,34 +156,65 @@ def synthesize(spec: SignalSpec, sample_rate: float, n_points: int, t0: float = 
     _validate(spec, sample_rate, n_points)
     rng = np.random.default_rng(spec.seed)
     t = t0 + np.arange(n_points) / sample_rate
-    samples = _GENERATORS[spec.kind](spec, t, rng) + spec.offset
     if spec.ringing_frequency > 0:
         # A damped sinusoid triggered at each edge. Real probe/scope front-ends
         # ring after a fast transition; this is what gives overshoot/preshoot
-        # measurements something real to measure. Deterministic and edge-local,
-        # so it needs no generator and is automatically continuous across
-        # stream() chunks. Applied to the base signal BEFORE drift and glitches:
-        # ringing is part of the signal's own edge response, not a baseline
-        # wander or an additive event.
-        edges = np.flatnonzero(np.diff(samples))
+        # measurements something real to measure. Applied to the base signal
+        # BEFORE drift and glitches: ringing is part of the signal's own edge
+        # response, not a baseline wander or an additive event.
+        #
+        # I3: this must be a function of ABSOLUTE TIME, like drift, not of the
+        # current buffer alone -- np.diff() cannot see an edge across a
+        # stream() chunk boundary, so an edge landing right at a boundary used
+        # to get no ringing at all, and one near a chunk's end had its ring
+        # truncated. Fixed the same way drift is continuous: render
+        # `decay_len` extra samples BEFORE t0, detect edges (and let their
+        # ringing spill forward) across that whole extended window, then slice
+        # the prepended samples back off. The generator is called exactly
+        # once (over the extended window) rather than once for the plain
+        # buffer and again for the extended one, so a stochastic kind (e.g.
+        # "noise") does not draw from `rng` twice.
+        decay_len = min(_MAX_RINGING_KERNEL_SAMPLES, max(1, int(sample_rate / max(spec.ringing_damping, 1e-9) * 5)))
+        # Built as t0 + (index - decay_len) / sample_rate, NOT (t0 - decay_len /
+        # sample_rate) + index / sample_rate -- the two are mathematically equal
+        # but round differently in float64. With the latter, this chunk's t0
+        # (itself computed elsewhere as start_time + produced / sample_rate) and
+        # this expression's own "t0 - decay_len/sample_rate" partial sum
+        # accumulate rounding error differently than a neighboring chunk's
+        # equivalent sample does, so the same absolute instant can land a few
+        # ULP apart depending on which chunk computed it -- enough to flip which
+        # side of a razor's-edge comparison (e.g. square wave's `< duty`) a
+        # sample falls on, right when frequency and chunk_size divide evenly
+        # (verified: this happened at every chunk boundary in the drift-style
+        # continuity test below until reordered this way).
+        t_ext = t0 + (np.arange(n_points + decay_len) - decay_len) / sample_rate
+        samples_ext = _GENERATORS[spec.kind](spec, t_ext, rng) + spec.offset
+        edges = np.flatnonzero(np.diff(samples_ext))
         if edges.size:
             # 5 time constants of decay, in samples. `max(spec.ringing_damping, 1e-9)`
             # only guards the division against damping == 0 (undamped ringing) --
             # it must NOT clamp small-but-nonzero damping up to some larger floor,
             # or slow decay would be truncated before it actually decays, showing
             # up as a discontinuity where the kernel window ends. `max(1, ...)`
-            # then guards int() truncating to 0 for very heavy damping. Both are
-            # capped by n_points, since the kernel can never need to run longer
-            # than the buffer itself.
-            decay_len = min(n_points, max(1, int(sample_rate / max(spec.ringing_damping, 1e-9) * 5)))
+            # then guards int() truncating to 0 for very heavy damping.
+            # `_MAX_RINGING_KERNEL_SAMPLES` is a defensive backstop, not the
+            # normal control on cost -- M8 gives ringing_damping a sensible
+            # nonzero default so ordinary use never approaches it; it only
+            # bounds the (user-opted-into) case of an explicit near-zero
+            # damping, which would otherwise make the kernel unboundedly long.
+            total = n_points + decay_len
             tail = np.arange(decay_len) / sample_rate
             kernel = np.sin(2 * np.pi * spec.ringing_frequency * tail) * np.exp(-spec.ringing_damping * tail)
-            response = np.zeros(n_points)
+            response = np.zeros(total)
             for edge in edges:
-                step = samples[edge + 1] - samples[edge]
-                end = min(n_points, edge + 1 + decay_len)
+                step = samples_ext[edge + 1] - samples_ext[edge]
+                end = min(total, edge + 1 + decay_len)
                 response[edge + 1 : end] += 0.5 * step * kernel[: end - edge - 1]
-            samples = samples + response
+            samples = samples_ext[decay_len:] + response[decay_len:]
+        else:
+            samples = samples_ext[decay_len:]
+    else:
+        samples = _GENERATORS[spec.kind](spec, t, rng) + spec.offset
     if spec.drift_amplitude > 0:
         # Time-based, NOT a random walk: stream() re-seeds per chunk, so a walk
         # would reset at every chunk boundary and a live view would show sawtooth
