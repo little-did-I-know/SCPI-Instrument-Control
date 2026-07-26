@@ -42,18 +42,20 @@ def _scope(source):
     return scope
 
 
-def test_the_capture_has_no_settling_transient_at_its_head():
-    """The load-bearing test. Without the lead-in the first samples ramp up from
-    zero, so the head of the capture would differ wildly from its body."""
+def test_the_capture_is_in_steady_state_from_its_very_first_period():
+    """The lead-in is what makes this true. Filtering a bare capture starts from
+    y=0, so the first period would carry a settling ramp the last period does not
+    -- and at 1 kHz the RC settles in ~159 samples, well inside one 1000-sample
+    period, so the two windows would visibly disagree."""
     awg = _awg(function="SQUARE", frequency=1_000.0, amplitude=2.0)
     scope = _scope(AwgLoopback(awg, dut=RCLowPass(cutoff_hz=5_000.0)))
     try:
         data = scope.get_waveform(1, provenance=False)
     finally:
         scope.disconnect()
-    head = data.voltage[:2_000]
-    body = data.voltage[6_000:8_000]
-    assert np.ptp(head) == pytest.approx(np.ptp(body), rel=0.15), "the head must already be settled"
+    period = 1_000  # 1 kHz at 1 MSa/s
+    # atol covers one int8 code: 25 codes/div at the mock's 1 V/div default.
+    np.testing.assert_allclose(data.voltage[:period], data.voltage[-period:], atol=0.05)
 
 
 def test_consecutive_captures_of_a_triggered_signal_agree():
@@ -115,7 +117,13 @@ def test_a_filtered_square_matches_the_independently_derived_exponential_kind():
     filtered = dut.apply(square, RATE)[warmup:]
     closed_form = synthesize(SignalSpec(kind="exponential", frequency=1_000.0, amplitude=1.0, tau=tau), RATE, n)
 
-    # Tolerance is the IIR's first-order discretisation error at tau/dt = 100.
-    # Report the measured maximum in the task report -- if it is far below this,
-    # tighten the bound rather than leaving slack.
-    assert np.max(np.abs(filtered - closed_form)) < 0.02
+    # RCLowPass.apply uses the exact zero-order-hold discretisation (alpha = 1 -
+    # exp(-dt/tau)), so this is NOT a per-step approximation gap between the IIR
+    # and the closed form -- measured max ~0.0198, concentrated at each square-
+    # wave transition and decaying with the filter's own tau over the following
+    # samples (an inherent one-sample edge-registration artifact where a
+    # discretely-sampled instantaneous edge meets a causal recurrence, present
+    # under any single-pole discretisation, not specific to this one). Bound
+    # carries a small margin above the measured value rather than the 0.02 a
+    # backward-Euler discretisation needed.
+    assert np.max(np.abs(filtered - closed_form)) < 0.021

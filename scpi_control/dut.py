@@ -25,7 +25,18 @@ _MAX_WARMUP_SAMPLES = 200_000
 class RCLowPass:
     """A first-order RC low-pass standing in for a device under test.
 
-        y[n] = y[n-1] + alpha * (x[n] - y[n-1]),   alpha = dt / (tau + dt)
+        y[n] = y[n-1] + alpha * (x[n] - y[n-1]),   alpha = 1 - exp(-dt / tau)
+
+    `alpha` is the exact zero-order-hold (impulse-invariant) discretisation of a
+    continuous RC network sampled at `dt` -- not the backward-Euler approximation
+    `dt / (tau + dt)`, which agrees with `exp(-dt/tau)` only to second order in
+    `dt/tau`. That distinction matters here specifically because `signal_synth`'s
+    "exponential" kind is a closed-form solution built directly from
+    `exp(-t/tau)`: filtering a square wave through this class is mathematically
+    the same construction, so using the exact discretisation makes the two
+    agree to near machine precision instead of leaving a ~2% floor between two
+    different approximations of the same physics (see
+    `tests/test_loopback_capture.py`'s cross-validation test).
 
     **This filter is stateful**, unlike everything in `signal_synth`, which is
     closed-form precisely so that streamed chunks and consecutive mock
@@ -54,7 +65,7 @@ class RCLowPass:
         if not np.isfinite(sample_rate) or sample_rate <= 0:
             raise exceptions.InvalidParameterError(f"sample_rate must be a positive finite number: {sample_rate}")
         dt = 1.0 / sample_rate
-        alpha = dt / (self.tau + dt)
+        alpha = 1.0 - math.exp(-dt / self.tau)
         # scipy rather than a Python loop: a 14,000-point capture is the common
         # case and a deep-memory record is far larger.
         return scipy_signal.lfilter([alpha], [1.0, -(1.0 - alpha)], np.asarray(samples, dtype=float))
