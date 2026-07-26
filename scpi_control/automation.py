@@ -46,7 +46,7 @@ import numpy as np
 
 from scpi_control import Oscilloscope
 from scpi_control.connection import BaseConnection
-from scpi_control.exceptions import SiglentError, SiglentTimeoutError
+from scpi_control.exceptions import InvalidParameterError, SiglentError, SiglentTimeoutError
 from scpi_control.units import parse_si_value
 from scpi_control.waveform import WaveformData
 
@@ -160,13 +160,15 @@ class DataCollector:
         Args:
             channels: List of channel numbers to capture (e.g., [1, 2, 3])
             auto_setup: If True, run auto-setup before capture
-            max_wait: Seconds to wait for the acquisition to complete. None
-                (default) derives a budget from the current timebase.
+            max_wait: Seconds to wait for the acquisition to complete. Must be
+                positive. None (default) derives a budget from the current
+                timebase.
 
         Returns:
             Dictionary mapping channel number to WaveformData object
 
         Raises:
+            InvalidParameterError: If max_wait is not positive.
             SiglentTimeoutError: If the acquisition does not complete in time.
                 Reading anyway would return the PREVIOUS acquisition, which is
                 what this replaced.
@@ -178,6 +180,13 @@ class DataCollector:
         """
         if not self._connected:
             raise SiglentError(f"Not connected to oscilloscope at {self.scope.host}:{self.scope.port}")
+
+        # Checked explicitly, because the failure is otherwise misattributed: a
+        # zero or negative budget skips the poll loop without a single status
+        # read and raises "last status: unknown", which reads like an
+        # instrument fault rather than the bad argument it is.
+        if max_wait is not None and max_wait <= 0:
+            raise InvalidParameterError(f"max_wait must be a positive number of seconds, not {max_wait!r}")
 
         if auto_setup:
             self.scope.auto_setup()
@@ -273,8 +282,12 @@ class DataCollector:
         total = len(configs) * triggers_per_config
         current = 0
 
-        # Execute batch capture
-        for config in configs:
+        # Execute batch capture. Enumerated rather than looked up with
+        # configs.index(config): parsing makes duplicate configs genuinely
+        # possible -- ['1us', '1000ns'] used to yield two distinct raw-string
+        # dicts and now both parse to {'timebase': 1e-06} -- and index() would
+        # then report "Config 1/2" twice.
+        for config_index, config in enumerate(configs):
             # Apply configuration
             if "timebase" in config:
                 if hasattr(self.scope, "set_timebase"):
@@ -298,7 +311,7 @@ class DataCollector:
                 current += 1
 
                 if progress_callback:
-                    status = f"Config {configs.index(config)+1}/{len(configs)}, Trigger {trigger_num+1}/{triggers_per_config}"
+                    status = f"Config {config_index+1}/{len(configs)}, Trigger {trigger_num+1}/{triggers_per_config}"
                     progress_callback(current, total, status)
 
                 entry = {

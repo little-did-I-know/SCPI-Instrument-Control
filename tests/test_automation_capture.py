@@ -9,6 +9,7 @@ the new config's label -- wrong data, correctly formatted, no warning.
 FakeTime is used throughout so the timeout tests cost no wall-clock time.
 """
 
+import numpy as np
 import pytest
 
 from scpi_control import exceptions
@@ -184,6 +185,65 @@ def test_a_timed_out_capture_becomes_a_visible_failed_entry(monkeypatch):
         assert "error" in entry
         assert entry["config"]
     # Nothing already captured is lost, and no entry claims a waveform it lacks.
+
+
+def test_start_continuous_capture_writes_files_with_its_default_format(monkeypatch, tmp_path):
+    """The regression that actually shipped, pinned at the caller level.
+
+    start_continuous_capture's default file_format is 'npz', which was valid as
+    a filename EXTENSION and rejected as a format ARGUMENT, so every save raised
+    -- swallowed by the loop's broad except, leaving an empty output directory
+    and a log line. The alias fix is covered at unit level; this covers the path
+    that failed, including the filename/extension interaction, end to end.
+    """
+    monkeypatch.setattr("scpi_control.automation.time", FakeTime(step=0.01))
+    dc, _ = _collector()
+    try:
+        returned = dc.start_continuous_capture(channels=[1], duration=0.1, interval=0.02, output_dir=tmp_path)
+    finally:
+        dc.disconnect()
+
+    written = sorted(tmp_path.glob("*.npz"))
+    assert written, "the default file_format must produce files, not a silently empty directory"
+    assert returned == [], "with output_dir set, captures go to disk rather than the returned list"
+    # Loading proves a real npz was written, not an empty or mis-formatted file.
+    with np.load(str(written[0])) as archive:
+        assert len(archive["voltage"]) > 0
+
+
+def test_capture_single_rejects_a_non_positive_max_wait(monkeypatch):
+    """max_wait=0 skipped the poll loop without a single status read and raised
+    'last status: unknown', which reads like an instrument fault rather than the
+    bad argument it is."""
+    monkeypatch.setattr("scpi_control.automation.time", FakeTime())
+    dc, conn = _collector()
+    try:
+        for bad in (0, -1.0):
+            with pytest.raises(exceptions.InvalidParameterError) as excinfo:
+                dc.capture_single([1], max_wait=bad)
+            assert repr(bad) in str(excinfo.value)
+        assert conn.waveform_requests == []
+    finally:
+        dc.disconnect()
+
+
+def test_duplicate_configs_are_numbered_by_position_not_by_value(monkeypatch):
+    """'1us' and '1000ns' are the same timebase, so after parsing both configs
+    are the identical dict {'timebase': 1e-06}. configs.index(config) matched
+    the first one for both and reported 'Config 1/2' twice."""
+    monkeypatch.setattr("scpi_control.automation.time", FakeTime())
+    dc, _ = _collector()
+    statuses = []
+    try:
+        dc.batch_capture(
+            channels=[1],
+            timebase_scales=["1us", "1000ns"],
+            triggers_per_config=1,
+            progress_callback=lambda current, total, status: statuses.append(status),
+        )
+    finally:
+        dc.disconnect()
+    assert [s.split(",")[0] for s in statuses] == ["Config 1/2", "Config 2/2"]
 
 
 def test_successful_entries_carry_no_error_key(monkeypatch):
