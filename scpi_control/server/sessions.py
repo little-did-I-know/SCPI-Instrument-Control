@@ -15,93 +15,20 @@ from concurrent.futures import Future
 from concurrent.futures import TimeoutError as FuturesTimeoutError
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
-from scpi_control import Oscilloscope
-from scpi_control.connection.mock import MockConnection
 from scpi_control.exceptions import InvalidParameterError, SiglentConnectionError, SiglentError
-from scpi_control.server import compute
-from scpi_control.server.netpolicy import validate_target
+from scpi_control.server.adapters import ADAPTERS, MAX_FRAME_POINTS, _decimate_frame, _waveform_frame, read_state  # noqa: F401  (re-exported: stream.py/api/scope.py and tests import these from here)
+from scpi_control.server.adapters import make_mock_scope_connection as _make_mock_connection  # noqa: F401  (re-exported for backward compatibility)
 from scpi_control.server.recorder import TrendRecorder
 
-MAX_FRAME_POINTS = 2000
-MEASUREMENT_EVERY_N_POLLS = 4
-
-
-def _safe(fn, default=None):
-    try:
-        return fn()
-    except SiglentError:
-        return default
-
-
-def _quiet(fn, default=None):
-    """Like _safe, but for analysis compute: ANY exception degrades to default.
-
-    The poll tick is the session heartbeat; a numpy edge case in analysis
-    must never kill the worker thread.
-    """
-    try:
-        return fn()
-    except Exception:
-        return default
-
-
-def read_state(scope: Oscilloscope) -> Dict[str, Any]:
-    channels: Dict[int, Dict[str, Any]] = {}
-    for n in scope.supported_channels:
-        ch = scope.get_channel(n)
-        channels[n] = {
-            "enabled": ch.enabled,
-            "voltage_scale": ch.voltage_scale,
-            "voltage_offset": ch.voltage_offset,
-            "coupling": ch.coupling,
-            "probe_ratio": _safe(lambda: ch.probe_ratio),
-        }
-    trig = scope.trigger
-    return {
-        "run_state": scope.acquisition_status(),
-        "timebase": scope.timebase,
-        "channels": channels,
-        "trigger": {
-            "mode": trig.mode,
-            "source": _safe(lambda: trig.source),
-            "level": _safe(lambda: trig.level),
-            "slope": _safe(lambda: trig.slope),
-            "coupling": _safe(lambda: trig.coupling),
-        },
-    }
-
-
-def _decimate_frame(channel, time_axis, voltage) -> Dict[str, Any]:
-    step = max(1, -(-len(voltage) // MAX_FRAME_POINTS))  # ceiling division keeps len(points) <= cap
-    points = voltage[::step]
-    t0 = float(time_axis[0]) if len(time_axis) else 0.0
-    dt = float(time_axis[1] - time_axis[0]) * step if len(time_axis) > 1 else 1.0
-    return {"type": "waveform", "channel": channel, "t0": t0, "dt": dt, "points": [float(v) for v in points]}
-
-
-def _waveform_frame(scope: Oscilloscope, channel: int) -> Dict[str, Any]:
-    data = scope.get_waveform(channel, provenance=False)
-    return _decimate_frame(channel, data.time, data.voltage)
-
-
 _STOP = object()
-
-DEFAULT_MOCK_IDN = "Siglent Technologies,SDS1104X-E,MOCK0001,1.0.0.0"
 
 
 class SessionError(RuntimeError):
     """Session is not in a state that can accept jobs (maps to HTTP 409)."""
 
 
-def _make_mock_connection(model: Optional[str]) -> MockConnection:
-    idn = DEFAULT_MOCK_IDN if model is None else "Siglent Technologies,{0},MOCK0001,1.0.0.0".format(model)
-    # No explicit waveform_payloads: channels serve state-coupled synthesized
-    # signals (connection/mock/synth.py). 1 MSa/s x 14 div x 1 ms/div = 14k points.
-    return MockConnection("mock", idn=idn, channel_states={1: True, 2: False, 3: False, 4: False}, trigger_status=["Stop"], sample_rate=1_000_000.0, timebase=1e-3)
-
-
 class InstrumentSession:
-    def __init__(self, label: str, scope: Oscilloscope, mock: bool, address: Optional[str], poll_interval: float):
+    def __init__(self, label: str, instrument: Any, mock: bool, address: Optional[str], poll_interval: float, adapter: Any):
         self.id = uuid.uuid4().hex[:8]
         self.label = label
         self.mock = mock
@@ -112,7 +39,12 @@ class InstrumentSession:
         self.dialect = ""
         self.num_channels = 0
         self.error_detail: Optional[str] = None
-        self._scope = scope
+        self.adapter = adapter
+        # Transitional: the adapter reads scope-owned config (filters,
+        # spectrum_config, measurements, recorder, active_reference) off this
+        # back-reference until Task 3 moves that state onto the adapter itself.
+        self.adapter.session = self
+        self._instrument = instrument
         self._poll_interval = poll_interval
         self._queue: "queue.Queue" = queue.Queue()
         self._closed = threading.Event()
@@ -187,6 +119,7 @@ class InstrumentSession:
         cls,
         label: str,
         *,
+        kind: str = "scope",
         address: Optional[str] = None,
         port: int = 5025,
         mock: bool = False,
@@ -196,15 +129,9 @@ class InstrumentSession:
         allowed_ports: Optional[frozenset] = None,
         _connection=None,
     ) -> "InstrumentSession":
-        if mock:
-            conn = _connection if _connection is not None else _make_mock_connection(model)
-            scope = Oscilloscope("mock", connection=conn)
-        else:
-            if not address:
-                raise ValueError("address is required for a non-mock session")
-            validate_target(address, port, allowed_ports=allowed_ports)
-            scope = Oscilloscope(address, port=port)
-        session = cls(label, scope, mock, address, poll_interval)
+        adapter = ADAPTERS[kind]()
+        instrument = adapter.build(address=address, port=port, mock=mock, model=model, allowed_ports=allowed_ports, connection=_connection)
+        session = cls(label, instrument, mock, address, poll_interval, adapter)
         session.owner = owner
         session._thread.start()
         try:
@@ -219,16 +146,20 @@ class InstrumentSession:
             raise
         return session
 
-    def _connect_job(self, scope: Oscilloscope) -> None:
-        scope.connect()
-        self.idn = scope.identify()
-        info = scope.device_info or {}
-        self.model = info.get("model", "")
-        self.dialect = scope.dialect or ""
-        self.num_channels = len(scope.supported_channels)
+    @property
+    def _scope(self) -> Any:
+        """Alias kept for the mechanical Task 3 rename; use ``_instrument``."""
+        return self._instrument
+
+    def _connect_job(self, instrument: Any) -> None:
+        info = self.adapter.connect(instrument)
+        self.idn = info["idn"]
+        self.model = info["model"]
+        self.dialect = info["dialect"]
+        self.num_channels = info["num_channels"]
         self.state = "connected"
 
-    def submit(self, fn: Callable[[Oscilloscope], Any]) -> "Future":
+    def submit(self, fn: Callable[[Any], Any]) -> "Future":
         if self._closed.is_set() or self.state == "error":
             # spec: mutations on a dead session are 409 until it is deleted
             raise SessionError("session {0} is {1}".format(self.id, self.state))
@@ -355,63 +286,17 @@ class InstrumentSession:
                 return
         if self.state != "connected":
             return
-        if not self._scope.is_connected:
+        if not self._instrument.is_connected:
             # The wire dropped while idle (no job in flight to surface it).
             self._enter_error_state("connection lost")
             return
         self._poll_count += 1
-        scope = self._scope
         try:
-            acquired = {}
-            for n in scope.supported_channels:
-                ch = scope.get_channel(n)
-                if ch is not None and _safe(lambda: ch.enabled, default=False):
-                    data = scope.get_waveform(n, provenance=False)
-                    acquired["C{0}".format(n)] = data
-                    self.publish(_decimate_frame(n, data.time, data.voltage))
-            shown_now = set()
-            for label, math in (("M1", scope.math1), ("M2", scope.math2)):
-                result = None
-                if math is not None and _safe(lambda: math.enabled, default=False):
-                    result = _safe(lambda: math.compute(acquired))
-                if result is not None:
-                    self.publish(_decimate_frame(label, result.time, result.voltage))
-                    shown_now.add(label)
-                elif label in self._shown:
-                    self.publish(_decimate_frame(label, [], []))  # one-shot clear on transition
-            for n in sorted(self.filters):
-                config = self.filters[n]
-                label = "F{0}".format(n)
-                result = _quiet(lambda: compute.filtered_waveform(config, acquired)) if config["enabled"] else None
-                if result is not None:
-                    self.publish(_decimate_frame(label, result.time, result.voltage))
-                    shown_now.add(label)
-                elif label in self._shown:
-                    self.publish(_decimate_frame(label, [], []))
-            spectrum_config = self.spectrum_config  # snapshot: request threads swap the dict atomically
-            frame = _quiet(lambda: compute.spectrum_frame(spectrum_config, acquired)) if spectrum_config["enabled"] else None
-            if frame is not None:
-                self.publish(frame)
-                shown_now.add("SPEC")
-            elif "SPEC" in self._shown:
-                self.publish(compute.empty_spectrum_frame(spectrum_config))
-            self._shown = shown_now
-            if self._poll_count % MEASUREMENT_EVERY_N_POLLS == 0:
-                if self.measurements:
-                    now = time.time()
-                    values = []
-                    for channel, mtype in self.measurements:
-                        value = _safe(lambda: scope.measurement.measure(mtype, channel))
-                        values.append({"channel": channel, "mtype": mtype, "value": value})
-                    self.publish({"type": "measurements", "values": values, "timestamp": now})
-                    self.recorder.append(now, [entry["value"] for entry in values])
-                reference = self.active_reference  # snapshot for thread safety
-                if reference is not None:
-                    self.publish(compute.reference_stats(reference, acquired))
+            self.adapter.poll(self._instrument, self.publish, self._poll_count)
         except SiglentError as exc:
             self.error_detail = str(exc)
             self.publish({"type": "error", "detail": str(exc)})
-            if not scope.is_connected:
+            if not self._instrument.is_connected:
                 self.state = "error"
 
 
