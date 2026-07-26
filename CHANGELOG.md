@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.6.0] - 2026-07-26
+
 ### Fixed
 
 - `save_waveform` now accepts `npz` and `h5` as aliases for `NPY` and `HDF5`. `npz` is
