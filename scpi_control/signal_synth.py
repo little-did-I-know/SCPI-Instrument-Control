@@ -36,10 +36,14 @@ class SignalSpec:
         glitch_rate: Mean glitches per second (0 = off).
         glitch_amplitude: Volts, peak height of a glitch.
         ringing_frequency: Hz of post-edge oscillation (0 = off). Ringing is
-            an EDGE impairment -- it is only meaningful on signals that have
-            edges to trigger on ("square", or a pulse-like "ramp"). Applying
-            it to "sine" or "dc" has no effect, since those kinds never
-            produce a discontinuity.
+            an EDGE impairment: it is PHYSICALLY meaningful on kinds with fast
+            edges ("square", "pulse", or a pulse-like "ramp"). It is not,
+            however, a no-op elsewhere -- edges are found as any nonzero
+            sample-to-sample change, not only as a discontinuity, so on a
+            continuous kind ("sine", "chirp", "exponential", "multitone") it
+            acts as a derivative-weighted filter whose magnitude scales with
+            the signal's slew rate: measurable, but usually small. Only "dc",
+            whose sample-to-sample differences are all zero, is a true no-op.
         ringing_damping: Decay rate per second of that oscillation; only used
             when ringing_frequency > 0. Defaults away from 0 for the same
             reason drift_frequency does: undamped ringing (decay rate 0)
@@ -78,7 +82,7 @@ class SignalSpec:
     drift_frequency: float = 0.1  # Hz of that wander; only used when drift_amplitude > 0
     glitch_rate: float = 0.0  # mean glitches per second (0 = off)
     glitch_amplitude: float = 0.0  # volts, peak height of a glitch
-    ringing_frequency: float = 0.0  # Hz of post-edge oscillation (0 = off); an edge impairment, meaningful only on "square"/pulse-like "ramp"
+    ringing_frequency: float = 0.0  # Hz of post-edge oscillation (0 = off); an edge impairment -- physically meaningful on "square"/"pulse"; on continuous kinds a small derivative filter, not a no-op
     ringing_damping: float = 5_000.0  # decay rate per second (M8: nonzero default, same reason as drift_frequency -- damping=0 never decays, making the kernel run the whole buffer on every edge)
     # Kind-specific parameters, appended at the END for the same reason the
     # impairments above were: inserting them beside the fields they read best
@@ -153,7 +157,10 @@ def _exponential(spec: SignalSpec, t: np.ndarray, rng: np.random.Generator) -> n
 
     Both branch boundaries evaluate to the same level (the high branch at t_high
     equals low_start; the low branch at t_low equals high_start), so the result
-    is continuous everywhere -- ringing is a genuine no-op on this kind.
+    is continuous everywhere -- there is no jump for a probe's edge response to
+    key on. (Not the same as ringing being a no-op here: it keys on any
+    sample-to-sample change, so it still filters this kind slightly. See
+    SignalSpec.ringing_frequency.)
     """
     period = 1.0 / spec.frequency
     t_high = spec.duty * period
@@ -368,6 +375,11 @@ def synthesize(spec: SignalSpec, sample_rate: float, n_points: int, t0: float = 
         # continuity test below until reordered this way).
         t_ext = t0 + (np.arange(n_points + decay_len) - decay_len) / sample_rate
         samples_ext = _GENERATORS[spec.kind](spec, t_ext, rng) + spec.offset
+        # ANY nonzero sample-to-sample change is an edge here, not just a
+        # discontinuity: on a continuous kind every sample qualifies, so this
+        # becomes a derivative-weighted filter rather than a no-op. That is
+        # defensible as a band-limited edge response and is documented as such
+        # on SignalSpec.ringing_frequency -- it is not a special case to strip.
         edges = np.flatnonzero(np.diff(samples_ext))
         if edges.size:
             # 5 time constants of decay, in samples. `max(spec.ringing_damping, 1e-9)`

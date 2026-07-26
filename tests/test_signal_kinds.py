@@ -161,8 +161,10 @@ def test_a_very_slow_rc_stays_finite():
 
 def test_exponential_is_continuous_at_its_phase_boundaries():
     """Both branch boundaries evaluate to the same level by construction, so the
-    trace has no jump anywhere -- which is why ringing is a documented no-op on
-    this kind."""
+    trace has no jump anywhere -- there is no real edge for a probe's edge
+    response to key on. (That is NOT the same as ringing being a no-op here:
+    ringing keys on any sample-to-sample change, so it still filters this kind
+    slightly. Only "dc" is a true no-op.)"""
     samples = synthesize(SignalSpec(kind="exponential", frequency=1_000.0, tau=1e-4), RATE, 3_000)
     assert np.max(np.abs(np.diff(samples))) < 0.05
 
@@ -382,3 +384,35 @@ def test_the_reassemble_check_actually_detects_a_chunk_relative_state_bug(monkey
     with pytest.raises(AssertionError):
         np.testing.assert_allclose(streamed, whole, rtol=0, atol=1e-9)
     assert np.max(np.abs(streamed - whole)) > 0.1  # order the amplitude, not float noise
+
+
+@pytest.mark.parametrize(
+    "kwargs, floor",
+    [
+        ({"kind": "chirp", "end_frequency": 10_000.0, "sweep_time": 0.01}, 5e-2),
+        ({"kind": "exponential", "tau": 1e-4}, 2e-2),
+        ({"kind": "multitone"}, 5e-3),
+        ({"kind": "sine"}, 5e-3),
+    ],
+    ids=["chirp", "exponential", "multitone", "sine"],
+)
+def test_ringing_is_not_a_no_op_on_a_continuous_kind(kwargs, floor):
+    """Pins the corrected documentation. Ringing was described as a no-op on
+    every continuous kind; it is not. Edges are found as ANY nonzero
+    sample-to-sample change, not as a discontinuity, so on a continuous signal
+    every sample qualifies and the impairment acts as a derivative-weighted
+    filter. Floors are ~half the measured deviation at these settings (chirp
+    1.04e-1 V, exponential 5.60e-2, multitone 1.33e-2, sine 9.85e-3 -- square,
+    which has real edges, is 8.95e-1)."""
+    plain = SignalSpec(frequency=1_000.0, amplitude=1.0, **kwargs)
+    ringing = dataclasses.replace(plain, ringing_frequency=50_000.0)
+    deviation = np.max(np.abs(synthesize(ringing, RATE, 5_000) - synthesize(plain, RATE, 5_000)))
+    assert deviation > floor
+
+
+def test_ringing_is_a_true_no_op_only_on_dc():
+    """The one kind whose sample-to-sample differences are all zero, so no
+    sample is ever detected as an edge."""
+    plain = SignalSpec(kind="dc", offset=0.5)
+    ringing = dataclasses.replace(plain, ringing_frequency=50_000.0)
+    np.testing.assert_array_equal(synthesize(ringing, RATE, 5_000), synthesize(plain, RATE, 5_000))

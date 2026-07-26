@@ -63,14 +63,19 @@ value that leaves the signal unaffected, so existing code that constructs a
 - **`ringing_frequency`/`ringing_damping`** add a damped sinusoid after every
   edge of a periodic signal -- what a real probe/scope front-end does after a
   fast transition, and what gives an overshoot/preshoot measurement something
-  genuine to measure. It's an edge impairment, so it is only meaningful on
-  signals that actually have edges (`"square"` and `"pulse"`, or a pulse-like
-  `"ramp"`) -- applying it to `"sine"` or `"dc"` has no effect, since those
-  kinds have no discontinuities for it to trigger on. It is likewise a
-  genuine no-op on `"chirp"`, `"exponential"`, and `"multitone"`, all three of
-  which are continuous. For `"exponential"` that continuity is by
-  construction: both branch boundaries of the RC charge/discharge evaluate to
-  the same level, so there is never a real edge for the kernel to trigger on.
+  genuine to measure. It's an edge impairment, so it is *physically*
+  meaningful on signals that actually have fast edges (`"square"` and
+  `"pulse"`, or a pulse-like `"ramp"`). On the continuous kinds (`"sine"`,
+  `"chirp"`, `"exponential"`, `"multitone"`) it is **not** a no-op, though:
+  edges are found as any nonzero sample-to-sample change rather than as a
+  discontinuity, so every sample of a continuous signal qualifies and the
+  impairment becomes a derivative-weighted filter. Its magnitude scales with
+  the signal's slew rate -- measurable, but usually far smaller than on a real
+  edge (at `sample_rate=1e6`, `amplitude=1.0`,
+  `ringing_frequency=50_000`: about 0.10 V on `"chirp"`, 0.056 V on
+  `"exponential"`, 0.013 V on `"multitone"` and 0.010 V on `"sine"`, against
+  0.90 V on `"square"`). `"dc"`, whose sample-to-sample differences are all
+  zero, is the only kind ringing genuinely leaves untouched.
 
 ```python
 from scpi_control.signal_synth import SignalSpec, synthesize
