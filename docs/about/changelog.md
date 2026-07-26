@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- The oscilloscope screenshot at the top of the README no longer fails to load on the PyPI
+  project page. It used a repository-relative path, which GitHub resolves against the repo but
+  PyPI cannot — PyPI renders the README as a standalone document with no repo context, so the
+  image silently broke there while looking fine on GitHub. It now uses an absolute raw URL. Note
+  that PyPI project pages are immutable per release, so the fix appears from the next release
+  onward; already-published pages keep the broken image.
+
 ## [5.5.0] - 2026-07-26
 
 ### Added
