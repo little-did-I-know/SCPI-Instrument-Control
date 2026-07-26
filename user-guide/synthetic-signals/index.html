@@ -1027,6 +1027,67 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#awg-to-scope-loopback" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AWG to Scope Loopback
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="AWG to Scope Loopback">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#signals-as-a-callable" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        signals= as a callable
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#function-mapping" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Function mapping
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#duty-is-clamped-not-validated" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Duty is clamped, not validated
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-dut-rclowpass" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The DUT: RCLowPass
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#extensibility" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3718,6 +3779,67 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#awg-to-scope-loopback" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AWG to Scope Loopback
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="AWG to Scope Loopback">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#signals-as-a-callable" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        signals= as a callable
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#function-mapping" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Function mapping
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#duty-is-clamped-not-validated" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Duty is clamped, not validated
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-dut-rclowpass" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The DUT: RCLowPass
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#extensibility" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4197,6 +4319,132 @@ byte-identical tests unaffected by this feature.</p>
 <code>sample_rate=1_000_000.0</code>, so a default mock session's captures are 14,000
 points long (14 divisions x 1 ms/div timebase) instead of the fixed 256-byte
 explicit ramp payloads earlier sessions served.</p>
+<h2 id="awg-to-scope-loopback">AWG to Scope Loopback<a class="headerlink" href="#awg-to-scope-loopback" title="Permanent link">&para;</a></h2>
+<p>Every example so far has one mock instrument synthesizing from its own state.
+<code>AwgLoopback</code> (<code>scpi_control.connection.mock.loopback</code>) patches a second mock
+instrument's state into that synthesis, so a mock scope can capture whatever a
+mock AWG is currently outputting -- two separate <code>MockConnection</code> objects, one
+virtual cable between them:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">scpi_control.connection</span><span class="w"> </span><span class="kn">import</span> <span class="n">MockConnection</span>
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">scpi_control.connection.mock.loopback</span><span class="w"> </span><span class="kn">import</span> <span class="n">AwgLoopback</span>
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">scpi_control.dut</span><span class="w"> </span><span class="kn">import</span> <span class="n">RCLowPass</span>
+</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="kn">from</span><span class="w"> </span><span class="nn">scpi_control.oscilloscope</span><span class="w"> </span><span class="kn">import</span> <span class="n">Oscilloscope</span>
+</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>
+</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="n">awg</span> <span class="o">=</span> <span class="n">MockConnection</span><span class="p">(</span><span class="s2">&quot;mock&quot;</span><span class="p">,</span> <span class="n">awg_mode</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</span><span id="__span-6-7"><a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a><span class="n">scope_conn</span> <span class="o">=</span> <span class="n">MockConnection</span><span class="p">(</span><span class="s2">&quot;mock&quot;</span><span class="p">,</span> <span class="n">signals</span><span class="o">=</span><span class="p">{</span><span class="mi">1</span><span class="p">:</span> <span class="n">AwgLoopback</span><span class="p">(</span><span class="n">awg</span><span class="p">,</span> <span class="n">awg_channel</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">dut</span><span class="o">=</span><span class="n">RCLowPass</span><span class="p">(</span><span class="n">cutoff_hz</span><span class="o">=</span><span class="mi">2_000</span><span class="p">))})</span>
+</span><span id="__span-6-8"><a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a><span class="n">scope</span> <span class="o">=</span> <span class="n">Oscilloscope</span><span class="p">(</span><span class="s2">&quot;mock&quot;</span><span class="p">,</span> <span class="n">connection</span><span class="o">=</span><span class="n">scope_conn</span><span class="p">)</span>
+</span></code></pre></div>
+<h3 id="signals-as-a-callable"><code>signals=</code> as a callable<a class="headerlink" href="#signals-as-a-callable" title="Permanent link">&para;</a></h3>
+<p><code>signals={channel: ...}</code> now accepts a callable that returns a <code>SignalSpec</code>,
+not just a static <code>SignalSpec</code> instance -- and unlike a static spec, which is
+read once, a callable is invoked at <strong>every acquisition</strong>. That is what makes
+the loopback live: <code>AwgLoopback</code> is such a callable, and each call re-reads
+the AWG connection's current channel state, so a <code>C1:BSWV</code> write on the AWG
+changes the very next scope capture. This is a general extension point, not
+specific to AWGs -- anything with a <code>() -&gt; SignalSpec</code> signature works.</p>
+<h3 id="function-mapping">Function mapping<a class="headerlink" href="#function-mapping" title="Permanent link">&para;</a></h3>
+<p><code>AwgLoopback</code> translates the AWG channel's live state into a <code>SignalSpec</code> on
+every call:</p>
+<table>
+<thead>
+<tr>
+<th>AWG <code>WVTP</code></th>
+<th><code>SignalSpec.kind</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>SINE</code></td>
+<td><code>sine</code></td>
+</tr>
+<tr>
+<td><code>SQUARE</code></td>
+<td><code>square</code></td>
+</tr>
+<tr>
+<td><code>NOISE</code></td>
+<td><code>noise</code></td>
+</tr>
+<tr>
+<td><code>DC</code></td>
+<td><code>dc</code></td>
+</tr>
+<tr>
+<td><code>PULSE</code></td>
+<td><code>pulse</code></td>
+</tr>
+<tr>
+<td><code>RAMP</code></td>
+<td><code>triangle</code> if symmetry is within 1 percentage point of 50 (i.e. 49 to 51), otherwise <code>ramp</code></td>
+</tr>
+<tr>
+<td><code>ARB</code></td>
+<td><code>sine</code>, with a logged warning (the mock stores no arbitrary sample data)</td>
+</tr>
+</tbody>
+</table>
+<p>Two unit conversions happen on the way in, because the AWG and <code>SignalSpec</code>
+don't speak the same units for the same quantity:</p>
+<ul>
+<li><strong>Amplitude.</strong> An AWG's <code>AMP</code> is peak-to-peak; <code>SignalSpec.amplitude</code> is
+  peak. <code>AwgLoopback</code> halves it, so an AWG set to 2.0 Vpp arrives as a 2.0 V
+  peak-to-peak capture, not 4.0. <strong><code>NOISE</code> is the exception</strong>, because
+  <code>SignalSpec.amplitude</code> is a standard deviation for that kind rather than a
+  peak: Gaussian noise has no true peak, so <code>AwgLoopback</code> maps the AWG's <code>AMP</code>
+  on the usual convention that a quoted peak-to-peak is the &plusmn;3 sigma span
+  (99.7% of samples), i.e. <code>sigma = Vpp / 6</code>. An AWG set to 2.0 Vpp of noise
+  therefore arrives as a sigma = 0.333 V trace, and only sigma is fixed by that
+  mapping -- the measured peak-to-peak of an actual capture is not scattered
+  around 2.0 V but systematically above it, because the extreme of N Gaussian
+  samples grows with N rather than converging on the &plusmn;3 sigma convention used
+  to set sigma. A 14,000-sample capture's expected extreme is about 7.9 sigma,
+  i.e. roughly 2.3 to 2.8 V peak-to-peak for this 2.0 Vpp request, and larger
+  still for a longer capture.</li>
+<li><strong>Phase.</strong> An AWG's <code>PHSE</code> is in degrees; <code>SignalSpec.phase</code> is in radians.
+  <code>AwgLoopback</code> converts.</li>
+</ul>
+<p>An output with <code>enabled=False</code> reads flat -- like a disconnected input, not a
+zero-amplitude waveform at some frequency.</p>
+<h3 id="duty-is-clamped-not-validated">Duty is clamped, not validated<a class="headerlink" href="#duty-is-clamped-not-validated" title="Permanent link">&para;</a></h3>
+<p><code>SignalSpec</code> requires strictly <code>0 &lt; duty &lt; 1</code> and raises <code>InvalidParameterError</code>
+outside that range, but a real AWG accepts <code>DUTY,0</code> and <code>DUTY,100</code> without
+complaint. <code>AwgLoopback</code> clamps the converted duty into <code>SignalSpec</code>'s legal
+range instead of propagating the AWG's value verbatim, because a mock
+instrument should not raise where a real one would simply output something
+(a very narrow pulse, or one at the opposite rail) and keep going.</p>
+<h3 id="the-dut-rclowpass">The DUT: <code>RCLowPass</code><a class="headerlink" href="#the-dut-rclowpass" title="Permanent link">&para;</a></h3>
+<p><code>AwgLoopback</code> accepts an optional <code>dut=</code> -- a device model sitting between
+the AWG and the scope, exactly where a real device under test would
+physically sit. That's why the DUT lives on the loopback rather than on the
+scope's <code>MockConnection</code>: it belongs to the cable run connecting the two
+instruments, not to either instrument itself.</p>
+<p><code>scpi_control.dut.RCLowPass(cutoff_hz=...)</code> is a first-order RC low-pass. It
+is stateful -- unlike every generator in <code>signal_synth</code>, which is closed-form
+specifically so consecutive captures and streamed chunks join seamlessly --
+so filtering a bare capture would start from <code>y = 0</code> and put a settling
+transient at the head of every acquisition. To avoid that, the filter is
+applied to a lead-in rendered <em>before</em> the capture window and then discarded,
+the same fix <code>signal_synth</code>'s ringing impairment uses for the same reason: a
+capture is in steady state from its very first sample, with no transient at
+the head.</p>
+<p><strong>Known simplification:</strong> trigger alignment (see <a href="#state-coupling">State
+coupling</a> above) searches for the trigger-level crossing on
+the <em>unfiltered</em> signal, so where a capture triggers does not depend on the
+DUT's filter state -- only the sample values within the window do.</p>
+<p><strong>Quantization caveat:</strong> a legacy-dialect mock capture is quantized to int8
+codes at 25 codes/division (see <a href="#state-coupling">State coupling</a> above), so a
+voltage difference smaller than one code -- 0.04 V at the default 1 V/div --
+cannot be resolved in a capture, no matter how gently the DUT is filtering. The
+modern dialect's <code>:WAVeform:WIDTh WORD</code> path is 256x finer (6400 codes/division,
+0.15625 mV/LSB), and since both paths share the same synthesis it is the WORD
+grid, not int8, that the filter's lead-in depth is sized against
+(<code>dut._WARMUP_TIME_CONSTANTS</code>, 12 time constants: <code>e^-12</code> leaves under 0.05 WORD
+LSB un-settled at the head of the window). A
+comparison that leans on fine amplitude detail (e.g. a raw sample-to-sample
+step height at a gentle cutoff) will end up measuring the code grid rather
+than the filter. Either widen the effect until it clears one code, or measure
+a time-domain property such as rise time instead, which isn't limited by the
+code grid -- see <code>examples/awg_scope_loopback.py</code>, which does exactly that.</p>
 <h2 id="extensibility">Extensibility<a class="headerlink" href="#extensibility" title="Permanent link">&para;</a></h2>
 <p>Signal kinds live in a small dispatch table (<code>kind -&gt; generator function</code>)
 inside <code>scpi_control/signal_synth.py</code>. The mock's state-coupling and
@@ -4210,6 +4458,8 @@ generator function, a table entry, and matching docs/tests -- no changes to
 <li><code>examples/synthetic_signals.py</code> for a runnable, hardware-free walkthrough
   of <code>make_waveform()</code>, a mock session reacting to SCPI writes, and the
   save/reload round trip</li>
+<li><code>examples/awg_scope_loopback.py</code> for a runnable walkthrough of the AWG to
+  scope loopback, including the <code>RCLowPass</code> DUT</li>
 </ul>
 
 

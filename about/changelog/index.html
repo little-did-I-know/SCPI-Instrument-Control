@@ -6524,6 +6524,22 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   shortfall. Note this changes the default behaviour of a run whose captures all fail: it now stops
   early instead of attempting every planned capture. Pass <code>max_consecutive_failures=None</code> to
   restore the old behaviour; a run with genuinely sparse triggers should raise <code>max_wait</code> instead.</li>
+<li>A mock AWG's output can now be captured by a mock oscilloscope: wire
+  <code>AwgLoopback(awg_connection, awg_channel=1)</code> into the scope's <code>signals=</code>, and a SCPI write to the
+  AWG changes the next capture. Previously the mock AWG was a write-only surface — you could set a
+  waveform and read it back, but nothing in the system responded to its output, which made it
+  untestable end to end without hardware. <code>MockConnection</code>'s <code>signals=</code> now accepts a callable
+  returning a <code>SignalSpec</code> as well as a static one, evaluated at every acquisition; this is a
+  general extension point, not AWG-specific, so any dynamic signal source works the same way.
+  <code>scpi_control.dut.RCLowPass</code> is a new first-order RC low-pass usable as a device under test
+  between the two instruments, or on any array on its own, using exact zero-order-hold
+  discretisation; the mock applies it with a lead-in rendered before the capture window so a
+  capture has no settling transient at its head. Two conversions are worth knowing, because
+  getting them wrong produces plausible-looking output: AWG amplitude is peak-to-peak and is
+  halved into <code>SignalSpec</code>'s peak amplitude, and phase is degrees and becomes radians — an output
+  that is off reads flat. <code>ARB</code> is captured as a sine with a logged warning, since the mock stores
+  no arbitrary sample data, and extreme duty values are clamped rather than raising. Non-breaking:
+  a static <code>SignalSpec</code> in <code>signals=</code> behaves exactly as before.</li>
 </ul>
 <h3 id="changed">Changed<a class="headerlink" href="#changed" title="Permanent link">&para;</a></h3>
 <ul>
