@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `batch_capture` gained a circuit breaker: `max_consecutive_failures` (default 3) stops a run
+  after that many back-to-back capture failures, counted across configurations and reset by any
+  success. This guards the common unattended failure — a trigger level the signal never crosses —
+  which otherwise times out on every single capture: at a 70 s timeout and 100 triggers per
+  configuration, that is hours of waiting to collect nothing, previously surfaced only as one log
+  line per failure. Everything gathered before the breaker trips is still returned, with the
+  failed entries carrying their `error` field, and an error-level log names the reason and the
+  shortfall. Note this changes the default behaviour of a run whose captures all fail: it now stops
+  early instead of attempting every planned capture. Pass `max_consecutive_failures=None` to
+  restore the old behaviour; a run with genuinely sparse triggers should raise `max_wait` instead.
+
+### Changed
+
+- `start_continuous_capture` with `output_dir` set now returns per-capture metadata instead of an
+  empty list. Entries carry `timestamp`, `elapsed_time`, `capture_num` and the `files` written,
+  omitting the bulky waveform arrays (those are on disk). Previously the function returned `[]`
+  whether it had written ten thousand files or none, so a caller had no way to tell what happened.
+  In-memory mode (no `output_dir`) is unchanged and still returns the `waveforms`.
+
 ### Fixed
 
 - `start_continuous_capture` no longer hides save failures. Saving sat inside the capture loop's
@@ -24,14 +45,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   *attempted* — every capture yielding no waveforms, from disabled channels or a failing
   `acquire()` — now ends with a warning too; that is the same empty-directory symptom reached by a
   different route, and it was equally silent.
-
-### Changed
-
-- `start_continuous_capture` with `output_dir` set now returns per-capture metadata instead of an
-  empty list. Entries carry `timestamp`, `elapsed_time`, `capture_num` and the `files` written,
-  omitting the bulky waveform arrays (those are on disk). Previously the function returned `[]`
-  whether it had written ten thousand files or none, so a caller had no way to tell what happened.
-  In-memory mode (no `output_dir`) is unchanged and still returns the `waveforms`.
+- `batch_capture` no longer discards the whole run when interrupted or when the instrument stops
+  answering. It had no `KeyboardInterrupt` handler at all, so an operator stopping a run they could
+  see was doomed lost every capture already taken; it now keeps and returns them, matching what
+  `start_continuous_capture` already did. The guard covers the whole per-configuration body rather
+  than only the capture, because the gap between configurations — two socket writes plus the settle
+  delay — is exactly where an impatient operator tends to press Ctrl-C.
+- `batch_capture` now records any `SiglentError` as a failed entry, not just `SiglentTimeoutError`.
+  A dropped link mid-run previously propagated and discarded every capture already taken, which is
+  the precise loss the failed-entry path exists to prevent. Connection failures count toward the
+  circuit breaker as well — an instrument that has stopped answering is exactly what it is for. A
+  failure while *applying* a configuration stops the run and returns what was collected.
 
 ## [5.6.0] - 2026-07-26
 

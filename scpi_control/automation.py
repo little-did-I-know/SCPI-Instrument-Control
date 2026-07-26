@@ -231,6 +231,7 @@ class DataCollector:
         voltage_scales: Optional[Dict[int, List[str]]] = None,
         triggers_per_config: int = 1,
         progress_callback: Optional[Callable[[int, int, str], None]] = None,
+        max_consecutive_failures: Optional[int] = 3,
     ) -> List[Dict[str, Any]]:
         """Capture multiple waveforms with different configurations.
 
@@ -241,9 +242,25 @@ class DataCollector:
                            (e.g., {1: ['1V', '2V'], 2: ['500mV', '1V']})
             triggers_per_config: Number of captures per configuration
             progress_callback: Optional callback function(current, total, status)
+            max_consecutive_failures: Stop the run after this many back-to-back
+                capture timeouts, counted ACROSS configurations and reset by any
+                success. Guards the common unattended failure -- a trigger level
+                set where the signal never crosses it -- which otherwise times
+                out on every capture for the whole run: at a 70 s timeout and
+                100 triggers per configuration that is hours of waiting to
+                collect nothing. Pass None to disable the breaker entirely; a
+                run with genuinely sparse triggers should raise `max_wait`
+                rather than rely on repeated timeouts.
 
         Returns:
-            List of dictionaries containing waveforms and configuration metadata
+            List of dictionaries containing waveforms and configuration metadata.
+            When the breaker trips (or the run is interrupted) everything gathered
+            so far is still returned -- failed entries carry an ``error`` field --
+            rather than being discarded.
+
+        Raises:
+            InvalidParameterError: If a scale cannot be parsed, or
+                ``max_consecutive_failures`` is not None and not at least 1.
 
         Example:
             >>> results = collector.batch_capture(
@@ -253,10 +270,17 @@ class DataCollector:
             ... )
             >>> print(f"Collected {len(results)} captures")
         """
+        # Arguments are validated before the connection check: a bad argument is a
+        # bad argument whether or not an instrument happens to be attached, and
+        # reporting it only when connected makes it look like a connection problem.
+        if max_consecutive_failures is not None and max_consecutive_failures < 1:
+            raise InvalidParameterError(f"max_consecutive_failures must be at least 1, or None to disable the breaker: {max_consecutive_failures}")
         if not self._connected:
             raise SiglentError(f"Not connected to oscilloscope at {self.scope.host}:{self.scope.port}")
 
         results = []
+        consecutive_failures = 0
+        stop_reason = None
 
         # Build configuration list
         configs = []
@@ -288,50 +312,91 @@ class DataCollector:
         # dicts and now both parse to {'timebase': 1e-06} -- and index() would
         # then report "Config 1/2" twice.
         for config_index, config in enumerate(configs):
-            # Apply configuration
-            if "timebase" in config:
-                if hasattr(self.scope, "set_timebase"):
-                    self.scope.set_timebase(config["timebase"])
-                else:
-                    self.scope.timebase = config["timebase"]
-                logger.info(f"Set timebase to {config['timebase']}")
+            # The WHOLE per-config body is guarded, not just the capture. Ctrl-C
+            # lands wherever the operator happens to press it, and the gap between
+            # configs -- two socket writes plus the settle sleep below -- is exactly
+            # where an impatient operator watching a doomed run tends to hit it.
+            # Guarding only the capture would discard the whole run for a keypress
+            # one statement earlier, which is the loss this exists to prevent.
+            try:
+                # Apply configuration
+                if "timebase" in config:
+                    if hasattr(self.scope, "set_timebase"):
+                        self.scope.set_timebase(config["timebase"])
+                    else:
+                        self.scope.timebase = config["timebase"]
+                    logger.info(f"Set timebase to {config['timebase']}")
 
-            for ch, scale in [(int(k[2]), v) for k, v in config.items() if k.startswith("ch") and k.endswith("_vdiv")]:
-                channel = getattr(self.scope, f"channel{ch}")
-                if hasattr(channel, "set_scale"):
-                    channel.set_scale(scale)
-                else:
-                    channel.voltage_scale = scale
-                logger.info(f"Set channel {ch} scale to {scale}")
+                for ch, scale in [(int(k[2]), v) for k, v in config.items() if k.startswith("ch") and k.endswith("_vdiv")]:
+                    channel = getattr(self.scope, f"channel{ch}")
+                    if hasattr(channel, "set_scale"):
+                        channel.set_scale(scale)
+                    else:
+                        channel.voltage_scale = scale
+                    logger.info(f"Set channel {ch} scale to {scale}")
 
-            time.sleep(0.2)  # Allow settings to settle
+                time.sleep(0.2)  # Allow settings to settle
 
-            # Capture multiple triggers with this configuration
-            for trigger_num in range(triggers_per_config):
-                current += 1
+                # Capture multiple triggers with this configuration
+                for trigger_num in range(triggers_per_config):
+                    current += 1
 
-                if progress_callback:
-                    status = f"Config {config_index+1}/{len(configs)}, Trigger {trigger_num+1}/{triggers_per_config}"
-                    progress_callback(current, total, status)
+                    if progress_callback:
+                        status = f"Config {config_index+1}/{len(configs)}, Trigger {trigger_num+1}/{triggers_per_config}"
+                        progress_callback(current, total, status)
 
-                entry = {
-                    "timestamp": datetime.now().isoformat(),
-                    "config": config.copy(),
-                    "waveforms": {},
-                    "trigger_num": trigger_num,
-                }
-                try:
-                    entry["waveforms"] = self.capture_single(channels)
-                except SiglentTimeoutError as exc:
-                    # Record the failure and carry on. Raising would discard every
-                    # capture already taken; returning the stale waveform is what
-                    # this replaced. An "error" key appears ONLY on failed entries,
-                    # so consumers reading config/waveforms/trigger_num are
-                    # unaffected.
-                    logger.warning(f"Capture timed out for config {config}: {exc}")
-                    entry["error"] = str(exc)
-                results.append(entry)
+                    entry = {
+                        "timestamp": datetime.now().isoformat(),
+                        "config": config.copy(),
+                        "waveforms": {},
+                        "trigger_num": trigger_num,
+                    }
+                    try:
+                        entry["waveforms"] = self.capture_single(channels)
+                        # Any success proves the setup can still trigger, so the breaker
+                        # counts CONSECUTIVE failures rather than total ones -- an
+                        # occasional miss in a long run is not the same as a run that
+                        # cannot trigger at all.
+                        consecutive_failures = 0
+                    except SiglentError as exc:
+                        # SiglentError, not just SiglentTimeoutError: a dropped link is
+                        # the other likely unattended failure, and letting it propagate
+                        # would discard every capture already taken -- precisely the loss
+                        # this whole path exists to prevent. A scope that stopped
+                        # answering is also exactly what a breaker is for, so it counts.
+                        # Record and carry on; an "error" key appears ONLY on failed
+                        # entries, so consumers reading config/waveforms/trigger_num are
+                        # unaffected.
+                        logger.warning(f"Capture failed for config {config}: {exc}")
+                        entry["error"] = str(exc)
+                        consecutive_failures += 1
+                    results.append(entry)
 
+                    if max_consecutive_failures is not None and consecutive_failures >= max_consecutive_failures:
+                        stop_reason = f"{consecutive_failures} consecutive capture failures"
+                        break
+
+            except KeyboardInterrupt:
+                # Keep what was collected. Without this an operator aborting a run
+                # they can see is doomed loses every capture already taken.
+                logger.info("Batch capture interrupted by user")
+                stop_reason = "interrupted by user"
+            except SiglentError as exc:
+                # Applying the configuration failed -- the instrument stopped
+                # answering between captures. Stop, but return what was collected.
+                logger.error(f"Batch capture stopped: applying configuration {config} failed: {exc}")
+                stop_reason = f"instrument error while applying a configuration: {exc}"
+
+            if stop_reason is not None:
+                break
+
+        if stop_reason is not None:
+            # Not silent: the collected results come back, the failed entries carry
+            # their own `error`, and the caller is told the run was cut short. ERROR
+            # rather than WARNING because a truncated batch is a result the caller
+            # will otherwise mistake for a complete one -- `len(results)` is the only
+            # other signal, and save_batch reports it without any hint of a shortfall.
+            logger.error(f"Batch capture stopped early ({stop_reason}) after {len(results)} of {total} planned captures. Check the trigger level and max_wait if captures are timing out.")
         logger.info(f"Batch capture complete: {len(results)} captures")
         return results
 
