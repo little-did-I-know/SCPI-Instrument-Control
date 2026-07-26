@@ -149,10 +149,11 @@ def handle_write(conn, command: str) -> bool:
         return True
     if match := re.match(r"TRIGGER:A:HOLDOFF:TIME\s+(.+)", upper):
         value = float(match.group(1))
-        # trigger.py's own validation only rejects a NEGATIVE holdoff
-        # (`if time_seconds < 0: raise`), so 0 is legitimate and this is not
-        # gated on positivity.
-        if conn.reject_if_invalid(value, name="TRIGGER:A:HOLDOFF:TIME", positive=False):
+        # trigger.py's own validation rejects a NEGATIVE holdoff
+        # (`if time_seconds < 0: raise`), so 0 is legitimate but a negative
+        # value is not -- gated on non_negative (>= 0), not positive (> 0)
+        # (I2: `positive=False` alone let `-5.0` silently through).
+        if conn.reject_if_invalid(value, name="TRIGGER:A:HOLDOFF:TIME", positive=False, non_negative=True):
             return True
         conn.holdoff_time = value
         return True

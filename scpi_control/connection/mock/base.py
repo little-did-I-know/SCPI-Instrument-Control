@@ -259,7 +259,7 @@ class MockConnection(BaseConnection):
     # later without changing any caller.
     _ABSURD_MAGNITUDE = 1e6
 
-    def reject_if_invalid(self, value: float, *, name: str, positive: bool = True, max_magnitude: Optional[float] = None) -> bool:
+    def reject_if_invalid(self, value: float, *, name: str, positive: bool = True, non_negative: bool = False, max_magnitude: Optional[float] = None) -> bool:
         """Queue -222 and return True when `value` is unusable on any instrument.
 
         Callers skip their assignment when this returns True, so the command is
@@ -270,9 +270,15 @@ class MockConnection(BaseConnection):
         whose quantity legitimately exceeds it in normal use -- e.g. AWG
         frequency, where registered models go up to 120e6 Hz (awg_models.py)
         and the scope-calibrated 1e6 bound would reject a real value.
+
+        `non_negative=True` rejects a negative value while still accepting zero --
+        for callers whose real-driver validation is `>= 0` rather than `> 0`
+        (trigger holdoff, AWG phase/ramp symmetry, PSU voltage/current). Pass it
+        together with `positive=False` (the default `positive=True` already
+        excludes negatives, so `non_negative` would be redundant with it).
         """
         bound = self._ABSURD_MAGNITUDE if max_magnitude is None else max_magnitude
-        if not math.isfinite(value) or (positive and value <= 0) or abs(value) > bound:
+        if not math.isfinite(value) or (positive and value <= 0) or (non_negative and value < 0) or abs(value) > bound:
             self.push_error(-222, "Data out of range")
             return True
         return False
@@ -299,25 +305,34 @@ class MockConnection(BaseConnection):
         # Power supply commands
         if self.psu_mode:
             # Voltage setting: CH1:VOLT 5.0 (Siglent) or SOUR1:VOLT 5.0 (generic)
-            if match := re.match(r"(?:CH|SOUR)(\d+):VOLT\s+([\d.]+)", command, re.IGNORECASE):
+            # I1: the capture used to be `([\d.]+)`, which cannot match a sign,
+            # an exponent, or non-finite text -- `CH1:CURR 5e-05` matched only
+            # the leading "5" and silently stored 5.0A, a 100000x error with no
+            # error queued. `(.+)` (matching the scope handlers' own convention
+            # elsewhere in this file) hands the full token to float() so
+            # reject_if_invalid actually sees what was sent.
+            if match := re.match(r"(?:CH|SOUR)(\d+):VOLT\s+(.+)", command, re.IGNORECASE):
                 ch = int(match.group(1))
                 voltage = float(match.group(2))
                 # A voltage setpoint of 0.0 (output at rest) is legitimate --
                 # power_supply_output.py's own validation allows
-                # `0 <= volts <= max_voltage` -- so it is not gated on positivity.
-                if self.reject_if_invalid(voltage, name="VOLT", positive=False):
+                # `0 <= volts <= max_voltage` -- so it is gated on non_negative
+                # (>= 0) rather than positive (> 0): zero is accepted, a
+                # negative setpoint is not (I2).
+                if self.reject_if_invalid(voltage, name="VOLT", positive=False, non_negative=True):
                     return
                 if ch in self.psu_outputs:
                     self.psu_outputs[ch]["voltage"] = voltage
                 return
 
             # Current setting: CH1:CURR 2.0 (Siglent) or SOUR1:CURR 2.0 (generic)
-            if match := re.match(r"(?:CH|SOUR)(\d+):CURR\s+([\d.]+)", command, re.IGNORECASE):
+            if match := re.match(r"(?:CH|SOUR)(\d+):CURR\s+(.+)", command, re.IGNORECASE):
                 ch = int(match.group(1))
                 current = float(match.group(2))
                 # A current limit of 0.0 is legitimate for the same reason as
-                # voltage above, so it is not gated on positivity.
-                if self.reject_if_invalid(current, name="CURR", positive=False):
+                # voltage above, so it is gated on non_negative rather than
+                # positive (I2).
+                if self.reject_if_invalid(current, name="CURR", positive=False, non_negative=True):
                     return
                 if ch in self.psu_outputs:
                     self.psu_outputs[ch]["current"] = current
@@ -354,7 +369,7 @@ class MockConnection(BaseConnection):
                 return
 
             # OVP setting: CH1:VOLT:PROT 25.0 or SOUR1:VOLT:PROT 25.0
-            if match := re.match(r"(?:CH|SOUR)(\d+):VOLT:PROT\s+([\d.]+)", command, re.IGNORECASE):
+            if match := re.match(r"(?:CH|SOUR)(\d+):VOLT:PROT\s+(.+)", command, re.IGNORECASE):
                 ch = int(match.group(1))
                 level = float(match.group(2))
                 # Unlike voltage/current setpoints above, an OVP level of 0V
@@ -366,7 +381,7 @@ class MockConnection(BaseConnection):
                 return
 
             # OCP setting: CH1:CURR:PROT 2.5 or SOUR1:CURR:PROT 2.5
-            if match := re.match(r"(?:CH|SOUR)(\d+):CURR:PROT\s+([\d.]+)", command, re.IGNORECASE):
+            if match := re.match(r"(?:CH|SOUR)(\d+):CURR:PROT\s+(.+)", command, re.IGNORECASE):
                 ch = int(match.group(1))
                 level = float(match.group(2))
                 # Same reasoning as OVP: an OCP level of 0A is not usable, so
@@ -458,11 +473,13 @@ class MockConnection(BaseConnection):
 
             # Phase: C1:BSWV PHSE,90 (Siglent) or SOUR1:PHAS 90 (generic)
             # Phase 0 is legitimate (awg_output.py's own validation allows
-            # `0 <= degrees <= 360`), so it is not gated on positivity.
+            # `0 <= degrees <= 360`), so it is gated on non_negative (>= 0)
+            # rather than positive (> 0) -- a negative phase is not a value
+            # the real driver ever allows either (I2).
             if match := re.match(r"C(\d+):BSWV\s+PHSE,([\d.E+\-]+)", command, re.IGNORECASE):
                 ch = int(match.group(1))
                 phase = float(match.group(2))
-                if self.reject_if_invalid(phase, name="PHSE", positive=False):
+                if self.reject_if_invalid(phase, name="PHSE", positive=False, non_negative=True):
                     return
                 if ch in self.awg_channels:
                     self.awg_channels[ch]["phase"] = phase
@@ -470,7 +487,7 @@ class MockConnection(BaseConnection):
             if match := re.match(r"SOUR(\d+):PHAS\s+([\d.E+\-]+)", command, re.IGNORECASE):
                 ch = int(match.group(1))
                 phase = float(match.group(2))
-                if self.reject_if_invalid(phase, name="PHAS", positive=False):
+                if self.reject_if_invalid(phase, name="PHAS", positive=False, non_negative=True):
                     return
                 if ch in self.awg_channels:
                     self.awg_channels[ch]["phase"] = phase
@@ -500,12 +517,13 @@ class MockConnection(BaseConnection):
             # Ramp symmetry: C1:BSWV SYM,50 (Siglent) or SOUR1:FUNC:RAMP:SYMM 50 (generic)
             # Symmetry 0 (a pure downward sawtooth) is legitimate
             # (awg_output.py's own validation allows `0 <= percent <= 100`
-            # inclusive, unlike duty cycle above), so it is not gated on
-            # positivity.
+            # inclusive, unlike duty cycle above), so it is gated on
+            # non_negative (>= 0) rather than positive (> 0) -- a negative
+            # symmetry is not a value the real driver ever allows either (I2).
             if match := re.match(r"C(\d+):BSWV\s+SYM,([\d.E+\-]+)", command, re.IGNORECASE):
                 ch = int(match.group(1))
                 symm = float(match.group(2))
-                if self.reject_if_invalid(symm, name="SYM", positive=False):
+                if self.reject_if_invalid(symm, name="SYM", positive=False, non_negative=True):
                     return
                 if ch in self.awg_channels:
                     self.awg_channels[ch]["ramp_symmetry"] = symm
@@ -513,7 +531,7 @@ class MockConnection(BaseConnection):
             if match := re.match(r"SOUR(\d+):FUNC:RAMP:SYMM\s+([\d.E+\-]+)", command, re.IGNORECASE):
                 ch = int(match.group(1))
                 symm = float(match.group(2))
-                if self.reject_if_invalid(symm, name="FUNC:RAMP:SYMM", positive=False):
+                if self.reject_if_invalid(symm, name="FUNC:RAMP:SYMM", positive=False, non_negative=True):
                     return
                 if ch in self.awg_channels:
                     self.awg_channels[ch]["ramp_symmetry"] = symm

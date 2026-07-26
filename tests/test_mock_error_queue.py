@@ -231,8 +231,17 @@ def test_daq_error_is_visible_through_the_public_api():
 # --- PSU numeric setters ----------------------------------------------------
 
 
-@pytest.mark.parametrize("value", [1e9], ids=["absurd"])
+@pytest.mark.parametrize(
+    "value",
+    [-5.0, 1e9, float("nan"), float("inf")],
+    ids=["negative", "absurd", "nan", "inf"],
+)
 def test_invalid_psu_voltage_is_rejected_and_queued(value):
+    """I1: the capture used to be `([\\d.]+)`, which cannot match a sign, nan,
+    or inf -- these all fell straight through unmatched (no rejection, no
+    state change, but also no error queued -- the guard was never reached at
+    all). Brought up to the same negative/nan/inf coverage as the scope
+    guards (test_invalid_voltage_scale_is_rejected_and_queued)."""
     conn = _conn(psu_mode=True)
     conn.write("CH1:VOLT {0}".format(value))
     assert conn.psu_outputs[1]["voltage"] == 0.0, "a rejected command must not change state"
@@ -249,7 +258,22 @@ def test_zero_psu_voltage_is_accepted_and_queues_nothing():
     assert conn.error_queue == []
 
 
-@pytest.mark.parametrize("value", [1e9], ids=["absurd"])
+def test_psu_voltage_microvolt_setpoint_is_not_corrupted_by_the_regex():
+    """I1 regression: `CH1:VOLT 2e-05` (what `"{0}".format(0.00002)` produces)
+    used to match only the leading "2" under the old `([\\d.]+)` capture, so
+    the mock silently stored 2.0V instead of 20 microvolts -- a 100000x error
+    with nothing queued to reveal it."""
+    conn = _conn(psu_mode=True)
+    conn.write("CH1:VOLT {0}".format(0.00002))
+    assert conn.psu_outputs[1]["voltage"] == 2e-05
+    assert conn.error_queue == []
+
+
+@pytest.mark.parametrize(
+    "value",
+    [-5.0, 1e9, float("nan"), float("inf")],
+    ids=["negative", "absurd", "nan", "inf"],
+)
 def test_invalid_psu_current_is_rejected_and_queued(value):
     conn = _conn(psu_mode=True)
     conn.write("CH1:CURR {0}".format(value))
@@ -266,11 +290,27 @@ def test_zero_psu_current_is_accepted_and_queues_nothing():
     assert conn.error_queue == []
 
 
-@pytest.mark.parametrize("value", [0.0, 1e9], ids=["zero", "absurd"])
+def test_psu_current_microamp_setpoint_is_not_corrupted_by_the_regex():
+    """I1 regression: `set_current(0.00005)` emits `CH1:CURR 5e-05`; the old
+    `([\\d.]+)` capture matched only the leading "5" and stored 5.0A -- a
+    100000x error, no error queued. Microamp-level current limits are entirely
+    plausible, so this is reachable through normal public-API use."""
+    conn = _conn(psu_mode=True)
+    conn.write("CH1:CURR {0}".format(0.00005))
+    assert conn.psu_outputs[1]["current"] == 5e-05
+    assert conn.error_queue == []
+
+
+@pytest.mark.parametrize(
+    "value",
+    [0.0, -5.0, 1e9, float("nan"), float("inf")],
+    ids=["zero", "negative", "absurd", "nan", "inf"],
+)
 def test_invalid_psu_ovp_is_rejected_and_queued(value):
     """Unlike voltage/current setpoints, an over-voltage protection level of
     0V would trip immediately and is not a usable value, so OVP is gated on
-    positivity."""
+    positivity. Negative/nan/inf coverage added alongside I1's regex widening,
+    which is what makes the guard reachable for these values at all."""
     conn = _conn(psu_mode=True)
     before = conn.psu_ovp_levels[1]
     conn.write("CH1:VOLT:PROT {0}".format(value))
@@ -285,7 +325,11 @@ def test_valid_psu_ovp_is_accepted_and_queues_nothing():
     assert conn.error_queue == []
 
 
-@pytest.mark.parametrize("value", [0.0, 1e9], ids=["zero", "absurd"])
+@pytest.mark.parametrize(
+    "value",
+    [0.0, -5.0, 1e9, float("nan"), float("inf")],
+    ids=["zero", "negative", "absurd", "nan", "inf"],
+)
 def test_invalid_psu_ocp_is_rejected_and_queued(value):
     """Same reasoning as OVP: an over-current protection level of 0A is not
     a usable value, so OCP is gated on positivity."""
@@ -374,10 +418,24 @@ def test_valid_negative_awg_offset_is_accepted_and_queues_nothing():
     assert conn.error_queue == []
 
 
-def test_invalid_awg_phase_is_rejected_and_queued():
+@pytest.mark.parametrize("value", [1e9], ids=["absurd"])
+def test_invalid_awg_phase_is_rejected_and_queued(value):
     conn = _conn(awg_mode=True)
     before = conn.awg_channels[1]["phase"]
-    conn.write("SOUR1:PHAS {0}".format(1e9))
+    conn.write("SOUR1:PHAS {0}".format(value))
+    assert conn.awg_channels[1]["phase"] == before, "a rejected command must not change state"
+    assert conn.error_queue == [(-222, "Data out of range")]
+
+
+def test_invalid_negative_awg_phase_is_rejected_and_queued():
+    """I2: `SOUR1:PHAS -1000` used to be accepted and stored as -1000.0
+    because `positive=False` alone allows any sign. awg_output.py's
+    real-driver validation is `0 <= degrees <= 360`, so a negative phase must
+    now be rejected via `non_negative=True` while zero (tested below) still
+    passes."""
+    conn = _conn(awg_mode=True)
+    before = conn.awg_channels[1]["phase"]
+    conn.write("SOUR1:PHAS -1000")
     assert conn.awg_channels[1]["phase"] == before, "a rejected command must not change state"
     assert conn.error_queue == [(-222, "Data out of range")]
 
@@ -411,10 +469,24 @@ def test_valid_awg_pulse_duty_is_accepted_and_queues_nothing():
     assert conn.error_queue == []
 
 
-def test_invalid_awg_ramp_symmetry_is_rejected_and_queued():
+@pytest.mark.parametrize("value", [1e9], ids=["absurd"])
+def test_invalid_awg_ramp_symmetry_is_rejected_and_queued(value):
     conn = _conn(awg_mode=True)
     before = conn.awg_channels[1]["ramp_symmetry"]
-    conn.write("SOUR1:FUNC:RAMP:SYMM {0}".format(1e9))
+    conn.write("SOUR1:FUNC:RAMP:SYMM {0}".format(value))
+    assert conn.awg_channels[1]["ramp_symmetry"] == before, "a rejected command must not change state"
+    assert conn.error_queue == [(-222, "Data out of range")]
+
+
+def test_invalid_negative_awg_ramp_symmetry_is_rejected_and_queued():
+    """I2: `SOUR1:FUNC:RAMP:SYMM -50` used to be accepted and stored as -50.0
+    because `positive=False` alone allows any sign. awg_output.py's
+    real-driver validation is `0 <= percent <= 100`, so a negative symmetry
+    must now be rejected via `non_negative=True` while zero (tested below)
+    still passes."""
+    conn = _conn(awg_mode=True)
+    before = conn.awg_channels[1]["ramp_symmetry"]
+    conn.write("SOUR1:FUNC:RAMP:SYMM -50")
     assert conn.awg_channels[1]["ramp_symmetry"] == before, "a rejected command must not change state"
     assert conn.error_queue == [(-222, "Data out of range")]
 
@@ -541,6 +613,19 @@ def test_invalid_tek_holdoff_time_is_rejected_and_queued():
     conn = _conn(idn=TEK_IDN)
     before = conn.holdoff_time
     conn.write("TRIGGER:A:HOLDOFF:TIME {0}".format(1e9))
+    assert conn.holdoff_time == before, "a rejected command must not change state"
+    assert conn.error_queue == [(-222, "Data out of range")]
+
+
+def test_invalid_negative_tek_holdoff_time_is_rejected_and_queued():
+    """I2: `TRIGGER:A:HOLDOFF:TIME -5.0` used to be accepted and stored as
+    -5.0 because `positive=False` alone allows any sign, even though
+    trigger.py's own real-driver validation is `if time_seconds < 0: raise`.
+    Now gated on `non_negative=True` instead: negative is rejected, zero
+    (tested below) still passes."""
+    conn = _conn(idn=TEK_IDN)
+    before = conn.holdoff_time
+    conn.write("TRIGGER:A:HOLDOFF:TIME -5.0")
     assert conn.holdoff_time == before, "a rejected command must not change state"
     assert conn.error_queue == [(-222, "Data out of range")]
 
