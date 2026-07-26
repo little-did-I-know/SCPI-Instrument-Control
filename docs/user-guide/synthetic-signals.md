@@ -36,6 +36,59 @@ signal:
 | `duty` | `0.5` | High fraction of a `"square"` period, `0 < duty < 1` (pulse/PWM) |
 | `noise_rms` | `0.0` | Std-dev of additive Gaussian noise laid on top of any kind |
 | `seed` | `None` | `None` for fresh randomness on every call; an `int` for reproducible output |
+| `drift_amplitude` | `0.0` | Volts of slow baseline wander; `0` (the default) turns drift off |
+| `drift_frequency` | `0.1` | Hz of that wander; only used when `drift_amplitude > 0` |
+| `glitch_rate` | `0.0` | Mean glitches per second; `0` (the default) turns glitches off |
+| `glitch_amplitude` | `0.0` | Volts, peak height of a glitch |
+| `ringing_frequency` | `0.0` | Hz of post-edge oscillation; `0` (the default) turns ringing off |
+| `ringing_damping` | `0.0` | Decay rate per second of that oscillation |
+
+The last six fields are impairments: default-off knobs that make a signal
+imperfect the way a real one is, so measurement and analysis code has
+something realistic to face instead of a mathematically clean waveform. All
+six are appended at the end of the dataclass and every one defaults to a
+value that leaves the signal unaffected, so existing code that constructs a
+`SignalSpec` positionally or without these arguments is unaffected.
+
+- **`drift_amplitude`/`drift_frequency`** add slow baseline wander -- a
+  sinusoid at `drift_frequency` Hz, `drift_amplitude` volts of amplitude,
+  derived from absolute time so it (like ringing, below) stays continuous
+  across `stream()` chunks instead of jumping at chunk boundaries.
+- **`glitch_rate`/`glitch_amplitude`** add sparse, isolated spikes -- a
+  Poisson process at `glitch_rate` events per second, each an instantaneous
+  `+/-glitch_amplitude` volt spike on one sample. Glitches draw from their own
+  generator (seeded independently from the base signal/noise), so enabling
+  them never perturbs `noise_rms`'s samples.
+- **`ringing_frequency`/`ringing_damping`** add a damped sinusoid after every
+  edge of a periodic signal -- what a real probe/scope front-end does after a
+  fast transition, and what gives an overshoot/preshoot measurement something
+  genuine to measure. It's an edge impairment, so it is only meaningful on
+  signals that actually have edges (`"square"`, or a pulse-like `"ramp"`) --
+  applying it to `"sine"` or `"dc"` has no effect, since those kinds have no
+  discontinuities for it to trigger on.
+
+```python
+from scpi_control.signal_synth import SignalSpec, synthesize
+
+# A 1kHz square wave with all three impairments: slow thermal-style drift on
+# the baseline, occasional glitches, and probe-style ringing after every edge
+# -- an intentionally imperfect signal for exercising measurement code against
+# something closer to what a real instrument would actually capture.
+messy = SignalSpec(
+    kind="square",
+    frequency=1_000.0,
+    amplitude=1.0,
+    noise_rms=0.02,
+    drift_amplitude=0.05,
+    drift_frequency=0.2,
+    glitch_rate=2.0,
+    glitch_amplitude=0.3,
+    ringing_frequency=20_000.0,
+    ringing_damping=5_000.0,
+    seed=42,
+)
+volts = synthesize(messy, sample_rate=1_000_000.0, n_points=10_000)
+```
 
 `"square"`'s `duty` is the fraction of each period spent high, so a
 `SignalSpec(kind="square", duty=0.2)` is a 20%-duty pulse/PWM waveform, not
@@ -43,8 +96,10 @@ just a symmetric square wave. `"dc"` ignores `amplitude` entirely and always
 outputs `offset`. `"noise"` uses `amplitude` as the Gaussian standard
 deviation rather than a peak value. An invalid `kind` or an out-of-range
 parameter (non-positive `frequency` on a periodic kind, `duty` outside
-`(0, 1)`, negative `noise_rms`) raises `InvalidParameterError` -- no partial
-or silently-clamped signal is ever returned.
+`(0, 1)`, negative `noise_rms`, a negative `drift_amplitude`/`glitch_rate`/
+`glitch_amplitude`/`ringing_frequency`/`ringing_damping`, or a non-positive
+`drift_frequency` while `drift_amplitude > 0`) raises `InvalidParameterError`
+-- no partial or silently-clamped signal is ever returned.
 
 ## Generating Signals Directly
 
