@@ -20,7 +20,8 @@ class SignalSpec:
     """Parameters of one synthetic signal.
 
     Attributes:
-        kind: One of "sine", "square", "triangle", "ramp", "dc", "noise".
+        kind: One of "sine", "square", "triangle", "ramp", "dc", "noise",
+            "chirp", "exponential", "pulse", "multitone".
         frequency: Repetition rate in Hz (periodic kinds only).
         amplitude: Peak amplitude in volts (Vpp = 2*amplitude); for "noise",
             the standard deviation. Ignored for "dc".

@@ -38,7 +38,7 @@ Control SCPI-compatible test equipment from Python — oscilloscopes, function g
 - **GUI Application**: Modern PyQt6-based graphical interface
 - **Waveform Acquisition**: Capture and download waveform data in multiple formats (.npz, .csv, .mat, .h5)
 - **Acquisition Provenance**: every saved waveform records the instrument, settings, and timestamp that produced it; extract raw data from any saved file with load_waveform() or the scpi-extract CLI
-- **Synthetic Signals & Realistic Mock**: generate parameterized test waveforms (sine/square/triangle/ramp/DC/noise) with `SignalSpec`/`make_waveform`, or `synthesize()`/`stream()` for one-shot arrays and phase-continuous, optionally real-time-paced chunks; develop without hardware against a mock scope that synthesizes state-coupled, trigger-aligned waveforms by default
+- **Synthetic Signals & Realistic Mock**: generate parameterized test waveforms (sine/square/triangle/ramp/DC/noise/chirp/exponential/pulse/multitone) with `SignalSpec`/`make_waveform`, or `synthesize()`/`stream()` for one-shot arrays and phase-continuous, optionally real-time-paced chunks; develop without hardware against a mock scope that synthesizes state-coupled, trigger-aligned waveforms by default
 - **Channel Configuration**: Control voltage scale, coupling, offset, bandwidth
 - **Trigger Settings**: Configure trigger modes, levels, edge detection
 - **Advanced Analysis**: Built-in FFT, SNR, THD, and statistical analysis tools
