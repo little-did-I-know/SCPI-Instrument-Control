@@ -479,11 +479,14 @@ class MockConnection(BaseConnection):
             # Phase 0 is legitimate (awg_output.py's own validation allows
             # `0 <= degrees <= 360`), so it is gated on non_negative (>= 0)
             # rather than positive (> 0) -- a negative phase is not a value
-            # the real driver ever allows either (I2).
+            # the real driver ever allows either (I2). max_magnitude=360: a
+            # phase angle never legitimately exceeds 360 degrees, so the
+            # generic 1e6 scope-calibrated bound let through nonsense like
+            # PHAS 999999 (M5).
             if match := re.match(r"C(\d+):BSWV\s+PHSE,([\d.E+\-]+)", command, re.IGNORECASE):
                 ch = int(match.group(1))
                 phase = float(match.group(2))
-                if self.reject_if_invalid(phase, name="PHSE", positive=False, non_negative=True):
+                if self.reject_if_invalid(phase, name="PHSE", positive=False, non_negative=True, max_magnitude=360):
                     return
                 if ch in self.awg_channels:
                     self.awg_channels[ch]["phase"] = phase
@@ -491,7 +494,7 @@ class MockConnection(BaseConnection):
             if match := re.match(r"SOUR(\d+):PHAS\s+([\d.E+\-]+)", command, re.IGNORECASE):
                 ch = int(match.group(1))
                 phase = float(match.group(2))
-                if self.reject_if_invalid(phase, name="PHAS", positive=False, non_negative=True):
+                if self.reject_if_invalid(phase, name="PHAS", positive=False, non_negative=True, max_magnitude=360):
                     return
                 if ch in self.awg_channels:
                     self.awg_channels[ch]["phase"] = phase
@@ -500,11 +503,14 @@ class MockConnection(BaseConnection):
             # Pulse duty cycle: C1:BSWV DUTY,25 (Siglent) or SOUR1:FUNC:PULS:DCYC 25 (generic)
             # awg_output.py's own validation requires `0 < percent < 100`
             # (strictly exclusive), so duty cycle is gated on positivity --
-            # unlike ramp symmetry below, 0% is never allowed either.
+            # unlike ramp symmetry below, 0% is never allowed either. M5:
+            # max_magnitude=100 -- a percentage, unlike frequency, never
+            # legitimately exceeds 100 in normal use, so the generic 1e6
+            # scope-calibrated bound let through nonsense like DUTY 500000.
             if match := re.match(r"C(\d+):BSWV\s+DUTY,([\d.E+\-]+)", command, re.IGNORECASE):
                 ch = int(match.group(1))
                 duty = float(match.group(2))
-                if self.reject_if_invalid(duty, name="DUTY"):
+                if self.reject_if_invalid(duty, name="DUTY", max_magnitude=100):
                     return
                 if ch in self.awg_channels:
                     self.awg_channels[ch]["pulse_duty"] = duty
@@ -512,7 +518,7 @@ class MockConnection(BaseConnection):
             if match := re.match(r"SOUR(\d+):FUNC:PULS:DCYC\s+([\d.E+\-]+)", command, re.IGNORECASE):
                 ch = int(match.group(1))
                 duty = float(match.group(2))
-                if self.reject_if_invalid(duty, name="FUNC:PULS:DCYC"):
+                if self.reject_if_invalid(duty, name="FUNC:PULS:DCYC", max_magnitude=100):
                     return
                 if ch in self.awg_channels:
                     self.awg_channels[ch]["pulse_duty"] = duty
@@ -524,10 +530,12 @@ class MockConnection(BaseConnection):
             # inclusive, unlike duty cycle above), so it is gated on
             # non_negative (>= 0) rather than positive (> 0) -- a negative
             # symmetry is not a value the real driver ever allows either (I2).
+            # max_magnitude=100 for the same percentage-bound reason as duty
+            # cycle above (M5).
             if match := re.match(r"C(\d+):BSWV\s+SYM,([\d.E+\-]+)", command, re.IGNORECASE):
                 ch = int(match.group(1))
                 symm = float(match.group(2))
-                if self.reject_if_invalid(symm, name="SYM", positive=False, non_negative=True):
+                if self.reject_if_invalid(symm, name="SYM", positive=False, non_negative=True, max_magnitude=100):
                     return
                 if ch in self.awg_channels:
                     self.awg_channels[ch]["ramp_symmetry"] = symm
@@ -535,7 +543,7 @@ class MockConnection(BaseConnection):
             if match := re.match(r"SOUR(\d+):FUNC:RAMP:SYMM\s+([\d.E+\-]+)", command, re.IGNORECASE):
                 ch = int(match.group(1))
                 symm = float(match.group(2))
-                if self.reject_if_invalid(symm, name="FUNC:RAMP:SYMM", positive=False, non_negative=True):
+                if self.reject_if_invalid(symm, name="FUNC:RAMP:SYMM", positive=False, non_negative=True, max_magnitude=100):
                     return
                 if ch in self.awg_channels:
                     self.awg_channels[ch]["ramp_symmetry"] = symm

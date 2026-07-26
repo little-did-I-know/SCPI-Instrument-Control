@@ -450,6 +450,17 @@ def test_valid_zero_awg_phase_is_accepted_and_queues_nothing():
     assert conn.error_queue == []
 
 
+def test_awg_phase_above_360_is_rejected_and_queued():
+    """M5: a phase angle never legitimately exceeds 360 degrees, but the
+    generic 1e6 scope-calibrated bound let PHAS 999999 through -- below 1e6,
+    above any usable phase. Now caught by max_magnitude=360."""
+    conn = _conn(awg_mode=True)
+    before = conn.awg_channels[1]["phase"]
+    conn.write("SOUR1:PHAS 999999")
+    assert conn.awg_channels[1]["phase"] == before, "a rejected command must not change state"
+    assert conn.error_queue == [(-222, "Data out of range (PHAS)")]
+
+
 @pytest.mark.parametrize("value", [-10.0, 0.0], ids=["negative", "zero"])
 def test_invalid_awg_pulse_duty_is_rejected_and_queued(value):
     """awg_output.py's real-driver validation requires `0 < percent < 100`
@@ -467,6 +478,17 @@ def test_valid_awg_pulse_duty_is_accepted_and_queues_nothing():
     conn.write("SOUR1:FUNC:PULS:DCYC 25.0")
     assert conn.awg_channels[1]["pulse_duty"] == 25.0
     assert conn.error_queue == []
+
+
+def test_awg_pulse_duty_above_100_is_rejected_and_queued():
+    """M5: a percentage never legitimately exceeds 100, but the generic 1e6
+    scope-calibrated bound let FUNC:PULS:DCYC 500000 through -- below 1e6,
+    nonsense for a duty cycle. Now caught by max_magnitude=100."""
+    conn = _conn(awg_mode=True)
+    before = conn.awg_channels[1]["pulse_duty"]
+    conn.write("SOUR1:FUNC:PULS:DCYC 500000")
+    assert conn.awg_channels[1]["pulse_duty"] == before, "a rejected command must not change state"
+    assert conn.error_queue == [(-222, "Data out of range (FUNC:PULS:DCYC)")]
 
 
 @pytest.mark.parametrize("value", [1e9], ids=["absurd"])
@@ -500,6 +522,17 @@ def test_valid_zero_awg_ramp_symmetry_is_accepted_and_queues_nothing():
     conn.write("SOUR1:FUNC:RAMP:SYMM 0.0")
     assert conn.awg_channels[1]["ramp_symmetry"] == 0.0
     assert conn.error_queue == []
+
+
+def test_awg_ramp_symmetry_above_100_is_rejected_and_queued():
+    """M5: a percentage never legitimately exceeds 100, but the generic 1e6
+    scope-calibrated bound let FUNC:RAMP:SYMM 999999 through -- below 1e6,
+    nonsense for a symmetry percentage. Now caught by max_magnitude=100."""
+    conn = _conn(awg_mode=True)
+    before = conn.awg_channels[1]["ramp_symmetry"]
+    conn.write("SOUR1:FUNC:RAMP:SYMM 999999")
+    assert conn.awg_channels[1]["ramp_symmetry"] == before, "a rejected command must not change state"
+    assert conn.error_queue == [(-222, "Data out of range (FUNC:RAMP:SYMM)")]
 
 
 # --- Tektronix dialect: same guard, mirrored per the Task 3 review ---------
