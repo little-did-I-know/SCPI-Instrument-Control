@@ -10,6 +10,7 @@ window.
 import math
 
 import numpy as np
+import pytest
 
 from scpi_control.connection import MockConnection
 from scpi_control.connection.mock.loopback import AwgLoopback
@@ -157,3 +158,54 @@ def test_a_filtered_square_matches_the_independently_derived_exponential_kind():
     # orders of magnitude over this bound, so this test would catch either
     # regression.
     assert np.max(np.abs(filtered - closed_form)) < 1e-6
+
+
+def test_writing_to_the_awg_changes_the_next_scope_capture():
+    """The whole feature in one test: two instruments, one cable, a SCPI write on
+    one visibly changing what the other captures."""
+    from scpi_control.function_generator import FunctionGenerator
+
+    awg_conn = _awg(function="SINE", frequency=1_000.0, amplitude=2.0)
+    awg = FunctionGenerator("mock", connection=awg_conn)
+    awg.connect()
+    scope = _scope(AwgLoopback(awg_conn))
+    try:
+        as_sine = scope.get_waveform(1, provenance=False)
+        awg_conn.write("C1:BSWV WVTP,SQUARE")
+        as_square = scope.get_waveform(1, provenance=False)
+    finally:
+        scope.disconnect()
+        awg.disconnect()
+
+    # A square spends its time at the rails; a sine sweeps through the middle.
+    # The fraction of samples near an extreme separates them without relying on
+    # any particular amplitude.
+    def rail_fraction(v):
+        return float(np.mean(np.abs(v) > 0.8 * np.max(np.abs(v))))
+
+    assert rail_fraction(as_square.voltage) > 2 * rail_fraction(as_sine.voltage)
+
+
+def test_turning_the_output_off_flattens_the_capture():
+    awg_conn = _awg(function="SINE", frequency=1_000.0, amplitude=2.0)
+    scope = _scope(AwgLoopback(awg_conn))
+    try:
+        driven = scope.get_waveform(1, provenance=False)
+        awg_conn.awg_channels[1]["enabled"] = False
+        idle = scope.get_waveform(1, provenance=False)
+    finally:
+        scope.disconnect()
+    assert np.ptp(driven.voltage) > 1.5
+    assert np.ptp(idle.voltage) < 0.1
+
+
+def test_the_captured_amplitude_is_the_awg_setting_not_double_it():
+    """End-to-end guard on the Vpp conversion: an AMP of 2.0 Vpp must arrive as a
+    2.0 V peak-to-peak trace, not 4.0."""
+    awg_conn = _awg(function="SINE", frequency=1_000.0, amplitude=2.0)
+    scope = _scope(AwgLoopback(awg_conn))
+    try:
+        data = scope.get_waveform(1, provenance=False)
+    finally:
+        scope.disconnect()
+    assert np.ptp(data.voltage) == pytest.approx(2.0, abs=0.2)
