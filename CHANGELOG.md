@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- A synthesized waveform no longer carries a spurious full-amplitude sample where a cycle begins.
+  `synthesize` builds its time array as `t0 + i / sample_rate`, and for an arbitrary `t0` — a trigger
+  crossing, a free-run drift offset, a device model's lead-in — that sum cannot land exactly on a
+  whole number of periods, so the cycle count came out an ULP below an integer and the modulo mapped
+  it to 0.9999999999999991 instead of 0. Continuous kinds never showed it, but `square` read its low
+  level at the instant it should switch high and `ramp` reset a sample early: one sample at full
+  amplitude, roughly 50 int8 codes of spike in a mock capture. The cycle count is now snapped to a
+  whole cycle when it sits within a few ULP of one, which moves the cycle position by less than any
+  consumer can resolve and leaves every other sample bit-identical. Note this covers the cycle wrap
+  only; a sample landing exactly on a *duty* or edge threshold is still subject to the same float
+  error, which shifts that edge by one sample rather than inverting a sample, and
+  `tests/test_cycle_boundary.py` pins that residual so it stays visible.
+
 ## [5.7.0] - 2026-07-26
 
 ### Added
