@@ -46,6 +46,17 @@ def test_cls_clears_the_queue():
     assert conn.query("SYST:ERR?") == NO_ERROR
 
 
+def test_rst_also_clears_the_queue():
+    """M7: real instruments clear the error queue on both *CLS and *RST --
+    *RST used to fall through unmatched (a silent no-op), so a caller
+    resetting after an error would still see it queued on the next
+    SYST:ERR?."""
+    conn = _conn(awg_mode=True)
+    conn.push_error(-222, "Data out of range")
+    conn.write("*RST")
+    assert conn.query("SYST:ERR?") == NO_ERROR
+
+
 def test_scope_mode_still_has_no_error_query():
     """Scopes deliberately have no get_error -- scope.get_error() raises
     NotImplementedError and test_scpi_command_tables.py:38 asserts the command's

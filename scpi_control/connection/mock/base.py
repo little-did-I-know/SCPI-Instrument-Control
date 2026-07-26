@@ -302,7 +302,10 @@ class MockConnection(BaseConnection):
         command = command.strip()
         self.writes.append(command)
 
-        if command.strip().upper() == "*CLS":
+        if command.upper() in ("*CLS", "*RST"):
+            # Real instruments clear the error queue on both *CLS and *RST
+            # (M7); *RST previously fell through unmatched to a silent no-op,
+            # so a caller resetting after an error would still see it queued.
             self.error_queue.clear()
             return
 
