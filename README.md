@@ -22,7 +22,10 @@ Control SCPI-compatible test equipment from Python — oscilloscopes, function g
 > **Formerly `Siglent-Oscilloscope`.** Upgrading from the old package? See the [Migration Guide](#migration-guide).
 
 <p align="center">
-  <img src="docs/images/sds824x-hd-cal-square.png" alt="Live screen capture from a Siglent SDS824X HD oscilloscope" width="720">
+  <!-- Absolute raw URL, not a repo-relative path: PyPI renders this README as a
+       standalone document with no repo context, so a relative src has nothing to
+       resolve against and the image silently fails to load there. -->
+  <img src="https://raw.githubusercontent.com/little-did-I-know/SCPI-Instrument-Control/main/docs/images/sds824x-hd-cal-square.png" alt="Live screen capture from a Siglent SDS824X HD oscilloscope" width="720">
   <br>
   <em>A live screen capture pulled over LAN from a Siglent SDS824X&nbsp;HD (its 1&nbsp;kHz calibration square wave), via <code>scope.screen_capture.get_screenshot_pil()</code>.</em>
 </p>
