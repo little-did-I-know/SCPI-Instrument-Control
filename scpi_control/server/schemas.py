@@ -97,6 +97,15 @@ class OwnerPut(BaseModel):
     name: str
 
 
+class PsuOutputPatch(BaseModel):
+    voltage: Optional[float] = None
+    current: Optional[float] = None
+
+
+class PsuEnablePatch(BaseModel):
+    enabled: bool
+
+
 class ModelOut(BaseModel):
     model_name: str
     series: str

@@ -79,6 +79,7 @@ _BODIES = {
     ("PUT", "/sessions/{session_id}/scope/measurements"): [{"channel": 1, "mtype": "PKPK"}],
     ("POST", "/sessions/{session_id}/scope/references"): {"name": "ref", "channel": 1},
     ("POST", "/sessions/{session_id}/owner"): {"name": "carol"},
+    ("PATCH", "/sessions/{session_id}/psu/outputs/{n}/enable"): {"enabled": True},
 }
 
 
