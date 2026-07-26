@@ -101,6 +101,32 @@ def test_enabling_drift_does_not_change_the_noise_samples():
     np.testing.assert_allclose(recovered, noisy, atol=1e-9)
 
 
+def test_enabling_glitches_does_not_perturb_the_shared_noise_generator():
+    """I4: glitches are the only impairment that draws randomness, via a
+    separate generator (`_impairment_rng(spec.seed, 1)`), so switching them on
+    must not perturb `noise_rms`'s shared `rng` draw. test_enabling_drift_does_
+    not_change_the_noise_samples does not prove this: drift is deterministic
+    and time-based and never touches any generator, so it only proves
+    additivity. If glitches drew from the same `rng` as noise instead (e.g.
+    `glitch_rng = rng`), the noise draw would shift too, and every sample --
+    not just the sparse glitches themselves -- would differ from the
+    non-glitchy spec's output."""
+    base = dict(kind="dc", offset=0.0, noise_rms=0.1, seed=13)
+    noisy = synthesize(SignalSpec(**base), RATE, N)
+    noisy_glitchy = synthesize(SignalSpec(glitch_rate=500.0, glitch_amplitude=3.0, **base), RATE, N)
+    diff = noisy_glitchy - noisy
+    changed = np.flatnonzero(diff)
+    assert changed.size > 0, "glitch_rate=500 over a 4000-sample buffer should land at least one glitch"
+    # A perturbed shared generator would shift every one of the 4000 samples,
+    # not just the handful of sparse glitches -- this bounds "handful".
+    assert changed.size < N // 4, "far more samples changed than glitches could plausibly land on -- the noise generator was perturbed"
+    # Every changed sample must be an exact integer multiple of glitch_amplitude
+    # (one or more glitches landing there) -- not an arbitrarily-shifted noise
+    # value, which is what a perturbed shared generator would produce instead.
+    remainder = diff[changed] / 3.0
+    np.testing.assert_allclose(remainder, np.round(remainder), atol=1e-9)
+
+
 def test_default_spec_produces_exactly_the_clean_signal():
     """The real default-off guarantee. A DC spec at zero offset with no noise must
     return EXACTLY zeros, so ANY nonzero default impairment -- drift, glitch or
