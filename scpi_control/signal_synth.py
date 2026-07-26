@@ -124,6 +124,22 @@ def _noise(spec: SignalSpec, t: np.ndarray, rng: np.random.Generator) -> np.ndar
     return rng.normal(0.0, spec.amplitude, t.shape)
 
 
+def _multitone(spec: SignalSpec, t: np.ndarray, rng: np.random.Generator) -> np.ndarray:
+    """A fundamental plus a coherent harmonic series -- a distorted sine.
+
+    Harmonic k rides at k*theta, so its phase advances with the fundamental's
+    rather than drifting against it. That makes THD exactly sqrt(sum(h**2)),
+    independent of amplitude, frequency and phase, which is the whole point:
+    it gives the repo's THD code a signal with a known correct answer.
+    """
+    theta = 2.0 * np.pi * spec.frequency * t + spec.phase
+    samples = np.sin(theta)
+    for order, relative in enumerate(spec.harmonics, start=2):
+        if relative:
+            samples = samples + relative * np.sin(order * theta)
+    return spec.amplitude * samples
+
+
 _GENERATORS: Dict[str, Callable[[SignalSpec, np.ndarray, np.random.Generator], np.ndarray]] = {
     "sine": _sine,
     "square": _square,
@@ -131,9 +147,10 @@ _GENERATORS: Dict[str, Callable[[SignalSpec, np.ndarray, np.random.Generator], n
     "ramp": _ramp,
     "dc": _dc,
     "noise": _noise,
+    "multitone": _multitone,
 }
 
-PERIODIC_KINDS = ("sine", "square", "triangle", "ramp")
+PERIODIC_KINDS = ("sine", "square", "triangle", "ramp", "multitone")
 
 # Hard cap on the ringing decay kernel's length in samples, independent of
 # n_points (I3) or sample_rate. This is a backstop against a user-supplied
@@ -154,6 +171,14 @@ def _validate(spec: SignalSpec, sample_rate: float, n_points: int) -> None:
         raise exceptions.InvalidParameterError(f"frequency must be positive for {spec.kind!r}: {spec.frequency}")
     if spec.kind == "square" and not 0.0 < spec.duty < 1.0:
         raise exceptions.InvalidParameterError(f"duty must be strictly between 0 and 1: {spec.duty}")
+    if spec.kind == "multitone":
+        try:
+            relatives = list(spec.harmonics)
+        except TypeError:
+            raise exceptions.InvalidParameterError(f"harmonics must be a sequence of relative amplitudes: {spec.harmonics!r}") from None
+        for order, relative in enumerate(relatives, start=2):
+            if not np.isfinite(relative) or relative < 0:
+                raise exceptions.InvalidParameterError(f"harmonics[{order - 2}] (harmonic order {order}) must be a non-negative finite number: {relative}")
     if spec.noise_rms < 0:
         raise exceptions.InvalidParameterError(f"noise_rms must be non-negative: {spec.noise_rms}")
     if spec.drift_amplitude < 0:
