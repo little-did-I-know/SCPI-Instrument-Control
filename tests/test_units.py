@@ -72,6 +72,29 @@ def test_rejects_values_with_no_usable_number(bad):
         parse_si_value(bad, "test quantity")
 
 
+@pytest.mark.parametrize("bad", ["1,000us", "1_000", "1..5", "5 000"])
+def test_rejects_a_suffix_that_swallowed_part_of_the_number(bad):
+    """The counterpart to the unvalidated-unit rule above, and the same
+    silent-wrong-value class this parser exists to eliminate.
+
+    The regex captures a leading number and treats the rest as a unit, so
+    '1,000us' -- an operator writing 1 ms -- parsed to 1.0 and set a timebase
+    1000x off, recorded under the label '1.0' so nothing downstream could tell.
+    An unknown unit discards nothing; a dropped numeric remainder discards
+    everything after it.
+    """
+    with pytest.raises(exceptions.InvalidParameterError):
+        parse_si_value(bad, "timebase scale")
+
+
+def test_an_exponent_beyond_the_decimal_range_is_a_parameter_error():
+    """Decimal.scaleb raises Overflow, which is NOT a subclass of
+    InvalidOperation, so the original guard let a raw decimal exception escape
+    a module that promises InvalidParameterError for every bad input."""
+    with pytest.raises(exceptions.InvalidParameterError):
+        parse_si_value("1e999995G", "scale")
+
+
 def test_the_error_names_the_quantity_and_the_value():
     with pytest.raises(exceptions.InvalidParameterError) as excinfo:
         parse_si_value("wat", "timebase scale")
