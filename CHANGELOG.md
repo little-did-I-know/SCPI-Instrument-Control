@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Four new synthetic signal kinds join `sine`/`square`/`triangle`/`ramp`/`dc`/`noise`: `chirp`, a
+  repeating frequency sweep from `frequency` to `end_frequency` over `sweep_time` (linear or, with
+  `sweep_log`, logarithmic), with phase carried across the retrace so the sweep boundary is
+  discontinuity-free — it's also the one kind the mock free-runs rather than trigger-aligns, since
+  a sweep has no stable period; `exponential`, a square wave through an RC network with time
+  constant `tau`, evaluated at its periodic steady state so it's settled from the first cycle
+  rather than over the first few, and split by `duty`; `pulse`, a trapezoid whose width and edge
+  rate are set independently of the period by `pulse_width` and `edge_time` (`edge_time` may be 0
+  for an ideal edge) rather than by `duty`, which `pulse` ignores — `pulse_width` is the
+  50%-to-50% (FWHM) width, matching both instrument convention and the threshold the repo's timing
+  analyzer measures at, so the flat top runs for `pulse_width - edge_time`; and `multitone`, a
+  fundamental plus a coherent harmonic series (`harmonics` gives the relative amplitudes of the
+  2nd, 3rd, ... harmonic), where `amplitude` sets the fundamental rather than the peak of the sum
+  — deliberately not normalized, since normalizing would make THD depend on the harmonic set. The
+  new kinds give the repo's timing, THD and spectrum analyzers a closed-form answer to check
+  against for the first time, rather than only a pure sine, a square, or noise. Non-breaking:
+  every new `SignalSpec` field is optional and appended at the end of the dataclass, so existing
+  specs and positional construction are unaffected.
+
 ## [5.4.0] - 2026-07-26
 
 ### Added
