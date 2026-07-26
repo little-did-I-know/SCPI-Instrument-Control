@@ -355,7 +355,21 @@ class DataCollector:
             progress_callback: Optional callback function(captures_done, status)
 
         Returns:
-            List of capture dictionaries (or empty list if output_dir is specified)
+            List of capture dictionaries. Without ``output_dir`` each entry
+            carries the captured ``waveforms``; with ``output_dir`` the bulky
+            arrays are omitted (they are on disk) and each entry instead lists
+            the ``files`` written, so a caller can still tell how many captures
+            happened and where they went.
+
+        Raises:
+            SiglentError: If the very first save fails and no file was written.
+                That means the run is misconfigured -- a rejected ``file_format``,
+                an unwritable ``output_dir``, a missing optional dependency --
+                and every later attempt would fail identically, so an unattended
+                run is stopped immediately rather than writing nothing for its
+                full duration. Once one file has landed the configuration is
+                proven, and later save failures are counted and logged without
+                aborting the run.
 
         Example:
             >>> # Capture for 60 seconds, save to files
@@ -378,6 +392,9 @@ class DataCollector:
         results = []
         start_time = time.time()
         capture_count = 0
+        files_written = 0
+        save_failures = 0
+        fatal_save_error = None
 
         # Set to AUTO trigger mode for continuous acquisition
         self.scope.trigger.mode = "AUTO"
@@ -409,9 +426,39 @@ class DataCollector:
                 # Save to file or memory
                 if output_dir:
                     timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+                    saved_paths = []
                     for ch, waveform in waveforms.items():
                         filename = output_path / f"ch{ch}_{timestamp_str}.{file_format}"
-                        self.scope.waveform.save_waveform(waveform, str(filename), format=file_format)
+                        try:
+                            self.scope.waveform.save_waveform(waveform, str(filename), format=file_format)
+                        except Exception as exc:
+                            # Saves get their own handler rather than falling through to
+                            # the loop's broad one. That handler logs and CONTINUES, so a
+                            # rejected file_format used to fail identically on every
+                            # iteration for the whole duration while the function returned
+                            # an empty list -- an overnight run producing an empty
+                            # directory and no signal at all. That is how the npz default
+                            # stayed broken (see the 5.6.0 changelog).
+                            save_failures += 1
+                            logger.error(f"Failed to save channel {ch} to {filename}: {exc}")
+                            if files_written == 0:
+                                # Nothing has ever been written, so this is configuration,
+                                # not a transient hiccup, and every later attempt fails the
+                                # same way. Stop now. Once one file has landed the
+                                # configuration is proven and later failures are tolerated.
+                                fatal_save_error = exc
+                                break
+                            continue
+                        files_written += 1
+                        saved_paths.append(str(filename))
+                    # Metadata without the arrays -- they are on disk. This mode used to
+                    # append nothing at all, so a caller could not tell how many captures
+                    # happened, where they went, or whether any had failed.
+                    saved_record = {key: value for key, value in capture_data.items() if key != "waveforms"}
+                    saved_record["files"] = saved_paths
+                    results.append(saved_record)
+                    if fatal_save_error is not None:
+                        break
                     logger.debug(f"Saved capture {capture_count}")
                 else:
                     results.append(capture_data)
@@ -432,6 +479,13 @@ class DataCollector:
                 break
             except Exception as e:
                 logger.error(f"Error during continuous capture: {e}")
+
+        if fatal_save_error is not None:
+            raise SiglentError(
+                f"Continuous capture aborted after {capture_count} capture(s): the first save failed and no file was written. Check output_dir and file_format={file_format!r}."
+            ) from fatal_save_error
+        if save_failures:
+            logger.warning(f"Continuous capture: {save_failures} save(s) failed, {files_written} file(s) written")
 
         logger.info(f"Continuous capture complete: {capture_count} captures over {duration}s")
         return results

@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- `start_continuous_capture` no longer hides save failures. Saving sat inside the capture loop's
+  broad `except`, which logs and continues, so a rejected `file_format` or an unwritable
+  `output_dir` failed identically on every iteration for the run's entire duration while the
+  function returned an empty list — an overnight run producing an empty directory and no signal
+  at all. This is what kept the `npz` default (fixed in 5.6.0) invisible for so long. Saves now
+  have their own handler: if the *first* save fails and no file has been written, the run stops
+  immediately with a `SiglentError` naming the format and chaining the underlying cause, because
+  that is configuration rather than a transient fault and every later attempt would fail the same
+  way. Once one file has landed the configuration is proven, so later failures are counted,
+  logged, and summarised at the end without aborting a long unattended run.
+
+### Changed
+
+- `start_continuous_capture` with `output_dir` set now returns per-capture metadata instead of an
+  empty list. Entries carry `timestamp`, `elapsed_time`, `capture_num` and the `files` written,
+  omitting the bulky waveform arrays (those are on disk). Previously the function returned `[]`
+  whether it had written ten thousand files or none, so a caller had no way to tell what happened.
+  In-memory mode (no `output_dir`) is unchanged and still returns the `waveforms`.
+
 ## [5.6.0] - 2026-07-26
 
 ### Fixed

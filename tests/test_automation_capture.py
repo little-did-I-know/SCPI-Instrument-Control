@@ -205,7 +205,11 @@ def test_start_continuous_capture_writes_files_with_its_default_format(monkeypat
 
     written = sorted(tmp_path.glob("*.npz"))
     assert written, "the default file_format must produce files, not a silently empty directory"
-    assert returned == [], "with output_dir set, captures go to disk rather than the returned list"
+    # output_dir mode used to return [] unconditionally; it now returns metadata
+    # without the bulky arrays, so a caller can see what happened and where.
+    assert returned, "output_dir mode must report what it captured"
+    assert "waveforms" not in returned[0], "the arrays are on disk, not in the return value"
+    assert returned[0]["files"], "each entry must name the files it wrote"
     # Loading proves a real npz was written, not an empty or mis-formatted file.
     with np.load(str(written[0])) as archive:
         assert len(archive["voltage"]) > 0
@@ -256,3 +260,69 @@ def test_successful_entries_carry_no_error_key(monkeypatch):
         dc.disconnect()
     assert results and "error" not in results[0]
     assert results[0]["waveforms"]
+
+
+def test_a_doomed_save_configuration_fails_fast_instead_of_writing_nothing(monkeypatch, tmp_path):
+    """The defect this replaced: a rejected file_format failed identically on
+    every iteration for the run's whole duration, each failure swallowed by the
+    loop's broad except, and the function returned an empty list. An overnight
+    run produced an empty directory and no signal at all.
+
+    'parquet' is not a supported format, so the FIRST save raises and nothing is
+    ever written -- configuration, not a transient hiccup."""
+    monkeypatch.setattr("scpi_control.automation.time", FakeTime(step=0.01))
+    # A dedicated subdirectory, not tmp_path itself: a conftest fixture puts a
+    # 'fake-home' directory in tmp_path, so tmp_path is never empty.
+    output_dir = tmp_path / "captures"
+    dc, _ = _collector()
+    try:
+        with pytest.raises(exceptions.SiglentError) as excinfo:
+            dc.start_continuous_capture(channels=[1], duration=10.0, interval=0.02, output_dir=output_dir, file_format="parquet")
+    finally:
+        dc.disconnect()
+
+    message = str(excinfo.value)
+    assert "parquet" in message, "the error must name the format that was rejected"
+    assert "no file was written" in message
+    assert sorted(output_dir.iterdir()) == [], "nothing should have been written"
+    # The cause is chained rather than discarded, so the underlying reason survives.
+    assert isinstance(excinfo.value.__cause__, exceptions.InvalidParameterError)
+
+
+def test_a_later_save_failure_is_counted_without_aborting_the_run(monkeypatch, tmp_path):
+    """Once one file has landed the configuration is proven, so a transient
+    failure must not throw away a long unattended run."""
+    monkeypatch.setattr("scpi_control.automation.time", FakeTime(step=0.01))
+    dc, _ = _collector()
+    real_save = dc.scope.waveform.save_waveform
+    calls = {"n": 0}
+
+    def flaky_save(waveform, filename, format=None, **kwargs):
+        calls["n"] += 1
+        if calls["n"] == 2:  # first one succeeds, proving the configuration
+            raise OSError("transient disk hiccup")
+        return real_save(waveform, filename, format=format, **kwargs)
+
+    monkeypatch.setattr(dc.scope.waveform, "save_waveform", flaky_save)
+    try:
+        returned = dc.start_continuous_capture(channels=[1], duration=0.1, interval=0.02, output_dir=tmp_path)
+    finally:
+        dc.disconnect()
+
+    assert calls["n"] > 2, "the run must continue past the failed save"
+    assert len(returned) > 1, "captures after the failure must still be reported"
+    assert sorted(tmp_path.glob("*.npz")), "the successful saves must still be on disk"
+
+
+def test_in_memory_mode_still_returns_the_waveforms(monkeypatch):
+    """Without output_dir nothing changed: the arrays come back in the result."""
+    monkeypatch.setattr("scpi_control.automation.time", FakeTime(step=0.01))
+    dc, _ = _collector()
+    try:
+        returned = dc.start_continuous_capture(channels=[1], duration=0.1, interval=0.02, output_dir=None)
+    finally:
+        dc.disconnect()
+
+    assert returned
+    assert "waveforms" in returned[0]
+    assert "files" not in returned[0]
