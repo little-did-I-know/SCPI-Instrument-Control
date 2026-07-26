@@ -389,8 +389,13 @@ don't speak the same units for the same quantity:
   peak: Gaussian noise has no true peak, so `AwgLoopback` maps the AWG's `AMP`
   on the usual convention that a quoted peak-to-peak is the +/-3 sigma span
   (99.7% of samples), i.e. `sigma = Vpp / 6`. An AWG set to 2.0 Vpp of noise
-  therefore arrives as a sigma = 0.333 V trace, whose measured peak-to-peak is
-  approximately -- but, being random, never exactly -- 2.0 V.
+  therefore arrives as a sigma = 0.333 V trace, and only sigma is fixed by that
+  mapping -- the measured peak-to-peak of an actual capture is not scattered
+  around 2.0 V but systematically above it, because the extreme of N Gaussian
+  samples grows with N rather than converging on the +/-3 sigma convention used
+  to set sigma. A 14,000-sample capture's expected extreme is about 7.9 sigma,
+  i.e. roughly 2.3 to 2.8 V peak-to-peak for this 2.0 Vpp request, and larger
+  still for a longer capture.
 - **Phase.** An AWG's `PHSE` is in degrees; `SignalSpec.phase` is in radians.
   `AwgLoopback` converts.
 
