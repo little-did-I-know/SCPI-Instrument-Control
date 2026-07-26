@@ -12,6 +12,7 @@ ALLOWED_FILTER_KINDS = frozenset({"lowpass", "highpass", "bandpass"})
 
 class SessionCreate(BaseModel):
     label: str = ""
+    kind: str = "scope"
     address: Optional[str] = None
     port: int = 5025
     mock: bool = False
@@ -21,6 +22,7 @@ class SessionCreate(BaseModel):
 class SessionOut(BaseModel):
     id: str
     label: str
+    kind: str
     mock: bool
     address: Optional[str]
     state: str
@@ -107,6 +109,7 @@ def session_out(session) -> Dict[str, Any]:
     return SessionOut(
         id=session.id,
         label=session.label,
+        kind=session.kind,
         mock=session.mock,
         address=session.address,
         state=session.state,

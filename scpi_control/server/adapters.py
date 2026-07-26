@@ -12,7 +12,7 @@ much worse failure than a little indirection.
 import time
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
-from scpi_control import Oscilloscope
+from scpi_control import Oscilloscope, PowerSupply
 from scpi_control.connection.mock import MockConnection
 from scpi_control.exceptions import InvalidParameterError, SiglentError
 from scpi_control.server import compute
@@ -23,6 +23,7 @@ MAX_FRAME_POINTS = 2000
 MEASUREMENT_EVERY_N_POLLS = 4
 
 DEFAULT_MOCK_IDN = "Siglent Technologies,SDS1104X-E,MOCK0001,1.0.0.0"
+DEFAULT_MOCK_PSU_IDN = "Siglent Technologies,SPD3303X,SPD123456,1.0"
 
 
 def _safe(fn, default=None):
@@ -88,6 +89,11 @@ def make_mock_scope_connection(model: Optional[str]) -> MockConnection:
     # No explicit waveform_payloads: channels serve state-coupled synthesized
     # signals (connection/mock/synth.py). 1 MSa/s x 14 div x 1 ms/div = 14k points.
     return MockConnection("mock", idn=idn, channel_states={1: True, 2: False, 3: False, 4: False}, trigger_status=["Stop"], sample_rate=1_000_000.0, timebase=1e-3)
+
+
+def make_mock_psu_connection(model: Optional[str]) -> MockConnection:
+    idn = DEFAULT_MOCK_PSU_IDN if model is None else "Siglent Technologies,{0},MOCK0001,1.0.0.0".format(model)
+    return MockConnection("mock", psu_mode=True, psu_idn=idn)
 
 
 class InstrumentAdapter:
@@ -235,4 +241,55 @@ class ScopeAdapter(InstrumentAdapter):
         publish({"type": "reference", **self.reference_overlay()})
 
 
-ADAPTERS: Dict[str, type] = {"scope": ScopeAdapter}
+def read_psu_outputs(psu: PowerSupply) -> List[Dict[str, Any]]:
+    """One dict per output. Shared by PsuAdapter.poll and GET /psu/state so the
+    streamed shape and the fetched shape cannot drift apart."""
+    outputs = []
+    for n in psu.supported_outputs:
+        out = psu.get_output(n)
+        if out is None:
+            continue
+        outputs.append(
+            {
+                "output": n,
+                "voltage": _safe(lambda: out.voltage),
+                "current": _safe(lambda: out.current),
+                "enabled": _safe(lambda: out.enabled, default=False),
+                "measured_voltage": _safe(lambda: out.measure_voltage()),
+                "measured_current": _safe(lambda: out.measure_current()),
+                "measured_power": _safe(lambda: out.measure_power()),
+            }
+        )
+    return outputs
+
+
+class PsuAdapter(InstrumentAdapter):
+    kind = "psu"
+
+    def build(self, address, port, mock, model, allowed_ports, connection):
+        if mock:
+            conn = connection if connection is not None else make_mock_psu_connection(model)
+            return PowerSupply("mock", connection=conn)
+        if not address:
+            raise ValueError("address is required for a non-mock session")
+        validate_target(address, port, allowed_ports=allowed_ports)
+        return PowerSupply(address, port=port)
+
+    def connect(self, instrument):
+        instrument.connect()
+        info = instrument.device_info or {}
+        return {
+            "idn": instrument.identify(),
+            "model": info.get("model", ""),
+            "dialect": "",  # a PSU has no scope-style dialect; the field stays for payload compatibility
+            "num_channels": len(instrument.supported_outputs),
+        }
+
+    def poll(self, instrument, publish, tick):
+        publish({"type": "state", "kind": "psu", "outputs": read_psu_outputs(instrument)})
+
+    def close(self, instrument):
+        instrument.disconnect()
+
+
+ADAPTERS: Dict[str, type] = {"scope": ScopeAdapter, "psu": PsuAdapter}

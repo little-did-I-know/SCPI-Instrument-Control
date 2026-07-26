@@ -21,7 +21,7 @@ MAX_HOSTS = 1024  # /22
 _KIND_PREFIXES = (("SPD", "psu"), ("SDP", "psu"), ("SDG", "awg"), ("SDM", "daq"))
 
 
-def _classify(model: str) -> str:
+def classify(model: str) -> str:
     upper = model.upper()
     if model in MODEL_REGISTRY or upper.startswith("SDS"):
         return "scope"
@@ -29,6 +29,9 @@ def _classify(model: str) -> str:
         if upper.startswith(prefix):
             return kind
     return "unknown"
+
+
+_classify = classify  # backward-compat alias; nothing internal should break
 
 
 def _local_ip() -> Optional[str]:

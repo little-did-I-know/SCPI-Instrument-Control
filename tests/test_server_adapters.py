@@ -71,3 +71,46 @@ def test_a_non_mock_build_validates_the_target():
     adapter = ScopeAdapter()
     with pytest.raises(Exception):
         adapter.build(address="10.0.0.1", port=9999, mock=False, model=None, allowed_ports=frozenset({5025}), connection=None)
+
+
+def test_the_psu_adapter_builds_and_connects_a_mock():
+    from scpi_control.server.adapters import PsuAdapter
+
+    adapter = PsuAdapter()
+    conn = MockConnection(psu_mode=True, psu_idn="Siglent Technologies,SPD3303X,SPD123456,1.0")
+    instrument = adapter.build(address=None, port=5025, mock=True, model=None, allowed_ports=None, connection=conn)
+    try:
+        identity = adapter.connect(instrument)
+        assert "SPD3303X" in identity["idn"]
+        assert identity["num_channels"] >= 1, "num_channels carries the PSU's OUTPUT count"
+    finally:
+        adapter.close(instrument)
+
+
+def test_the_psu_adapter_publishes_measured_values():
+    from scpi_control.server.adapters import PsuAdapter
+
+    adapter = PsuAdapter()
+    conn = MockConnection(psu_mode=True, psu_idn="Siglent Technologies,SPD3303X,SPD123456,1.0")
+    instrument = adapter.build(address=None, port=5025, mock=True, model=None, allowed_ports=None, connection=conn)
+    published = []
+    try:
+        adapter.connect(instrument)
+        adapter.poll(instrument, published.append, 1)
+    finally:
+        adapter.close(instrument)
+    assert len(published) == 1, "a PSU emits one state message per tick, unlike a scope's frame-per-channel"
+    state = published[0]
+    assert state["kind"] == "psu"
+    first = state["outputs"][0]
+    assert {"output", "voltage", "current", "enabled", "measured_voltage", "measured_current", "measured_power"} <= set(first)
+
+
+def test_the_psu_adapter_has_no_scope_state():
+    """The point of moving state onto adapters: a PSU session must not carry a
+    spectrum config or a filter bank it can never use."""
+    from scpi_control.server.adapters import PsuAdapter
+
+    adapter = PsuAdapter()
+    for scope_only in ("measurements", "spectrum_config", "filters", "active_reference", "recorder"):
+        assert not hasattr(adapter, scope_only), f"{scope_only} is scope-only and must not be on the PSU adapter"

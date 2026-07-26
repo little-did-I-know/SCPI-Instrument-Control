@@ -18,6 +18,7 @@ from typing import Any, Callable, Dict, List, Optional
 from scpi_control.exceptions import SiglentConnectionError, SiglentError
 from scpi_control.server.adapters import ADAPTERS, MAX_FRAME_POINTS, _waveform_frame, read_state  # noqa: F401  (re-exported: stream.py/api/scope.py and tests import these from here)
 from scpi_control.server.adapters import make_mock_scope_connection as _make_mock_connection  # noqa: F401  (re-exported for backward compatibility)
+from scpi_control.server.discovery import classify
 
 _STOP = object()
 
@@ -33,6 +34,7 @@ class InstrumentSession:
         self.mock = mock
         self.address = address
         self.state = "connecting"
+        self.kind = "scope"
         self.idn = ""
         self.model = ""
         self.dialect = ""
@@ -116,9 +118,12 @@ class InstrumentSession:
         allowed_ports: Optional[frozenset] = None,
         _connection=None,
     ) -> "InstrumentSession":
+        if kind not in ADAPTERS:
+            raise SessionError("unknown instrument kind {0!r}".format(kind))
         adapter = ADAPTERS[kind]()
         instrument = adapter.build(address=address, port=port, mock=mock, model=model, allowed_ports=allowed_ports, connection=_connection)
         session = cls(label, instrument, mock, address, poll_interval, adapter)
+        session.kind = kind
         session.owner = owner
         session._thread.start()
         try:
@@ -144,6 +149,10 @@ class InstrumentSession:
         self.model = info["model"]
         self.dialect = info["dialect"]
         self.num_channels = info["num_channels"]
+        if not self.mock and self.model:
+            detected = classify(self.model)
+            if detected != self.kind:
+                raise SessionError("connected instrument is a {0}, not a {1}".format(detected, self.kind))
         self.state = "connected"
 
     def submit(self, fn: Callable[[Any], Any]) -> "Future":
@@ -276,7 +285,9 @@ class SessionManager:
         # see create() for why that matters.
         self._pending = 0
 
-    def create(self, label: str, *, address: Optional[str] = None, port: int = 5025, mock: bool = False, model: Optional[str] = None, owner: str = "", _connection=None) -> InstrumentSession:
+    def create(
+        self, label: str, *, kind: str = "scope", address: Optional[str] = None, port: int = 5025, mock: bool = False, model: Optional[str] = None, owner: str = "", _connection=None
+    ) -> InstrumentSession:
         # Checked BEFORE InstrumentSession.open: opening spawns a worker thread
         # and blocks on a connect with a 30s timeout, so checking the cap after
         # the fact would let concurrent requests past the cap occupy every
@@ -310,7 +321,7 @@ class SessionManager:
             self._pending += 1
         registered = False
         try:
-            session = InstrumentSession.open(label, address=address, port=port, mock=mock, model=model, owner=owner, allowed_ports=self.allowed_ports, _connection=_connection)
+            session = InstrumentSession.open(label, kind=kind, address=address, port=port, mock=mock, model=model, owner=owner, allowed_ports=self.allowed_ports, _connection=_connection)
             with self._lock:
                 self._pending -= 1
                 self._sessions[session.id] = session

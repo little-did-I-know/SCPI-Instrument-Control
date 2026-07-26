@@ -49,7 +49,9 @@ def get_session(session_id: str, request: Request):
 async def create_session(body: SessionCreate, request: Request):
     label = body.label or (body.model or ("Mock scope" if body.mock else body.address or ""))
     # InstrumentSession.open blocks on connect; keep the event loop free.
-    session = await run_in_threadpool(get_manager(request).create, label, address=body.address, port=body.port, mock=body.mock, model=body.model, owner=getattr(request.state, "identity", ""))
+    session = await run_in_threadpool(
+        get_manager(request).create, label, kind=body.kind, address=body.address, port=body.port, mock=body.mock, model=body.model, owner=getattr(request.state, "identity", "")
+    )
     return session_out(session)
 
 
