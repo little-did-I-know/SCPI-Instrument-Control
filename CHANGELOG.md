@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `batch_capture` gained a circuit breaker: `max_consecutive_failures` (default 3) stops a run
+  after that many back-to-back capture timeouts, counted across configurations and reset by any
+  success. This guards the common unattended failure — a trigger level the signal never crosses —
+  which otherwise times out on every single capture: at a 70 s timeout and 100 triggers per
+  configuration, that is hours of waiting to collect nothing, previously surfaced only as one log
+  line per failure. Everything gathered before the breaker trips is still returned, with the
+  failed entries carrying their `error` field, and a warning names the reason and the shortfall.
+  Note this changes the default behaviour of a run whose captures all time out: it now stops early
+  instead of attempting every planned capture. Pass `max_consecutive_failures=None` to restore the
+  old behaviour; a run with genuinely sparse triggers should raise `max_wait` instead.
+
+### Fixed
+
+- `batch_capture` no longer discards the whole run when interrupted. It had no `KeyboardInterrupt`
+  handler, so an operator stopping a run they could see was doomed lost every capture already
+  taken. It now keeps and returns them, matching what `start_continuous_capture` already did.
+
 ## [5.6.0] - 2026-07-26
 
 ### Fixed

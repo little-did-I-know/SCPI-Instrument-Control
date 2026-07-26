@@ -231,6 +231,7 @@ class DataCollector:
         voltage_scales: Optional[Dict[int, List[str]]] = None,
         triggers_per_config: int = 1,
         progress_callback: Optional[Callable[[int, int, str], None]] = None,
+        max_consecutive_failures: Optional[int] = 3,
     ) -> List[Dict[str, Any]]:
         """Capture multiple waveforms with different configurations.
 
@@ -241,9 +242,25 @@ class DataCollector:
                            (e.g., {1: ['1V', '2V'], 2: ['500mV', '1V']})
             triggers_per_config: Number of captures per configuration
             progress_callback: Optional callback function(current, total, status)
+            max_consecutive_failures: Stop the run after this many back-to-back
+                capture timeouts, counted ACROSS configurations and reset by any
+                success. Guards the common unattended failure -- a trigger level
+                set where the signal never crosses it -- which otherwise times
+                out on every capture for the whole run: at a 70 s timeout and
+                100 triggers per configuration that is hours of waiting to
+                collect nothing. Pass None to disable the breaker entirely; a
+                run with genuinely sparse triggers should raise `max_wait`
+                rather than rely on repeated timeouts.
 
         Returns:
-            List of dictionaries containing waveforms and configuration metadata
+            List of dictionaries containing waveforms and configuration metadata.
+            When the breaker trips (or the run is interrupted) everything gathered
+            so far is still returned -- failed entries carry an ``error`` field --
+            rather than being discarded.
+
+        Raises:
+            InvalidParameterError: If a scale cannot be parsed, or
+                ``max_consecutive_failures`` is not None and not at least 1.
 
         Example:
             >>> results = collector.batch_capture(
@@ -255,8 +272,12 @@ class DataCollector:
         """
         if not self._connected:
             raise SiglentError(f"Not connected to oscilloscope at {self.scope.host}:{self.scope.port}")
+        if max_consecutive_failures is not None and max_consecutive_failures < 1:
+            raise InvalidParameterError(f"max_consecutive_failures must be at least 1, or None to disable the breaker: {max_consecutive_failures}")
 
         results = []
+        consecutive_failures = 0
+        stop_reason = None
 
         # Build configuration list
         configs = []
@@ -322,6 +343,11 @@ class DataCollector:
                 }
                 try:
                     entry["waveforms"] = self.capture_single(channels)
+                    # Any success proves the setup can still trigger, so the breaker
+                    # counts CONSECUTIVE failures rather than total ones -- an
+                    # occasional miss in a long run is not the same as a run that
+                    # cannot trigger at all.
+                    consecutive_failures = 0
                 except SiglentTimeoutError as exc:
                     # Record the failure and carry on. Raising would discard every
                     # capture already taken; returning the stale waveform is what
@@ -330,8 +356,26 @@ class DataCollector:
                     # unaffected.
                     logger.warning(f"Capture timed out for config {config}: {exc}")
                     entry["error"] = str(exc)
+                    consecutive_failures += 1
+                except KeyboardInterrupt:
+                    # Keep what was collected. Without this an operator aborting a
+                    # run they can see is doomed loses every capture already taken.
+                    logger.info("Batch capture interrupted by user")
+                    stop_reason = "interrupted by user"
+                    break
                 results.append(entry)
 
+                if max_consecutive_failures is not None and consecutive_failures >= max_consecutive_failures:
+                    stop_reason = f"{consecutive_failures} consecutive capture timeouts"
+                    break
+
+            if stop_reason is not None:
+                break
+
+        if stop_reason is not None:
+            # Not silent: the collected results come back, the failed entries carry
+            # their own `error`, and the caller is told the run was cut short.
+            logger.warning(f"Batch capture stopped early ({stop_reason}) after {len(results)} of {total} planned captures. Check the trigger level and max_wait if captures are timing out.")
         logger.info(f"Batch capture complete: {len(results)} captures")
         return results
 

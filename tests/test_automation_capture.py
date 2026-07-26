@@ -256,3 +256,124 @@ def test_successful_entries_carry_no_error_key(monkeypatch):
         dc.disconnect()
     assert results and "error" not in results[0]
     assert results[0]["waveforms"]
+
+
+def test_the_breaker_stops_a_run_that_cannot_trigger(monkeypatch):
+    """The unattended failure this guards: a trigger level the signal never
+    crosses times out on EVERY capture. At a 70 s timeout and 100 triggers per
+    config that is hours of waiting to collect nothing, previously surfaced only
+    as one log line per failure."""
+    monkeypatch.setattr("scpi_control.automation.time", FakeTime())
+    dc, _ = _collector(trigger_status=["Trig'd"] * 5000)
+    try:
+        results = dc.batch_capture(
+            channels=[1],
+            timebase_scales=["1us", "10us", "100us"],
+            triggers_per_config=10,
+            max_consecutive_failures=3,
+        )
+    finally:
+        dc.disconnect()
+
+    assert len(results) == 3, "the run must stop at the third consecutive timeout, not after all 30"
+    assert all("error" in entry for entry in results)
+    # Everything gathered is still returned rather than discarded.
+    assert results[0]["config"]
+
+
+def test_a_success_resets_the_breaker(monkeypatch):
+    """Consecutive, not cumulative: an occasional miss in a long run is not the
+    same as a run that cannot trigger at all, and must not stop it."""
+    monkeypatch.setattr("scpi_control.automation.time", FakeTime())
+    dc, _ = _collector()
+    real_capture = dc.capture_single
+    calls = {"n": 0}
+
+    def flaky_capture(channels, **kwargs):
+        calls["n"] += 1
+        if calls["n"] % 2 == 0:  # every other capture times out
+            raise exceptions.SiglentTimeoutError("no trigger")
+        return real_capture(channels, **kwargs)
+
+    monkeypatch.setattr(dc, "capture_single", flaky_capture)
+    try:
+        results = dc.batch_capture(channels=[1], timebase_scales=["1us"], triggers_per_config=8, max_consecutive_failures=3)
+    finally:
+        dc.disconnect()
+
+    assert len(results) == 8, "alternating failures never reach 3 in a row, so the run completes"
+    assert sum("error" in entry for entry in results) == 4
+
+
+def test_the_breaker_counts_across_configuration_boundaries(monkeypatch):
+    """triggers_per_config=1 would never trip a per-config breaker, which is why
+    the count crosses configurations rather than resetting at each one."""
+    monkeypatch.setattr("scpi_control.automation.time", FakeTime())
+    dc, _ = _collector(trigger_status=["Trig'd"] * 5000)
+    try:
+        results = dc.batch_capture(channels=[1], timebase_scales=["1us", "10us", "100us", "1ms"], triggers_per_config=1, max_consecutive_failures=2)
+    finally:
+        dc.disconnect()
+
+    assert len(results) == 2, "two configs of one trigger each must trip a threshold of 2"
+
+
+def test_the_breaker_can_be_disabled(monkeypatch):
+    """A run with genuinely sparse triggers can opt out."""
+    monkeypatch.setattr("scpi_control.automation.time", FakeTime())
+    dc, _ = _collector(trigger_status=["Trig'd"] * 5000)
+    try:
+        results = dc.batch_capture(channels=[1], timebase_scales=["1us"], triggers_per_config=5, max_consecutive_failures=None)
+    finally:
+        dc.disconnect()
+
+    assert len(results) == 5, "with the breaker disabled every planned capture is attempted"
+    assert all("error" in entry for entry in results)
+
+
+def test_the_breaker_defaults_on(monkeypatch):
+    """The run worth protecting is the one where nobody thought to pass the
+    parameter, so the default must not be None."""
+    monkeypatch.setattr("scpi_control.automation.time", FakeTime())
+    dc, _ = _collector(trigger_status=["Trig'd"] * 5000)
+    try:
+        results = dc.batch_capture(channels=[1], timebase_scales=["1us"], triggers_per_config=50)
+    finally:
+        dc.disconnect()
+
+    assert len(results) < 50, "the default breaker must cut a doomed run short"
+
+
+@pytest.mark.parametrize("bad", [0, -1])
+def test_an_invalid_breaker_threshold_is_rejected(bad):
+    dc, _ = _collector()
+    try:
+        with pytest.raises(exceptions.InvalidParameterError):
+            dc.batch_capture(channels=[1], timebase_scales=["1us"], max_consecutive_failures=bad)
+    finally:
+        dc.disconnect()
+
+
+def test_an_interrupted_run_keeps_what_it_collected(monkeypatch):
+    """Ctrl-C on a run the operator can see is doomed must not throw away the
+    captures already taken. start_continuous_capture already behaved this way;
+    batch_capture had no handler at all, so the whole run was lost."""
+    monkeypatch.setattr("scpi_control.automation.time", FakeTime())
+    dc, _ = _collector()
+    real_capture = dc.capture_single
+    calls = {"n": 0}
+
+    def interrupt_on_third(channels, **kwargs):
+        calls["n"] += 1
+        if calls["n"] == 3:
+            raise KeyboardInterrupt
+        return real_capture(channels, **kwargs)
+
+    monkeypatch.setattr(dc, "capture_single", interrupt_on_third)
+    try:
+        results = dc.batch_capture(channels=[1], timebase_scales=["1us"], triggers_per_config=10)
+    finally:
+        dc.disconnect()
+
+    assert len(results) == 2, "the two completed captures must survive the interrupt"
+    assert all(entry["waveforms"] for entry in results)
