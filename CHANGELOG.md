@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.7.0] - 2026-07-26
+
 ### Added
 
 - `batch_capture` gained a circuit breaker: `max_consecutive_failures` (default 3) stops a run
