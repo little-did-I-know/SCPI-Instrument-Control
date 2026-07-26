@@ -1,5 +1,7 @@
 """State-coupled mock waveform synthesis: all vendor personalities, trigger alignment, and server mock sessions."""
 
+from dataclasses import replace
+
 import numpy as np
 import pytest
 
@@ -271,3 +273,38 @@ def test_new_kinds_still_couple_to_volts_per_division():
     # Wider V/div, same signal: still ~1 V peak in volts, but the mock had to
     # encode it at half the code density -- so the trace is coarser, not smaller.
     assert np.max(coarse.voltage) == pytest.approx(1.0, abs=0.15)
+
+
+@pytest.mark.parametrize(
+    "impairment",
+    [
+        {"ringing_frequency": 50_000.0},
+        {"drift_amplitude": 0.5, "drift_frequency": 200.0},
+        {"glitch_rate": 50_000.0, "glitch_amplitude": 2.0, "seed": 3},
+    ],
+    ids=["ringing", "drift", "glitch"],
+)
+def test_trigger_search_ignores_the_impairments(impairment):
+    """The search is for the IDEAL crossing, so every impairment is stripped from
+    it -- an impairment that moved the crossing would move t0 with it, and the
+    alignment would track the impairment settings rather than the signal's own
+    edge. Discriminating: with the impairments left in (noise and seed alone
+    stripped, as before), this exponential's ideal 68.85 us crossing moves to
+    66.41 us with ringing, 64.70 us with drift and 10.25 us with glitches."""
+    from scpi_control.connection.mock.synth import _trigger_crossing
+
+    clean = SignalSpec(kind="exponential", frequency=1_000.0, amplitude=1.0, tau=1e-4, noise_rms=0.0)
+    impaired = replace(clean, **impairment)
+    assert _trigger_crossing(impaired, 0.0, True) == _trigger_crossing(clean, 0.0, True)
+
+
+def test_a_ringing_trigger_aligned_kind_still_displays_stably():
+    """The behavioural half: a trigger-aligned kind with ringing switched on
+    still lands on the same t0 every acquisition, so the trace does not walk."""
+    spec = SignalSpec(kind="exponential", frequency=1_000.0, amplitude=1.0, tau=1e-4, noise_rms=0.0, ringing_frequency=50_000.0)
+    scope, _ = _scope(signals={1: spec})
+    scope.write("C1:TRLV 0.0")
+    first = scope.get_waveform(1, provenance=False)
+    second = scope.get_waveform(1, provenance=False)
+    scope.disconnect()
+    np.testing.assert_array_equal(first.voltage, second.voltage)
