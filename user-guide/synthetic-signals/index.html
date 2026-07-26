@@ -902,6 +902,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="SignalSpec">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#kind-specific-parameters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Kind-specific parameters
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -3576,6 +3593,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="SignalSpec">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#kind-specific-parameters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Kind-specific parameters
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -3736,7 +3770,8 @@ captures.</p>
 <ul>
 <li><strong>Develop and test without hardware.</strong> Write and exercise capture,
   analysis, and reporting code against realistic waveforms -- sine, square,
-  triangle, ramp, DC, noise -- before an instrument is available.</li>
+  triangle, ramp, DC, noise, chirp, exponential, pulse, multitone -- before
+  an instrument is available.</li>
 <li><strong>Reproducible test data.</strong> A seeded <code>SignalSpec</code> produces the exact same
   samples every run, which makes it useful for regression tests and
   deterministic examples/demos.</li>
@@ -3761,7 +3796,7 @@ signal:</p>
 <tr>
 <td><code>kind</code></td>
 <td><code>"sine"</code></td>
-<td><code>"sine"</code>, <code>"square"</code>, <code>"triangle"</code>, <code>"ramp"</code>, <code>"dc"</code>, or <code>"noise"</code></td>
+<td><code>"sine"</code>, <code>"square"</code>, <code>"triangle"</code>, <code>"ramp"</code>, <code>"dc"</code>, <code>"noise"</code>, <code>"chirp"</code>, <code>"exponential"</code>, <code>"pulse"</code>, or <code>"multitone"</code></td>
 </tr>
 <tr>
 <td><code>frequency</code></td>
@@ -3849,10 +3884,19 @@ value that leaves the signal unaffected, so existing code that constructs a
 <li><strong><code>ringing_frequency</code>/<code>ringing_damping</code></strong> add a damped sinusoid after every
   edge of a periodic signal -- what a real probe/scope front-end does after a
   fast transition, and what gives an overshoot/preshoot measurement something
-  genuine to measure. It's an edge impairment, so it is only meaningful on
-  signals that actually have edges (<code>"square"</code>, or a pulse-like <code>"ramp"</code>) --
-  applying it to <code>"sine"</code> or <code>"dc"</code> has no effect, since those kinds have no
-  discontinuities for it to trigger on.</li>
+  genuine to measure. It's an edge impairment, so it is <em>physically</em>
+  meaningful on signals that actually have fast edges (<code>"square"</code> and
+  <code>"pulse"</code>, or a pulse-like <code>"ramp"</code>). On the continuous kinds (<code>"sine"</code>,
+  <code>"chirp"</code>, <code>"exponential"</code>, <code>"multitone"</code>) it is <strong>not</strong> a no-op, though:
+  edges are found as any nonzero sample-to-sample change rather than as a
+  discontinuity, so every sample of a continuous signal qualifies and the
+  impairment becomes a derivative-weighted filter. Its magnitude scales with
+  the signal's slew rate -- measurable, but usually far smaller than on a real
+  edge (at <code>sample_rate=1e6</code>, <code>amplitude=1.0</code>,
+  <code>ringing_frequency=50_000</code>: about 0.10 V on <code>"chirp"</code>, 0.056 V on
+  <code>"exponential"</code>, 0.013 V on <code>"multitone"</code> and 0.010 V on <code>"sine"</code>, against
+  0.90 V on <code>"square"</code>). <code>"dc"</code>, whose sample-to-sample differences are all
+  zero, is the only kind ringing genuinely leaves untouched.</li>
 </ul>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">scpi_control.signal_synth</span><span class="w"> </span><span class="kn">import</span> <span class="n">SignalSpec</span><span class="p">,</span> <span class="n">synthesize</span>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
@@ -3885,6 +3929,84 @@ parameter (non-positive <code>frequency</code> on a periodic kind, <code>duty</c
 <code>glitch_amplitude</code>/<code>ringing_frequency</code>/<code>ringing_damping</code>, or a non-positive
 <code>drift_frequency</code> while <code>drift_amplitude &gt; 0</code>) raises <code>InvalidParameterError</code>
 -- no partial or silently-clamped signal is ever returned.</p>
+<h3 id="kind-specific-parameters">Kind-specific parameters<a class="headerlink" href="#kind-specific-parameters" title="Permanent link">&para;</a></h3>
+<p>Seven more fields exist purely to parameterize the four newer kinds; each is
+ignored by every other kind, and every default is chosen so
+<code>SignalSpec(kind=X)</code> alone works at the default 1 kHz <code>frequency</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Read by</th>
+<th>Default</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>end_frequency</code></td>
+<td><code>"chirp"</code></td>
+<td><code>10_000.0</code></td>
+<td>Sweep stop frequency in Hz</td>
+</tr>
+<tr>
+<td><code>sweep_time</code></td>
+<td><code>"chirp"</code></td>
+<td><code>0.01</code></td>
+<td>Seconds per sweep, after which it retraces</td>
+</tr>
+<tr>
+<td><code>sweep_log</code></td>
+<td><code>"chirp"</code></td>
+<td><code>False</code></td>
+<td>Sweep logarithmically (equal time per octave) instead of linearly</td>
+</tr>
+<tr>
+<td><code>tau</code></td>
+<td><code>"exponential"</code></td>
+<td><code>1e-4</code></td>
+<td>RC time constant in seconds</td>
+</tr>
+<tr>
+<td><code>pulse_width</code></td>
+<td><code>"pulse"</code></td>
+<td><code>2e-4</code></td>
+<td>50%-to-50% width (FWHM) in seconds</td>
+</tr>
+<tr>
+<td><code>edge_time</code></td>
+<td><code>"pulse"</code></td>
+<td><code>1e-5</code></td>
+<td>0-to-100% transition time in seconds; <code>0</code> gives an ideal instantaneous edge</td>
+</tr>
+<tr>
+<td><code>harmonics</code></td>
+<td><code>"multitone"</code></td>
+<td><code>(0.1, 0.05)</code></td>
+<td>Relative amplitudes of the 2<sup>nd</sup>, 3<sup>rd</sup>, ... harmonic</td>
+</tr>
+</tbody>
+</table>
+<p>Three things are easy to get wrong here:</p>
+<ul>
+<li><strong><code>pulse_width</code> is the 50%-to-50% width (FWHM)</strong>, not the flat-top
+  duration -- it matches the instrument convention
+  (<code>SOUR{ch}:FUNC:PULS:WIDT</code>) and the threshold the repo's timing analyzer
+  measures at. The flat top itself runs for <code>pulse_width - edge_time</code>.
+  <code>"pulse"</code> also <strong>ignores <code>duty</code></strong> entirely; independence from the period is
+  the whole reason it exists alongside <code>"square"</code>, whose only shape control
+  <em>is</em> <code>duty</code>.</li>
+<li><strong>For <code>"multitone"</code>, <code>amplitude</code> is the fundamental's amplitude, not the
+  peak of the sum.</strong> It is deliberately not normalized against the harmonics,
+  because normalizing would make THD depend on which harmonics are present;
+  as generated, THD is exactly <code>sqrt(sum(h**2))</code> for <code>harmonics = (h2, h3,
+  ...)</code>.</li>
+<li><strong><code>"chirp"</code> retraces every <code>sweep_time</code></strong>, with phase carried across the
+  retrace rather than reset, so there is no discontinuity at a sweep
+  boundary. Because it has no stable period, <code>"chirp"</code> is deliberately not in
+  <code>PERIODIC_KINDS</code>: it is the one kind the mock free-runs rather than
+  trigger-aligns (see <a href="#state-coupling">Trigger alignment</a> below).</li>
+</ul>
 <h2 id="generating-signals-directly">Generating Signals Directly<a class="headerlink" href="#generating-signals-directly" title="Permanent link">&para;</a></h2>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">scpi_control.signal_synth</span><span class="w"> </span><span class="kn">import</span> <span class="n">SignalSpec</span><span class="p">,</span> <span class="n">synthesize</span><span class="p">,</span> <span class="n">make_waveform</span>
 </span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
@@ -4049,7 +4171,10 @@ before an acquisition change what comes back:</p>
   fraction of the window, so consecutive captures visibly shift rather than
   repeating. Each channel aligns to its own trigger level and signal; the
   mock does not model <code>trigger_source</code> routing (triggering one channel off
-  another channel's crossing) between channels.</li>
+  another channel's crossing) between channels. <code>"chirp"</code> is not in
+  <code>PERIODIC_KINDS</code> (it has no stable period), so it always free-runs -- never
+  trigger-aligned, even when the configured trigger level/slope is otherwise
+  attainable.</li>
 </ul>
 <h3 id="precedence-vs-waveform_payloads">Precedence vs. <code>waveform_payloads</code><a class="headerlink" href="#precedence-vs-waveform_payloads" title="Permanent link">&para;</a></h3>
 <p><code>waveform_payloads={channel: bytes}</code> bypasses synthesis entirely for that
