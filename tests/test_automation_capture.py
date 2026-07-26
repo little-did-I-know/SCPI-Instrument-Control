@@ -122,3 +122,81 @@ def test_default_mode_is_armed_single_shot(monkeypatch):
     finally:
         dc.disconnect()
     assert any("TRIG_MODE SINGLE" in w.upper() for w in conn.writes)
+
+
+def test_batch_capture_accepts_its_own_documented_string_scales(monkeypatch):
+    """The docstring documents timebase_scales=['1us','10us'] and
+    voltage_scales={1:['1V','2V']} and its example copies them verbatim -- then
+    the apply path passed them to set_scale() unparsed and raised TypeError,
+    losing every capture taken so far."""
+    monkeypatch.setattr("scpi_control.automation.time", FakeTime())
+    dc, conn = _collector()
+    try:
+        results = dc.batch_capture(
+            channels=[1],
+            timebase_scales=["1us", "10us"],
+            voltage_scales={1: ["1V", "500mV"]},
+            triggers_per_config=1,
+        )
+    finally:
+        dc.disconnect()
+    assert len(results) == 4
+    # pytest.approx: parse_si_value("10us") is 10 * 1e-6, which is
+    # 9.999999999999999e-06 in IEEE 754 binary64 -- not bit-identical to the
+    # 1e-5 literal even though both mean "10 microseconds". test_units.py
+    # uses the same tolerance for the identical reason.
+    assert conn.timebase_updates == pytest.approx([1e-6, 1e-6, 1e-5, 1e-5])
+    assert conn.scale_updates[1] == [1.0, 0.5, 1.0, 0.5]
+
+
+def test_batch_capture_still_accepts_numeric_scales(monkeypatch):
+    """Purely additive: callers already passing floats keep working."""
+    monkeypatch.setattr("scpi_control.automation.time", FakeTime())
+    dc, conn = _collector()
+    try:
+        results = dc.batch_capture(channels=[1], timebase_scales=[1e-3], voltage_scales={1: [0.5]}, triggers_per_config=1)
+    finally:
+        dc.disconnect()
+    assert len(results) == 1
+    assert conn.timebase_updates == [1e-3]
+
+
+def test_batch_capture_rejects_an_unparseable_scale_before_capturing(monkeypatch):
+    """Fail on the argument, not 40 captures in."""
+    monkeypatch.setattr("scpi_control.automation.time", FakeTime())
+    dc, conn = _collector()
+    try:
+        with pytest.raises(exceptions.InvalidParameterError):
+            dc.batch_capture(channels=[1], timebase_scales=["banana"], triggers_per_config=1)
+        assert conn.waveform_requests == []
+    finally:
+        dc.disconnect()
+
+
+def test_a_timed_out_capture_becomes_a_visible_failed_entry(monkeypatch):
+    """The run continues and the failure is in the returned data, not only in a
+    log line. Previously the slot held the PREVIOUS config's waveform."""
+    monkeypatch.setattr("scpi_control.automation.time", FakeTime())
+    dc, _ = _collector(trigger_status=["Trig'd"] * 500)
+    try:
+        results = dc.batch_capture(channels=[1], timebase_scales=["1us", "10us"], triggers_per_config=1)
+    finally:
+        dc.disconnect()
+    assert len(results) == 2, "the run must continue past a timeout"
+    for entry in results:
+        assert entry["waveforms"] == {}
+        assert "error" in entry
+        assert entry["config"]
+    # Nothing already captured is lost, and no entry claims a waveform it lacks.
+
+
+def test_successful_entries_carry_no_error_key(monkeypatch):
+    """Existing consumers reading config/waveforms/trigger_num are unaffected."""
+    monkeypatch.setattr("scpi_control.automation.time", FakeTime())
+    dc, _ = _collector()
+    try:
+        results = dc.batch_capture(channels=[1], timebase_scales=["1us"], triggers_per_config=1)
+    finally:
+        dc.disconnect()
+    assert results and "error" not in results[0]
+    assert results[0]["waveforms"]

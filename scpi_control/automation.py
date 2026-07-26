@@ -47,6 +47,7 @@ import numpy as np
 from scpi_control import Oscilloscope
 from scpi_control.connection import BaseConnection
 from scpi_control.exceptions import SiglentError, SiglentTimeoutError
+from scpi_control.units import parse_si_value
 from scpi_control.waveform import WaveformData
 
 logger = logging.getLogger(__name__)
@@ -252,7 +253,9 @@ class DataCollector:
         configs = []
         if timebase_scales:
             for tb in timebase_scales:
-                configs.append({"timebase": tb})
+                # Parsed HERE, not at apply time, so an unparseable scale fails
+                # before any capture is taken rather than part-way through a run.
+                configs.append({"timebase": parse_si_value(tb, "timebase scale")})
         else:
             configs.append({})
 
@@ -262,7 +265,7 @@ class DataCollector:
                 for ch, scales in voltage_scales.items():
                     for scale in scales:
                         new_config = config.copy()
-                        new_config[f"ch{ch}_vdiv"] = scale
+                        new_config[f"ch{ch}_vdiv"] = parse_si_value(scale, f"channel {ch} voltage scale")
                         new_configs.append(new_config)
             if new_configs:
                 configs = new_configs
@@ -298,16 +301,23 @@ class DataCollector:
                     status = f"Config {configs.index(config)+1}/{len(configs)}, Trigger {trigger_num+1}/{triggers_per_config}"
                     progress_callback(current, total, status)
 
-                waveforms = self.capture_single(channels)
-
-                results.append(
-                    {
-                        "timestamp": datetime.now().isoformat(),
-                        "config": config.copy(),
-                        "waveforms": waveforms,
-                        "trigger_num": trigger_num,
-                    }
-                )
+                entry = {
+                    "timestamp": datetime.now().isoformat(),
+                    "config": config.copy(),
+                    "waveforms": {},
+                    "trigger_num": trigger_num,
+                }
+                try:
+                    entry["waveforms"] = self.capture_single(channels)
+                except SiglentTimeoutError as exc:
+                    # Record the failure and carry on. Raising would discard every
+                    # capture already taken; returning the stale waveform is what
+                    # this replaced. An "error" key appears ONLY on failed entries,
+                    # so consumers reading config/waveforms/trigger_num are
+                    # unaffected.
+                    logger.warning(f"Capture timed out for config {config}: {exc}")
+                    entry["error"] = str(exc)
+                results.append(entry)
 
         logger.info(f"Batch capture complete: {len(results)} captures")
         return results
