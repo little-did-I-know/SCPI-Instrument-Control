@@ -305,7 +305,7 @@ def test_a_later_save_failure_is_counted_without_aborting_the_run(monkeypatch, t
 
     monkeypatch.setattr(dc.scope.waveform, "save_waveform", flaky_save)
     try:
-        returned = dc.start_continuous_capture(channels=[1], duration=0.1, interval=0.02, output_dir=tmp_path)
+        returned = dc.start_continuous_capture(channels=[1], duration=0.2, interval=0.02, output_dir=tmp_path)
     finally:
         dc.disconnect()
 
@@ -326,3 +326,37 @@ def test_in_memory_mode_still_returns_the_waveforms(monkeypatch):
     assert returned
     assert "waveforms" in returned[0]
     assert "files" not in returned[0]
+
+
+def test_a_run_that_saves_nothing_at_all_still_says_so(caplog, tmp_path):
+    """The other route to an empty output directory: no save ever FAILS because
+    no save is ever attempted. Every capture yields no waveforms (the channel is
+    disabled, or acquire() raises and the inner handler logs and continues), so
+    the save counters stay at zero and nothing would otherwise signal it."""
+    import logging
+
+    conn = MockConnection(channel_states={1: False}, sample_rate=1_000.0, timebase=1e-3)
+    dc = DataCollector("mock", connection=conn)
+    dc.connect()
+    try:
+        with caplog.at_level(logging.WARNING, logger="scpi_control.automation"):
+            returned = dc.start_continuous_capture(channels=[1], duration=0.05, interval=0.01, output_dir=tmp_path / "captures")
+    finally:
+        dc.disconnect()
+
+    assert returned, "captures still happened, they just produced nothing to save"
+    assert all(entry["files"] == [] for entry in returned)
+    assert any("wrote no files" in record.message for record in caplog.records), "a run that writes nothing must say so"
+
+
+def test_the_fatal_error_keeps_its_original_exception_type(tmp_path):
+    """A caller catching InvalidParameterError must still catch it. Wrapping in a
+    plain SiglentError would flatten the type and silently break that."""
+    conn = MockConnection(channel_states={1: True}, sample_rate=1_000.0, timebase=1e-3)
+    dc = DataCollector("mock", connection=conn)
+    dc.connect()
+    try:
+        with pytest.raises(exceptions.InvalidParameterError):
+            dc.start_continuous_capture(channels=[1], duration=0.05, interval=0.01, output_dir=tmp_path / "captures", file_format="parquet")
+    finally:
+        dc.disconnect()

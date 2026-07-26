@@ -446,6 +446,12 @@ class DataCollector:
                                 # not a transient hiccup, and every later attempt fails the
                                 # same way. Stop now. Once one file has landed the
                                 # configuration is proven and later failures are tolerated.
+                                #
+                                # This abandons any remaining channels in THIS capture, which
+                                # is deliberate: a rejected format or an unwritable directory
+                                # is channel-independent, so ch2 would fail exactly as ch1
+                                # just did. (The reverse order is tolerated -- if ch1 wrote
+                                # and ch2 failed, the configuration is already proven.)
                                 fatal_save_error = exc
                                 break
                             continue
@@ -481,11 +487,22 @@ class DataCollector:
                 logger.error(f"Error during continuous capture: {e}")
 
         if fatal_save_error is not None:
-            raise SiglentError(
-                f"Continuous capture aborted after {capture_count} capture(s): the first save failed and no file was written. Check output_dir and file_format={file_format!r}."
-            ) from fatal_save_error
+            message = f"Continuous capture aborted after {capture_count} capture(s): no file was written. Check output_dir and file_format={file_format!r}."
+            # Preserve the original type when it is already one of ours -- wrapping an
+            # InvalidParameterError in a plain SiglentError would stop a caller that
+            # catches the specific type from catching it at all.
+            if isinstance(fatal_save_error, SiglentError):
+                raise type(fatal_save_error)(f"{message} ({fatal_save_error})") from fatal_save_error
+            raise SiglentError(message) from fatal_save_error
         if save_failures:
             logger.warning(f"Continuous capture: {save_failures} save(s) failed, {files_written} file(s) written")
+        elif output_dir and files_written == 0:
+            # No save was even ATTEMPTED -- every capture yielded no waveforms, because
+            # the channels are disabled or acquire() failed each time (both handled by
+            # the inner handler above, which logs and continues). Without this the run
+            # ends silently against an empty directory: the same symptom the save
+            # handler fixes, reached by a different route.
+            logger.warning(f"Continuous capture wrote no files: {capture_count} capture(s) produced no waveforms to save. Check that the requested channels are enabled.")
 
         logger.info(f"Continuous capture complete: {capture_count} captures over {duration}s")
         return results

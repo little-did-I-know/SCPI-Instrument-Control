@@ -18,7 +18,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   immediately with a `SiglentError` naming the format and chaining the underlying cause, because
   that is configuration rather than a transient fault and every later attempt would fail the same
   way. Once one file has landed the configuration is proven, so later failures are counted,
-  logged, and summarised at the end without aborting a long unattended run.
+  logged, and summarised at the end without aborting a long unattended run. The raised error keeps
+  its original type when it is already a library exception, so a caller catching
+  `InvalidParameterError` still catches it. A run that writes nothing because no save was ever
+  *attempted* — every capture yielding no waveforms, from disabled channels or a failing
+  `acquire()` — now ends with a warning too; that is the same empty-directory symptom reached by a
+  different route, and it was equally silent.
 
 ### Changed
 
