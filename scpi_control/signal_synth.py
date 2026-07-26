@@ -30,6 +30,22 @@ class SignalSpec:
         duty: High fraction of a "square" period, 0 < duty < 1 (pulse/PWM).
         noise_rms: Std-dev of additive Gaussian noise laid on any kind.
         seed: None for fresh randomness per call; an int for reproducibility.
+        drift_amplitude: Volts of slow baseline wander (0 = off).
+        drift_frequency: Hz of that wander; only used when drift_amplitude > 0.
+        glitch_rate: Mean glitches per second (0 = off).
+        glitch_amplitude: Volts, peak height of a glitch.
+        ringing_frequency: Hz of post-edge oscillation (0 = off). Ringing is
+            an EDGE impairment -- it is only meaningful on signals that have
+            edges to trigger on ("square", or a pulse-like "ramp"). Applying
+            it to "sine" or "dc" has no effect, since those kinds never
+            produce a discontinuity.
+        ringing_damping: Decay rate per second of that oscillation; only used
+            when ringing_frequency > 0. Defaults away from 0 for the same
+            reason drift_frequency does: undamped ringing (decay rate 0)
+            never actually decays, so the kernel would run for the entire
+            buffer on every edge -- quadratic in the number of edges once
+            ringing_frequency is switched on the most natural way, by setting
+            only that field.
     """
 
     kind: str = "sine"
@@ -40,6 +56,15 @@ class SignalSpec:
     duty: float = 0.5
     noise_rms: float = 0.0
     seed: Optional[int] = None
+    # Impairments, all default-off. Appended at the END of the dataclass
+    # deliberately: inserting them next to noise_rms, where they read better,
+    # would reorder positional construction and break callers.
+    drift_amplitude: float = 0.0  # volts of slow baseline wander (0 = off)
+    drift_frequency: float = 0.1  # Hz of that wander; only used when drift_amplitude > 0
+    glitch_rate: float = 0.0  # mean glitches per second (0 = off)
+    glitch_amplitude: float = 0.0  # volts, peak height of a glitch
+    ringing_frequency: float = 0.0  # Hz of post-edge oscillation (0 = off); an edge impairment, meaningful only on "square"/pulse-like "ramp"
+    ringing_damping: float = 5_000.0  # decay rate per second (M8: nonzero default, same reason as drift_frequency -- damping=0 never decays, making the kernel run the whole buffer on every edge)
 
 
 def _cycle_fraction(spec: SignalSpec, t: np.ndarray) -> np.ndarray:
@@ -81,6 +106,13 @@ _GENERATORS: Dict[str, Callable[[SignalSpec, np.ndarray, np.random.Generator], n
 
 PERIODIC_KINDS = ("sine", "square", "triangle", "ramp")
 
+# Hard cap on the ringing decay kernel's length in samples, independent of
+# n_points (I3) or sample_rate. This is a backstop against a user-supplied
+# ringing_damping near zero making `5 / damping` samples unboundedly long --
+# not the normal control on cost, which is ringing_damping's own sensible
+# nonzero default (M8).
+_MAX_RINGING_KERNEL_SAMPLES = 200_000
+
 
 def _validate(spec: SignalSpec, sample_rate: float, n_points: int) -> None:
     if spec.kind not in _GENERATORS:
@@ -95,6 +127,35 @@ def _validate(spec: SignalSpec, sample_rate: float, n_points: int) -> None:
         raise exceptions.InvalidParameterError(f"duty must be strictly between 0 and 1: {spec.duty}")
     if spec.noise_rms < 0:
         raise exceptions.InvalidParameterError(f"noise_rms must be non-negative: {spec.noise_rms}")
+    if spec.drift_amplitude < 0:
+        raise exceptions.InvalidParameterError(f"drift_amplitude must be non-negative: {spec.drift_amplitude}")
+    if spec.drift_amplitude > 0 and spec.drift_frequency <= 0:
+        # M3: drift_frequency itself was never validated, so drift_frequency=0.0
+        # (with drift enabled) silently produced NO drift at all -- sin(0*t) is
+        # always 0 -- and a negative value merely inverted phase, both surprising
+        # and undocumented. Only checked when drift is actually enabled: a
+        # disabled drift_frequency default/leftover value is never used.
+        raise exceptions.InvalidParameterError(f"drift_frequency must be positive when drift_amplitude > 0: {spec.drift_frequency}")
+    if spec.glitch_rate < 0:
+        raise exceptions.InvalidParameterError(f"glitch_rate must be non-negative: {spec.glitch_rate}")
+    if spec.glitch_amplitude < 0:
+        raise exceptions.InvalidParameterError(f"glitch_amplitude must be non-negative: {spec.glitch_amplitude}")
+    if spec.ringing_frequency < 0:
+        raise exceptions.InvalidParameterError(f"ringing_frequency must be non-negative: {spec.ringing_frequency}")
+    if spec.ringing_damping < 0:
+        raise exceptions.InvalidParameterError(f"ringing_damping must be non-negative: {spec.ringing_damping}")
+
+
+def _impairment_rng(seed: Optional[int], stream_index: int) -> np.random.Generator:
+    """An independent, seed-reproducible generator per impairment.
+
+    Drawing impairments from synthesize()'s shared `rng` would make enabling one
+    impairment change another's samples and the base noise, so a test asserting on
+    noise would break merely because drift was switched on.
+    """
+    if seed is None:
+        return np.random.default_rng()
+    return np.random.default_rng([seed, stream_index])
 
 
 def synthesize(spec: SignalSpec, sample_rate: float, n_points: int, t0: float = 0.0) -> np.ndarray:
@@ -112,7 +173,82 @@ def synthesize(spec: SignalSpec, sample_rate: float, n_points: int, t0: float = 
     _validate(spec, sample_rate, n_points)
     rng = np.random.default_rng(spec.seed)
     t = t0 + np.arange(n_points) / sample_rate
-    samples = _GENERATORS[spec.kind](spec, t, rng) + spec.offset
+    if spec.ringing_frequency > 0:
+        # A damped sinusoid triggered at each edge. Real probe/scope front-ends
+        # ring after a fast transition; this is what gives overshoot/preshoot
+        # measurements something real to measure. Applied to the base signal
+        # BEFORE drift and glitches: ringing is part of the signal's own edge
+        # response, not a baseline wander or an additive event.
+        #
+        # I3: this must be a function of ABSOLUTE TIME, like drift, not of the
+        # current buffer alone -- np.diff() cannot see an edge across a
+        # stream() chunk boundary, so an edge landing right at a boundary used
+        # to get no ringing at all, and one near a chunk's end had its ring
+        # truncated. Fixed the same way drift is continuous: render
+        # `decay_len` extra samples BEFORE t0, detect edges (and let their
+        # ringing spill forward) across that whole extended window, then slice
+        # the prepended samples back off. The generator is called exactly
+        # once (over the extended window) rather than once for the plain
+        # buffer and again for the extended one, so a stochastic kind (e.g.
+        # "noise") does not draw from `rng` twice.
+        decay_len = min(_MAX_RINGING_KERNEL_SAMPLES, max(1, int(sample_rate / max(spec.ringing_damping, 1e-9) * 5)))
+        # Built as t0 + (index - decay_len) / sample_rate, NOT (t0 - decay_len /
+        # sample_rate) + index / sample_rate -- the two are mathematically equal
+        # but round differently in float64. With the latter, this chunk's t0
+        # (itself computed elsewhere as start_time + produced / sample_rate) and
+        # this expression's own "t0 - decay_len/sample_rate" partial sum
+        # accumulate rounding error differently than a neighboring chunk's
+        # equivalent sample does, so the same absolute instant can land a few
+        # ULP apart depending on which chunk computed it -- enough to flip which
+        # side of a razor's-edge comparison (e.g. square wave's `< duty`) a
+        # sample falls on, right when frequency and chunk_size divide evenly
+        # (verified: this happened at every chunk boundary in the drift-style
+        # continuity test below until reordered this way).
+        t_ext = t0 + (np.arange(n_points + decay_len) - decay_len) / sample_rate
+        samples_ext = _GENERATORS[spec.kind](spec, t_ext, rng) + spec.offset
+        edges = np.flatnonzero(np.diff(samples_ext))
+        if edges.size:
+            # 5 time constants of decay, in samples. `max(spec.ringing_damping, 1e-9)`
+            # only guards the division against damping == 0 (undamped ringing) --
+            # it must NOT clamp small-but-nonzero damping up to some larger floor,
+            # or slow decay would be truncated before it actually decays, showing
+            # up as a discontinuity where the kernel window ends. `max(1, ...)`
+            # then guards int() truncating to 0 for very heavy damping.
+            # `_MAX_RINGING_KERNEL_SAMPLES` is a defensive backstop, not the
+            # normal control on cost -- M8 gives ringing_damping a sensible
+            # nonzero default so ordinary use never approaches it; it only
+            # bounds the (user-opted-into) case of an explicit near-zero
+            # damping, which would otherwise make the kernel unboundedly long.
+            total = n_points + decay_len
+            tail = np.arange(decay_len) / sample_rate
+            kernel = np.sin(2 * np.pi * spec.ringing_frequency * tail) * np.exp(-spec.ringing_damping * tail)
+            response = np.zeros(total)
+            for edge in edges:
+                step = samples_ext[edge + 1] - samples_ext[edge]
+                end = min(total, edge + 1 + decay_len)
+                response[edge + 1 : end] += 0.5 * step * kernel[: end - edge - 1]
+            samples = samples_ext[decay_len:] + response[decay_len:]
+        else:
+            samples = samples_ext[decay_len:]
+    else:
+        samples = _GENERATORS[spec.kind](spec, t, rng) + spec.offset
+    if spec.drift_amplitude > 0:
+        # Time-based, NOT a random walk: stream() re-seeds per chunk, so a walk
+        # would reset at every chunk boundary and a live view would show sawtooth
+        # jumps. Deriving drift from absolute time keeps it continuous for free.
+        samples = samples + spec.drift_amplitude * np.sin(2 * np.pi * spec.drift_frequency * t)
+    if spec.glitch_rate > 0 and spec.glitch_amplitude > 0:
+        glitch_rng = _impairment_rng(spec.seed, 1)
+        expected = spec.glitch_rate * n_points / sample_rate
+        count = glitch_rng.poisson(expected)
+        if count:
+            positions = glitch_rng.integers(0, n_points, size=count)
+            signs = glitch_rng.choice(np.array([-1.0, 1.0]), size=count)
+            samples = samples.copy()
+            # np.add.at, NOT samples[positions] += ... -- fancy-index += applies
+            # only ONCE per repeated index, so duplicate glitch positions would be
+            # silently dropped and the glitch rate would come out low.
+            np.add.at(samples, positions, signs * spec.glitch_amplitude)
     if spec.noise_rms > 0:
         samples = samples + rng.normal(0.0, spec.noise_rms, n_points)
     return samples

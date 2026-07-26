@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- The mock instrument can now misbehave the way real hardware does. It keeps a real SCPI error
+  queue behind `SYST:ERR?` (drained by `*CLS` and `*RST`) and rejects out-of-range parameters
+  instead of storing them — a bad value is accepted by the transport, ignored, and reported as
+  `-222,"Data out of range (<parameter>)"` on the next query, which is what an instrument
+  actually does. Validation covers the Siglent scope, PSU and AWG personalities, plus the
+  Tektronix and LeCroy scope dialects; DAQ mode gains the `SYST:ERR?` queue itself but has no
+  numeric parameters to validate (its only two writes, `ROUT:SCAN` and `TRIG:SOUR`, are
+  non-numeric). `reject_if_invalid` gained an optional `max_magnitude` override, since the shared
+  scope-calibrated bound rejected legitimate AWG frequencies (and tightened it for AWG
+  percentages/phase, which never legitimately need it), plus an optional `non_negative` bound for
+  parameters whose real-driver validation is `>= 0` rather than `> 0` (trigger holdoff, AWG
+  phase/ramp symmetry, PSU voltage/current). `FunctionGenerator.get_error()` and
+  `PowerSupply.get_error()` go from timing out entirely to answering `SYST:ERR?` for the first
+  time; `DataLogger.get_error()` already answered before this work, but only ever the hardcoded
+  `+0,"No error"` — it can now report a real queued error too. Unimplemented commands still time
+  out under `strict=True`, unchanged.
+- `SignalSpec` gained optional signal impairments — baseline drift, glitches and edge ringing —
+  so measurement and analysis code can be exercised against imperfect signals instead of
+  mathematically clean ones. All default to off, so existing synthesised output is unchanged.
+  Ringing is continuous across `stream()` chunks, the same way drift already is, rather than
+  resetting at each chunk boundary; it's an edge impairment, meaningful only on signals that
+  actually have edges (`"square"`, or a pulse-like `"ramp"`).
+
 ## [5.3.0] - 2026-07-25
 
 ### Fixed

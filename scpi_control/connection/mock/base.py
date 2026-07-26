@@ -3,8 +3,9 @@ and personality dispatch to the vendor-specific scope write/query/waveform modul
 
 from __future__ import annotations
 
+import math
 import re
-from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Set, Union
+from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Set, Tuple, Union
 
 from scpi_control import exceptions
 from scpi_control.connection.base import BaseConnection
@@ -175,6 +176,12 @@ class MockConnection(BaseConnection):
                 self.trigger_status = ["SAVE"]
 
         self.custom_responses = custom_responses or {}
+        # SCPI error queue. Real instruments accept a bad command, ignore it, and
+        # queue an error for collection via SYST:ERR?; they do not fail the
+        # transport. Empty queue answers '+0,"No error"', which is exactly what
+        # the old hardcoded stub returned -- so nothing changes until something
+        # actually queues an error.
+        self.error_queue: List[Tuple[int, str]] = []
         self.writes: List[str] = []
         self.queries: List[str] = []
         self.timebase_updates: List[float] = []
@@ -240,6 +247,53 @@ class MockConnection(BaseConnection):
         """Mark the connection as closed."""
         self._connected = False
 
+    def push_error(self, code: int, message: str) -> None:
+        """Queue a SCPI error for later collection via SYST:ERR?."""
+        self.error_queue.append((code, message))
+
+    # Broad plausibility bounds. These are deliberately NOT per-model limits --
+    # they reject what is wrong for any oscilloscope (non-finite, non-positive,
+    # absurd magnitude), which is what catches the failure that actually happens:
+    # a typo'd or unit-confused value. Per-model ranges belong in the model
+    # registry (models.py already carries max_sample_rate) and can tighten this
+    # later without changing any caller.
+    _ABSURD_MAGNITUDE = 1e6
+
+    def reject_if_invalid(self, value: float, *, name: str, positive: bool = True, non_negative: bool = False, max_magnitude: Optional[float] = None) -> bool:
+        """Queue -222 and return True when `value` is unusable on any instrument.
+
+        Callers skip their assignment when this returns True, so the command is
+        accepted by the transport, ignored, and reported on the next SYST:ERR? --
+        which is how real hardware behaves for a bad parameter.
+
+        `max_magnitude` overrides `_ABSURD_MAGNITUDE` (default 1e6) for callers
+        whose quantity legitimately exceeds it in normal use -- e.g. AWG
+        frequency, where registered models go up to 120e6 Hz (awg_models.py)
+        and the scope-calibrated 1e6 bound would reject a real value.
+
+        `non_negative=True` rejects a negative value while still accepting zero --
+        for callers whose real-driver validation is `>= 0` rather than `> 0`
+        (trigger holdoff, AWG phase/ramp symmetry, PSU voltage/current). Pass it
+        together with `positive=False` (the default `positive=True` already
+        excludes negatives, so `non_negative` would be redundant with it).
+
+        `name` is folded into the queued message (M1: it used to be accepted
+        by ~25 call sites and read by nothing, so a caller polling SYST:ERR?
+        could tell a parameter was rejected but never which one).
+        """
+        bound = self._ABSURD_MAGNITUDE if max_magnitude is None else max_magnitude
+        if not math.isfinite(value) or (positive and value <= 0) or (non_negative and value < 0) or abs(value) > bound:
+            self.push_error(-222, f"Data out of range ({name})")
+            return True
+        return False
+
+    def _pop_error(self) -> str:
+        """The SYST:ERR? response: oldest queued error, or '+0,"No error"'."""
+        if self.error_queue:
+            code, message = self.error_queue.pop(0)
+            return f'{code:+d},"{message}"'
+        return '+0,"No error"'
+
     def write(self, command: str) -> None:
         """Record the command and update simple internal state."""
         if not self._connected:
@@ -248,20 +302,45 @@ class MockConnection(BaseConnection):
         command = command.strip()
         self.writes.append(command)
 
+        if command.upper() in ("*CLS", "*RST"):
+            # Real instruments clear the error queue on both *CLS and *RST
+            # (M7); *RST previously fell through unmatched to a silent no-op,
+            # so a caller resetting after an error would still see it queued.
+            self.error_queue.clear()
+            return
+
         # Power supply commands
         if self.psu_mode:
             # Voltage setting: CH1:VOLT 5.0 (Siglent) or SOUR1:VOLT 5.0 (generic)
-            if match := re.match(r"(?:CH|SOUR)(\d+):VOLT\s+([\d.]+)", command, re.IGNORECASE):
+            # I1: the capture used to be `([\d.]+)`, which cannot match a sign,
+            # an exponent, or non-finite text -- `CH1:CURR 5e-05` matched only
+            # the leading "5" and silently stored 5.0A, a 100000x error with no
+            # error queued. `(.+)` (matching the scope handlers' own convention
+            # elsewhere in this file) hands the full token to float() so
+            # reject_if_invalid actually sees what was sent.
+            if match := re.match(r"(?:CH|SOUR)(\d+):VOLT\s+(.+)", command, re.IGNORECASE):
                 ch = int(match.group(1))
                 voltage = float(match.group(2))
+                # A voltage setpoint of 0.0 (output at rest) is legitimate --
+                # power_supply_output.py's own validation allows
+                # `0 <= volts <= max_voltage` -- so it is gated on non_negative
+                # (>= 0) rather than positive (> 0): zero is accepted, a
+                # negative setpoint is not (I2).
+                if self.reject_if_invalid(voltage, name="VOLT", positive=False, non_negative=True):
+                    return
                 if ch in self.psu_outputs:
                     self.psu_outputs[ch]["voltage"] = voltage
                 return
 
             # Current setting: CH1:CURR 2.0 (Siglent) or SOUR1:CURR 2.0 (generic)
-            if match := re.match(r"(?:CH|SOUR)(\d+):CURR\s+([\d.]+)", command, re.IGNORECASE):
+            if match := re.match(r"(?:CH|SOUR)(\d+):CURR\s+(.+)", command, re.IGNORECASE):
                 ch = int(match.group(1))
                 current = float(match.group(2))
+                # A current limit of 0.0 is legitimate for the same reason as
+                # voltage above, so it is gated on non_negative rather than
+                # positive (I2).
+                if self.reject_if_invalid(current, name="CURR", positive=False, non_negative=True):
+                    return
                 if ch in self.psu_outputs:
                     self.psu_outputs[ch]["current"] = current
                 return
@@ -297,16 +376,25 @@ class MockConnection(BaseConnection):
                 return
 
             # OVP setting: CH1:VOLT:PROT 25.0 or SOUR1:VOLT:PROT 25.0
-            if match := re.match(r"(?:CH|SOUR)(\d+):VOLT:PROT\s+([\d.]+)", command, re.IGNORECASE):
+            if match := re.match(r"(?:CH|SOUR)(\d+):VOLT:PROT\s+(.+)", command, re.IGNORECASE):
                 ch = int(match.group(1))
                 level = float(match.group(2))
+                # Unlike voltage/current setpoints above, an OVP level of 0V
+                # would trip immediately and is not a usable value, so it is
+                # gated on positivity.
+                if self.reject_if_invalid(level, name="VOLT:PROT"):
+                    return
                 self.psu_ovp_levels[ch] = level
                 return
 
             # OCP setting: CH1:CURR:PROT 2.5 or SOUR1:CURR:PROT 2.5
-            if match := re.match(r"(?:CH|SOUR)(\d+):CURR:PROT\s+([\d.]+)", command, re.IGNORECASE):
+            if match := re.match(r"(?:CH|SOUR)(\d+):CURR:PROT\s+(.+)", command, re.IGNORECASE):
                 ch = int(match.group(1))
                 level = float(match.group(2))
+                # Same reasoning as OVP: an OCP level of 0A is not usable, so
+                # it is gated on positivity.
+                if self.reject_if_invalid(level, name="CURR:PROT"):
+                    return
                 self.psu_ocp_levels[ch] = level
                 return
 
@@ -327,85 +415,139 @@ class MockConnection(BaseConnection):
                 return
 
             # Frequency: C1:BSWV FRQ,1000 (Siglent) or SOUR1:FREQ 1000 (generic)
+            # awg_output.py's own validation requires `0 < freq_hz`, so
+            # frequency is gated on positivity.
             if match := re.match(r"C(\d+):BSWV\s+FRQ,([\d.E+\-]+)", command, re.IGNORECASE):
                 ch = int(match.group(1))
                 freq = float(match.group(2))
+                # Registered AWG models go up to 120MHz (awg_models.py), well
+                # above the scope-calibrated 1e6 default, so this uses a
+                # frequency-appropriate bound instead.
+                if self.reject_if_invalid(freq, name="FRQ", max_magnitude=1e9):
+                    return
                 if ch in self.awg_channels:
                     self.awg_channels[ch]["frequency"] = freq
                 return
             if match := re.match(r"SOUR(\d+):FREQ\s+([\d.E+\-]+)", command, re.IGNORECASE):
                 ch = int(match.group(1))
                 freq = float(match.group(2))
+                if self.reject_if_invalid(freq, name="FREQ", max_magnitude=1e9):
+                    return
                 if ch in self.awg_channels:
                     self.awg_channels[ch]["frequency"] = freq
                 return
 
             # Amplitude: C1:BSWV AMP,5.0 (Siglent) or SOUR1:VOLT 5.0 (generic)
+            # A 0 or negative Vpp amplitude is not a usable waveform, so it is
+            # gated on positivity, same as scope V/div.
             if match := re.match(r"C(\d+):BSWV\s+AMP,([\d.E+\-]+)", command, re.IGNORECASE):
                 ch = int(match.group(1))
                 amp = float(match.group(2))
+                if self.reject_if_invalid(amp, name="AMP"):
+                    return
                 if ch in self.awg_channels:
                     self.awg_channels[ch]["amplitude"] = amp
                 return
             if match := re.match(r"SOUR(\d+):VOLT\s+([\d.E+\-]+)", command, re.IGNORECASE):
                 ch = int(match.group(1))
                 amp = float(match.group(2))
+                if self.reject_if_invalid(amp, name="VOLT"):
+                    return
                 if ch in self.awg_channels:
                     self.awg_channels[ch]["amplitude"] = amp
                 return
 
             # Offset: C1:BSWV OFST,0.5 (Siglent) or SOUR1:VOLT:OFFS 0.5 (generic)
+            # Offset may legitimately be negative or zero (awg_output.py's own
+            # validation only checks `abs(volts) > max_offset`, never sign),
+            # so it is not gated on positivity.
             if match := re.match(r"C(\d+):BSWV\s+OFST,([\d.E+\-]+)", command, re.IGNORECASE):
                 ch = int(match.group(1))
                 offset = float(match.group(2))
+                if self.reject_if_invalid(offset, name="OFST", positive=False):
+                    return
                 if ch in self.awg_channels:
                     self.awg_channels[ch]["offset"] = offset
                 return
             if match := re.match(r"SOUR(\d+):VOLT:OFFS\s+([\d.E+\-]+)", command, re.IGNORECASE):
                 ch = int(match.group(1))
                 offset = float(match.group(2))
+                if self.reject_if_invalid(offset, name="VOLT:OFFS", positive=False):
+                    return
                 if ch in self.awg_channels:
                     self.awg_channels[ch]["offset"] = offset
                 return
 
             # Phase: C1:BSWV PHSE,90 (Siglent) or SOUR1:PHAS 90 (generic)
+            # Phase 0 is legitimate (awg_output.py's own validation allows
+            # `0 <= degrees <= 360`), so it is gated on non_negative (>= 0)
+            # rather than positive (> 0) -- a negative phase is not a value
+            # the real driver ever allows either (I2). max_magnitude=360: a
+            # phase angle never legitimately exceeds 360 degrees, so the
+            # generic 1e6 scope-calibrated bound let through nonsense like
+            # PHAS 999999 (M5).
             if match := re.match(r"C(\d+):BSWV\s+PHSE,([\d.E+\-]+)", command, re.IGNORECASE):
                 ch = int(match.group(1))
                 phase = float(match.group(2))
+                if self.reject_if_invalid(phase, name="PHSE", positive=False, non_negative=True, max_magnitude=360):
+                    return
                 if ch in self.awg_channels:
                     self.awg_channels[ch]["phase"] = phase
                 return
             if match := re.match(r"SOUR(\d+):PHAS\s+([\d.E+\-]+)", command, re.IGNORECASE):
                 ch = int(match.group(1))
                 phase = float(match.group(2))
+                if self.reject_if_invalid(phase, name="PHAS", positive=False, non_negative=True, max_magnitude=360):
+                    return
                 if ch in self.awg_channels:
                     self.awg_channels[ch]["phase"] = phase
                 return
 
             # Pulse duty cycle: C1:BSWV DUTY,25 (Siglent) or SOUR1:FUNC:PULS:DCYC 25 (generic)
+            # awg_output.py's own validation requires `0 < percent < 100`
+            # (strictly exclusive), so duty cycle is gated on positivity --
+            # unlike ramp symmetry below, 0% is never allowed either. M5:
+            # max_magnitude=100 -- a percentage, unlike frequency, never
+            # legitimately exceeds 100 in normal use, so the generic 1e6
+            # scope-calibrated bound let through nonsense like DUTY 500000.
             if match := re.match(r"C(\d+):BSWV\s+DUTY,([\d.E+\-]+)", command, re.IGNORECASE):
                 ch = int(match.group(1))
                 duty = float(match.group(2))
+                if self.reject_if_invalid(duty, name="DUTY", max_magnitude=100):
+                    return
                 if ch in self.awg_channels:
                     self.awg_channels[ch]["pulse_duty"] = duty
                 return
             if match := re.match(r"SOUR(\d+):FUNC:PULS:DCYC\s+([\d.E+\-]+)", command, re.IGNORECASE):
                 ch = int(match.group(1))
                 duty = float(match.group(2))
+                if self.reject_if_invalid(duty, name="FUNC:PULS:DCYC", max_magnitude=100):
+                    return
                 if ch in self.awg_channels:
                     self.awg_channels[ch]["pulse_duty"] = duty
                 return
 
             # Ramp symmetry: C1:BSWV SYM,50 (Siglent) or SOUR1:FUNC:RAMP:SYMM 50 (generic)
+            # Symmetry 0 (a pure downward sawtooth) is legitimate
+            # (awg_output.py's own validation allows `0 <= percent <= 100`
+            # inclusive, unlike duty cycle above), so it is gated on
+            # non_negative (>= 0) rather than positive (> 0) -- a negative
+            # symmetry is not a value the real driver ever allows either (I2).
+            # max_magnitude=100 for the same percentage-bound reason as duty
+            # cycle above (M5).
             if match := re.match(r"C(\d+):BSWV\s+SYM,([\d.E+\-]+)", command, re.IGNORECASE):
                 ch = int(match.group(1))
                 symm = float(match.group(2))
+                if self.reject_if_invalid(symm, name="SYM", positive=False, non_negative=True, max_magnitude=100):
+                    return
                 if ch in self.awg_channels:
                     self.awg_channels[ch]["ramp_symmetry"] = symm
                 return
             if match := re.match(r"SOUR(\d+):FUNC:RAMP:SYMM\s+([\d.E+\-]+)", command, re.IGNORECASE):
                 ch = int(match.group(1))
                 symm = float(match.group(2))
+                if self.reject_if_invalid(symm, name="FUNC:RAMP:SYMM", positive=False, non_negative=True, max_magnitude=100):
+                    return
                 if ch in self.awg_channels:
                     self.awg_channels[ch]["ramp_symmetry"] = symm
                 return
@@ -486,16 +628,20 @@ class MockConnection(BaseConnection):
             else:
                 return self.idn
 
+        # SYST:ERR? for the three instrument classes that expose get_error()
+        # (psu_scpi_commands.py:70, awg_scpi_commands.py:65,
+        # daq_scpi_commands.py:59). Scopes deliberately have no get_error, so
+        # scope mode falls through to the strict-mode timeout -- adding an
+        # accessor there would quietly undo that gating.
+        if "SYST:ERR?" in upper and (self.psu_mode or self.awg_mode or self.daq_mode):
+            return self._pop_error()
+
         # Data acquisition (DAQ) queries
         if self.daq_mode:
             # Specific queries first -- the old readings matcher used
             # `"R?" in upper`, which is a substring test and swallowed
             # SYST:ERR? and TRIG:SOUR? (both end in "R?") before they ever
             # reached their own handlers (audit M7).
-
-            # Error query
-            if "SYST:ERR?" in upper:
-                return '+0,"No error"'
 
             # Scan list query
             if "ROUT:SCAN?" in upper:
