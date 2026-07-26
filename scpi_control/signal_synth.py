@@ -34,8 +34,18 @@ class SignalSpec:
         drift_frequency: Hz of that wander; only used when drift_amplitude > 0.
         glitch_rate: Mean glitches per second (0 = off).
         glitch_amplitude: Volts, peak height of a glitch.
-        ringing_frequency: Hz of post-edge oscillation (0 = off).
-        ringing_damping: Decay rate per second of that oscillation.
+        ringing_frequency: Hz of post-edge oscillation (0 = off). Ringing is
+            an EDGE impairment -- it is only meaningful on signals that have
+            edges to trigger on ("square", or a pulse-like "ramp"). Applying
+            it to "sine" or "dc" has no effect, since those kinds never
+            produce a discontinuity.
+        ringing_damping: Decay rate per second of that oscillation; only used
+            when ringing_frequency > 0. Defaults away from 0 for the same
+            reason drift_frequency does: undamped ringing (decay rate 0)
+            never actually decays, so the kernel would run for the entire
+            buffer on every edge -- quadratic in the number of edges once
+            ringing_frequency is switched on the most natural way, by setting
+            only that field.
     """
 
     kind: str = "sine"
@@ -53,8 +63,8 @@ class SignalSpec:
     drift_frequency: float = 0.1  # Hz of that wander; only used when drift_amplitude > 0
     glitch_rate: float = 0.0  # mean glitches per second (0 = off)
     glitch_amplitude: float = 0.0  # volts, peak height of a glitch
-    ringing_frequency: float = 0.0  # Hz of post-edge oscillation (0 = off)
-    ringing_damping: float = 0.0  # decay rate per second of that oscillation
+    ringing_frequency: float = 0.0  # Hz of post-edge oscillation (0 = off); an edge impairment, meaningful only on "square"/pulse-like "ramp"
+    ringing_damping: float = 5_000.0  # decay rate per second (M8: nonzero default, same reason as drift_frequency -- damping=0 never decays, making the kernel run the whole buffer on every edge)
 
 
 def _cycle_fraction(spec: SignalSpec, t: np.ndarray) -> np.ndarray:

@@ -41,7 +41,7 @@ signal:
 | `glitch_rate` | `0.0` | Mean glitches per second; `0` (the default) turns glitches off |
 | `glitch_amplitude` | `0.0` | Volts, peak height of a glitch |
 | `ringing_frequency` | `0.0` | Hz of post-edge oscillation; `0` (the default) turns ringing off |
-| `ringing_damping` | `0.0` | Decay rate per second of that oscillation |
+| `ringing_damping` | `5000.0` | Decay rate per second of that oscillation; only used when `ringing_frequency > 0` |
 
 The last six fields are impairments: default-off knobs that make a signal
 imperfect the way a real one is, so measurement and analysis code has

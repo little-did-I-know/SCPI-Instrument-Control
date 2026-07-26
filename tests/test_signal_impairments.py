@@ -198,6 +198,20 @@ def test_ringing_is_off_by_default_for_a_square_wave():
     assert np.max(clean) == pytest.approx(1.0)
 
 
+def test_ringing_damping_defaults_to_nonzero():
+    """M8: the natural way to switch ringing on is setting only
+    ringing_frequency. If ringing_damping stayed at its old default (0.0,
+    undamped), the resulting kernel never decays, so it would run for
+    n_points-1 edges * n_points samples each on a fast square wave --
+    quadratic in n_points (measured, pre-fix: 0.013/0.084/0.402s at n =
+    5k/20k/50k). Same fix as drift_frequency's own nonzero default, and for
+    the same reason."""
+    spec = SignalSpec(kind="square", frequency=1_000.0, amplitude=1.0, ringing_frequency=20_000.0, seed=2)
+    assert spec.ringing_damping > 0.0
+    out = synthesize(spec, 1_000_000.0, 50_000)
+    assert np.isfinite(out).all()
+
+
 def test_ringing_is_continuous_across_stream_chunks():
     """I3: the doc comment used to claim ringing was 'automatically continuous
     across stream() chunks'. It wasn't -- np.diff() only sees edges inside the
