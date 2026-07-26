@@ -42,6 +42,13 @@ beforeEach(() => {
       if (url.endsWith("/api/sessions")) return Promise.resolve(jsonResponse([]));
       if (url.includes("/api/discover")) return Promise.resolve(jsonResponse([]));
       if (url.includes("/reference")) return Promise.resolve(jsonResponse({ name: null, channel: null, t0: 0, dt: 0, points: [] }));
+      if (url.includes("/psu/state")) {
+        return Promise.resolve(
+          jsonResponse({
+            outputs: [{ output: 1, voltage: 3.3, current: 0.5, enabled: false, measured_voltage: 0.0, measured_current: 0.0, measured_power: 0.0 }],
+          }),
+        );
+      }
       return Promise.resolve(jsonResponse({}));
     }),
   );
@@ -58,12 +65,13 @@ describe("App view selection", () => {
     expect(screen.getByText("Channels")).toBeInTheDocument();
   });
 
-  it("does NOT render the scope rail for a psu session, and renders the placeholder instead", () => {
+  it("does NOT render the scope rail for a psu session, and renders the PSU panel instead", async () => {
     useSession.getState().setSession({ ...SESSION, kind: "psu" });
     render(<App />);
     expect(screen.queryByText("Channels")).not.toBeInTheDocument();
-    expect(screen.getByText("Power supply")).toBeInTheDocument();
-    expect(screen.getByText(/coming soon/i)).toBeInTheDocument();
+    expect(screen.queryByText(/coming soon/i)).not.toBeInTheDocument();
+    expect(await screen.findByLabelText("Output 1 voltage")).toBeInTheDocument();
+    expect(screen.getByLabelText("Output 1 enable")).not.toBeChecked();
   });
 
   it("renders the home screen with no session", () => {

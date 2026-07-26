@@ -84,6 +84,20 @@ export type StreamMessage =
   | { type: "closed" }
   | ({ type: "log_status" } & LogStatus);
 
+export type PsuOutputState = {
+  output: number;
+  voltage: number;
+  current: number;
+  enabled: boolean;
+  measured_voltage: number;
+  measured_current: number;
+  measured_power: number;
+};
+
+export type PsuState = { outputs: PsuOutputState[] };
+
+export type PsuOutputPatch = Partial<{ voltage: number; current: number }>;
+
 export type SessionCreate = { label?: string; address?: string; port?: number; mock?: boolean; model?: string };
 export type ChannelPatch = Partial<{ enabled: boolean; voltage_scale: number; voltage_offset: number; coupling: string; probe_ratio: number }>;
 export type TriggerPatch = Partial<{ mode: string; source: string; level: number; slope: string; coupling: string }>;

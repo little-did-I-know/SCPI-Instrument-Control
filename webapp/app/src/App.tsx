@@ -11,6 +11,7 @@ import { ReadoutStrip } from "./features/readout/ReadoutStrip";
 import { ReferencePanel } from "./features/reference/ReferencePanel";
 import { useReferenceSeed } from "./features/reference/useReferenceSeed";
 import { kindMeta } from "./features/home/kinds";
+import { PsuPanel } from "./features/psu/PsuPanel";
 import { TerminalPanel } from "./features/terminal/TerminalPanel";
 import { LogPanel } from "./features/trend/LogPanel";
 import { TrendCanvas } from "./features/trend/TrendCanvas";
@@ -66,7 +67,8 @@ export default function App() {
               </div>
             </div>
           )}
-          {session !== null && session.kind !== "scope" && (
+          {session !== null && session.kind === "psu" && <PsuPanel />}
+          {session !== null && session.kind !== "scope" && session.kind !== "psu" && (
             <GroupBox title={kindMeta(session.kind).label}>
               <p style={{ margin: 0, color: "var(--lc-muted)" }}>A dedicated view for this instrument kind is coming soon.</p>
             </GroupBox>
