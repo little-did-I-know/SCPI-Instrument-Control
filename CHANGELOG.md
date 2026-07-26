@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.4.0] - 2026-07-26
+
 ### Added
 
 - The mock instrument can now misbehave the way real hardware does. It keeps a real SCPI error
