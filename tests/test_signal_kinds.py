@@ -320,3 +320,29 @@ def test_chirp_rejects_bad_parameters(kwargs):
     params.update(kwargs)
     with pytest.raises(exceptions.InvalidParameterError):
         synthesize(SignalSpec(**params), RATE, 100)
+
+
+@pytest.mark.parametrize(
+    "spec",
+    [
+        SignalSpec(kind="chirp", frequency=1_000.0, end_frequency=9_000.0, sweep_time=1e-3),
+        SignalSpec(kind="exponential", frequency=1_000.0, tau=1e-4),
+        SignalSpec(kind="pulse", frequency=1_000.0, pulse_width=2e-4, edge_time=1e-5),
+        SignalSpec(kind="multitone", frequency=1_000.0),
+        # The ringing path renders samples before t0 and dispatches the generator
+        # over an extended window (signal_synth.py:208), a second call site the
+        # plain path never exercises.
+        SignalSpec(kind="pulse", frequency=1_000.0, pulse_width=2e-4, edge_time=1e-5, ringing_frequency=50_000.0),
+    ],
+    ids=["chirp", "exponential", "pulse", "multitone", "pulse+ringing"],
+)
+def test_streamed_chunks_reassemble_into_one_synthesize_call(spec):
+    """Not asserted bitwise: stream() computes each chunk's t0 as
+    produced/sample_rate and synthesize() then adds arange(n)/sample_rate, which
+    rounds a hair differently from one arange over the whole span. Those
+    differences are ~1e-16; a phase reset, a settling restart, or a truncated
+    ring would each be of order the amplitude, so 1e-9 separates them cleanly."""
+    chunk, chunks = 512, 8
+    streamed = np.concatenate(list(itertools.islice(stream(spec, RATE, chunk), chunks)))
+    whole = synthesize(spec, RATE, chunk * chunks)
+    np.testing.assert_allclose(streamed, whole, rtol=0, atol=1e-9)
