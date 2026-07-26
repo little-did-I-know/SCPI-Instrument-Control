@@ -428,3 +428,38 @@ class TestSessionManager:
         # with a 409 -- a footgun that looks like a crash. Reject it eagerly.
         with pytest.raises(ValueError):
             SessionManager(max_sessions=max_sessions)
+
+    def test_create_with_an_unknown_kind_fails_cleanly(self):
+        # The guard in InstrumentSession.open checks `kind not in ADAPTERS`
+        # before ADAPTERS[kind]() is ever evaluated, so a garbage kind must
+        # raise SessionError (-> HTTP 409), not a bare KeyError (-> HTTP 500).
+        # No connection/hardware needed: the check fires before build() runs.
+        manager = SessionManager()
+        try:
+            with pytest.raises(SessionError):
+                manager.create("x", kind="bogus", mock=True)
+            assert manager.list() == []
+        finally:
+            manager.close_all()
+
+
+class TestKindMismatchGuard:
+    def test_a_misreporting_instrument_is_rejected(self):
+        # The kind-mismatch guard in _connect_job compares classify(self.model)
+        # against self.kind for any non-mock session. Reachable without real
+        # hardware by constructing InstrumentSession directly (bypassing
+        # .open()/adapter.build()) with mock=False and a PowerSupply wrapping a
+        # MockConnection(psu_mode=True, ...): the instrument genuinely reports
+        # "SPD3303X" via *IDN?, which classify() resolves to "psu", while the
+        # session's own `kind` (left at the InstrumentSession.__init__ default
+        # of "scope" since open() was bypassed) says otherwise -- the exact
+        # "instrument silently misreports its own kind" case the guard exists for.
+        from scpi_control.power_supply import PowerSupply
+        from scpi_control.server.adapters import PsuAdapter
+
+        conn = MockConnection(psu_mode=True, psu_idn="Siglent Technologies,SPD3303X,SPD123456,1.0")
+        instrument = PowerSupply("mock", connection=conn)
+        session = InstrumentSession("bench-1", instrument, False, "10.0.0.5", 0.25, PsuAdapter())
+        assert session.kind == "scope"  # the untouched __init__ default
+        with pytest.raises(SessionError):
+            session._connect_job(instrument)
