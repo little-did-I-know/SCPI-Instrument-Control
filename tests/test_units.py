@@ -78,3 +78,30 @@ def test_the_error_names_the_quantity_and_the_value():
     message = str(excinfo.value)
     assert "timebase scale" in message
     assert "wat" in message
+
+
+@pytest.mark.parametrize(
+    "text,expected",
+    [
+        ("10us", 1e-5),
+        ("100ns", 1e-7),
+        ("10mV", 1e-2),
+        ("100us", 1e-4),
+        ("1e6m", 1e3),
+    ],
+)
+def test_parsed_values_are_canonical_floats(text, expected):
+    """Exact equality, NOT pytest.approx -- that is the whole point.
+
+    parse_si_value used to compute float(number) * scale, and float
+    multiplication is not correctly rounded the way parsing a decimal literal
+    is: float("10") * 1e-6 is 9.999999999999999e-06 while 10e-6 is 1e-05. The
+    parsed value is formatted straight into a SCPI command, so the difference
+    reached the wire as "TDIV 9.999999999999999e-06".
+    """
+    assert parse_si_value(text, "scale") == expected
+
+
+def test_a_parsed_scale_formats_to_a_canonical_scpi_value():
+    """The wire-level consequence, pinned directly."""
+    assert "{0}".format(parse_si_value("10us", "timebase scale")) == "1e-05"

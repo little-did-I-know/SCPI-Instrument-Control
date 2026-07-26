@@ -141,11 +141,7 @@ def test_batch_capture_accepts_its_own_documented_string_scales(monkeypatch):
     finally:
         dc.disconnect()
     assert len(results) == 4
-    # pytest.approx: parse_si_value("10us") is 10 * 1e-6, which is
-    # 9.999999999999999e-06 in IEEE 754 binary64 -- not bit-identical to the
-    # 1e-5 literal even though both mean "10 microseconds". test_units.py
-    # uses the same tolerance for the identical reason.
-    assert conn.timebase_updates == pytest.approx([1e-6, 1e-6, 1e-5, 1e-5])
+    assert conn.timebase_updates == [1e-6, 1e-6, 1e-5, 1e-5]
     assert conn.scale_updates[1] == [1.0, 0.5, 1.0, 0.5]
 
 
