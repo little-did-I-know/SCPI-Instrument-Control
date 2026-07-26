@@ -282,8 +282,17 @@ def _validate(spec: SignalSpec, sample_rate: float, n_points: int) -> None:
         except TypeError:
             raise exceptions.InvalidParameterError(f"harmonics must be a sequence of relative amplitudes: {spec.harmonics!r}") from None
         for order, relative in enumerate(relatives, start=2):
-            if not np.isfinite(relative) or relative < 0:
-                raise exceptions.InvalidParameterError(f"harmonics[{order - 2}] (harmonic order {order}) must be a non-negative finite number: {relative}")
+            # The guard has to cover the ELEMENT test too, not just list(): on a
+            # non-numeric element np.isfinite raises a raw "ufunc 'isfinite' not
+            # supported" TypeError, and on a complex one the `>= 0` does --
+            # either would escape this module's contract that every bad
+            # parameter surfaces as InvalidParameterError.
+            try:
+                acceptable = bool(np.isfinite(relative)) and relative >= 0
+            except TypeError:
+                acceptable = False
+            if not acceptable:
+                raise exceptions.InvalidParameterError(f"harmonics[{order - 2}] (harmonic order {order}) must be a non-negative finite number: {relative!r}")
     if spec.kind == "pulse":
         if not np.isfinite(spec.edge_time) or spec.edge_time < 0:
             raise exceptions.InvalidParameterError(f"edge_time must be a non-negative, finite number: {spec.edge_time}")

@@ -440,3 +440,13 @@ def test_non_finite_kind_parameters_are_rejected(kind, field, value):
     spec = dataclasses.replace(SignalSpec(kind=kind, frequency=1_000.0), **{field: value})
     with pytest.raises(exceptions.InvalidParameterError):
         synthesize(spec, RATE, 100)
+
+
+@pytest.mark.parametrize("harmonics", [("a",), (0.1, None), ([0.1],), (1j,)], ids=["str", "None", "list", "complex"])
+def test_multitone_rejects_a_non_numeric_harmonic(harmonics):
+    """The module's contract is that every bad parameter raises
+    InvalidParameterError. A non-numeric element used to escape as a raw
+    TypeError ("ufunc 'isfinite' not supported for the input types"), because
+    the guard wrapped only the list() call and not the element test."""
+    with pytest.raises(exceptions.InvalidParameterError):
+        synthesize(SignalSpec(kind="multitone", frequency=1_000.0, harmonics=harmonics), RATE, 100)
