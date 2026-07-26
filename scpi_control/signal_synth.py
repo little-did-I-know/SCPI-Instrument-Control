@@ -101,8 +101,49 @@ class SignalSpec:
     )  # "multitone": relative amplitudes of the 2nd, 3rd, ... harmonic; non-empty by default so SignalSpec(kind="multitone") is not a bit-identical duplicate of "sine"
 
 
+# How close to a whole cycle a sample may sit and still count as landing exactly
+# on the boundary. In ULPs so it scales with the magnitude of the cycle count --
+# see _cycle_fraction for why this exists at all.
+_CYCLE_BOUNDARY_ULPS = 4
+
+
 def _cycle_fraction(spec: SignalSpec, t: np.ndarray) -> np.ndarray:
-    return (spec.frequency * t + spec.phase / (2.0 * np.pi)) % 1.0
+    """Position within the current cycle, in [0, 1).
+
+    The near-integer snap is load-bearing, not defensive. `synthesize` builds
+    `t = t0 + i / sample_rate`, and for an arbitrary t0 -- a trigger crossing, a
+    free-run drift offset, a DUT's lead-in -- that sum cannot land exactly on a
+    whole number of periods. The product then comes out an ULP *below* an
+    integer and `%` maps it to 0.9999999999999991 rather than 0.0.
+
+    On a continuous kind that is invisible. On one that is discontinuous at the
+    wrap it inverts a sample: "square" reads its low level at the instant it
+    should switch high, and "ramp" resets a sample early. In a mock capture that
+    is a full-amplitude artifact -- about 50 int8 codes -- on an otherwise
+    correct trace, which reads as a broken instrument model rather than as
+    arithmetic.
+
+    Snapping cannot do harm larger than it repairs: it moves the cycle position
+    by at most _CYCLE_BOUNDARY_ULPS ULPs, below the resolution of every consumer.
+    A legitimate sample would have to fall within a few ULP of a boundary to be
+    touched -- adjacent samples are frequency/sample_rate apart, many orders of
+    magnitude more -- and a sample that close to a boundary belongs on it. A
+    sweep of 3000 random specs (1 Hz to 10 MHz, 1 kSa/s to 1 GSa/s, arbitrary t0
+    and phase) snapped nothing at all.
+
+    KNOWN RESIDUAL: this fixes the wrap at fraction 0, not the other decision
+    points. `_square` compares against `duty`, `_pulse` against its edge and
+    width, `_exponential` against its high-phase length; a sample landing on one
+    of those thresholds is subject to the same float error, which moves that edge
+    by one sample. Strictly smaller than an inverted sample, and closing it means
+    making every threshold comparison in every generator boundary-aware. See
+    tests/test_cycle_boundary.py, which pins the current behaviour so the gap is
+    visible.
+    """
+    cycles = spec.frequency * t + spec.phase / (2.0 * np.pi)
+    nearest = np.round(cycles)
+    cycles = np.where(np.abs(cycles - nearest) <= _CYCLE_BOUNDARY_ULPS * np.spacing(np.abs(cycles)), nearest, cycles)
+    return cycles % 1.0
 
 
 def _sine(spec: SignalSpec, t: np.ndarray, rng: np.random.Generator) -> np.ndarray:
