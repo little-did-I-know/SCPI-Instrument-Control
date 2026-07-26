@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "SCPI-Instrument-Control"
-version = "5.6.0"
+version = "5.7.0"
 # NOTE: this is the PyPI summary and has a hard 512-character cap. Check the length
 # before every release -- the v3.2.0 publish failed on exactly this.
 description = "Universal Python library for SCPI test equipment over Ethernet, USB, GPIB or serial. One API for oscilloscopes (Siglent, Tektronix, LeCroy), AWGs, power supplies and DAQ units, with waveform capture and provenance, FFT analysis, a PyQt6 GUI, a browser lab gateway, PDF/Markdown reports with local-LLM analysis, and high-fidelity mock instruments for developing with no hardware attached."
