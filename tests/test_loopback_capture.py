@@ -103,10 +103,33 @@ def test_no_dut_means_no_filtering():
 
 
 def test_a_filtered_square_matches_the_independently_derived_exponential_kind():
-    """The strongest evidence in this plan. An RC low-pass fed a square wave IS
-    the `exponential` kind, which was implemented separately in 5.5.0 as a
-    closed-form periodic steady state. Two independently derived implementations
-    of the same physics must agree; neither is checked against a golden array."""
+    """An RC low-pass fed a square wave IS the `exponential` kind, which was
+    implemented separately in 5.5.0 as a closed-form periodic steady state. Two
+    independently derived implementations of the same physics should agree on
+    the bulk of the waveform; neither is checked against a golden array.
+
+    This does NOT converge to machine precision, and that is expected rather
+    than a defect to chase. RCLowPass.apply uses the exact zero-order-hold
+    discretisation (alpha = 1 - exp(-dt/tau)), so the per-step approximation gap
+    between the IIR and the closed form is not the story here -- switching from
+    backward Euler to exact ZOH only moved the measured max from 0.020047 to
+    0.019811, not the order-of-magnitude drop a per-step fix would produce.
+    Per-sample inspection shows the ~2% error is concentrated at each square-
+    wave transition and decays with the filter's own tau over the following
+    samples (0.0198 at the edge, ~0.0072 by 100 samples later, ~0.0027 by 200 --
+    matching 0.0198*exp(-k/tau) closely). A one-sample registration offset (the
+    discrete square's transition landing between samples n and n+1 while the
+    closed form assumes an ideal step at an exact instant) was tested directly
+    and ruled out as the (sole) explanation: shifting the comparison by one
+    sample in either direction does not collapse the error by an order of
+    magnitude -- one shift roughly doubles it (0.0394) and the other roughly
+    thirds it (0.0066), neither of which is the clean collapse a pure one-sample
+    offset would produce. So the residual is treated here as a structural
+    artifact of comparing a discrete causal filter against a continuous,
+    idealised closed form at a signal discontinuity -- not a bug, and not
+    something to tighten away by changing the filter's own sample-timing
+    convention (that would be contorting production code to shrink a test
+    number)."""
     tau = 1e-4
     cutoff = 1.0 / (2 * np.pi * tau)
     dut = RCLowPass(cutoff_hz=cutoff)
@@ -117,13 +140,8 @@ def test_a_filtered_square_matches_the_independently_derived_exponential_kind():
     filtered = dut.apply(square, RATE)[warmup:]
     closed_form = synthesize(SignalSpec(kind="exponential", frequency=1_000.0, amplitude=1.0, tau=tau), RATE, n)
 
-    # RCLowPass.apply uses the exact zero-order-hold discretisation (alpha = 1 -
-    # exp(-dt/tau)), so this is NOT a per-step approximation gap between the IIR
-    # and the closed form -- measured max ~0.0198, concentrated at each square-
-    # wave transition and decaying with the filter's own tau over the following
-    # samples (an inherent one-sample edge-registration artifact where a
-    # discretely-sampled instantaneous edge meets a causal recurrence, present
-    # under any single-pole discretisation, not specific to this one). Bound
-    # carries a small margin above the measured value rather than the 0.02 a
-    # backward-Euler discretisation needed.
+    # Bound is ~2% of amplitude, with a small margin above the measured 0.019811
+    # -- not slack to be tightened. Do not shrink this without re-running the
+    # per-sample/shift investigation above; a tighter bound will make this test
+    # flake on transition-adjacent samples for no gain in real coverage.
     assert np.max(np.abs(filtered - closed_form)) < 0.021
