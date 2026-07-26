@@ -80,7 +80,7 @@ def test_invalid_voltage_scale_is_rejected_and_queued(value):
     assert conn._voltage_scales.get(1) == before, "a rejected command must not change state"
     # Scope mode has no SYST:ERR? accessor (scopes expose no get_error), so assert
     # on the queue attribute directly rather than over the wire.
-    assert conn.error_queue == [(-222, "Data out of range")]
+    assert conn.error_queue == [(-222, "Data out of range (VDIV)")]
 
 
 def test_valid_voltage_scale_is_accepted_and_queues_nothing():
@@ -105,7 +105,7 @@ def test_invalid_probe_attenuation_is_rejected_and_queued(value):
     conn.write("C1:ATTN {0}".format(value))
 
     assert conn.probe_ratios.get(1) == before, "a rejected command must not change state"
-    assert conn.error_queue == [(-222, "Data out of range")]
+    assert conn.error_queue == [(-222, "Data out of range (ATTN)")]
 
 
 def test_valid_probe_attenuation_is_accepted_and_queues_nothing():
@@ -127,7 +127,7 @@ def test_invalid_legacy_trigger_level_is_rejected_and_queued(value):
     conn.write("C1:TRLV {0}".format(value))
 
     assert conn.trigger_level.get(1) == before, "a rejected command must not change state"
-    assert conn.error_queue == [(-222, "Data out of range")]
+    assert conn.error_queue == [(-222, "Data out of range (TRLV)")]
 
 
 def test_valid_negative_legacy_trigger_level_is_accepted_and_queues_nothing():
@@ -152,7 +152,7 @@ def test_invalid_modern_trigger_level_is_rejected_and_queued(value):
     conn.write(":TRIGger:EDGE:LEVel {0}".format(value))
 
     assert conn.trigger_level.get(1) == before, "a rejected command must not change state"
-    assert conn.error_queue == [(-222, "Data out of range")]
+    assert conn.error_queue == [(-222, "Data out of range (TRIGger:EDGE:LEVel)")]
 
 
 def test_valid_negative_modern_trigger_level_is_accepted_and_queues_nothing():
@@ -245,7 +245,7 @@ def test_invalid_psu_voltage_is_rejected_and_queued(value):
     conn = _conn(psu_mode=True)
     conn.write("CH1:VOLT {0}".format(value))
     assert conn.psu_outputs[1]["voltage"] == 0.0, "a rejected command must not change state"
-    assert conn.error_queue == [(-222, "Data out of range")]
+    assert conn.error_queue == [(-222, "Data out of range (VOLT)")]
 
 
 def test_zero_psu_voltage_is_accepted_and_queues_nothing():
@@ -278,7 +278,7 @@ def test_invalid_psu_current_is_rejected_and_queued(value):
     conn = _conn(psu_mode=True)
     conn.write("CH1:CURR {0}".format(value))
     assert conn.psu_outputs[1]["current"] == 0.0, "a rejected command must not change state"
-    assert conn.error_queue == [(-222, "Data out of range")]
+    assert conn.error_queue == [(-222, "Data out of range (CURR)")]
 
 
 def test_zero_psu_current_is_accepted_and_queues_nothing():
@@ -315,7 +315,7 @@ def test_invalid_psu_ovp_is_rejected_and_queued(value):
     before = conn.psu_ovp_levels[1]
     conn.write("CH1:VOLT:PROT {0}".format(value))
     assert conn.psu_ovp_levels[1] == before, "a rejected command must not change state"
-    assert conn.error_queue == [(-222, "Data out of range")]
+    assert conn.error_queue == [(-222, "Data out of range (VOLT:PROT)")]
 
 
 def test_valid_psu_ovp_is_accepted_and_queues_nothing():
@@ -337,7 +337,7 @@ def test_invalid_psu_ocp_is_rejected_and_queued(value):
     before = conn.psu_ocp_levels[1]
     conn.write("CH1:CURR:PROT {0}".format(value))
     assert conn.psu_ocp_levels[1] == before, "a rejected command must not change state"
-    assert conn.error_queue == [(-222, "Data out of range")]
+    assert conn.error_queue == [(-222, "Data out of range (CURR:PROT)")]
 
 
 def test_valid_psu_ocp_is_accepted_and_queues_nothing():
@@ -358,7 +358,7 @@ def test_invalid_awg_frequency_is_rejected_and_queued(value):
     before = conn.awg_channels[1]["frequency"]
     conn.write("SOUR1:FREQ {0}".format(value))
     assert conn.awg_channels[1]["frequency"] == before, "a rejected command must not change state"
-    assert conn.error_queue == [(-222, "Data out of range")]
+    assert conn.error_queue == [(-222, "Data out of range (FREQ)")]
 
 
 def test_valid_awg_frequency_is_accepted_and_queues_nothing():
@@ -389,7 +389,7 @@ def test_invalid_awg_amplitude_is_rejected_and_queued(value):
     before = conn.awg_channels[1]["amplitude"]
     conn.write("SOUR1:VOLT {0}".format(value))
     assert conn.awg_channels[1]["amplitude"] == before, "a rejected command must not change state"
-    assert conn.error_queue == [(-222, "Data out of range")]
+    assert conn.error_queue == [(-222, "Data out of range (VOLT)")]
 
 
 def test_valid_awg_amplitude_is_accepted_and_queues_nothing():
@@ -404,7 +404,7 @@ def test_invalid_awg_offset_is_rejected_and_queued():
     before = conn.awg_channels[1]["offset"]
     conn.write("SOUR1:VOLT:OFFS {0}".format(1e9))
     assert conn.awg_channels[1]["offset"] == before, "a rejected command must not change state"
-    assert conn.error_queue == [(-222, "Data out of range")]
+    assert conn.error_queue == [(-222, "Data out of range (VOLT:OFFS)")]
 
 
 def test_valid_negative_awg_offset_is_accepted_and_queues_nothing():
@@ -424,7 +424,7 @@ def test_invalid_awg_phase_is_rejected_and_queued(value):
     before = conn.awg_channels[1]["phase"]
     conn.write("SOUR1:PHAS {0}".format(value))
     assert conn.awg_channels[1]["phase"] == before, "a rejected command must not change state"
-    assert conn.error_queue == [(-222, "Data out of range")]
+    assert conn.error_queue == [(-222, "Data out of range (PHAS)")]
 
 
 def test_invalid_negative_awg_phase_is_rejected_and_queued():
@@ -437,7 +437,7 @@ def test_invalid_negative_awg_phase_is_rejected_and_queued():
     before = conn.awg_channels[1]["phase"]
     conn.write("SOUR1:PHAS -1000")
     assert conn.awg_channels[1]["phase"] == before, "a rejected command must not change state"
-    assert conn.error_queue == [(-222, "Data out of range")]
+    assert conn.error_queue == [(-222, "Data out of range (PHAS)")]
 
 
 def test_valid_zero_awg_phase_is_accepted_and_queues_nothing():
@@ -459,7 +459,7 @@ def test_invalid_awg_pulse_duty_is_rejected_and_queued(value):
     before = conn.awg_channels[1]["pulse_duty"]
     conn.write("SOUR1:FUNC:PULS:DCYC {0}".format(value))
     assert conn.awg_channels[1]["pulse_duty"] == before, "a rejected command must not change state"
-    assert conn.error_queue == [(-222, "Data out of range")]
+    assert conn.error_queue == [(-222, "Data out of range (FUNC:PULS:DCYC)")]
 
 
 def test_valid_awg_pulse_duty_is_accepted_and_queues_nothing():
@@ -475,7 +475,7 @@ def test_invalid_awg_ramp_symmetry_is_rejected_and_queued(value):
     before = conn.awg_channels[1]["ramp_symmetry"]
     conn.write("SOUR1:FUNC:RAMP:SYMM {0}".format(value))
     assert conn.awg_channels[1]["ramp_symmetry"] == before, "a rejected command must not change state"
-    assert conn.error_queue == [(-222, "Data out of range")]
+    assert conn.error_queue == [(-222, "Data out of range (FUNC:RAMP:SYMM)")]
 
 
 def test_invalid_negative_awg_ramp_symmetry_is_rejected_and_queued():
@@ -488,7 +488,7 @@ def test_invalid_negative_awg_ramp_symmetry_is_rejected_and_queued():
     before = conn.awg_channels[1]["ramp_symmetry"]
     conn.write("SOUR1:FUNC:RAMP:SYMM -50")
     assert conn.awg_channels[1]["ramp_symmetry"] == before, "a rejected command must not change state"
-    assert conn.error_queue == [(-222, "Data out of range")]
+    assert conn.error_queue == [(-222, "Data out of range (FUNC:RAMP:SYMM)")]
 
 
 def test_valid_zero_awg_ramp_symmetry_is_accepted_and_queues_nothing():
@@ -513,7 +513,7 @@ def test_invalid_tek_channel_scale_is_rejected_and_queued(value):
     before = conn._voltage_scales.get(1)
     conn.write("CH1:SCALE {0}".format(value))
     assert conn._voltage_scales.get(1) == before, "a rejected command must not change state"
-    assert conn.error_queue == [(-222, "Data out of range")]
+    assert conn.error_queue == [(-222, "Data out of range (SCALE)")]
 
 
 def test_valid_tek_channel_scale_is_accepted_and_queues_nothing():
@@ -528,7 +528,7 @@ def test_invalid_tek_channel_offset_is_rejected_and_queued():
     before = conn._voltage_offsets.get(1)
     conn.write("CH1:OFFSET {0}".format(1e9))
     assert conn._voltage_offsets.get(1) == before, "a rejected command must not change state"
-    assert conn.error_queue == [(-222, "Data out of range")]
+    assert conn.error_queue == [(-222, "Data out of range (OFFSET)")]
 
 
 def test_valid_negative_tek_channel_offset_is_accepted_and_queues_nothing():
@@ -548,7 +548,7 @@ def test_invalid_tek_tbs_probe_gain_is_rejected_and_queued(value):
     before = conn.probe_gains.get(1)
     conn.write("CH1:PROBE:GAIN {0}".format(value))
     assert conn.probe_gains.get(1) == before, "a rejected command must not change state"
-    assert conn.error_queue == [(-222, "Data out of range")]
+    assert conn.error_queue == [(-222, "Data out of range (PROBE:GAIN)")]
 
 
 def test_valid_tek_tbs_probe_gain_is_accepted_and_queues_nothing():
@@ -565,7 +565,7 @@ def test_invalid_tek_mso_probe_gain_is_rejected_and_queued(value):
     before = conn.probe_gains.get(1)
     conn.write("CH1:PROBEFUNC:EXTATTEN {0}".format(value))
     assert conn.probe_gains.get(1) == before, "a rejected command must not change state"
-    assert conn.error_queue == [(-222, "Data out of range")]
+    assert conn.error_queue == [(-222, "Data out of range (PROBEFUNC:EXTATTEN)")]
 
 
 def test_valid_tek_mso_probe_gain_is_accepted_and_queues_nothing():
@@ -581,7 +581,7 @@ def test_invalid_tek_horizontal_scale_is_rejected_and_queued(value):
     before = conn.timebase
     conn.write("HORIZONTAL:SCALE {0}".format(value))
     assert conn.timebase == before, "a rejected command must not change state"
-    assert conn.error_queue == [(-222, "Data out of range")]
+    assert conn.error_queue == [(-222, "Data out of range (HORIZONTAL:SCALE)")]
 
 
 def test_valid_tek_horizontal_scale_is_accepted_and_queues_nothing():
@@ -596,7 +596,7 @@ def test_invalid_tek_trigger_level_is_rejected_and_queued():
     before = conn.trigger_level.get(1)
     conn.write("TRIGGER:A:LEVEL:CH1 {0}".format(1e9))
     assert conn.trigger_level.get(1) == before, "a rejected command must not change state"
-    assert conn.error_queue == [(-222, "Data out of range")]
+    assert conn.error_queue == [(-222, "Data out of range (TRIGGER:A:LEVEL)")]
 
 
 def test_valid_negative_tek_trigger_level_is_accepted_and_queues_nothing():
@@ -614,7 +614,7 @@ def test_invalid_tek_holdoff_time_is_rejected_and_queued():
     before = conn.holdoff_time
     conn.write("TRIGGER:A:HOLDOFF:TIME {0}".format(1e9))
     assert conn.holdoff_time == before, "a rejected command must not change state"
-    assert conn.error_queue == [(-222, "Data out of range")]
+    assert conn.error_queue == [(-222, "Data out of range (TRIGGER:A:HOLDOFF:TIME)")]
 
 
 def test_invalid_negative_tek_holdoff_time_is_rejected_and_queued():
@@ -627,7 +627,7 @@ def test_invalid_negative_tek_holdoff_time_is_rejected_and_queued():
     before = conn.holdoff_time
     conn.write("TRIGGER:A:HOLDOFF:TIME -5.0")
     assert conn.holdoff_time == before, "a rejected command must not change state"
-    assert conn.error_queue == [(-222, "Data out of range")]
+    assert conn.error_queue == [(-222, "Data out of range (TRIGGER:A:HOLDOFF:TIME)")]
 
 
 def test_valid_zero_tek_holdoff_time_is_accepted_and_queues_nothing():
@@ -653,7 +653,7 @@ def test_invalid_lecroy_voltage_scale_is_rejected_and_queued():
     before = conn._voltage_scales.get(1)
     conn.write("C1:VDIV {0}".format(1e9))
     assert conn._voltage_scales.get(1) == before, "a rejected command must not change state"
-    assert conn.error_queue == [(-222, "Data out of range")]
+    assert conn.error_queue == [(-222, "Data out of range (VDIV)")]
 
 
 def test_valid_lecroy_voltage_scale_is_accepted_and_queues_nothing():

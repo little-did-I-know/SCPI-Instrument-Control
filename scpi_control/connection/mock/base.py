@@ -276,10 +276,14 @@ class MockConnection(BaseConnection):
         (trigger holdoff, AWG phase/ramp symmetry, PSU voltage/current). Pass it
         together with `positive=False` (the default `positive=True` already
         excludes negatives, so `non_negative` would be redundant with it).
+
+        `name` is folded into the queued message (M1: it used to be accepted
+        by ~25 call sites and read by nothing, so a caller polling SYST:ERR?
+        could tell a parameter was rejected but never which one).
         """
         bound = self._ABSURD_MAGNITUDE if max_magnitude is None else max_magnitude
         if not math.isfinite(value) or (positive and value <= 0) or (non_negative and value < 0) or abs(value) > bound:
-            self.push_error(-222, "Data out of range")
+            self.push_error(-222, f"Data out of range ({name})")
             return True
         return False
 
