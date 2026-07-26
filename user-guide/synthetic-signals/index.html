@@ -3798,37 +3798,114 @@ signal:</p>
 <td><code>None</code></td>
 <td><code>None</code> for fresh randomness on every call; an <code>int</code> for reproducible output</td>
 </tr>
+<tr>
+<td><code>drift_amplitude</code></td>
+<td><code>0.0</code></td>
+<td>Volts of slow baseline wander; <code>0</code> (the default) turns drift off</td>
+</tr>
+<tr>
+<td><code>drift_frequency</code></td>
+<td><code>0.1</code></td>
+<td>Hz of that wander; only used when <code>drift_amplitude &gt; 0</code></td>
+</tr>
+<tr>
+<td><code>glitch_rate</code></td>
+<td><code>0.0</code></td>
+<td>Mean glitches per second; <code>0</code> (the default) turns glitches off</td>
+</tr>
+<tr>
+<td><code>glitch_amplitude</code></td>
+<td><code>0.0</code></td>
+<td>Volts, peak height of a glitch</td>
+</tr>
+<tr>
+<td><code>ringing_frequency</code></td>
+<td><code>0.0</code></td>
+<td>Hz of post-edge oscillation; <code>0</code> (the default) turns ringing off</td>
+</tr>
+<tr>
+<td><code>ringing_damping</code></td>
+<td><code>5000.0</code></td>
+<td>Decay rate per second of that oscillation; only used when <code>ringing_frequency &gt; 0</code></td>
+</tr>
 </tbody>
 </table>
+<p>The last six fields are impairments: default-off knobs that make a signal
+imperfect the way a real one is, so measurement and analysis code has
+something realistic to face instead of a mathematically clean waveform. All
+six are appended at the end of the dataclass and every one defaults to a
+value that leaves the signal unaffected, so existing code that constructs a
+<code>SignalSpec</code> positionally or without these arguments is unaffected.</p>
+<ul>
+<li><strong><code>drift_amplitude</code>/<code>drift_frequency</code></strong> add slow baseline wander -- a
+  sinusoid at <code>drift_frequency</code> Hz, <code>drift_amplitude</code> volts of amplitude,
+  derived from absolute time so it (like ringing, below) stays continuous
+  across <code>stream()</code> chunks instead of jumping at chunk boundaries.</li>
+<li><strong><code>glitch_rate</code>/<code>glitch_amplitude</code></strong> add sparse, isolated spikes -- a
+  Poisson process at <code>glitch_rate</code> events per second, each an instantaneous
+  <code>+/-glitch_amplitude</code> volt spike on one sample. Glitches draw from their own
+  generator (seeded independently from the base signal/noise), so enabling
+  them never perturbs <code>noise_rms</code>'s samples.</li>
+<li><strong><code>ringing_frequency</code>/<code>ringing_damping</code></strong> add a damped sinusoid after every
+  edge of a periodic signal -- what a real probe/scope front-end does after a
+  fast transition, and what gives an overshoot/preshoot measurement something
+  genuine to measure. It's an edge impairment, so it is only meaningful on
+  signals that actually have edges (<code>"square"</code>, or a pulse-like <code>"ramp"</code>) --
+  applying it to <code>"sine"</code> or <code>"dc"</code> has no effect, since those kinds have no
+  discontinuities for it to trigger on.</li>
+</ul>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">scpi_control.signal_synth</span><span class="w"> </span><span class="kn">import</span> <span class="n">SignalSpec</span><span class="p">,</span> <span class="n">synthesize</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="c1"># A 1kHz square wave with all three impairments: slow thermal-style drift on</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="c1"># the baseline, occasional glitches, and probe-style ringing after every edge</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="c1"># -- an intentionally imperfect signal for exercising measurement code against</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="c1"># something closer to what a real instrument would actually capture.</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="n">messy</span> <span class="o">=</span> <span class="n">SignalSpec</span><span class="p">(</span>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>    <span class="n">kind</span><span class="o">=</span><span class="s2">&quot;square&quot;</span><span class="p">,</span>
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>    <span class="n">frequency</span><span class="o">=</span><span class="mf">1_000.0</span><span class="p">,</span>
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>    <span class="n">amplitude</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span>
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>    <span class="n">noise_rms</span><span class="o">=</span><span class="mf">0.02</span><span class="p">,</span>
+</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>    <span class="n">drift_amplitude</span><span class="o">=</span><span class="mf">0.05</span><span class="p">,</span>
+</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>    <span class="n">drift_frequency</span><span class="o">=</span><span class="mf">0.2</span><span class="p">,</span>
+</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>    <span class="n">glitch_rate</span><span class="o">=</span><span class="mf">2.0</span><span class="p">,</span>
+</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>    <span class="n">glitch_amplitude</span><span class="o">=</span><span class="mf">0.3</span><span class="p">,</span>
+</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>    <span class="n">ringing_frequency</span><span class="o">=</span><span class="mf">20_000.0</span><span class="p">,</span>
+</span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>    <span class="n">ringing_damping</span><span class="o">=</span><span class="mf">5_000.0</span><span class="p">,</span>
+</span><span id="__span-0-18"><a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>    <span class="n">seed</span><span class="o">=</span><span class="mi">42</span><span class="p">,</span>
+</span><span id="__span-0-19"><a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a><span class="p">)</span>
+</span><span id="__span-0-20"><a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a><span class="n">volts</span> <span class="o">=</span> <span class="n">synthesize</span><span class="p">(</span><span class="n">messy</span><span class="p">,</span> <span class="n">sample_rate</span><span class="o">=</span><span class="mf">1_000_000.0</span><span class="p">,</span> <span class="n">n_points</span><span class="o">=</span><span class="mi">10_000</span><span class="p">)</span>
+</span></code></pre></div>
 <p><code>"square"</code>'s <code>duty</code> is the fraction of each period spent high, so a
 <code>SignalSpec(kind="square", duty=0.2)</code> is a 20%-duty pulse/PWM waveform, not
 just a symmetric square wave. <code>"dc"</code> ignores <code>amplitude</code> entirely and always
 outputs <code>offset</code>. <code>"noise"</code> uses <code>amplitude</code> as the Gaussian standard
 deviation rather than a peak value. An invalid <code>kind</code> or an out-of-range
 parameter (non-positive <code>frequency</code> on a periodic kind, <code>duty</code> outside
-<code>(0, 1)</code>, negative <code>noise_rms</code>) raises <code>InvalidParameterError</code> -- no partial
-or silently-clamped signal is ever returned.</p>
+<code>(0, 1)</code>, negative <code>noise_rms</code>, a negative <code>drift_amplitude</code>/<code>glitch_rate</code>/
+<code>glitch_amplitude</code>/<code>ringing_frequency</code>/<code>ringing_damping</code>, or a non-positive
+<code>drift_frequency</code> while <code>drift_amplitude &gt; 0</code>) raises <code>InvalidParameterError</code>
+-- no partial or silently-clamped signal is ever returned.</p>
 <h2 id="generating-signals-directly">Generating Signals Directly<a class="headerlink" href="#generating-signals-directly" title="Permanent link">&para;</a></h2>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">scpi_control.signal_synth</span><span class="w"> </span><span class="kn">import</span> <span class="n">SignalSpec</span><span class="p">,</span> <span class="n">synthesize</span><span class="p">,</span> <span class="n">make_waveform</span>
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="n">spec</span> <span class="o">=</span> <span class="n">SignalSpec</span><span class="p">(</span><span class="n">kind</span><span class="o">=</span><span class="s2">&quot;sine&quot;</span><span class="p">,</span> <span class="n">frequency</span><span class="o">=</span><span class="mf">1_000.0</span><span class="p">,</span> <span class="n">amplitude</span><span class="o">=</span><span class="mf">0.8</span><span class="p">,</span> <span class="n">noise_rms</span><span class="o">=</span><span class="mf">0.02</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="mi">42</span><span class="p">)</span>
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>
-</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="c1"># Raw voltage samples, as a numpy array</span>
-</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="n">volts</span> <span class="o">=</span> <span class="n">synthesize</span><span class="p">(</span><span class="n">spec</span><span class="p">,</span> <span class="n">sample_rate</span><span class="o">=</span><span class="mf">100_000.0</span><span class="p">,</span> <span class="n">n_points</span><span class="o">=</span><span class="mi">1_000</span><span class="p">)</span>
-</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>
-</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="c1"># A full WaveformData, ready for analysis, saving, or the report generator</span>
-</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="n">waveform</span> <span class="o">=</span> <span class="n">make_waveform</span><span class="p">(</span><span class="n">spec</span><span class="p">,</span> <span class="n">sample_rate</span><span class="o">=</span><span class="mf">100_000.0</span><span class="p">,</span> <span class="n">n_points</span><span class="o">=</span><span class="mi">1_000</span><span class="p">,</span> <span class="n">channel</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
-</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="n">waveform</span><span class="o">.</span><span class="n">voltage</span><span class="p">,</span> <span class="n">waveform</span><span class="o">.</span><span class="n">time</span><span class="p">,</span> <span class="n">waveform</span><span class="o">.</span><span class="n">sample_rate</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">scpi_control.signal_synth</span><span class="w"> </span><span class="kn">import</span> <span class="n">SignalSpec</span><span class="p">,</span> <span class="n">synthesize</span><span class="p">,</span> <span class="n">make_waveform</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="n">spec</span> <span class="o">=</span> <span class="n">SignalSpec</span><span class="p">(</span><span class="n">kind</span><span class="o">=</span><span class="s2">&quot;sine&quot;</span><span class="p">,</span> <span class="n">frequency</span><span class="o">=</span><span class="mf">1_000.0</span><span class="p">,</span> <span class="n">amplitude</span><span class="o">=</span><span class="mf">0.8</span><span class="p">,</span> <span class="n">noise_rms</span><span class="o">=</span><span class="mf">0.02</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="mi">42</span><span class="p">)</span>
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="c1"># Raw voltage samples, as a numpy array</span>
+</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="n">volts</span> <span class="o">=</span> <span class="n">synthesize</span><span class="p">(</span><span class="n">spec</span><span class="p">,</span> <span class="n">sample_rate</span><span class="o">=</span><span class="mf">100_000.0</span><span class="p">,</span> <span class="n">n_points</span><span class="o">=</span><span class="mi">1_000</span><span class="p">)</span>
+</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>
+</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="c1"># A full WaveformData, ready for analysis, saving, or the report generator</span>
+</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="n">waveform</span> <span class="o">=</span> <span class="n">make_waveform</span><span class="p">(</span><span class="n">spec</span><span class="p">,</span> <span class="n">sample_rate</span><span class="o">=</span><span class="mf">100_000.0</span><span class="p">,</span> <span class="n">n_points</span><span class="o">=</span><span class="mi">1_000</span><span class="p">,</span> <span class="n">channel</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="n">waveform</span><span class="o">.</span><span class="n">voltage</span><span class="p">,</span> <span class="n">waveform</span><span class="o">.</span><span class="n">time</span><span class="p">,</span> <span class="n">waveform</span><span class="o">.</span><span class="n">sample_rate</span>
 </span></code></pre></div>
 <p><code>synthesize()</code> returns a <code>float64</code> array of <code>n_points</code> voltage samples;
 <code>t0</code> shifts the start time, which matters for periodic kinds (it's how the
 mock aligns a capture to a trigger crossing -- see below). <code>make_waveform()</code>
 wraps the same samples in a <code>WaveformData</code> with a matching <code>time</code> axis, so it
 composes directly with the rest of the library:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="n">waveform</span> <span class="o">=</span> <span class="n">make_waveform</span><span class="p">(</span><span class="n">SignalSpec</span><span class="p">(</span><span class="n">kind</span><span class="o">=</span><span class="s2">&quot;square&quot;</span><span class="p">,</span> <span class="n">frequency</span><span class="o">=</span><span class="mf">1_000.0</span><span class="p">,</span> <span class="n">amplitude</span><span class="o">=</span><span class="mf">1.0</span><span class="p">),</span> <span class="n">sample_rate</span><span class="o">=</span><span class="mf">1_000_000.0</span><span class="p">,</span> <span class="n">n_points</span><span class="o">=</span><span class="mi">10_000</span><span class="p">)</span>
-</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="c1"># waveform.voltage / waveform.time feed analysis, plotting, or a report exactly</span>
-</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="c1"># like a captured waveform would -- see docs/report-generator/ for the reporting</span>
-</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="c1"># side of that chain.</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">waveform</span> <span class="o">=</span> <span class="n">make_waveform</span><span class="p">(</span><span class="n">SignalSpec</span><span class="p">(</span><span class="n">kind</span><span class="o">=</span><span class="s2">&quot;square&quot;</span><span class="p">,</span> <span class="n">frequency</span><span class="o">=</span><span class="mf">1_000.0</span><span class="p">,</span> <span class="n">amplitude</span><span class="o">=</span><span class="mf">1.0</span><span class="p">),</span> <span class="n">sample_rate</span><span class="o">=</span><span class="mf">1_000_000.0</span><span class="p">,</span> <span class="n">n_points</span><span class="o">=</span><span class="mi">10_000</span><span class="p">)</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="c1"># waveform.voltage / waveform.time feed analysis, plotting, or a report exactly</span>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="c1"># like a captured waveform would -- see docs/report-generator/ for the reporting</span>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="c1"># side of that chain.</span>
 </span></code></pre></div>
 <p>Two calls with <code>seed=None</code> (the default) produce different noise and, for
 <code>"noise"</code> itself, different signal on every call. Pass an <code>int</code> seed to get
@@ -3838,15 +3915,15 @@ byte-identical output across runs.</p>
 continuous or live simulation -- feeding a loop, a plot, or a network socket
 indefinitely -- <code>stream()</code> does the same phase-continuous generation without
 hand-rolling the <code>t0</code> bookkeeping yourself:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">stream</span><span class="p">(</span>
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>    <span class="n">spec</span><span class="p">:</span> <span class="n">SignalSpec</span><span class="p">,</span>
-</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>    <span class="n">sample_rate</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
-</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>    <span class="n">chunk_size</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
-</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>    <span class="o">*</span><span class="p">,</span>
-</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>    <span class="n">start_time</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0</span><span class="p">,</span>
-</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>    <span class="n">duration</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>    <span class="n">realtime</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
-</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Iterator</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">stream</span><span class="p">(</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>    <span class="n">spec</span><span class="p">:</span> <span class="n">SignalSpec</span><span class="p">,</span>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>    <span class="n">sample_rate</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>    <span class="n">chunk_size</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>    <span class="o">*</span><span class="p">,</span>
+</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>    <span class="n">start_time</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0</span><span class="p">,</span>
+</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>    <span class="n">duration</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>    <span class="n">realtime</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Iterator</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]</span>
 </span></code></pre></div>
 <p>It returns an iterator of <code>float64</code> voltage chunks, each <code>chunk_size</code>
 samples long, where every chunk picks up exactly where the previous one left
@@ -3854,11 +3931,11 @@ off -- no phase discontinuity at chunk boundaries. Validation errors (the
 same ones <code>SignalSpec</code> and <code>synthesize()</code> raise) happen at call time, before
 the first chunk is produced.</p>
 <p>A minimal continuous loop:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">scpi_control.signal_synth</span><span class="w"> </span><span class="kn">import</span> <span class="n">SignalSpec</span><span class="p">,</span> <span class="n">stream</span>
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="n">spec</span> <span class="o">=</span> <span class="n">SignalSpec</span><span class="p">(</span><span class="n">kind</span><span class="o">=</span><span class="s2">&quot;sine&quot;</span><span class="p">,</span> <span class="n">frequency</span><span class="o">=</span><span class="mf">1_000.0</span><span class="p">,</span> <span class="n">amplitude</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">noise_rms</span><span class="o">=</span><span class="mf">0.02</span><span class="p">)</span>
-</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="k">for</span> <span class="n">chunk</span> <span class="ow">in</span> <span class="n">stream</span><span class="p">(</span><span class="n">spec</span><span class="p">,</span> <span class="n">sample_rate</span><span class="o">=</span><span class="mf">1_000_000.0</span><span class="p">,</span> <span class="n">chunk_size</span><span class="o">=</span><span class="mi">10_000</span><span class="p">):</span>
-</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>    <span class="n">process</span><span class="p">(</span><span class="n">chunk</span><span class="p">)</span>  <span class="c1"># phase-continuous float64 volts; break when done</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">scpi_control.signal_synth</span><span class="w"> </span><span class="kn">import</span> <span class="n">SignalSpec</span><span class="p">,</span> <span class="n">stream</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="n">spec</span> <span class="o">=</span> <span class="n">SignalSpec</span><span class="p">(</span><span class="n">kind</span><span class="o">=</span><span class="s2">&quot;sine&quot;</span><span class="p">,</span> <span class="n">frequency</span><span class="o">=</span><span class="mf">1_000.0</span><span class="p">,</span> <span class="n">amplitude</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">noise_rms</span><span class="o">=</span><span class="mf">0.02</span><span class="p">)</span>
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="k">for</span> <span class="n">chunk</span> <span class="ow">in</span> <span class="n">stream</span><span class="p">(</span><span class="n">spec</span><span class="p">,</span> <span class="n">sample_rate</span><span class="o">=</span><span class="mf">1_000_000.0</span><span class="p">,</span> <span class="n">chunk_size</span><span class="o">=</span><span class="mi">10_000</span><span class="p">):</span>
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>    <span class="n">process</span><span class="p">(</span><span class="n">chunk</span><span class="p">)</span>  <span class="c1"># phase-continuous float64 volts; break when done</span>
 </span></code></pre></div>
 <p>By default <code>stream()</code> yields chunks as fast as the consumer pulls them. With
 <code>duration=None</code> (the default) it streams forever -- <code>break</code> out of the loop
@@ -3930,23 +4007,23 @@ below).</p>
 <p>Pass a <code>signals={channel: SignalSpec(...)}</code> dict to <code>MockConnection</code> to
 override the defaults for specific channels; channels you don't mention keep
 their built-in default:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">scpi_control.connection</span><span class="w"> </span><span class="kn">import</span> <span class="n">MockConnection</span>
-</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">scpi_control.oscilloscope</span><span class="w"> </span><span class="kn">import</span> <span class="n">Oscilloscope</span>
-</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">scpi_control.signal_synth</span><span class="w"> </span><span class="kn">import</span> <span class="n">SignalSpec</span>
-</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>
-</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="n">conn</span> <span class="o">=</span> <span class="n">MockConnection</span><span class="p">(</span>
-</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>    <span class="s2">&quot;mock&quot;</span><span class="p">,</span>
-</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>    <span class="n">idn</span><span class="o">=</span><span class="s2">&quot;Siglent Technologies,SDS1104X-E,MOCK0001,1.0.0.0&quot;</span><span class="p">,</span>
-</span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>    <span class="n">channel_states</span><span class="o">=</span><span class="p">{</span><span class="mi">1</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span> <span class="mi">2</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span> <span class="mi">3</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span> <span class="mi">4</span><span class="p">:</span> <span class="kc">False</span><span class="p">},</span>
-</span><span id="__span-4-9"><a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>    <span class="n">trigger_status</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;Stop&quot;</span><span class="p">],</span>
-</span><span id="__span-4-10"><a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a>    <span class="n">sample_rate</span><span class="o">=</span><span class="mf">1_000_000.0</span><span class="p">,</span>
-</span><span id="__span-4-11"><a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a>    <span class="n">timebase</span><span class="o">=</span><span class="mf">1e-3</span><span class="p">,</span>
-</span><span id="__span-4-12"><a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a>    <span class="n">signals</span><span class="o">=</span><span class="p">{</span><span class="mi">1</span><span class="p">:</span> <span class="n">SignalSpec</span><span class="p">(</span><span class="n">kind</span><span class="o">=</span><span class="s2">&quot;sine&quot;</span><span class="p">,</span> <span class="n">frequency</span><span class="o">=</span><span class="mf">2_000.0</span><span class="p">,</span> <span class="n">amplitude</span><span class="o">=</span><span class="mf">0.8</span><span class="p">,</span> <span class="n">noise_rms</span><span class="o">=</span><span class="mf">0.02</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="mi">42</span><span class="p">)},</span>
-</span><span id="__span-4-13"><a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a><span class="p">)</span>
-</span><span id="__span-4-14"><a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a><span class="n">scope</span> <span class="o">=</span> <span class="n">Oscilloscope</span><span class="p">(</span><span class="s2">&quot;mock&quot;</span><span class="p">,</span> <span class="n">connection</span><span class="o">=</span><span class="n">conn</span><span class="p">)</span>
-</span><span id="__span-4-15"><a id="__codelineno-4-15" name="__codelineno-4-15" href="#__codelineno-4-15"></a><span class="n">scope</span><span class="o">.</span><span class="n">connect</span><span class="p">()</span>
-</span><span id="__span-4-16"><a id="__codelineno-4-16" name="__codelineno-4-16" href="#__codelineno-4-16"></a><span class="n">waveform</span> <span class="o">=</span> <span class="n">scope</span><span class="o">.</span><span class="n">get_waveform</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
-</span><span id="__span-4-17"><a id="__codelineno-4-17" name="__codelineno-4-17" href="#__codelineno-4-17"></a><span class="n">scope</span><span class="o">.</span><span class="n">disconnect</span><span class="p">()</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">scpi_control.connection</span><span class="w"> </span><span class="kn">import</span> <span class="n">MockConnection</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">scpi_control.oscilloscope</span><span class="w"> </span><span class="kn">import</span> <span class="n">Oscilloscope</span>
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">scpi_control.signal_synth</span><span class="w"> </span><span class="kn">import</span> <span class="n">SignalSpec</span>
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>
+</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="n">conn</span> <span class="o">=</span> <span class="n">MockConnection</span><span class="p">(</span>
+</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>    <span class="s2">&quot;mock&quot;</span><span class="p">,</span>
+</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>    <span class="n">idn</span><span class="o">=</span><span class="s2">&quot;Siglent Technologies,SDS1104X-E,MOCK0001,1.0.0.0&quot;</span><span class="p">,</span>
+</span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>    <span class="n">channel_states</span><span class="o">=</span><span class="p">{</span><span class="mi">1</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span> <span class="mi">2</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span> <span class="mi">3</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span> <span class="mi">4</span><span class="p">:</span> <span class="kc">False</span><span class="p">},</span>
+</span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a>    <span class="n">trigger_status</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;Stop&quot;</span><span class="p">],</span>
+</span><span id="__span-5-10"><a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a>    <span class="n">sample_rate</span><span class="o">=</span><span class="mf">1_000_000.0</span><span class="p">,</span>
+</span><span id="__span-5-11"><a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a>    <span class="n">timebase</span><span class="o">=</span><span class="mf">1e-3</span><span class="p">,</span>
+</span><span id="__span-5-12"><a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a>    <span class="n">signals</span><span class="o">=</span><span class="p">{</span><span class="mi">1</span><span class="p">:</span> <span class="n">SignalSpec</span><span class="p">(</span><span class="n">kind</span><span class="o">=</span><span class="s2">&quot;sine&quot;</span><span class="p">,</span> <span class="n">frequency</span><span class="o">=</span><span class="mf">2_000.0</span><span class="p">,</span> <span class="n">amplitude</span><span class="o">=</span><span class="mf">0.8</span><span class="p">,</span> <span class="n">noise_rms</span><span class="o">=</span><span class="mf">0.02</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="mi">42</span><span class="p">)},</span>
+</span><span id="__span-5-13"><a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a><span class="p">)</span>
+</span><span id="__span-5-14"><a id="__codelineno-5-14" name="__codelineno-5-14" href="#__codelineno-5-14"></a><span class="n">scope</span> <span class="o">=</span> <span class="n">Oscilloscope</span><span class="p">(</span><span class="s2">&quot;mock&quot;</span><span class="p">,</span> <span class="n">connection</span><span class="o">=</span><span class="n">conn</span><span class="p">)</span>
+</span><span id="__span-5-15"><a id="__codelineno-5-15" name="__codelineno-5-15" href="#__codelineno-5-15"></a><span class="n">scope</span><span class="o">.</span><span class="n">connect</span><span class="p">()</span>
+</span><span id="__span-5-16"><a id="__codelineno-5-16" name="__codelineno-5-16" href="#__codelineno-5-16"></a><span class="n">waveform</span> <span class="o">=</span> <span class="n">scope</span><span class="o">.</span><span class="n">get_waveform</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+</span><span id="__span-5-17"><a id="__codelineno-5-17" name="__codelineno-5-17" href="#__codelineno-5-17"></a><span class="n">scope</span><span class="o">.</span><span class="n">disconnect</span><span class="p">()</span>
 </span></code></pre></div>
 <h3 id="state-coupling">State coupling<a class="headerlink" href="#state-coupling" title="Permanent link">&para;</a></h3>
 <p>The next capture reflects the mock's <em>current</em> SCPI state, so writes made
