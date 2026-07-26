@@ -25,7 +25,7 @@ For automated test report generation:
     from scpi_control.report_generator import ReportGenerator
 """
 
-__version__ = "5.4.0"
+__version__ = "5.5.0"
 
 from scpi_control.exceptions import CommandError, SiglentConnectionError, SiglentError, SiglentTimeoutError
 from scpi_control.oscilloscope import Oscilloscope

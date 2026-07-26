@@ -7,6 +7,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.5.0] - 2026-07-26
+
+### Added
+
+- Four new synthetic signal kinds join `sine`/`square`/`triangle`/`ramp`/`dc`/`noise`: `chirp`, a
+  repeating frequency sweep from `frequency` to `end_frequency` over `sweep_time` (linear or, with
+  `sweep_log`, logarithmic), with phase carried across the retrace so the sweep boundary is
+  discontinuity-free — it's also the one kind the mock free-runs rather than trigger-aligns, since
+  a sweep has no stable period; `exponential`, a square wave through an RC network with time
+  constant `tau`, evaluated at its periodic steady state so it's settled from the first cycle
+  rather than over the first few, and split by `duty`; `pulse`, a trapezoid whose width and edge
+  rate are set independently of the period by `pulse_width` and `edge_time` (`edge_time` may be 0
+  for an ideal edge) rather than by `duty`, which `pulse` ignores — `pulse_width` is the
+  50%-to-50% (FWHM) width, matching both instrument convention and the threshold the repo's timing
+  analyzer measures at, so the flat top runs for `pulse_width - edge_time`; and `multitone`, a
+  fundamental plus a coherent harmonic series (`harmonics` gives the relative amplitudes of the
+  2nd, 3rd, ... harmonic), where `amplitude` sets the fundamental rather than the peak of the sum
+  — deliberately not normalized, since normalizing would make THD depend on the harmonic set. The
+  new kinds give the repo's timing, THD and spectrum analyzers a closed-form answer to check
+  against for the first time, rather than only a pure sine, a square, or noise. Non-breaking:
+  every new `SignalSpec` field is optional and appended at the end of the dataclass, so existing
+  specs and positional construction are unaffected.
+
+### Fixed
+
+- Signal synthesis documented ringing as having "no effect" on kinds without edges. That was
+  wrong: ringing finds its edges with `np.diff(samples) != 0` — any nonzero sample-to-sample
+  change — so on a continuous signal every sample qualifies and the impairment acts as a
+  derivative-weighted filter rather than an edge response. At 1 MSa/s, 1 V amplitude and 50 kHz
+  ringing, the measured deviation is 1.04e-1 V on `chirp`, 5.60e-2 V on `exponential`,
+  1.33e-2 V on `multitone` and 9.85e-3 V on `sine`; only `dc` is a genuine no-op. The behaviour
+  is unchanged and defensible as a band-limited edge response — only the documentation was
+  wrong, and it now states the real effect with those measured figures.
+- `SignalSpec` accepted non-finite kind parameters. `pulse_width=nan` passed validation entirely
+  (both `nan <= edge_time` and `nan > 1/frequency` are False) and produced a finite but silently
+  wrong waveform with no `nan` in the output to give it away; `tau=inf` produced an all-`nan`
+  trace and a numpy RuntimeWarning. `end_frequency`, `sweep_time`, `tau`, `pulse_width` and
+  `edge_time` are now checked with `np.isfinite` and raise `InvalidParameterError`.
+- A `multitone` spec whose `harmonics` contained a non-numeric element raised a raw `TypeError`
+  from numpy instead of the `InvalidParameterError` the module promises for every bad parameter.
+- The mock's trigger search now sees the ideal signal. `_trigger_crossing` synthesizes a short
+  reference trace to locate where the signal crosses the trigger level, but left the impairments
+  enabled, so drift, glitches and ringing each moved the crossing (68.85 us to 66.41, 64.70 and
+  10.25 us respectively) and ringing added roughly 21 ms per acquisition. It now zeroes them
+  alongside the noise it already stripped, so trigger alignment no longer jitters with the
+  impairment settings.
+
 ## [5.4.0] - 2026-07-26
 
 ### Added
