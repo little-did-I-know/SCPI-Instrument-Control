@@ -148,6 +148,14 @@ class DataCollector:
     def capture_single(self, channels: List[int], auto_setup: bool = False, max_wait: Optional[float] = None) -> Dict[int, WaveformData]:
         """Capture waveforms from specified channels.
 
+        If the scope is already in NORM trigger mode, this waits for the next
+        natural trigger instead of arming a single acquisition -- the user's
+        configured mode is left running rather than being overwritten. In any
+        other mode (including the default) it arms a single acquisition as
+        before. Previously this method always forced a single-shot regardless
+        of mode; a NORM-mode caller upgrading past this change will see
+        capture_single wait for a real trigger instead of forcing one.
+
         Args:
             channels: List of channel numbers to capture (e.g., [1, 2, 3])
             auto_setup: If True, run auto-setup before capture
@@ -181,6 +189,13 @@ class DataCollector:
             # Mirrors wait_for_trigger: NORMAL mode is already free-running and
             # re-arms itself, so arming a SINGLE here would stomp the user's
             # NORM setting and _wait_for_acquisition would never see it.
+            #
+            # Ordering is load-bearing, not cosmetic: trigger_single() writes
+            # TRIG_MODE SINGLE to the scope, which overwrites the very mode
+            # _wait_for_acquisition needs to read to pick its done-states. The
+            # mode must be checked BEFORE this call, not just before the poll
+            # -- moving this inside/after trigger_single() silently reproduces
+            # the bug this guard exists to prevent.
             self.scope.trigger_single()
         self._wait_for_acquisition(self._acquisition_timeout() if max_wait is None else max_wait)
 

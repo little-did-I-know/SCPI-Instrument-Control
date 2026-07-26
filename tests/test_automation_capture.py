@@ -93,3 +93,32 @@ def test_the_default_timeout_scales_with_the_timebase(monkeypatch):
         assert dc._acquisition_timeout() == pytest.approx(2.0)  # floor
     finally:
         dc.disconnect()
+
+
+def test_norm_mode_is_not_re_armed(monkeypatch):
+    """capture_single must not force a single-shot when the scope is already in
+    NORM: doing so would stomp the user's configured mode (and, incidentally,
+    defeat _wait_for_acquisition's own NORM branch, since it reads the mode
+    after this write). Pinned via the raw commands sent to the mock rather
+    than behaviour alone, so removing the guard fails this test even though
+    the capture still completes."""
+    monkeypatch.setattr("scpi_control.automation.time", FakeTime())
+    dc, conn = _collector(trigger_status=["Ready", "Ready", "Trig'd", "Trig'd"])
+    dc.scope.trigger.mode = "NORM"
+    try:
+        dc.capture_single([1], max_wait=5.0)
+    finally:
+        dc.disconnect()
+    assert not any("TRIG_MODE SINGLE" in w.upper() for w in conn.writes)
+
+
+def test_default_mode_is_armed_single_shot(monkeypatch):
+    """Companion to the NORM test above: in the default (non-NORM) mode,
+    capture_single must still arm a single acquisition as before."""
+    monkeypatch.setattr("scpi_control.automation.time", FakeTime())
+    dc, conn = _collector(trigger_status=["Trig'd", "Trig'd", "Stop"])
+    try:
+        dc.capture_single([1])
+    finally:
+        dc.disconnect()
+    assert any("TRIG_MODE SINGLE" in w.upper() for w in conn.writes)
