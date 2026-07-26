@@ -416,3 +416,27 @@ def test_ringing_is_a_true_no_op_only_on_dc():
     plain = SignalSpec(kind="dc", offset=0.5)
     ringing = dataclasses.replace(plain, ringing_frequency=50_000.0)
     np.testing.assert_array_equal(synthesize(ringing, RATE, 5_000), synthesize(plain, RATE, 5_000))
+
+
+@pytest.mark.parametrize("value", [float("nan"), float("inf"), float("-inf")], ids=["nan", "inf", "-inf"])
+@pytest.mark.parametrize(
+    "kind, field",
+    [
+        ("chirp", "end_frequency"),
+        ("chirp", "sweep_time"),
+        ("exponential", "tau"),
+        ("pulse", "pulse_width"),
+        ("pulse", "edge_time"),
+    ],
+)
+def test_non_finite_kind_parameters_are_rejected(kind, field, value):
+    """A bare sign check does not catch a non-finite value: nan is False on BOTH
+    sides of every ordering comparison, so `tau <= 0` and
+    `pulse_width <= edge_time` used to pass it straight through. pulse_width=nan
+    was the worst of them -- it produced a finite but silently wrong waveform,
+    with no nan in the output to give it away -- and tau=inf produced an all-nan
+    trace plus a RuntimeWarning, where the documented tau -> inf limit is the DC
+    average amplitude*(2*duty - 1)."""
+    spec = dataclasses.replace(SignalSpec(kind=kind, frequency=1_000.0), **{field: value})
+    with pytest.raises(exceptions.InvalidParameterError):
+        synthesize(spec, RATE, 100)

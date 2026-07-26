@@ -267,8 +267,15 @@ def _validate(spec: SignalSpec, sample_rate: float, n_points: int) -> None:
         raise exceptions.InvalidParameterError(f"frequency must be positive for {spec.kind!r}: {spec.frequency}")
     if spec.kind in ("square", "exponential") and not 0.0 < spec.duty < 1.0:
         raise exceptions.InvalidParameterError(f"duty must be strictly between 0 and 1: {spec.duty}")
-    if spec.kind == "exponential" and spec.tau <= 0:
-        raise exceptions.InvalidParameterError(f"tau must be positive for 'exponential': {spec.tau}")
+    # np.isfinite on every kind-specific scalar below, not just a sign check: nan
+    # passes BOTH sides of an ordering comparison, so `tau <= 0` and
+    # `pulse_width <= edge_time` silently let it through -- and a nan pulse_width
+    # is the worst of them, since it yields a finite but wrong waveform with no
+    # tell-tale in the output. tau=inf passes `tau <= 0` too, and produces an
+    # all-nan trace plus a RuntimeWarning, though the documented tau -> inf limit
+    # is the DC average amplitude*(2*duty - 1).
+    if spec.kind == "exponential" and not (np.isfinite(spec.tau) and spec.tau > 0):
+        raise exceptions.InvalidParameterError(f"tau must be a positive, finite number for 'exponential': {spec.tau}")
     if spec.kind == "multitone":
         try:
             relatives = list(spec.harmonics)
@@ -278,8 +285,10 @@ def _validate(spec: SignalSpec, sample_rate: float, n_points: int) -> None:
             if not np.isfinite(relative) or relative < 0:
                 raise exceptions.InvalidParameterError(f"harmonics[{order - 2}] (harmonic order {order}) must be a non-negative finite number: {relative}")
     if spec.kind == "pulse":
-        if spec.edge_time < 0:
-            raise exceptions.InvalidParameterError(f"edge_time must be non-negative: {spec.edge_time}")
+        if not np.isfinite(spec.edge_time) or spec.edge_time < 0:
+            raise exceptions.InvalidParameterError(f"edge_time must be a non-negative, finite number: {spec.edge_time}")
+        if not np.isfinite(spec.pulse_width):
+            raise exceptions.InvalidParameterError(f"pulse_width must be a finite number: {spec.pulse_width}")
         if spec.pulse_width <= spec.edge_time:
             raise exceptions.InvalidParameterError(f"pulse_width (50%-to-50%) must exceed edge_time, or the pulse never reaches its top: {spec.pulse_width} <= {spec.edge_time}")
         if spec.pulse_width + spec.edge_time > 1.0 / spec.frequency:
@@ -290,10 +299,10 @@ def _validate(spec: SignalSpec, sample_rate: float, n_points: int) -> None:
         # the shared positive-frequency check above does not cover it.
         if spec.frequency <= 0:
             raise exceptions.InvalidParameterError(f"frequency must be positive for 'chirp': {spec.frequency}")
-        if spec.end_frequency <= 0:
-            raise exceptions.InvalidParameterError(f"end_frequency must be positive for 'chirp': {spec.end_frequency}")
-        if spec.sweep_time <= 0:
-            raise exceptions.InvalidParameterError(f"sweep_time must be positive for 'chirp': {spec.sweep_time}")
+        if not (np.isfinite(spec.end_frequency) and spec.end_frequency > 0):
+            raise exceptions.InvalidParameterError(f"end_frequency must be a positive, finite number for 'chirp': {spec.end_frequency}")
+        if not (np.isfinite(spec.sweep_time) and spec.sweep_time > 0):
+            raise exceptions.InvalidParameterError(f"sweep_time must be a positive, finite number for 'chirp': {spec.sweep_time}")
     if spec.noise_rms < 0:
         raise exceptions.InvalidParameterError(f"noise_rms must be non-negative: {spec.noise_rms}")
     if spec.drift_amplitude < 0:
