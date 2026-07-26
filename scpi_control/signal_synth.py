@@ -140,6 +140,39 @@ def _multitone(spec: SignalSpec, t: np.ndarray, rng: np.random.Generator) -> np.
     return spec.amplitude * samples
 
 
+def _exponential(spec: SignalSpec, t: np.ndarray, rng: np.random.Generator) -> np.ndarray:
+    """A square wave through an RC network, at its PERIODIC STEADY STATE.
+
+    Solved in closed form rather than integrated forward: stream() re-enters
+    synthesize() per chunk with a new t0, so anything that had to settle in over
+    the first few cycles would restart its settling at every chunk boundary.
+    Requiring the trace to repeat exactly gives two linear equations in the two
+    phase-start levels; `duty` splits the period, the waveform charges toward
+    +amplitude and discharges toward -amplitude with time constant `tau`.
+
+    Both branch boundaries evaluate to the same level (the high branch at t_high
+    equals low_start; the low branch at t_low equals high_start), so the result
+    is continuous everywhere -- ringing is a genuine no-op on this kind.
+    """
+    period = 1.0 / spec.frequency
+    t_high = spec.duty * period
+    t_low = period - t_high
+    a = np.exp(-t_high / spec.tau)
+    b = np.exp(-t_low / spec.tau)
+    # expm1 form throughout: the algebraic result is (2b - 1 - ab)/(1 - ab), but
+    # as tau grows both numerator and denominator become differences of
+    # near-equal numbers and lose every significant digit -- at tau=1e12 the
+    # naive form divides by zero. -expm1(-period/tau) IS 1 - a*b, computed
+    # accurately.
+    denom = -np.expm1(-period / spec.tau)
+    high_start = spec.amplitude * (np.expm1(-t_low / spec.tau) - b * np.expm1(-t_high / spec.tau)) / denom
+    low_start = spec.amplitude * (a * np.expm1(-t_low / spec.tau) - np.expm1(-t_high / spec.tau)) / denom
+    within = _cycle_fraction(spec, t) * period
+    rising = within < t_high
+    decay = np.exp(-np.where(rising, within, within - t_high) / spec.tau)
+    return np.where(rising, spec.amplitude + (high_start - spec.amplitude) * decay, -spec.amplitude + (low_start + spec.amplitude) * decay)
+
+
 _GENERATORS: Dict[str, Callable[[SignalSpec, np.ndarray, np.random.Generator], np.ndarray]] = {
     "sine": _sine,
     "square": _square,
@@ -148,9 +181,10 @@ _GENERATORS: Dict[str, Callable[[SignalSpec, np.ndarray, np.random.Generator], n
     "dc": _dc,
     "noise": _noise,
     "multitone": _multitone,
+    "exponential": _exponential,
 }
 
-PERIODIC_KINDS = ("sine", "square", "triangle", "ramp", "multitone")
+PERIODIC_KINDS = ("sine", "square", "triangle", "ramp", "multitone", "exponential")
 
 # Hard cap on the ringing decay kernel's length in samples, independent of
 # n_points (I3) or sample_rate. This is a backstop against a user-supplied
@@ -169,8 +203,10 @@ def _validate(spec: SignalSpec, sample_rate: float, n_points: int) -> None:
         raise exceptions.InvalidParameterError(f"n_points must be at least 1: {n_points}")
     if spec.kind in PERIODIC_KINDS and spec.frequency <= 0:
         raise exceptions.InvalidParameterError(f"frequency must be positive for {spec.kind!r}: {spec.frequency}")
-    if spec.kind == "square" and not 0.0 < spec.duty < 1.0:
+    if spec.kind in ("square", "exponential") and not 0.0 < spec.duty < 1.0:
         raise exceptions.InvalidParameterError(f"duty must be strictly between 0 and 1: {spec.duty}")
+    if spec.kind == "exponential" and spec.tau <= 0:
+        raise exceptions.InvalidParameterError(f"tau must be positive for 'exponential': {spec.tau}")
     if spec.kind == "multitone":
         try:
             relatives = list(spec.harmonics)

@@ -116,3 +116,62 @@ def test_multitone_rejects_bad_harmonics(harmonics):
 def test_multitone_rejects_a_non_sequence_harmonics():
     with pytest.raises(exceptions.InvalidParameterError):
         synthesize(SignalSpec(kind="multitone", frequency=1_000.0, harmonics=0.1), RATE, 100)
+
+
+def test_exponential_is_periodic_from_the_very_first_cycle():
+    """What the closed-form steady-state solve buys. An implementation that
+    started at 0 (or at -amplitude) and settled in over a few cycles would fail
+    this -- and would also restart its settling at every stream() chunk."""
+    spec = SignalSpec(kind="exponential", frequency=1_000.0, tau=1e-4)
+    samples = synthesize(spec, RATE, 3_000)  # 1000 samples per period at 1 MSa/s
+    np.testing.assert_allclose(samples[:1_000], samples[1_000:2_000], atol=1e-12)
+    np.testing.assert_allclose(samples[:1_000], samples[2_000:3_000], atol=1e-12)
+
+
+def test_a_very_fast_rc_approaches_an_ideal_square():
+    fast = synthesize(SignalSpec(kind="exponential", frequency=1_000.0, tau=1e-9), RATE, 2_000)
+    ideal = synthesize(SignalSpec(kind="square", frequency=1_000.0), RATE, 2_000)
+    # Not identical: at the first sample of each phase the RC still sits at its
+    # pre-transition level while the ideal square has already switched, so the
+    # two differ by 2*amplitude at exactly one sample per edge (4 edges here).
+    assert np.mean(np.abs(fast - ideal)) < 0.01
+
+
+def test_a_very_slow_rc_settles_to_the_duty_weighted_average():
+    """tau -> inf limit: the RC cannot follow the square at all and sits at its
+    DC average, amplitude * (2*duty - 1)."""
+    spec = SignalSpec(kind="exponential", frequency=1_000.0, amplitude=1.0, duty=0.25, tau=10.0)
+    samples = synthesize(spec, RATE, 1_000)
+    assert samples.mean() == pytest.approx(-0.5, abs=1e-3)
+
+
+def test_a_symmetric_exponential_is_antisymmetric_about_zero():
+    spec = SignalSpec(kind="exponential", frequency=1_000.0, duty=0.5, tau=1e-4)
+    samples = synthesize(spec, RATE, 1_000)
+    assert samples.max() == pytest.approx(-samples.min(), rel=1e-9)
+
+
+def test_a_very_slow_rc_stays_finite():
+    """Guards the expm1 form. Written naively as (2b - 1 - ab)/(1 - ab), a large
+    tau makes the denominator a difference of near-equal numbers: it loses every
+    significant digit and eventually divides by zero."""
+    samples = synthesize(SignalSpec(kind="exponential", frequency=1_000.0, tau=1e12), RATE, 1_000)
+    assert np.all(np.isfinite(samples))
+
+
+def test_exponential_is_continuous_at_its_phase_boundaries():
+    """Both branch boundaries evaluate to the same level by construction, so the
+    trace has no jump anywhere -- which is why ringing is a documented no-op on
+    this kind."""
+    samples = synthesize(SignalSpec(kind="exponential", frequency=1_000.0, tau=1e-4), RATE, 3_000)
+    assert np.max(np.abs(np.diff(samples))) < 0.05
+
+
+def test_exponential_is_periodic_and_triggerable_in_the_mock():
+    assert "exponential" in PERIODIC_KINDS
+
+
+@pytest.mark.parametrize("kwargs", [{"tau": 0.0}, {"tau": -1e-4}, {"duty": 0.0}, {"duty": 1.0}, {"duty": 1.5}])
+def test_exponential_rejects_bad_parameters(kwargs):
+    with pytest.raises(exceptions.InvalidParameterError):
+        synthesize(SignalSpec(kind="exponential", frequency=1_000.0, **kwargs), RATE, 100)
