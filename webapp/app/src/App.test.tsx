@@ -58,10 +58,12 @@ describe("App view selection", () => {
     expect(screen.getByText("Channels")).toBeInTheDocument();
   });
 
-  it("does NOT render the scope rail for a psu session", () => {
+  it("does NOT render the scope rail for a psu session, and renders the placeholder instead", () => {
     useSession.getState().setSession({ ...SESSION, kind: "psu" });
     render(<App />);
     expect(screen.queryByText("Channels")).not.toBeInTheDocument();
+    expect(screen.getByText("Power supply")).toBeInTheDocument();
+    expect(screen.getByText(/coming soon/i)).toBeInTheDocument();
   });
 
   it("renders the home screen with no session", () => {
