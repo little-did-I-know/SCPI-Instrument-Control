@@ -8,7 +8,7 @@ docs and tests; the mock coupling and code-conversion layers are kind-agnostic.
 
 import time
 from dataclasses import dataclass, replace
-from typing import Callable, Dict, Iterator, Optional
+from typing import Callable, Dict, Iterator, Optional, Tuple, Union
 
 import numpy as np
 
@@ -46,6 +46,20 @@ class SignalSpec:
             buffer on every edge -- quadratic in the number of edges once
             ringing_frequency is switched on the most natural way, by setting
             only that field.
+        end_frequency: "chirp" sweep stop frequency in Hz.
+        sweep_time: "chirp" seconds per sweep, after which it retraces.
+        sweep_log: "chirp" sweeps logarithmically rather than linearly.
+        tau: "exponential" RC time constant in seconds.
+        pulse_width: "pulse" 50%-to-50% width in seconds (FWHM), matching the
+            instrument convention and the threshold the repo's timing analyzer
+            measures at. The flat top therefore runs for pulse_width -
+            edge_time. "pulse" ignores `duty`.
+        edge_time: "pulse" 0-to-100% transition time in seconds; 0 gives an
+            ideal instantaneous edge.
+        harmonics: "multitone" relative amplitudes of the 2nd, 3rd, ...
+            harmonic. `amplitude` is the FUNDAMENTAL's amplitude, so the peak
+            of the sum is higher; that is deliberate, since normalizing would
+            make the THD of a multitone depend on its harmonic set.
     """
 
     kind: str = "sine"
@@ -65,6 +79,21 @@ class SignalSpec:
     glitch_amplitude: float = 0.0  # volts, peak height of a glitch
     ringing_frequency: float = 0.0  # Hz of post-edge oscillation (0 = off); an edge impairment, meaningful only on "square"/pulse-like "ramp"
     ringing_damping: float = 5_000.0  # decay rate per second (M8: nonzero default, same reason as drift_frequency -- damping=0 never decays, making the kernel run the whole buffer on every edge)
+    # Kind-specific parameters, appended at the END for the same reason the
+    # impairments above were: inserting them beside the fields they read best
+    # next to would reorder positional construction and break callers. Every
+    # default is chosen so SignalSpec(kind=X) alone yields a sensible signal at
+    # the default 1 kHz frequency, the property the original six kinds have.
+    end_frequency: float = 10_000.0  # "chirp": sweep stop frequency, Hz
+    sweep_time: float = 0.01  # "chirp": seconds per sweep, then it retraces
+    sweep_log: bool = False  # "chirp": log rather than linear sweep
+    tau: float = 1e-4  # "exponential": RC time constant, s (5 tau per half period at 1 kHz)
+    pulse_width: float = 2e-4  # "pulse": 50%-to-50% width, s (20% duty at 1 kHz)
+    edge_time: float = 1e-5  # "pulse": 0->100% transition time, s
+    harmonics: Tuple[float, ...] = (
+        0.1,
+        0.05,
+    )  # "multitone": relative amplitudes of the 2nd, 3rd, ... harmonic; non-empty by default so SignalSpec(kind="multitone") is not a bit-identical duplicate of "sine"
 
 
 def _cycle_fraction(spec: SignalSpec, t: np.ndarray) -> np.ndarray:
