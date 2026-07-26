@@ -26,8 +26,18 @@ _FUNCTION_KINDS = {
     "PULSE": "pulse",
 }
 
-# Percent either side of 50 that still counts as a triangle rather than a sawtooth.
+# Percentage points either side of 50 that still count as a triangle rather than
+# a sawtooth (so 49..51, not 49.5..50.5).
 _RAMP_SYMMETRY_TOLERANCE = 1.0
+
+# Peak-to-peak volts per standard deviation, for NOISE only. Gaussian noise has
+# no true peak, so a source's quoted peak-to-peak is a CONVENTION: the one taken
+# here is the +/-3 sigma span, which contains 99.7% of samples. That makes
+# sigma = Vpp / 6. The factor is a choice, not arithmetic -- a vendor quoting
+# +/-2 sigma or a crest factor would want a different divisor -- so it is named
+# rather than inlined. Nothing else in this file uses it: every other kind's
+# `AMP` really is a peak-to-peak of a bounded waveform, and halves exactly.
+_NOISE_SIGMAS_PER_PEAK_TO_PEAK = 6.0
 
 # SignalSpec requires 0 < duty < 1; an AWG happily accepts 0 and 100.
 _MIN_DUTY = 0.01
@@ -67,8 +77,7 @@ class AwgLoopback:
     def _spec_from(self, state: Dict[str, Any]) -> SignalSpec:
         function = str(state.get("function", "SINE")).upper()
         frequency = float(state.get("frequency", 1000.0)) or 1000.0
-        # SDG `AMP` is peak-to-peak (PG02-E05B p.29); SignalSpec.amplitude is peak.
-        amplitude = float(state.get("amplitude", 1.0)) / 2.0
+        peak_to_peak = float(state.get("amplitude", 1.0))
         offset = float(state.get("offset", 0.0))
         phase = math.radians(float(state.get("phase", 0.0)))
         duty = min(_MAX_DUTY, max(_MIN_DUTY, float(state.get("pulse_duty", 50.0)) / 100.0))
@@ -83,6 +92,16 @@ class AwgLoopback:
             kind = "sine"
         else:
             kind = _FUNCTION_KINDS.get(function, "sine")
+
+        if kind == "noise":
+            # SignalSpec.amplitude is the standard DEVIATION for "noise", not a
+            # peak (see signal_synth.SignalSpec's docstring), so the plain
+            # halving below would be a unit error: it would hand sigma a peak
+            # value and produce a trace roughly 3.8x the requested Vpp.
+            amplitude = peak_to_peak / _NOISE_SIGMAS_PER_PEAK_TO_PEAK
+        else:
+            # SDG `AMP` is peak-to-peak (PG02-E05B p.29); SignalSpec.amplitude is peak.
+            amplitude = peak_to_peak / 2.0
 
         common = {"frequency": frequency, "amplitude": amplitude, "offset": offset, "phase": phase}
         if kind == "square":

@@ -209,3 +209,25 @@ def test_the_captured_amplitude_is_the_awg_setting_not_double_it():
     finally:
         scope.disconnect()
     assert np.ptp(data.voltage) == pytest.approx(2.0, abs=0.2)
+
+
+def test_a_captured_noise_trace_has_roughly_the_requested_peak_to_peak():
+    """The one kind where `SignalSpec.amplitude` is a standard deviation rather
+    than a peak, so the Vpp->peak halving every other kind needs is a unit error
+    here -- it captured 7.560 Vpp at sigma = 1.006 V for a 2.0 Vpp request. The
+    mapping takes Vpp as the +/-3 sigma span, so sigma is asserted tightly (it is
+    exactly what the mapping sets, and 14,000 samples estimate it well), while
+    the trace's peak-to-peak is asserted loosely: the extreme of N Gaussian
+    samples is itself a random variable that grows with N, and this spec is
+    unseeded. Measured over 12 unseeded captures: sigma 0.329 to 0.336,
+    peak-to-peak 2.44 to 2.76."""
+    awg_conn = _awg(function="NOISE", amplitude=2.0)
+    scope = _scope(AwgLoopback(awg_conn))
+    try:
+        data = scope.get_waveform(1, provenance=False)
+    finally:
+        scope.disconnect()
+    assert np.std(data.voltage) == pytest.approx(2.0 / 6.0, abs=0.03)
+    # Wide enough to survive the randomness, narrow enough that the pre-fix
+    # 7.56 Vpp (and an unconverted 2.0-as-sigma, ~15 Vpp) both fail.
+    assert 1.5 < np.ptp(data.voltage) < 4.0

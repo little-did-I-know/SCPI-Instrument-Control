@@ -28,6 +28,20 @@ def test_amplitude_is_halved_because_the_awg_reports_peak_to_peak():
     assert spec.amplitude == pytest.approx(1.0)
 
 
+def test_noise_amplitude_becomes_a_standard_deviation_not_a_peak():
+    """`SignalSpec.amplitude` is the standard deviation for "noise" and a peak
+    for every other kind, so the Vpp->peak halving that is correct everywhere
+    else is a UNIT ERROR here: it feeds a peak value to sigma and captures about
+    3.8x the requested peak-to-peak (measured: 7.56 Vpp for a 2.0 Vpp request).
+    The convention taken is that a noise source's quoted peak-to-peak is its
+    +/-3 sigma span, so sigma = Vpp / 6."""
+    spec = AwgLoopback(_awg(function="NOISE", amplitude=2.0))()
+    assert spec.kind == "noise"
+    assert spec.amplitude == pytest.approx(2.0 / 6.0)
+    # Explicitly NOT the halved value every bounded kind gets.
+    assert spec.amplitude != pytest.approx(1.0)
+
+
 def test_phase_is_converted_from_degrees_to_radians():
     spec = AwgLoopback(_awg(phase=90.0))()
     assert spec.phase == pytest.approx(math.pi / 2)

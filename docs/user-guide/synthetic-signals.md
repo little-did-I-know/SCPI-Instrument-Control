@@ -376,7 +376,7 @@ every call:
 | `NOISE` | `noise` |
 | `DC` | `dc` |
 | `PULSE` | `pulse` |
-| `RAMP` | `triangle` if symmetry is within 1% of 50, otherwise `ramp` |
+| `RAMP` | `triangle` if symmetry is within 1 percentage point of 50 (i.e. 49 to 51), otherwise `ramp` |
 | `ARB` | `sine`, with a logged warning (the mock stores no arbitrary sample data) |
 
 Two unit conversions happen on the way in, because the AWG and `SignalSpec`
@@ -384,7 +384,13 @@ don't speak the same units for the same quantity:
 
 - **Amplitude.** An AWG's `AMP` is peak-to-peak; `SignalSpec.amplitude` is
   peak. `AwgLoopback` halves it, so an AWG set to 2.0 Vpp arrives as a 2.0 V
-  peak-to-peak capture, not 4.0.
+  peak-to-peak capture, not 4.0. **`NOISE` is the exception**, because
+  `SignalSpec.amplitude` is a standard deviation for that kind rather than a
+  peak: Gaussian noise has no true peak, so `AwgLoopback` maps the AWG's `AMP`
+  on the usual convention that a quoted peak-to-peak is the +/-3 sigma span
+  (99.7% of samples), i.e. `sigma = Vpp / 6`. An AWG set to 2.0 Vpp of noise
+  therefore arrives as a sigma = 0.333 V trace, whose measured peak-to-peak is
+  approximately -- but, being random, never exactly -- 2.0 V.
 - **Phase.** An AWG's `PHSE` is in degrees; `SignalSpec.phase` is in radians.
   `AwgLoopback` converts.
 
