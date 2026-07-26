@@ -12,7 +12,6 @@ import pytest
 
 from scpi_control.automation import DataCollector
 from scpi_control.connection.mock import MockConnection
-from scpi_control.exceptions import InvalidParameterError
 from scpi_control.waveform import WaveformData
 
 
@@ -82,17 +81,19 @@ def test_save_data_explicit_npy_format_works(tmp_path):
         assert "voltage" in npz
 
 
-def test_save_data_explicit_lowercase_npz_still_raises(tmp_path):
-    """Pin the contract: save_waveform only accepts the exact tokens it upper-cases
-    to CSV/CSV_ENHANCED/NPY/MAT/HDF5. An explicit format="npz" is not one of them
-    and must still raise -- only the *default* (None) auto-detects."""
+def test_save_data_explicit_lowercase_npz_now_succeeds(tmp_path):
+    """save_waveform now maps the alias "NPZ" -> "NPY" (same as its extension
+    auto-detect already did for .npz), so an explicit format="npz" passed
+    through DataCollector.save_data succeeds instead of raising."""
     mock_connection = MockConnection(channel_states={1: True}, sample_rate=1_000.0, timebase=1e-3)
     collector = DataCollector("mock", connection=mock_connection)
     waveforms = {1: _make_waveform(1)}
     filename = str(tmp_path / "measurement.npz")
 
-    with pytest.raises(InvalidParameterError):
-        collector.save_data(waveforms, filename, format="npz")
+    collector.save_data(waveforms, filename, format="npz")
+
+    saved_path = tmp_path / "measurement_ch1.npz"
+    assert saved_path.exists()
 
 
 def test_save_batch_default_format_smoke(tmp_path):

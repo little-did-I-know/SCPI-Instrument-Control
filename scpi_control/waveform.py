@@ -34,6 +34,13 @@ WAVEFORM_CODE_CENTER = 0  # Center code value for signed integer ADC data
 # quantity ever needs this, case must be preserved upstream first.
 _SI_MAGNITUDES = {"G": 1e9, "M": 1e6, "K": 1e3}
 
+# User-facing spellings that mean an existing canonical format. These are the
+# same mappings save_waveform's auto-detect branch already applies to file
+# EXTENSIONS (.npz -> NPY, .h5 -> HDF5); without them the identical spelling was
+# valid as an extension and rejected as an argument, which is exactly how
+# start_continuous_capture shipped with a default format that always raised.
+_FORMAT_ALIASES = {"NPZ": "NPY", "H5": "HDF5"}
+
 
 def _to_float_with_magnitude(numeric_part: str) -> float:
     """Parse an NR3 value that may carry a trailing SI magnitude letter.
@@ -373,7 +380,7 @@ class Waveform:
             format = format_map.get(ext, "CSV")
             logger.debug(f"Auto-detected format: {format} from extension {ext}")
 
-        format = format.upper()
+        format = _FORMAT_ALIASES.get(format.upper(), format.upper())
 
         if format == "CSV":
             self._save_csv(waveform, filename, include_metadata=False, metadata=metadata, bare=bare)
