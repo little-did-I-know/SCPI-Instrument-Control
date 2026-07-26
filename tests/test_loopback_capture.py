@@ -7,8 +7,9 @@ it off -- the same fix, for the same reason, as the ringing impairment's pre-t0
 window.
 """
 
+import math
+
 import numpy as np
-import pytest
 
 from scpi_control.connection import MockConnection
 from scpi_control.connection.mock.loopback import AwgLoopback
@@ -105,43 +106,54 @@ def test_no_dut_means_no_filtering():
 def test_a_filtered_square_matches_the_independently_derived_exponential_kind():
     """An RC low-pass fed a square wave IS the `exponential` kind, which was
     implemented separately in 5.5.0 as a closed-form periodic steady state. Two
-    independently derived implementations of the same physics should agree on
-    the bulk of the waveform; neither is checked against a golden array.
+    independently derived implementations of the same physics must agree;
+    neither is checked against a golden array.
 
-    This does NOT converge to machine precision, and that is expected rather
-    than a defect to chase. RCLowPass.apply uses the exact zero-order-hold
-    discretisation (alpha = 1 - exp(-dt/tau)), so the per-step approximation gap
-    between the IIR and the closed form is not the story here -- switching from
-    backward Euler to exact ZOH only moved the measured max from 0.020047 to
-    0.019811, not the order-of-magnitude drop a per-step fix would produce.
-    Per-sample inspection shows the ~2% error is concentrated at each square-
-    wave transition and decays with the filter's own tau over the following
-    samples (0.0198 at the edge, ~0.0072 by 100 samples later, ~0.0027 by 200 --
-    matching 0.0198*exp(-k/tau) closely). A one-sample registration offset (the
-    discrete square's transition landing between samples n and n+1 while the
-    closed form assumes an ideal step at an exact instant) was tested directly
-    and ruled out as the (sole) explanation: shifting the comparison by one
-    sample in either direction does not collapse the error by an order of
-    magnitude -- one shift roughly doubles it (0.0394) and the other roughly
-    thirds it (0.0066), neither of which is the clean collapse a pure one-sample
-    offset would produce. So the residual is treated here as a structural
-    artifact of comparing a discrete causal filter against a continuous,
-    idealised closed form at a signal discontinuity -- not a bug, and not
-    something to tighten away by changing the filter's own sample-timing
-    convention (that would be contorting production code to shrink a test
-    number)."""
+    Now that RCLowPass.apply is the exact, strictly-proper zero-order-hold
+    discretisation (see dut.py), the two agree to near machine precision. The
+    only remaining floor is how much lead-in THIS TEST renders before the
+    comparison window -- production's `warmup_samples()` alone leaves ~0.0067 V
+    of the initial y=0 transient un-settled (fine there: it's below the mock's
+    ~0.04 V int8 quantization step), so this test renders more (see `lead_in`
+    below) to push that floor far below the precision being asserted here."""
     tau = 1e-4
     cutoff = 1.0 / (2 * np.pi * tau)
     dut = RCLowPass(cutoff_hz=cutoff)
     warmup = dut.warmup_samples(RATE)
     n = 4_000  # four whole 1 kHz periods at 1 MSa/s
 
-    square = synthesize(SignalSpec(kind="square", frequency=1_000.0, amplitude=1.0), RATE, n + warmup, t0=-warmup / RATE)
-    filtered = dut.apply(square, RATE)[warmup:]
+    # At least 3x warmup_samples(), per the above, but ALSO rounded up to a whole
+    # number of the signal's own periods and rendered from t0=0.0 rather than
+    # t0=-lead_in/RATE. Both matter, and skipping either reintroduces a full
+    # spurious error unrelated to the filter:
+    #   - A non-whole-period lead-in can leave the square wave in the WRONG
+    #     phase relative to `closed_form` (which always starts high at t=0),
+    #     producing a phase-inverted ~2x amplitude mismatch that looks like a
+    #     total failure of the filter when it is actually a bookkeeping error
+    #     (verified: 1x and 3x warmup here are 0.5 and 1.5 periods -- both
+    #     wrong; 2x and 4x are 1 and 2 whole periods -- both fine).
+    #   - Passing t0 as a pre-computed `-lead_in / RATE` looks equivalent to
+    #     starting the extended array at t0=0.0 and slicing off `lead_in`
+    #     samples, but is NOT bit-for-bit equivalent: synthesize() computes
+    #     `t0 + arange(n)/sample_rate`, so a subtraction-based t0 accumulates a
+    #     DIFFERENT rounding error than `closed_form`'s own t=0-based times get,
+    #     in exactly the "razor's-edge boundary comparison" way signal_synth.py's
+    #     ringing path already documents and avoids (t0 + (index-decay_len)/sr,
+    #     NOT (t0-decay_len/sr)+index/sr). Verified: with t0=-lead_in/RATE, some
+    #     lead-in lengths misregister exactly one transition by a full sample,
+    #     producing a spurious ~0.02 error that looks like a filter defect but
+    #     disappears entirely once t0=0.0 is used instead.
+    period_samples = RATE / 1_000.0
+    periods_needed = math.ceil((3 * warmup) / period_samples)
+    lead_in = int(periods_needed * period_samples)
+
+    square = synthesize(SignalSpec(kind="square", frequency=1_000.0, amplitude=1.0), RATE, n + lead_in, t0=0.0)
+    filtered = dut.apply(square, RATE)[lead_in:]
     closed_form = synthesize(SignalSpec(kind="exponential", frequency=1_000.0, amplitude=1.0, tau=tau), RATE, n)
 
-    # Bound is ~2% of amplitude, with a small margin above the measured 0.019811
-    # -- not slack to be tightened. Do not shrink this without re-running the
-    # per-sample/shift investigation above; a tighter bound will make this test
-    # flake on transition-adjacent samples for no gain in real coverage.
-    assert np.max(np.abs(filtered - closed_form)) < 0.021
+    # Measured 2.0e-9 with the correct construction above. For comparison,
+    # against this SAME construction: backward Euler (the pre-fix discretisation)
+    # measures 3.5e-3, and a tau mistuned by 2% measures 1.4e-2 -- both several
+    # orders of magnitude over this bound, so this test would catch either
+    # regression.
+    assert np.max(np.abs(filtered - closed_form)) < 1e-6
