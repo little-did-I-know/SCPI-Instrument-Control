@@ -8,6 +8,7 @@ perfect health and no caller-side error handling was reachable in tests.
 
 import pytest
 
+from scpi_control import exceptions
 from scpi_control.connection.mock import MockConnection
 
 NO_ERROR = '+0,"No error"'
@@ -63,16 +64,10 @@ def test_scope_mode_still_has_no_error_query():
     absence. Adding a wire-level accessor here would quietly undo that gating, so
     scope mode must keep timing out. The queue itself still works; it just has no
     SCPI accessor, which matches the library's model."""
-    from scpi_control import exceptions
-
     conn = _conn()  # default = scope mode
     with pytest.raises(exceptions.SiglentTimeoutError):
         conn.query("SYST:ERR?")
 
-
-import math
-
-from scpi_control import exceptions
 
 LEGACY_IDN = "Siglent Technologies,SDS1104X-E,MOCK0001,1.0.0.0"
 
