@@ -173,6 +173,26 @@ def _exponential(spec: SignalSpec, t: np.ndarray, rng: np.random.Generator) -> n
     return np.where(rising, spec.amplitude + (high_start - spec.amplitude) * decay, -spec.amplitude + (low_start + spec.amplitude) * decay)
 
 
+def _pulse(spec: SignalSpec, t: np.ndarray, rng: np.random.Generator) -> np.ndarray:
+    """A trapezoid whose width and edge rate are independent of the period.
+
+    That independence is the whole reason this kind exists alongside "square",
+    whose only shape control is `duty` -- which this kind therefore ignores.
+    `pulse_width` is the 50%-to-50% width: the 50% level sits at the midpoint of
+    each linear ramp, so the crossings land at edge_time/2 and
+    pulse_width + edge_time/2, exactly pulse_width apart.
+    """
+    within = _cycle_fraction(spec, t) / spec.frequency
+    high = spec.amplitude
+    low = -spec.amplitude
+    if spec.edge_time <= 0:
+        return np.where(within < spec.pulse_width, high, low)
+    span = high - low
+    rise = low + span * (within / spec.edge_time)
+    fall = high - span * ((within - spec.pulse_width) / spec.edge_time)
+    return np.where(within < spec.edge_time, rise, np.where(within < spec.pulse_width, high, np.where(within < spec.pulse_width + spec.edge_time, fall, low)))
+
+
 _GENERATORS: Dict[str, Callable[[SignalSpec, np.ndarray, np.random.Generator], np.ndarray]] = {
     "sine": _sine,
     "square": _square,
@@ -182,9 +202,10 @@ _GENERATORS: Dict[str, Callable[[SignalSpec, np.ndarray, np.random.Generator], n
     "noise": _noise,
     "multitone": _multitone,
     "exponential": _exponential,
+    "pulse": _pulse,
 }
 
-PERIODIC_KINDS = ("sine", "square", "triangle", "ramp", "multitone", "exponential")
+PERIODIC_KINDS = ("sine", "square", "triangle", "ramp", "multitone", "exponential", "pulse")
 
 # Hard cap on the ringing decay kernel's length in samples, independent of
 # n_points (I3) or sample_rate. This is a backstop against a user-supplied
@@ -215,6 +236,13 @@ def _validate(spec: SignalSpec, sample_rate: float, n_points: int) -> None:
         for order, relative in enumerate(relatives, start=2):
             if not np.isfinite(relative) or relative < 0:
                 raise exceptions.InvalidParameterError(f"harmonics[{order - 2}] (harmonic order {order}) must be a non-negative finite number: {relative}")
+    if spec.kind == "pulse":
+        if spec.edge_time < 0:
+            raise exceptions.InvalidParameterError(f"edge_time must be non-negative: {spec.edge_time}")
+        if spec.pulse_width <= spec.edge_time:
+            raise exceptions.InvalidParameterError(f"pulse_width (50%-to-50%) must exceed edge_time, or the pulse never reaches its top: {spec.pulse_width} <= {spec.edge_time}")
+        if spec.pulse_width + spec.edge_time > 1.0 / spec.frequency:
+            raise exceptions.InvalidParameterError(f"the trapezoid must fit in one period: pulse_width + edge_time = {spec.pulse_width + spec.edge_time} > {1.0 / spec.frequency}")
     if spec.noise_rms < 0:
         raise exceptions.InvalidParameterError(f"noise_rms must be non-negative: {spec.noise_rms}")
     if spec.drift_amplitude < 0:

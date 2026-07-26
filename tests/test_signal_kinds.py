@@ -175,3 +175,69 @@ def test_exponential_is_periodic_and_triggerable_in_the_mock():
 def test_exponential_rejects_bad_parameters(kwargs):
     with pytest.raises(exceptions.InvalidParameterError):
         synthesize(SignalSpec(kind="exponential", frequency=1_000.0, **kwargs), RATE, 100)
+
+
+def _fwhm_seconds(samples, rate):
+    """50%-to-50% width of the first pulse, the same threshold the repo's timing
+    analyzer uses."""
+    mid = (samples.max() + samples.min()) / 2.0
+    above = samples >= mid
+    rising = np.flatnonzero(~above[:-1] & above[1:])
+    falling = np.flatnonzero(above[:-1] & ~above[1:])
+    falling = falling[falling > rising[0]]
+    return (falling[0] - rising[0]) / rate
+
+
+def test_pulse_width_is_the_50_percent_width():
+    """pulse_width is FWHM, not top duration: it matches SOUR{ch}:FUNC:PULS:WIDT
+    and the threshold calculate_timing_stats() measures at, so the flat top runs
+    for pulse_width - edge_time."""
+    spec = SignalSpec(kind="pulse", frequency=1_000.0, pulse_width=2e-4, edge_time=1e-5)
+    samples = synthesize(spec, RATE, 2_000)
+    assert _fwhm_seconds(samples, RATE) == pytest.approx(2e-4, abs=2.0 / RATE)
+
+
+def test_pulse_plateaus_sit_at_plus_and_minus_amplitude():
+    spec = SignalSpec(kind="pulse", frequency=1_000.0, amplitude=3.0, pulse_width=2e-4, edge_time=1e-5)
+    samples = synthesize(spec, RATE, 2_000)
+    assert samples.max() == pytest.approx(3.0)
+    assert samples.min() == pytest.approx(-3.0)
+
+
+def test_pulse_edge_time_sets_the_transition_rate():
+    slow = synthesize(SignalSpec(kind="pulse", frequency=1_000.0, pulse_width=2e-4, edge_time=5e-5), RATE, 2_000)
+    fast = synthesize(SignalSpec(kind="pulse", frequency=1_000.0, pulse_width=2e-4, edge_time=1e-6), RATE, 2_000)
+    assert np.max(np.abs(np.diff(slow))) < np.max(np.abs(np.diff(fast)))
+
+
+def test_pulse_accepts_a_zero_edge_time():
+    """An ideal instantaneous edge is legal, and must not divide by zero."""
+    spec = SignalSpec(kind="pulse", frequency=1_000.0, pulse_width=2e-4, edge_time=0.0)
+    samples = synthesize(spec, RATE, 2_000)
+    assert np.all(np.isfinite(samples))
+    assert set(np.unique(np.round(samples, 9))) == {-1.0, 1.0}
+    assert _fwhm_seconds(samples, RATE) == pytest.approx(2e-4, abs=2.0 / RATE)
+
+
+def test_pulse_ignores_duty():
+    wide = synthesize(SignalSpec(kind="pulse", frequency=1_000.0, duty=0.9), RATE, 2_000)
+    narrow = synthesize(SignalSpec(kind="pulse", frequency=1_000.0, duty=0.1), RATE, 2_000)
+    np.testing.assert_array_equal(wide, narrow)
+
+
+def test_pulse_is_periodic_and_triggerable_in_the_mock():
+    assert "pulse" in PERIODIC_KINDS
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"edge_time": -1e-6},  # negative edge
+        {"pulse_width": 1e-6, "edge_time": 1e-5},  # width below the edge time
+        {"pulse_width": 0.0, "edge_time": 0.0},  # zero width
+        {"pulse_width": 9e-4, "edge_time": 2e-4},  # trapezoid longer than the 1 ms period
+    ],
+)
+def test_pulse_rejects_a_trapezoid_that_cannot_exist(kwargs):
+    with pytest.raises(exceptions.InvalidParameterError):
+        synthesize(SignalSpec(kind="pulse", frequency=1_000.0, **kwargs), RATE, 100)
