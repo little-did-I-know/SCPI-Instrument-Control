@@ -66,8 +66,19 @@ def _trigger_crossing(spec: SignalSpec, level: float, rising: bool) -> Optional[
 
 
 def spec_for(conn: "MockConnection", channel: int) -> SignalSpec:
-    """The signal a channel 'sees': user-specified, else the channel default."""
-    return conn._signals.get(channel) or _DEFAULT_SPECS.get(channel, _FALLBACK_SPEC)
+    """The signal a channel 'sees': user-specified, else the channel default.
+
+    A stored value is either a SignalSpec or a zero-argument callable returning
+    one. The callable is invoked at EVERY acquisition, which is what lets a live
+    source -- an AwgLoopback reading a mock AWG's state -- change what the scope
+    captures between captures. Everything downstream (point_count, raw_volts, the
+    trigger-crossing search, the three vendor personalities) keeps receiving a
+    plain SignalSpec and never learns the difference.
+    """
+    source = conn._signals.get(channel)
+    if source is None:
+        return _DEFAULT_SPECS.get(channel, _FALLBACK_SPEC)
+    return source() if callable(source) else source
 
 
 def point_count(conn: "MockConnection", channel: int) -> int:
