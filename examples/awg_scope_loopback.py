@@ -12,8 +12,13 @@ the edges of whatever the AWG outputs.
 This example (1) opens a mock AWG and a mock scope wired together with
 AwgLoopback and prints the captured peak-to-peak of a sine, (2) switches the
 AWG to a square wave with a plain SCPI write and prints the new peak-to-peak,
-then (3) adds an RCLowPass DUT and prints how much it reduces the steepest
-sample-to-sample step, i.e. how much it rounds the square wave's edges.
+then (3) adds an RCLowPass DUT and prints the 10%-90% rise time of the
+square wave's rising edge with and without the DUT, to show how much it
+rounds the edge. Rise time is used rather than a raw sample-to-sample step
+because the mock's int8 code quantization (25 codes/division, see
+docs/user-guide/synthetic-signals.md) would dominate a step-height
+comparison at a gentle cutoff; a 10%-90% time span is many samples wide and
+is not limited by the code grid.
 
 Requirements: SCPI-Instrument-Control (core install) -- runs entirely against
 mock connections, no instrument needed.
@@ -59,6 +64,41 @@ def _vpp(voltage) -> float:
     return float(voltage.max() - voltage.min())
 
 
+def _rising_crossing(time_s: np.ndarray, voltage: np.ndarray, level: float, start_index: int = 0):
+    """Sub-sample time of the first rising crossing of `level` at/after `start_index`.
+
+    Linear interpolation between the two bracketing samples locates the
+    crossing between samples, not just to the nearest one. Returns
+    (crossing_time, index_of_the_sample_just_before_the_crossing).
+    """
+    candidates = np.flatnonzero((voltage[start_index:-1] < level) & (voltage[start_index + 1 :] >= level))
+    if candidates.size == 0:
+        raise ValueError(f"no rising crossing of {level} found at or after index {start_index}")
+    i = start_index + int(candidates[0])
+    t0, t1 = time_s[i], time_s[i + 1]
+    v0, v1 = voltage[i], voltage[i + 1]
+    crossing_time = float(t0 + (level - v0) * (t1 - t0) / (v1 - v0))
+    return crossing_time, i
+
+
+def _rise_time_10_90_us(waveform) -> float:
+    """10%-90% rise time (microseconds) of the first rising transition.
+
+    The 10% and 90% levels are relative to the trace's own min/max, so this
+    works the same way whether or not a DUT has rounded the edge. Unlike a
+    raw sample-to-sample step, a rise time spans many samples and is not
+    limited by the mock's int8 code quantization.
+    """
+    voltage = waveform.voltage
+    time_s = waveform.time
+    lo, hi = float(voltage.min()), float(voltage.max())
+    v10 = lo + 0.10 * (hi - lo)
+    v90 = lo + 0.90 * (hi - lo)
+    t10, i10 = _rising_crossing(time_s, voltage, v10)
+    t90, _ = _rising_crossing(time_s, voltage, v90, start_index=i10)
+    return (t90 - t10) * 1e6
+
+
 def demo_live_loopback() -> MockConnection:
     """Capture a sine, switch the AWG to a square over SCPI, capture again."""
     print("=== Part 1: the scope captures whatever the AWG is currently outputting ===")
@@ -89,12 +129,11 @@ def demo_dut(awg: MockConnection) -> None:
         sharp_scope.disconnect()
         soft_scope.disconnect()
 
-    sharp_step = float(np.max(np.abs(np.diff(sharp.voltage))))
-    soft_step = float(np.max(np.abs(np.diff(soft.voltage))))
-    reduction_pct = 100.0 * (1.0 - soft_step / sharp_step)
-    print(f"Max sample-to-sample step with no DUT: {sharp_step:.4f} V")
-    print(f"Max sample-to-sample step with RCLowPass(cutoff_hz=2000): {soft_step:.4f} V")
-    print(f"The DUT reduced the steepest step by {reduction_pct:.1f} percent -- the edges are visibly rounded")
+    sharp_rise_us = _rise_time_10_90_us(sharp)
+    soft_rise_us = _rise_time_10_90_us(soft)
+    print(f"10-90 percent rise time with no DUT: {sharp_rise_us:.3f} us (an ideal edge, a fraction of one sample)")
+    print(f"10-90 percent rise time with RCLowPass(cutoff_hz=2000): {soft_rise_us:.1f} us")
+    print("The DUT stretched the rising edge from a fraction of a microsecond to roughly " f"{soft_rise_us:.0f} us -- the edge is visibly rounded")
 
 
 def main() -> None:

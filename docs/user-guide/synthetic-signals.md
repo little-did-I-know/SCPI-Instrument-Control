@@ -423,6 +423,16 @@ coupling](#state-coupling) above) searches for the trigger-level crossing on
 the *unfiltered* signal, so where a capture triggers does not depend on the
 DUT's filter state -- only the sample values within the window do.
 
+**Quantization caveat:** every mock capture is quantized to int8 codes at 25
+codes/division (see [State coupling](#state-coupling) above), so a voltage
+difference smaller than one code -- 0.04 V at the default 1 V/div -- cannot
+be resolved in a capture, no matter how gently the DUT is filtering. A
+comparison that leans on fine amplitude detail (e.g. a raw sample-to-sample
+step height at a gentle cutoff) will end up measuring the code grid rather
+than the filter. Either widen the effect until it clears one code, or measure
+a time-domain property such as rise time instead, which isn't limited by the
+code grid -- see `examples/awg_scope_loopback.py`, which does exactly that.
+
 ## Extensibility
 
 Signal kinds live in a small dispatch table (`kind -> generator function`)
