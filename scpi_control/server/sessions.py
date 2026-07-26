@@ -13,12 +13,11 @@ import uuid
 from collections import Counter
 from concurrent.futures import Future
 from concurrent.futures import TimeoutError as FuturesTimeoutError
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional
 
-from scpi_control.exceptions import InvalidParameterError, SiglentConnectionError, SiglentError
-from scpi_control.server.adapters import ADAPTERS, MAX_FRAME_POINTS, _decimate_frame, _waveform_frame, read_state  # noqa: F401  (re-exported: stream.py/api/scope.py and tests import these from here)
+from scpi_control.exceptions import SiglentConnectionError, SiglentError
+from scpi_control.server.adapters import ADAPTERS, MAX_FRAME_POINTS, _waveform_frame, read_state  # noqa: F401  (re-exported: stream.py/api/scope.py and tests import these from here)
 from scpi_control.server.adapters import make_mock_scope_connection as _make_mock_connection  # noqa: F401  (re-exported for backward compatibility)
-from scpi_control.server.recorder import TrendRecorder
 
 _STOP = object()
 
@@ -40,10 +39,6 @@ class InstrumentSession:
         self.num_channels = 0
         self.error_detail: Optional[str] = None
         self.adapter = adapter
-        # Transitional: the adapter reads scope-owned config (filters,
-        # spectrum_config, measurements, recorder, active_reference) off this
-        # back-reference until Task 3 moves that state onto the adapter itself.
-        self.adapter.session = self
         self._instrument = instrument
         self._poll_interval = poll_interval
         self._queue: "queue.Queue" = queue.Queue()
@@ -51,15 +46,7 @@ class InstrumentSession:
         self._thread = threading.Thread(target=self._worker, name="scpi-session-{0}".format(self.id), daemon=True)
         self._subscribers: List[Callable[[Dict[str, Any]], None]] = []
         self._subscribers_lock = threading.Lock()
-        self.measurements: List[Tuple[int, str]] = []
         self._poll_count = 0
-        # Server-owned analysis config. Request coroutines swap these whole
-        # dicts atomically (never mutate in place); the worker thread only reads.
-        self.spectrum_config: Dict[str, Any] = {"enabled": False, "channel": 1, "window": "hanning", "db": True}
-        self.filters: Dict[int, Dict[str, Any]] = {n: {"source": 1, "kind": "lowpass", "cutoff_low": None, "cutoff_high": None, "order": 5, "enabled": False} for n in (1, 2)}
-        self.active_reference: Optional[Dict[str, Any]] = None  # {"name", "channel", "data": {"time","voltage",...}}
-        self._shown: set = set()  # trace keys (M1/M2/F1/F2/SPEC) live on subscribers' canvases; worker-thread-only
-        self.recorder = TrendRecorder()  # internally locked: worker appends, request threads control/read
         self.owner = ""
         self.owner_last_active = time.monotonic()
         # Live stream watchers, keyed by identity (not by "is this the
@@ -202,39 +189,6 @@ class InstrumentSession:
                 callback(message)
             except Exception:  # a broken subscriber must not kill the worker thread
                 continue
-
-    def set_measurements(self, items: List[Tuple[int, str]]) -> None:
-        self.measurements = list(items)
-        self.publish({"type": "measurements_config", "items": [{"channel": c, "mtype": m} for c, m in self.measurements]})
-
-    def start_recording(self) -> Dict[str, Any]:
-        if self.recorder.state == "recording":
-            raise SessionError("already recording")
-        if not self.measurements:
-            raise InvalidParameterError("no measurements selected")
-        self.recorder.start(list(self.measurements), time.time())
-        self._publish_log_status()
-        return self.recorder.status()
-
-    def stop_recording(self) -> Dict[str, Any]:
-        self.recorder.stop()
-        self._publish_log_status()
-        return self.recorder.status()
-
-    def _publish_log_status(self) -> None:
-        status = self.recorder.status()
-        self.publish({"type": "log_status", "state": status["state"], "started_at": status["started_at"], "row_count": status["row_count"], "columns": status["columns"]})
-
-    def reference_overlay(self) -> Dict[str, Any]:
-        active = self.active_reference
-        if active is None:
-            return {"name": None, "channel": None, "t0": 0.0, "dt": 1.0, "points": []}
-        frame = _decimate_frame(active["channel"], active["data"]["time"], active["data"]["voltage"])
-        return {"name": active["name"], "channel": active["channel"], "t0": frame["t0"], "dt": frame["dt"], "points": frame["points"]}
-
-    def set_active_reference(self, name: Optional[str], channel: Optional[int], data: Optional[Dict[str, Any]]) -> None:
-        self.active_reference = None if name is None else {"name": name, "channel": channel, "data": data}
-        self.publish({"type": "reference", **self.reference_overlay()})
 
     def _enter_error_state(self, detail: str) -> None:
         """Flip to the terminal error state and tell the streams once."""

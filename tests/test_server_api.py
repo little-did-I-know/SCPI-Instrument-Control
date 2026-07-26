@@ -601,9 +601,9 @@ class TestTrendLog:
         client.put("/api/sessions/{0}/scope/measurements".format(sid), json=[{"channel": 1, "mtype": "PKPK"}, {"channel": 2, "mtype": "FREQ"}])
         client.post("/api/sessions/{0}/scope/log/start".format(sid))
         session = manager.get(sid)
-        started = session.recorder.started_at
-        session.recorder.append(started + 1.0, [1.5, None])
-        session.recorder.append(started + 2.0, [1.25, 50.0])
+        started = session.adapter.recorder.started_at
+        session.adapter.recorder.append(started + 1.0, [1.5, None])
+        session.adapter.recorder.append(started + 2.0, [1.25, 50.0])
 
         data = client.get("/api/sessions/{0}/scope/log/data".format(sid)).json()
         assert data["columns"] == [{"channel": 1, "mtype": "PKPK"}, {"channel": 2, "mtype": "FREQ"}]

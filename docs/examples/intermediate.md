@@ -1622,15 +1622,15 @@ def main() -> None:
         # or here: a trivial subscriber).
         unsubscribe = session.subscribe(lambda message: None)
 
-        session.set_measurements([(1, "PKPK"), (1, "FREQ")])
-        session.start_recording()
+        session.adapter.set_measurements([(1, "PKPK"), (1, "FREQ")], session.publish)
+        session.adapter.start_recording(session.publish)
         print(f"Recording C1 PKPK + FREQ for {RECORD_SECONDS} s...")
         time.sleep(RECORD_SECONDS)
-        status = session.stop_recording()
+        status = session.adapter.stop_recording(session.publish)
         unsubscribe()
         print(f"Recorded {status['row_count']} rows")
 
-        rows = session.recorder.rows_since()
+        rows = session.adapter.recorder.rows_since()
         columns = [f"C{c['channel']} {c['mtype']}" for c in status["columns"]]
         with open("trend_log.csv", "w", newline="") as f:
             writer = csv.writer(f)

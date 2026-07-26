@@ -124,21 +124,21 @@ async def send_command(session_id: str, body: CommandIn, request: Request):
 @router.put("/sessions/{session_id}/scope/measurements")
 async def put_measurements(session_id: str, body: List[MeasurementItem], request: Request):
     session = require_owner(request, session_id)
-    if session.recorder.state == "recording":
+    if session.adapter.recorder.state == "recording":
         raise SessionError("measurement selection is locked while recording")
     for item in body:
         if item.mtype.upper() not in ALLOWED_MEASUREMENTS:
             raise InvalidParameterError("unknown measurement type: {0}".format(item.mtype))
         if not 1 <= item.channel <= max(1, session.num_channels):
             raise InvalidParameterError("channel {0} out of range".format(item.channel))
-    session.set_measurements([(item.channel, item.mtype.upper()) for item in body])
-    return {"measurements": [{"channel": c, "mtype": m} for c, m in session.measurements]}
+    session.adapter.set_measurements([(item.channel, item.mtype.upper()) for item in body], session.publish)
+    return {"measurements": [{"channel": c, "mtype": m} for c, m in session.adapter.measurements]}
 
 
 @router.get("/sessions/{session_id}/scope/measurements")
 async def get_measurements(session_id: str, request: Request):
     session = require_session(request, session_id)
-    return {"measurements": [{"channel": c, "mtype": m} for c, m in session.measurements]}
+    return {"measurements": [{"channel": c, "mtype": m} for c, m in session.adapter.measurements]}
 
 
 def _build_csv(captures) -> str:
@@ -262,7 +262,7 @@ async def patch_math(session_id: str, n: int, body: MathPatch, request: Request)
 @router.get("/sessions/{session_id}/scope/spectrum")
 async def get_spectrum(session_id: str, request: Request):
     session = require_session(request, session_id)
-    return dict(session.spectrum_config)
+    return dict(session.adapter.spectrum_config)
 
 
 @router.patch("/sessions/{session_id}/scope/spectrum")
@@ -273,12 +273,12 @@ async def patch_spectrum(session_id: str, body: SpectrumPatch, request: Request)
         raise InvalidParameterError("unknown window: {0}".format(updates["window"]))
     if "channel" in updates and not 1 <= updates["channel"] <= max(1, session.num_channels):
         raise InvalidParameterError("channel {0} out of range".format(updates["channel"]))
-    session.spectrum_config = {**session.spectrum_config, **updates}
-    return dict(session.spectrum_config)
+    session.adapter.spectrum_config = {**session.adapter.spectrum_config, **updates}
+    return dict(session.adapter.spectrum_config)
 
 
 def _filter_state(session):
-    return [{"n": n, **session.filters[n]} for n in sorted(session.filters)]
+    return [{"n": n, **session.adapter.filters[n]} for n in sorted(session.adapter.filters)]
 
 
 @router.get("/sessions/{session_id}/scope/filters")
@@ -302,7 +302,7 @@ async def patch_filter(session_id: str, n: int, body: FilterPatch, request: Requ
     for key in ("cutoff_low", "cutoff_high"):
         if key in updates and updates[key] <= 0:
             raise InvalidParameterError("{0} must be positive".format(key))
-    merged = {**session.filters[n], **updates}
+    merged = {**session.adapter.filters[n], **updates}
     if merged["enabled"]:
         # completeness is only enforced when the merged config is enabled, so
         # partial configuration while disabled stays a valid workflow
@@ -315,7 +315,7 @@ async def patch_filter(session_id: str, n: int, body: FilterPatch, request: Requ
                 raise InvalidParameterError("bandpass requires cutoff_low and cutoff_high")
             if not merged["cutoff_low"] < merged["cutoff_high"]:
                 raise InvalidParameterError("cutoff_low must be below cutoff_high")
-    session.filters = {**session.filters, n: merged}
+    session.adapter.filters = {**session.adapter.filters, n: merged}
     return _filter_state(session)
 
 
@@ -380,55 +380,55 @@ async def delete_reference(session_id: str, name: str, request: Request):
 
     if not await run_in_threadpool(remove):
         raise HTTPException(status_code=404, detail="unknown reference {0}".format(name))
-    active = session.active_reference
+    active = session.adapter.active_reference
     if active is not None and active["name"] == name:
-        session.set_active_reference(None, None, None)
+        session.adapter.set_active_reference(None, None, None, session.publish)
 
 
 @router.get("/sessions/{session_id}/scope/reference")
 async def get_reference(session_id: str, request: Request):
     session = require_session(request, session_id)
-    return session.reference_overlay()
+    return session.adapter.reference_overlay()
 
 
 @router.put("/sessions/{session_id}/scope/reference")
 async def put_reference(session_id: str, body: ReferencePut, request: Request):
     session = require_owner(request, session_id)
     if body.name is None:
-        session.set_active_reference(None, None, None)
-        return session.reference_overlay()
+        session.adapter.set_active_reference(None, None, None, session.publish)
+        return session.adapter.reference_overlay()
     store = _reference_store(request)
     loaded = await run_in_threadpool(store.load_reference, body.name)
     if loaded is None:
         raise HTTPException(status_code=404, detail="unknown reference {0}".format(body.name))
     metadata = loaded.get("metadata", {})
-    session.set_active_reference(metadata.get("name", body.name), _ref_channel(metadata.get("channel")), loaded)
-    return session.reference_overlay()
+    session.adapter.set_active_reference(metadata.get("name", body.name), _ref_channel(metadata.get("channel")), loaded, session.publish)
+    return session.adapter.reference_overlay()
 
 
 @router.post("/sessions/{session_id}/scope/log/start")
 async def log_start(session_id: str, request: Request):
     session = require_owner(request, session_id)
-    return session.start_recording()
+    return session.adapter.start_recording(session.publish)
 
 
 @router.post("/sessions/{session_id}/scope/log/stop")
 async def log_stop(session_id: str, request: Request):
     session = require_owner(request, session_id)
-    return session.stop_recording()
+    return session.adapter.stop_recording(session.publish)
 
 
 @router.get("/sessions/{session_id}/scope/log")
 async def log_status(session_id: str, request: Request):
     session = require_session(request, session_id)
-    return session.recorder.status()
+    return session.adapter.recorder.status()
 
 
 @router.get("/sessions/{session_id}/scope/log/data")
 async def log_data(session_id: str, request: Request, since: float = 0.0):
     session = require_session(request, session_id)
-    status = session.recorder.status()
-    return {"columns": status["columns"], "rows": session.recorder.rows_since(since)}
+    status = session.adapter.recorder.status()
+    return {"columns": status["columns"], "rows": session.adapter.recorder.rows_since(since)}
 
 
 def _build_log_csv(status, rows) -> str:
@@ -445,10 +445,10 @@ def _build_log_csv(status, rows) -> str:
 @router.get("/sessions/{session_id}/scope/log.csv")
 async def log_csv(session_id: str, request: Request):
     session = require_session(request, session_id)
-    status = session.recorder.status()
+    status = session.adapter.recorder.status()
     if status["started_at"] is None:
         raise HTTPException(status_code=404, detail="no recording exists")
-    csv_text = _build_log_csv(status, session.recorder.rows_since())
+    csv_text = _build_log_csv(status, session.adapter.recorder.rows_since())
     filename = "log_{0}.csv".format(session.id)
     return PlainTextResponse(csv_text, media_type="text/csv", headers={"Content-Disposition": 'attachment; filename="{0}"'.format(filename)})
 

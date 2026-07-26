@@ -10,13 +10,14 @@ much worse failure than a little indirection.
 """
 
 import time
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from scpi_control import Oscilloscope
 from scpi_control.connection.mock import MockConnection
-from scpi_control.exceptions import SiglentError
+from scpi_control.exceptions import InvalidParameterError, SiglentError
 from scpi_control.server import compute
 from scpi_control.server.netpolicy import validate_target
+from scpi_control.server.recorder import TrendRecorder
 
 MAX_FRAME_POINTS = 2000
 MEASUREMENT_EVERY_N_POLLS = 4
@@ -113,13 +114,14 @@ class ScopeAdapter(InstrumentAdapter):
     kind = "scope"
 
     def __init__(self) -> None:
-        # Transitional back-reference: filters/spectrum_config/measurements/
-        # recorder/active_reference are still owned by InstrumentSession (Task
-        # 3 moves the scope-specific ones onto this adapter). InstrumentSession
-        # sets this right after constructing the session so poll() below can
-        # read the current values -- never a snapshot, since request coroutines
-        # swap these dicts wholesale at any time.
-        self.session: Optional[Any] = None
+        self.measurements: List[Tuple[int, str]] = []
+        # Server-owned analysis config. Request coroutines swap these whole
+        # dicts atomically (never mutate in place); the worker thread only reads.
+        self.spectrum_config: Dict[str, Any] = {"enabled": False, "channel": 1, "window": "hanning", "db": True}
+        self.filters: Dict[int, Dict[str, Any]] = {n: {"source": 1, "kind": "lowpass", "cutoff_low": None, "cutoff_high": None, "order": 5, "enabled": False} for n in (1, 2)}
+        self.active_reference: Optional[Dict[str, Any]] = None  # {"name", "channel", "data": {"time","voltage",...}}
+        self._shown: set = set()  # trace keys (M1/M2/F1/F2/SPEC) live on subscribers' canvases; worker-thread-only
+        self.recorder = TrendRecorder()  # internally locked: worker appends, request threads control/read
 
     def build(self, address, port, mock, model, allowed_ports, connection):
         if mock:
@@ -142,8 +144,7 @@ class ScopeAdapter(InstrumentAdapter):
 
     def poll(self, instrument, publish, tick):
         scope = instrument
-        session = self.session
-        shown = session._shown if session is not None else set()
+        shown = self._shown
         acquired = {}
         for n in scope.supported_channels:
             ch = scope.get_channel(n)
@@ -161,7 +162,7 @@ class ScopeAdapter(InstrumentAdapter):
                 shown_now.add(label)
             elif label in shown:
                 publish(_decimate_frame(label, [], []))  # one-shot clear on transition
-        filters = session.filters if session is not None else {}
+        filters = self.filters
         for n in sorted(filters):
             config = filters[n]
             label = "F{0}".format(n)
@@ -171,30 +172,67 @@ class ScopeAdapter(InstrumentAdapter):
                 shown_now.add(label)
             elif label in shown:
                 publish(_decimate_frame(label, [], []))
-        spectrum_config = session.spectrum_config if session is not None else {"enabled": False}
+        spectrum_config = self.spectrum_config
         frame = _quiet(lambda: compute.spectrum_frame(spectrum_config, acquired)) if spectrum_config["enabled"] else None
         if frame is not None:
             publish(frame)
             shown_now.add("SPEC")
         elif "SPEC" in shown:
             publish(compute.empty_spectrum_frame(spectrum_config))
-        if session is not None:
-            session._shown = shown_now
-            if tick % MEASUREMENT_EVERY_N_POLLS == 0:
-                if session.measurements:
-                    now = time.time()
-                    values = []
-                    for channel, mtype in session.measurements:
-                        value = _safe(lambda: scope.measurement.measure(mtype, channel))
-                        values.append({"channel": channel, "mtype": mtype, "value": value})
-                    publish({"type": "measurements", "values": values, "timestamp": now})
-                    session.recorder.append(now, [entry["value"] for entry in values])
-                reference = session.active_reference  # snapshot for thread safety
-                if reference is not None:
-                    publish(compute.reference_stats(reference, acquired))
+        self._shown = shown_now
+        if tick % MEASUREMENT_EVERY_N_POLLS == 0:
+            if self.measurements:
+                now = time.time()
+                values = []
+                for channel, mtype in self.measurements:
+                    value = _safe(lambda: scope.measurement.measure(mtype, channel))
+                    values.append({"channel": channel, "mtype": mtype, "value": value})
+                publish({"type": "measurements", "values": values, "timestamp": now})
+                self.recorder.append(now, [entry["value"] for entry in values])
+            reference = self.active_reference  # snapshot for thread safety
+            if reference is not None:
+                publish(compute.reference_stats(reference, acquired))
 
     def close(self, instrument):
         instrument.disconnect()
+
+    def set_measurements(self, items: List[Tuple[int, str]], publish: Callable[[Dict[str, Any]], None]) -> None:
+        self.measurements = list(items)
+        publish({"type": "measurements_config", "items": [{"channel": c, "mtype": m} for c, m in self.measurements]})
+
+    def start_recording(self, publish: Callable[[Dict[str, Any]], None]) -> Dict[str, Any]:
+        # Local import: sessions.py imports this module at top level, so a
+        # module-level import of SessionError back from sessions.py here would
+        # be circular. By call time sessions.py is fully loaded.
+        from scpi_control.server.sessions import SessionError
+
+        if self.recorder.state == "recording":
+            raise SessionError("already recording")
+        if not self.measurements:
+            raise InvalidParameterError("no measurements selected")
+        self.recorder.start(list(self.measurements), time.time())
+        self._publish_log_status(publish)
+        return self.recorder.status()
+
+    def stop_recording(self, publish: Callable[[Dict[str, Any]], None]) -> Dict[str, Any]:
+        self.recorder.stop()
+        self._publish_log_status(publish)
+        return self.recorder.status()
+
+    def _publish_log_status(self, publish: Callable[[Dict[str, Any]], None]) -> None:
+        status = self.recorder.status()
+        publish({"type": "log_status", "state": status["state"], "started_at": status["started_at"], "row_count": status["row_count"], "columns": status["columns"]})
+
+    def reference_overlay(self) -> Dict[str, Any]:
+        active = self.active_reference
+        if active is None:
+            return {"name": None, "channel": None, "t0": 0.0, "dt": 1.0, "points": []}
+        frame = _decimate_frame(active["channel"], active["data"]["time"], active["data"]["voltage"])
+        return {"name": active["name"], "channel": active["channel"], "t0": frame["t0"], "dt": frame["dt"], "points": frame["points"]}
+
+    def set_active_reference(self, name: Optional[str], channel: Optional[int], data: Optional[Dict[str, Any]], publish: Callable[[Dict[str, Any]], None]) -> None:
+        self.active_reference = None if name is None else {"name": name, "channel": channel, "data": data}
+        publish({"type": "reference", **self.reference_overlay()})
 
 
 ADAPTERS: Dict[str, type] = {"scope": ScopeAdapter}
