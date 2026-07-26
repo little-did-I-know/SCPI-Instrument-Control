@@ -13,7 +13,7 @@ import itertools
 import numpy as np
 import pytest
 
-from scpi_control import exceptions
+from scpi_control import exceptions, signal_synth
 from scpi_control.signal_synth import PERIODIC_KINDS, SignalSpec, stream, synthesize
 
 RATE = 1_000_000.0
@@ -260,10 +260,16 @@ def test_chirp_phase_is_continuous_across_a_sweep_retrace():
     """The reason phase accumulates (n * PHI(sweep_time) + PHI(within)) instead
     of resetting each sweep. A reset would put a step of order the amplitude at
     every sweep_time -- and the ringing impairment would then treat it as a real
-    edge."""
-    spec = SignalSpec(kind="chirp", frequency=1_000.0, end_frequency=5_000.0, sweep_time=1e-3)
+    edge.
+
+    5_300 rather than a round 5_000 on purpose: cycles per sweep is
+    T*(f0+f1)/2, which for 5_000 comes out an exact 3.0 -- the accumulated
+    phase term would then be congruent to zero mod 2*pi and dropping it
+    entirely would change nothing, so the test would pass against the very
+    bug it exists to catch. At 5_300 it is 3.15, leaving a 0.94 rad step."""
+    spec = SignalSpec(kind="chirp", frequency=1_000.0, end_frequency=5_300.0, sweep_time=1e-3)
     samples = synthesize(spec, RATE, 3_000)  # three full sweeps
-    steepest = 2 * np.pi * 5_000.0 * 1.0 / RATE  # the fastest legitimate slope, per sample
+    steepest = 2 * np.pi * 5_300.0 * 1.0 / RATE  # the fastest legitimate slope, per sample
     assert np.max(np.abs(np.diff(samples))) < 1.5 * steepest
 
 
@@ -346,3 +352,33 @@ def test_streamed_chunks_reassemble_into_one_synthesize_call(spec):
     streamed = np.concatenate(list(itertools.islice(stream(spec, RATE, chunk), chunks)))
     whole = synthesize(spec, RATE, chunk * chunks)
     np.testing.assert_allclose(streamed, whole, rtol=0, atol=1e-9)
+
+
+def test_the_reassemble_check_actually_detects_a_chunk_relative_state_bug(monkeypatch):
+    """A self-test of test_streamed_chunks_reassemble_into_one_synthesize_call:
+    asserts the detector detects. A pure-formula bug in a generator (e.g. an
+    algebraically wrong phase term) is still a function of the absolute time
+    array, so stream() and synthesize() agree on it regardless -- that class of
+    bug is caught elsewhere (see the sweep-retrace continuity test above), not
+    here. What this check exists to catch is a generator that depends on
+    something other than absolute time -- sample index, chunk-local origin, or
+    carried state -- which only shows up when a signal is split across chunk
+    boundaries. This plants exactly that bug (phase measured from the start of
+    the call instead of from the absolute sweep origin) and confirms it makes
+    the reassemble comparison fail by an amount of order the amplitude, not
+    float noise."""
+
+    def chunk_relative_chirp(spec, t, rng):
+        sweep = np.floor(t / spec.sweep_time)
+        within = t - t[0]  # bug: relative to this call's start, not the sweep origin
+        phase = sweep * signal_synth._chirp_phase(spec, spec.sweep_time) + signal_synth._chirp_phase(spec, within)
+        return spec.amplitude * np.sin(phase + spec.phase)
+
+    monkeypatch.setitem(signal_synth._GENERATORS, "chirp", chunk_relative_chirp)
+    spec = SignalSpec(kind="chirp", frequency=1_000.0, end_frequency=9_000.0, sweep_time=1e-3)
+    chunk, chunks = 512, 8
+    streamed = np.concatenate(list(itertools.islice(stream(spec, RATE, chunk), chunks)))
+    whole = synthesize(spec, RATE, chunk * chunks)
+    with pytest.raises(AssertionError):
+        np.testing.assert_allclose(streamed, whole, rtol=0, atol=1e-9)
+    assert np.max(np.abs(streamed - whole)) > 0.1  # order the amplitude, not float noise
