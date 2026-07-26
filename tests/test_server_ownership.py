@@ -1,5 +1,6 @@
 """Session ownership: the creating identity owns the session."""
 
+import threading
 import time
 
 import pytest
@@ -373,6 +374,7 @@ def test_watcher_released_on_abnormal_disconnect(two_users_ws, monkeypatch):
     client.app.state.abandon_after = 0.0
 
     raised = []
+    reached = threading.Event()
 
     def _boom(_scope):
         # Recording the call is inside the same body as the raise, so if a
@@ -381,14 +383,25 @@ def test_watcher_released_on_abnormal_disconnect(two_users_ws, monkeypatch):
         # with it, and the assertion below catches the decay into a
         # duplicate of the clean-close test.
         raised.append(True)
+        reached.set()
         raise RuntimeError("simulated mid-stream failure")
 
     monkeypatch.setattr(stream_module, "read_state", _boom)
     # No receive_json here: the handler crashes before it ever sends a
     # frame, so waiting on one would hang forever waiting for a message
     # that never arrives.
+    #
+    # But we cannot just close immediately either. The handler reaches
+    # read_state via ``session.submit(...)`` onto the session's worker thread
+    # (stream.py:98), so it runs asynchronously relative to the handshake --
+    # closing the socket right away races that dispatch, and the job may never
+    # run. That race made this test fail intermittently in CI on whichever
+    # interpreter happened to lose it (3.10 on one run, 3.11 on the next, each
+    # time passing on the others). Waiting for the helper to actually fire
+    # removes the timing dependency; the timeout keeps a genuine regression
+    # from hanging the suite.
     with client.websocket_connect("/api/sessions/{0}/stream".format(sid), subprotocols=alice_ws):
-        pass
+        assert reached.wait(timeout=10.0), "handler never reached read_state within 10s"
 
     assert raised, "abnormal path never exercised -- read_state must raise, not return"
 
