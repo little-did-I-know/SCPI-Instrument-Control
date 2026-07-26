@@ -118,7 +118,24 @@ def raw_volts(conn: "MockConnection", channel: int, n_override: Optional[int] = 
     else:
         t0 = count * window * _DRIFT_FRACTION  # untriggerable: free-run drift
     per_acquisition = spec if spec.seed is None else replace(spec, seed=spec.seed + count)
-    return synthesize(per_acquisition, conn.sample_rate, n, t0=t0)
+    dut = getattr(conn._signals.get(channel), "dut", None)
+    if dut is None:
+        return synthesize(per_acquisition, conn.sample_rate, n, t0=t0)
+    # A DUT filter is STATEFUL, unlike every generator in signal_synth. Filtering
+    # the bare capture would start from y=0 and put a settling transient at the
+    # head of every acquisition, so render a lead-in BEFORE t0, filter across the
+    # whole extended window, then slice the lead-in off -- the same fix, for the
+    # same reason, as the ringing impairment's pre-t0 window (signal_synth.py:381).
+    #
+    # Note the extended t0 is computed as a subtraction rather than by shifting
+    # the index range the way the ringing path does, so the sample at index
+    # `warmup` can land a few ULP from `t0`. That is deliberate here: the output
+    # is low-pass filtered and then quantized to int8 at 25 codes/div, which is
+    # ~0.04 V -- a sub-femtosecond timebase difference is many orders of
+    # magnitude below the smallest representable change.
+    warmup = dut.warmup_samples(conn.sample_rate)
+    extended = synthesize(per_acquisition, conn.sample_rate, n + warmup, t0=t0 - warmup / conn.sample_rate)
+    return dut.apply(extended, conn.sample_rate)[warmup:]
 
 
 def payload_for(conn: "MockConnection", channel: int, *, include_offset: bool) -> bytes:
