@@ -4,6 +4,7 @@ import contextlib
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
+from scpi_control.server.adapters import read_psu_outputs
 from scpi_control.server.auth import WS_ACCEPT_SUBPROTOCOL
 from scpi_control.server.sessions import read_state
 
@@ -95,8 +96,20 @@ async def stream(websocket: WebSocket, session_id: str):
     sender = None
     try:
         unmark_owner_watching = session.mark_owner_watching(identity)
-        initial = await asyncio.wrap_future(session.submit(read_state))
-        await websocket.send_json({"type": "state", "state": initial})
+        # The initial frame must match whatever shape this session's adapter
+        # publishes on every subsequent tick (read_state for scope,
+        # read_psu_outputs for psu) -- read_state() assumes an Oscilloscope
+        # and raises AttributeError against a PowerSupply, which used to be
+        # swallowed by the bare except below, leaving the socket open but
+        # silent forever (no initial frame, and polling never starts because
+        # _poll_tick() requires a subscriber that this handler's own
+        # exception prevented from ever seeing a first message).
+        if session.kind == "psu":
+            outputs = await asyncio.wrap_future(session.submit(read_psu_outputs))
+            await websocket.send_json({"type": "state", "kind": "psu", "outputs": outputs})
+        else:
+            initial = await asyncio.wrap_future(session.submit(read_state))
+            await websocket.send_json({"type": "state", "state": initial})
         # Run the receiver (disconnect detection) and sender concurrently; whichever
         # finishes first tears the connection down.
         receiver = asyncio.ensure_future(_receive_until_disconnect(websocket))

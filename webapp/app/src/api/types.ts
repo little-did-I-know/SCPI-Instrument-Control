@@ -74,6 +74,7 @@ export type LogData = { columns: { channel: number; mtype: string }[]; rows: (nu
 
 export type StreamMessage =
   | { type: "state"; state: ScopeState }
+  | { type: "state"; kind: "psu"; outputs: PsuOutputState[] }
   | { type: "waveform"; channel: number | string; t0: number; dt: number; points: number[] }
   | { type: "measurements"; values: MeasurementValue[]; timestamp?: number }
   | { type: "measurements_config"; items: { channel: number; mtype: string }[] }

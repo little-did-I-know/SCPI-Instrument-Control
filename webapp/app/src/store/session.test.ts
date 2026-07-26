@@ -51,4 +51,11 @@ describe("session store", () => {
     useSession.getState().applyMeasurements([{ channel: 1, mtype: "FREQ", value: null }]);
     expect(useSession.getState().measurements[0].value).toBeNull();
   });
+
+  it("applyPsuState replaces the psu snapshot, and clearSession resets it", () => {
+    useSession.getState().applyPsuState({ outputs: [{ output: 1, voltage: 3.3, current: 0.5, enabled: false, measured_voltage: 0, measured_current: 0, measured_power: 0 }] });
+    expect(useSession.getState().psu?.outputs[0].output).toBe(1);
+    useSession.getState().clearSession();
+    expect(useSession.getState().psu).toBeNull();
+  });
 });

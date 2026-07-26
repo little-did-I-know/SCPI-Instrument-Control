@@ -59,6 +59,17 @@ describe("useStream", () => {
     await waitFor(() => expect(useSession.getState().scope?.timebase).toBe(0.001));
   });
 
+  it("routes a psu state message to the psu store slot, not the scope slot", async () => {
+    renderHook(() => useStream("abc"));
+    FakeWebSocket.last!.emit({
+      type: "state",
+      kind: "psu",
+      outputs: [{ output: 1, voltage: 3.3, current: 0.5, enabled: false, measured_voltage: 3.31, measured_current: 0.12, measured_power: 0.4 }],
+    });
+    await waitFor(() => expect(useSession.getState().psu?.outputs[0].measured_voltage).toBe(3.31));
+    expect(useSession.getState().scope).toBeNull();
+  });
+
   it("routes waveform frames to the frame buffer, not the store", async () => {
     renderHook(() => useStream("abc"));
     FakeWebSocket.last!.emit({ type: "waveform", channel: 1, t0: 0, dt: 1e-6, points: [0, 0.5, 1] });
