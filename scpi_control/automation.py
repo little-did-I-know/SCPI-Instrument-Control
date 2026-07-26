@@ -46,10 +46,19 @@ import numpy as np
 
 from scpi_control import Oscilloscope
 from scpi_control.connection import BaseConnection
-from scpi_control.exceptions import SiglentError
+from scpi_control.exceptions import InvalidParameterError, SiglentError, SiglentTimeoutError
+from scpi_control.units import parse_si_value
 from scpi_control.waveform import WaveformData
 
 logger = logging.getLogger(__name__)
+
+# Acquisition polling. 14 divisions is one full sweep (matching
+# connection/mock/synth.py's DIVISIONS); x5 covers trigger wait plus transfer;
+# the floor keeps a fast timebase from getting an unusably small budget.
+_ACQUISITION_POLL_INTERVAL = 0.1
+_MIN_ACQUISITION_TIMEOUT = 2.0
+_SWEEP_DIVISIONS = 14
+_ACQUISITION_TIMEOUT_FACTOR = 5
 
 
 class DataCollector:
@@ -103,15 +112,66 @@ class DataCollector:
         self.disconnect()
         return False
 
-    def capture_single(self, channels: List[int], auto_setup: bool = False) -> Dict[int, WaveformData]:
+    def _acquisition_timeout(self) -> float:
+        """Budget for one acquisition, derived from the current timebase.
+
+        Reading the timebase is best-effort: falling back to the floor is better
+        than failing a capture because a diagnostic query did.
+        """
+        try:
+            timebase = float(self.scope.timebase)
+        except Exception:
+            # Deliberately broad: this is a best-effort diagnostic read, and any
+            # failure of it (timeout, unsupported query, a dialect that returns
+            # something unparseable) should degrade to the floor rather than
+            # abort a capture that would otherwise have worked.
+            return _MIN_ACQUISITION_TIMEOUT
+        return max(_MIN_ACQUISITION_TIMEOUT, _SWEEP_DIVISIONS * timebase * _ACQUISITION_TIMEOUT_FACTOR)
+
+    def _wait_for_acquisition(self, max_wait: float) -> None:
+        """Poll until the acquisition completes, mirroring wait_for_trigger.
+
+        The NORM branch is load-bearing: in NORMAL mode the scope re-arms after
+        every trigger and never reports STOP, so a `while status != "STOP"` loop
+        would always time out. TriggerWaitCollector.wait_for_trigger already
+        learned this; this is the same rule, not a second opinion.
+        """
+        done_states = {"TRIGD", "STOP"} if self.scope.trigger.mode == "NORM" else {"STOP"}
+        start_time = time.time()
+        status = ""
+        while (time.time() - start_time) < max_wait:
+            status = self.scope.acquisition_status()
+            if status in done_states:
+                return
+            time.sleep(_ACQUISITION_POLL_INTERVAL)
+        raise SiglentTimeoutError(f"Acquisition did not complete within {max_wait:.2f} s (last status: {status or 'unknown'})")
+
+    def capture_single(self, channels: List[int], auto_setup: bool = False, max_wait: Optional[float] = None) -> Dict[int, WaveformData]:
         """Capture waveforms from specified channels.
+
+        If the scope is already in NORM trigger mode, this waits for the next
+        natural trigger instead of arming a single acquisition -- the user's
+        configured mode is left running rather than being overwritten. In any
+        other mode (including the default) it arms a single acquisition as
+        before. Previously this method always forced a single-shot regardless
+        of mode; a NORM-mode caller upgrading past this change will see
+        capture_single wait for a real trigger instead of forcing one.
 
         Args:
             channels: List of channel numbers to capture (e.g., [1, 2, 3])
             auto_setup: If True, run auto-setup before capture
+            max_wait: Seconds to wait for the acquisition to complete. Must be
+                positive. None (default) derives a budget from the current
+                timebase.
 
         Returns:
             Dictionary mapping channel number to WaveformData object
+
+        Raises:
+            InvalidParameterError: If max_wait is not positive.
+            SiglentTimeoutError: If the acquisition does not complete in time.
+                Reading anyway would return the PREVIOUS acquisition, which is
+                what this replaced.
 
         Example:
             >>> data = collector.capture_single([1, 2])
@@ -121,13 +181,33 @@ class DataCollector:
         if not self._connected:
             raise SiglentError(f"Not connected to oscilloscope at {self.scope.host}:{self.scope.port}")
 
+        # Checked explicitly, because the failure is otherwise misattributed: a
+        # zero or negative budget skips the poll loop without a single status
+        # read and raises "last status: unknown", which reads like an
+        # instrument fault rather than the bad argument it is.
+        if max_wait is not None and max_wait <= 0:
+            raise InvalidParameterError(f"max_wait must be a positive number of seconds, not {max_wait!r}")
+
         if auto_setup:
             self.scope.auto_setup()
-            time.sleep(1)  # Wait for auto-setup to complete
+            # Unlike the trigger wait below, this genuinely is an
+            # unknown-duration sleep: auto-setup reports no status the library
+            # can poll, so there is nothing to wait ON.
+            time.sleep(1)
 
-        # Trigger single acquisition
-        self.scope.trigger_single()
-        time.sleep(0.5)  # Wait for trigger
+        if self.scope.trigger.mode != "NORM":
+            # Mirrors wait_for_trigger: NORMAL mode is already free-running and
+            # re-arms itself, so arming a SINGLE here would stomp the user's
+            # NORM setting and _wait_for_acquisition would never see it.
+            #
+            # Ordering is load-bearing, not cosmetic: trigger_single() writes
+            # TRIG_MODE SINGLE to the scope, which overwrites the very mode
+            # _wait_for_acquisition needs to read to pick its done-states. The
+            # mode must be checked BEFORE this call, not just before the poll
+            # -- moving this inside/after trigger_single() silently reproduces
+            # the bug this guard exists to prevent.
+            self.scope.trigger_single()
+        self._wait_for_acquisition(self._acquisition_timeout() if max_wait is None else max_wait)
 
         # Capture waveforms
         waveforms = {}
@@ -182,7 +262,9 @@ class DataCollector:
         configs = []
         if timebase_scales:
             for tb in timebase_scales:
-                configs.append({"timebase": tb})
+                # Parsed HERE, not at apply time, so an unparseable scale fails
+                # before any capture is taken rather than part-way through a run.
+                configs.append({"timebase": parse_si_value(tb, "timebase scale")})
         else:
             configs.append({})
 
@@ -192,7 +274,7 @@ class DataCollector:
                 for ch, scales in voltage_scales.items():
                     for scale in scales:
                         new_config = config.copy()
-                        new_config[f"ch{ch}_vdiv"] = scale
+                        new_config[f"ch{ch}_vdiv"] = parse_si_value(scale, f"channel {ch} voltage scale")
                         new_configs.append(new_config)
             if new_configs:
                 configs = new_configs
@@ -200,8 +282,12 @@ class DataCollector:
         total = len(configs) * triggers_per_config
         current = 0
 
-        # Execute batch capture
-        for config in configs:
+        # Execute batch capture. Enumerated rather than looked up with
+        # configs.index(config): parsing makes duplicate configs genuinely
+        # possible -- ['1us', '1000ns'] used to yield two distinct raw-string
+        # dicts and now both parse to {'timebase': 1e-06} -- and index() would
+        # then report "Config 1/2" twice.
+        for config_index, config in enumerate(configs):
             # Apply configuration
             if "timebase" in config:
                 if hasattr(self.scope, "set_timebase"):
@@ -225,19 +311,26 @@ class DataCollector:
                 current += 1
 
                 if progress_callback:
-                    status = f"Config {configs.index(config)+1}/{len(configs)}, Trigger {trigger_num+1}/{triggers_per_config}"
+                    status = f"Config {config_index+1}/{len(configs)}, Trigger {trigger_num+1}/{triggers_per_config}"
                     progress_callback(current, total, status)
 
-                waveforms = self.capture_single(channels)
-
-                results.append(
-                    {
-                        "timestamp": datetime.now().isoformat(),
-                        "config": config.copy(),
-                        "waveforms": waveforms,
-                        "trigger_num": trigger_num,
-                    }
-                )
+                entry = {
+                    "timestamp": datetime.now().isoformat(),
+                    "config": config.copy(),
+                    "waveforms": {},
+                    "trigger_num": trigger_num,
+                }
+                try:
+                    entry["waveforms"] = self.capture_single(channels)
+                except SiglentTimeoutError as exc:
+                    # Record the failure and carry on. Raising would discard every
+                    # capture already taken; returning the stale waveform is what
+                    # this replaced. An "error" key appears ONLY on failed entries,
+                    # so consumers reading config/waveforms/trigger_num are
+                    # unaffected.
+                    logger.warning(f"Capture timed out for config {config}: {exc}")
+                    entry["error"] = str(exc)
+                results.append(entry)
 
         logger.info(f"Batch capture complete: {len(results)} captures")
         return results

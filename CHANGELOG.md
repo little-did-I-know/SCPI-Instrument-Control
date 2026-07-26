@@ -9,6 +9,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `save_waveform` now accepts `npz` and `h5` as aliases for `NPY` and `HDF5`. `npz` is
+  `start_continuous_capture`'s default, so an overnight run using default arguments previously
+  raised on every save and wrote nothing; four shipped examples were broken the same way. The
+  same spellings were already valid as file *extensions* via auto-detect — that inconsistency is
+  what produced the bug.
+- `batch_capture` now parses the SI unit strings its own docstring documents (`'1us'`, `'500mV'`),
+  via the new `scpi_control.units.parse_si_value`. Previously the documented example raised
+  `TypeError` and discarded every capture already taken. Numeric scales keep working unchanged.
+- `capture_single` now polls `acquisition_status()` instead of sleeping a fixed 0.5 s, with a
+  timeout derived from the current timebase and a new optional `max_wait`. On a slow timebase it
+  previously returned the *previous* acquisition, which `batch_capture` then recorded under the
+  new config's label — wrong data, correctly formatted, no warning. A timed-out capture now
+  appears in `batch_capture`'s results as an entry with empty `waveforms` and an `error` field,
+  rather than aborting the run or holding stale data.
+- `capture_single` no longer clobbers a user-configured `NORM` trigger mode. It previously always
+  armed a single-shot acquisition regardless of trigger mode; it now leaves `NORM` alone and waits
+  for the next natural trigger, matching what `TriggerWaitCollector.wait_for_trigger` already did,
+  and continues to arm a single shot in every other mode as before.
+- `parse_si_value` scales by shifting the decimal exponent rather than multiplying by a float, so
+  `'10us'` is exactly `1e-05`. The multiply-based approach produced `9.999999999999999e-06`, which
+  reached the instrument as `TDIV 9.999999999999999e-06` instead of `TDIV 1e-05`.
 - The oscilloscope screenshot at the top of the README no longer fails to load on the PyPI
   project page. It used a repository-relative path, which GitHub resolves against the repo but
   PyPI cannot — PyPI renders the README as a standalone document with no repo context, so the
