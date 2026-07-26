@@ -8,7 +8,7 @@ docs and tests; the mock coupling and code-conversion layers are kind-agnostic.
 
 import time
 from dataclasses import dataclass, replace
-from typing import Callable, Dict, Iterator, Optional
+from typing import Callable, Dict, Iterator, Optional, Tuple, Union
 
 import numpy as np
 
@@ -20,7 +20,8 @@ class SignalSpec:
     """Parameters of one synthetic signal.
 
     Attributes:
-        kind: One of "sine", "square", "triangle", "ramp", "dc", "noise".
+        kind: One of "sine", "square", "triangle", "ramp", "dc", "noise",
+            "chirp", "exponential", "pulse", "multitone".
         frequency: Repetition rate in Hz (periodic kinds only).
         amplitude: Peak amplitude in volts (Vpp = 2*amplitude); for "noise",
             the standard deviation. Ignored for "dc".
@@ -35,10 +36,14 @@ class SignalSpec:
         glitch_rate: Mean glitches per second (0 = off).
         glitch_amplitude: Volts, peak height of a glitch.
         ringing_frequency: Hz of post-edge oscillation (0 = off). Ringing is
-            an EDGE impairment -- it is only meaningful on signals that have
-            edges to trigger on ("square", or a pulse-like "ramp"). Applying
-            it to "sine" or "dc" has no effect, since those kinds never
-            produce a discontinuity.
+            an EDGE impairment: it is PHYSICALLY meaningful on kinds with fast
+            edges ("square", "pulse", or a pulse-like "ramp"). It is not,
+            however, a no-op elsewhere -- edges are found as any nonzero
+            sample-to-sample change, not only as a discontinuity, so on a
+            continuous kind ("sine", "chirp", "exponential", "multitone") it
+            acts as a derivative-weighted filter whose magnitude scales with
+            the signal's slew rate: measurable, but usually small. Only "dc",
+            whose sample-to-sample differences are all zero, is a true no-op.
         ringing_damping: Decay rate per second of that oscillation; only used
             when ringing_frequency > 0. Defaults away from 0 for the same
             reason drift_frequency does: undamped ringing (decay rate 0)
@@ -46,6 +51,20 @@ class SignalSpec:
             buffer on every edge -- quadratic in the number of edges once
             ringing_frequency is switched on the most natural way, by setting
             only that field.
+        end_frequency: "chirp" sweep stop frequency in Hz.
+        sweep_time: "chirp" seconds per sweep, after which it retraces.
+        sweep_log: "chirp" sweeps logarithmically rather than linearly.
+        tau: "exponential" RC time constant in seconds.
+        pulse_width: "pulse" 50%-to-50% width in seconds (FWHM), matching the
+            instrument convention and the threshold the repo's timing analyzer
+            measures at. The flat top therefore runs for pulse_width -
+            edge_time. "pulse" ignores `duty`.
+        edge_time: "pulse" 0-to-100% transition time in seconds; 0 gives an
+            ideal instantaneous edge.
+        harmonics: "multitone" relative amplitudes of the 2nd, 3rd, ...
+            harmonic. `amplitude` is the FUNDAMENTAL's amplitude, so the peak
+            of the sum is higher; that is deliberate, since normalizing would
+            make the THD of a multitone depend on its harmonic set.
     """
 
     kind: str = "sine"
@@ -63,8 +82,23 @@ class SignalSpec:
     drift_frequency: float = 0.1  # Hz of that wander; only used when drift_amplitude > 0
     glitch_rate: float = 0.0  # mean glitches per second (0 = off)
     glitch_amplitude: float = 0.0  # volts, peak height of a glitch
-    ringing_frequency: float = 0.0  # Hz of post-edge oscillation (0 = off); an edge impairment, meaningful only on "square"/pulse-like "ramp"
+    ringing_frequency: float = 0.0  # Hz of post-edge oscillation (0 = off); an edge impairment -- physically meaningful on "square"/"pulse"; on continuous kinds a small derivative filter, not a no-op
     ringing_damping: float = 5_000.0  # decay rate per second (M8: nonzero default, same reason as drift_frequency -- damping=0 never decays, making the kernel run the whole buffer on every edge)
+    # Kind-specific parameters, appended at the END for the same reason the
+    # impairments above were: inserting them beside the fields they read best
+    # next to would reorder positional construction and break callers. Every
+    # default is chosen so SignalSpec(kind=X) alone yields a sensible signal at
+    # the default 1 kHz frequency, the property the original six kinds have.
+    end_frequency: float = 10_000.0  # "chirp": sweep stop frequency, Hz
+    sweep_time: float = 0.01  # "chirp": seconds per sweep, then it retraces
+    sweep_log: bool = False  # "chirp": log rather than linear sweep
+    tau: float = 1e-4  # "exponential": RC time constant, s (5 tau per half period at 1 kHz)
+    pulse_width: float = 2e-4  # "pulse": 50%-to-50% width, s (20% duty at 1 kHz)
+    edge_time: float = 1e-5  # "pulse": 0->100% transition time, s
+    harmonics: Tuple[float, ...] = (
+        0.1,
+        0.05,
+    )  # "multitone": relative amplitudes of the 2nd, 3rd, ... harmonic; non-empty by default so SignalSpec(kind="multitone") is not a bit-identical duplicate of "sine"
 
 
 def _cycle_fraction(spec: SignalSpec, t: np.ndarray) -> np.ndarray:
@@ -95,6 +129,110 @@ def _noise(spec: SignalSpec, t: np.ndarray, rng: np.random.Generator) -> np.ndar
     return rng.normal(0.0, spec.amplitude, t.shape)
 
 
+def _multitone(spec: SignalSpec, t: np.ndarray, rng: np.random.Generator) -> np.ndarray:
+    """A fundamental plus a coherent harmonic series -- a distorted sine.
+
+    Harmonic k rides at k*theta, so its phase advances with the fundamental's
+    rather than drifting against it. That makes THD exactly sqrt(sum(h**2)),
+    independent of amplitude, frequency and phase, which is the whole point:
+    it gives the repo's THD code a signal with a known correct answer.
+    """
+    theta = 2.0 * np.pi * spec.frequency * t + spec.phase
+    samples = np.sin(theta)
+    for order, relative in enumerate(spec.harmonics, start=2):
+        if relative:
+            samples = samples + relative * np.sin(order * theta)
+    return spec.amplitude * samples
+
+
+def _exponential(spec: SignalSpec, t: np.ndarray, rng: np.random.Generator) -> np.ndarray:
+    """A square wave through an RC network, at its PERIODIC STEADY STATE.
+
+    Solved in closed form rather than integrated forward: stream() re-enters
+    synthesize() per chunk with a new t0, so anything that had to settle in over
+    the first few cycles would restart its settling at every chunk boundary.
+    Requiring the trace to repeat exactly gives two linear equations in the two
+    phase-start levels; `duty` splits the period, the waveform charges toward
+    +amplitude and discharges toward -amplitude with time constant `tau`.
+
+    Both branch boundaries evaluate to the same level (the high branch at t_high
+    equals low_start; the low branch at t_low equals high_start), so the result
+    is continuous everywhere -- there is no jump for a probe's edge response to
+    key on. (Not the same as ringing being a no-op here: it keys on any
+    sample-to-sample change, so it still filters this kind slightly. See
+    SignalSpec.ringing_frequency.)
+    """
+    period = 1.0 / spec.frequency
+    t_high = spec.duty * period
+    t_low = period - t_high
+    a = np.exp(-t_high / spec.tau)
+    b = np.exp(-t_low / spec.tau)
+    # expm1 form throughout: the algebraic result is (2b - 1 - ab)/(1 - ab), but
+    # as tau grows both numerator and denominator become differences of
+    # near-equal numbers and lose every significant digit -- at tau=1e12 the
+    # naive form divides by zero. -expm1(-period/tau) IS 1 - a*b, computed
+    # accurately.
+    denom = -np.expm1(-period / spec.tau)
+    high_start = spec.amplitude * (np.expm1(-t_low / spec.tau) - b * np.expm1(-t_high / spec.tau)) / denom
+    low_start = spec.amplitude * (a * np.expm1(-t_low / spec.tau) - np.expm1(-t_high / spec.tau)) / denom
+    within = _cycle_fraction(spec, t) * period
+    rising = within < t_high
+    decay = np.exp(-np.where(rising, within, within - t_high) / spec.tau)
+    return np.where(rising, spec.amplitude + (high_start - spec.amplitude) * decay, -spec.amplitude + (low_start + spec.amplitude) * decay)
+
+
+def _pulse(spec: SignalSpec, t: np.ndarray, rng: np.random.Generator) -> np.ndarray:
+    """A trapezoid whose width and edge rate are independent of the period.
+
+    That independence is the whole reason this kind exists alongside "square",
+    whose only shape control is `duty` -- which this kind therefore ignores.
+    `pulse_width` is the 50%-to-50% width: the 50% level sits at the midpoint of
+    each linear ramp, so the crossings land at edge_time/2 and
+    pulse_width + edge_time/2, exactly pulse_width apart.
+    """
+    within = _cycle_fraction(spec, t) / spec.frequency
+    high = spec.amplitude
+    low = -spec.amplitude
+    if spec.edge_time <= 0:
+        return np.where(within < spec.pulse_width, high, low)
+    span = high - low
+    rise = low + span * (within / spec.edge_time)
+    fall = high - span * ((within - spec.pulse_width) / spec.edge_time)
+    return np.where(within < spec.edge_time, rise, np.where(within < spec.pulse_width, high, np.where(within < spec.pulse_width + spec.edge_time, fall, low)))
+
+
+def _chirp_phase(spec: SignalSpec, x: Union[float, np.ndarray]) -> Union[float, np.ndarray]:
+    """Phase accumulated from the start of a sweep to `x` seconds into it."""
+    f0 = spec.frequency
+    f1 = spec.end_frequency
+    span = spec.sweep_time
+    if spec.sweep_log:
+        ratio = f1 / f0
+        if ratio == 1.0:
+            # The limit of the log form as f1 -> f0: a constant-frequency tone.
+            # Taken here rather than raising, because log(1) == 0 would divide by
+            # zero on a spec that is degenerate but perfectly sane.
+            return 2.0 * np.pi * f0 * x
+        return 2.0 * np.pi * f0 * span / np.log(ratio) * (np.power(ratio, x / span) - 1.0)
+    return 2.0 * np.pi * (f0 * x + (f1 - f0) * x * x / (2.0 * span))
+
+
+def _chirp(spec: SignalSpec, t: np.ndarray, rng: np.random.Generator) -> np.ndarray:
+    """A repeating frequency sweep, with phase accumulated across retraces.
+
+    Phase is n * PHI(sweep_time) + PHI(position within this sweep), not merely
+    the latter: resetting phase at each retrace would put a step discontinuity
+    every sweep_time, which the ringing impairment would then treat as a real
+    edge. np.floor (not int truncation) gives the sweep index, because t is
+    routinely negative -- the mock free-runs from a negative t0 and ringing
+    renders samples before t0.
+    """
+    sweep = np.floor(t / spec.sweep_time)
+    within = t - sweep * spec.sweep_time
+    phase = sweep * _chirp_phase(spec, spec.sweep_time) + _chirp_phase(spec, within)
+    return spec.amplitude * np.sin(phase + spec.phase)
+
+
 _GENERATORS: Dict[str, Callable[[SignalSpec, np.ndarray, np.random.Generator], np.ndarray]] = {
     "sine": _sine,
     "square": _square,
@@ -102,9 +240,13 @@ _GENERATORS: Dict[str, Callable[[SignalSpec, np.ndarray, np.random.Generator], n
     "ramp": _ramp,
     "dc": _dc,
     "noise": _noise,
+    "multitone": _multitone,
+    "exponential": _exponential,
+    "pulse": _pulse,
+    "chirp": _chirp,
 }
 
-PERIODIC_KINDS = ("sine", "square", "triangle", "ramp")
+PERIODIC_KINDS = ("sine", "square", "triangle", "ramp", "multitone", "exponential", "pulse")
 
 # Hard cap on the ringing decay kernel's length in samples, independent of
 # n_points (I3) or sample_rate. This is a backstop against a user-supplied
@@ -123,8 +265,53 @@ def _validate(spec: SignalSpec, sample_rate: float, n_points: int) -> None:
         raise exceptions.InvalidParameterError(f"n_points must be at least 1: {n_points}")
     if spec.kind in PERIODIC_KINDS and spec.frequency <= 0:
         raise exceptions.InvalidParameterError(f"frequency must be positive for {spec.kind!r}: {spec.frequency}")
-    if spec.kind == "square" and not 0.0 < spec.duty < 1.0:
+    if spec.kind in ("square", "exponential") and not 0.0 < spec.duty < 1.0:
         raise exceptions.InvalidParameterError(f"duty must be strictly between 0 and 1: {spec.duty}")
+    # np.isfinite on every kind-specific scalar below, not just a sign check: nan
+    # passes BOTH sides of an ordering comparison, so `tau <= 0` and
+    # `pulse_width <= edge_time` silently let it through -- and a nan pulse_width
+    # is the worst of them, since it yields a finite but wrong waveform with no
+    # tell-tale in the output. tau=inf passes `tau <= 0` too, and produces an
+    # all-nan trace plus a RuntimeWarning, though the documented tau -> inf limit
+    # is the DC average amplitude*(2*duty - 1).
+    if spec.kind == "exponential" and not (np.isfinite(spec.tau) and spec.tau > 0):
+        raise exceptions.InvalidParameterError(f"tau must be a positive, finite number for 'exponential': {spec.tau}")
+    if spec.kind == "multitone":
+        try:
+            relatives = list(spec.harmonics)
+        except TypeError:
+            raise exceptions.InvalidParameterError(f"harmonics must be a sequence of relative amplitudes: {spec.harmonics!r}") from None
+        for order, relative in enumerate(relatives, start=2):
+            # The guard has to cover the ELEMENT test too, not just list(): on a
+            # non-numeric element np.isfinite raises a raw "ufunc 'isfinite' not
+            # supported" TypeError, and on a complex one the `>= 0` does --
+            # either would escape this module's contract that every bad
+            # parameter surfaces as InvalidParameterError.
+            try:
+                acceptable = bool(np.isfinite(relative)) and relative >= 0
+            except TypeError:
+                acceptable = False
+            if not acceptable:
+                raise exceptions.InvalidParameterError(f"harmonics[{order - 2}] (harmonic order {order}) must be a non-negative finite number: {relative!r}")
+    if spec.kind == "pulse":
+        if not np.isfinite(spec.edge_time) or spec.edge_time < 0:
+            raise exceptions.InvalidParameterError(f"edge_time must be a non-negative, finite number: {spec.edge_time}")
+        if not np.isfinite(spec.pulse_width):
+            raise exceptions.InvalidParameterError(f"pulse_width must be a finite number: {spec.pulse_width}")
+        if spec.pulse_width <= spec.edge_time:
+            raise exceptions.InvalidParameterError(f"pulse_width (50%-to-50%) must exceed edge_time, or the pulse never reaches its top: {spec.pulse_width} <= {spec.edge_time}")
+        if spec.pulse_width + spec.edge_time > 1.0 / spec.frequency:
+            raise exceptions.InvalidParameterError(f"the trapezoid must fit in one period: pulse_width + edge_time = {spec.pulse_width + spec.edge_time} > {1.0 / spec.frequency}")
+    if spec.kind == "chirp":
+        # chirp is deliberately outside PERIODIC_KINDS (no stable period, so the
+        # mock must free-run it rather than align it to a trigger), which means
+        # the shared positive-frequency check above does not cover it.
+        if spec.frequency <= 0:
+            raise exceptions.InvalidParameterError(f"frequency must be positive for 'chirp': {spec.frequency}")
+        if not (np.isfinite(spec.end_frequency) and spec.end_frequency > 0):
+            raise exceptions.InvalidParameterError(f"end_frequency must be a positive, finite number for 'chirp': {spec.end_frequency}")
+        if not (np.isfinite(spec.sweep_time) and spec.sweep_time > 0):
+            raise exceptions.InvalidParameterError(f"sweep_time must be a positive, finite number for 'chirp': {spec.sweep_time}")
     if spec.noise_rms < 0:
         raise exceptions.InvalidParameterError(f"noise_rms must be non-negative: {spec.noise_rms}")
     if spec.drift_amplitude < 0:
@@ -206,6 +393,11 @@ def synthesize(spec: SignalSpec, sample_rate: float, n_points: int, t0: float = 
         # continuity test below until reordered this way).
         t_ext = t0 + (np.arange(n_points + decay_len) - decay_len) / sample_rate
         samples_ext = _GENERATORS[spec.kind](spec, t_ext, rng) + spec.offset
+        # ANY nonzero sample-to-sample change is an edge here, not just a
+        # discontinuity: on a continuous kind every sample qualifies, so this
+        # becomes a derivative-weighted filter rather than a no-op. That is
+        # defensible as a band-limited edge response and is documented as such
+        # on SignalSpec.ringing_frequency -- it is not a special case to strip.
         edges = np.flatnonzero(np.diff(samples_ext))
         if edges.size:
             # 5 time constants of decay, in samples. `max(spec.ringing_damping, 1e-9)`

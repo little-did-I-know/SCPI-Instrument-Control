@@ -12,9 +12,11 @@ next capture -- exactly like a real scope.
 
 This example (1) generates a few signal kinds directly and prints basic
 stats, (2) opens a mock oscilloscope session, acquires, then changes TDIV and
-VDIV over SCPI to show the capture's length and clipping respond, and (3)
-saves one synthesized capture and reloads it with load_waveform() to show the
-chain composes.
+VDIV over SCPI to show the capture's length and clipping respond, (3) saves
+one synthesized capture and reloads it with load_waveform() to show the chain
+composes, (4) synthesizes a multitone and compares its measured THD to the
+analytically expected value, and (5) synthesizes a chirp and measures its
+start/end frequency from zero crossings.
 
 Requirements: SCPI-Instrument-Control (core install) -- runs entirely against
 a mock connection, no instrument needed.
@@ -22,6 +24,9 @@ a mock connection, no instrument needed.
 
 from pathlib import Path
 
+import numpy as np
+
+from scpi_control.analysis import FFTAnalyzer
 from scpi_control.connection import MockConnection
 from scpi_control.oscilloscope import Oscilloscope
 from scpi_control.signal_synth import SignalSpec, make_waveform
@@ -104,10 +109,63 @@ def demo_reload() -> None:
     print(f"First 5 samples (V): {loaded.voltage[:5].tolist()}")
 
 
+def demo_multitone() -> None:
+    """Synthesize a multitone and compare its measured THD to the analytic value.
+
+    harmonics gives the relative amplitudes of the 2nd, 3rd, ... harmonic of a
+    coherent series riding on the fundamental, so THD comes out to exactly
+    sqrt(sum(h**2)) -- independent of amplitude, frequency, and phase.
+    """
+    print()
+    print("=== Part 4: multitone -- measured vs. expected THD ===")
+    harmonics = (0.1, 0.05)
+    spec = SignalSpec(kind="multitone", frequency=1_000.0, amplitude=1.0, harmonics=harmonics)
+    waveform = make_waveform(spec, sample_rate=100_000.0, n_points=100_000)
+    measured_thd = FFTAnalyzer.thd_of_waveform(waveform)
+    expected_thd = 100.0 * float(np.sqrt(np.sum(np.square(harmonics))))
+    print(f"multitone: measured THD = {measured_thd:.3f}%  " f"expected THD (100*sqrt(sum(h**2))) = {expected_thd:.3f}%")
+
+
+def _zero_crossing_freq(time_s: np.ndarray, voltage: np.ndarray, from_end: bool) -> float:
+    """Estimate instantaneous frequency from one pair of rising zero crossings.
+
+    Linear interpolation between the two bracketing samples locates each
+    crossing sub-sample; the reciprocal of the gap between one crossing and
+    the next is a local frequency estimate -- accurate near the start or end
+    of a sweep, where the chirp's instantaneous frequency is nearly constant
+    over a single cycle.
+    """
+    rising = np.flatnonzero((voltage[:-1] <= 0.0) & (voltage[1:] > 0.0))
+    pair = rising[-2:] if from_end else rising[:2]
+
+    def _crossing_time(i: int) -> float:
+        t0, t1 = time_s[i], time_s[i + 1]
+        v0, v1 = voltage[i], voltage[i + 1]
+        return float(t0 + (0.0 - v0) * (t1 - t0) / (v1 - v0))
+
+    return 1.0 / (_crossing_time(pair[1]) - _crossing_time(pair[0]))
+
+
+def demo_chirp() -> None:
+    """Synthesize a chirp and measure its start/end frequency from zero crossings."""
+    print()
+    print("=== Part 5: chirp -- measured start/end frequency ===")
+    spec = SignalSpec(kind="chirp")  # defaults: 1 kHz -> 10 kHz over 10 ms, then it retraces
+    sample_rate = 1_000_000.0
+    n_points = int(round(sample_rate * spec.sweep_time))
+    waveform = make_waveform(spec, sample_rate=sample_rate, n_points=n_points)
+    start_freq = _zero_crossing_freq(waveform.time, waveform.voltage, from_end=False)
+    end_freq = _zero_crossing_freq(waveform.time, waveform.voltage, from_end=True)
+    print(f"chirp: configured {spec.frequency:.1f} Hz -> {spec.end_frequency:.1f} Hz over {spec.sweep_time * 1000:.1f} ms")
+    print(f"chirp: measured start = {start_freq:.1f} Hz  measured end = {end_freq:.1f} Hz")
+
+
 def main() -> None:
     demo_make_waveform()
     demo_mock_session()
     demo_reload()
+    demo_multitone()
+    demo_chirp()
 
 
 if __name__ == "__main__":

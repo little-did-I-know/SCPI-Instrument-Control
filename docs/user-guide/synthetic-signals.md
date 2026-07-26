@@ -11,7 +11,8 @@ captures.
 
 - **Develop and test without hardware.** Write and exercise capture,
   analysis, and reporting code against realistic waveforms -- sine, square,
-  triangle, ramp, DC, noise -- before an instrument is available.
+  triangle, ramp, DC, noise, chirp, exponential, pulse, multitone -- before
+  an instrument is available.
 - **Reproducible test data.** A seeded `SignalSpec` produces the exact same
   samples every run, which makes it useful for regression tests and
   deterministic examples/demos.
@@ -28,7 +29,7 @@ signal:
 
 | Field | Default | Meaning |
 | --- | --- | --- |
-| `kind` | `"sine"` | `"sine"`, `"square"`, `"triangle"`, `"ramp"`, `"dc"`, or `"noise"` |
+| `kind` | `"sine"` | `"sine"`, `"square"`, `"triangle"`, `"ramp"`, `"dc"`, `"noise"`, `"chirp"`, `"exponential"`, `"pulse"`, or `"multitone"` |
 | `frequency` | `1000.0` | Repetition rate in Hz (periodic kinds only) |
 | `amplitude` | `1.0` | Peak amplitude in volts (Vpp = `2 * amplitude`); for `"noise"`, the standard deviation; ignored for `"dc"` |
 | `offset` | `0.0` | DC offset in volts, added to every kind (`"dc"` outputs exactly this level) |
@@ -62,10 +63,19 @@ value that leaves the signal unaffected, so existing code that constructs a
 - **`ringing_frequency`/`ringing_damping`** add a damped sinusoid after every
   edge of a periodic signal -- what a real probe/scope front-end does after a
   fast transition, and what gives an overshoot/preshoot measurement something
-  genuine to measure. It's an edge impairment, so it is only meaningful on
-  signals that actually have edges (`"square"`, or a pulse-like `"ramp"`) --
-  applying it to `"sine"` or `"dc"` has no effect, since those kinds have no
-  discontinuities for it to trigger on.
+  genuine to measure. It's an edge impairment, so it is *physically*
+  meaningful on signals that actually have fast edges (`"square"` and
+  `"pulse"`, or a pulse-like `"ramp"`). On the continuous kinds (`"sine"`,
+  `"chirp"`, `"exponential"`, `"multitone"`) it is **not** a no-op, though:
+  edges are found as any nonzero sample-to-sample change rather than as a
+  discontinuity, so every sample of a continuous signal qualifies and the
+  impairment becomes a derivative-weighted filter. Its magnitude scales with
+  the signal's slew rate -- measurable, but usually far smaller than on a real
+  edge (at `sample_rate=1e6`, `amplitude=1.0`,
+  `ringing_frequency=50_000`: about 0.10 V on `"chirp"`, 0.056 V on
+  `"exponential"`, 0.013 V on `"multitone"` and 0.010 V on `"sine"`, against
+  0.90 V on `"square"`). `"dc"`, whose sample-to-sample differences are all
+  zero, is the only kind ringing genuinely leaves untouched.
 
 ```python
 from scpi_control.signal_synth import SignalSpec, synthesize
@@ -100,6 +110,42 @@ parameter (non-positive `frequency` on a periodic kind, `duty` outside
 `glitch_amplitude`/`ringing_frequency`/`ringing_damping`, or a non-positive
 `drift_frequency` while `drift_amplitude > 0`) raises `InvalidParameterError`
 -- no partial or silently-clamped signal is ever returned.
+
+### Kind-specific parameters
+
+Seven more fields exist purely to parameterize the four newer kinds; each is
+ignored by every other kind, and every default is chosen so
+`SignalSpec(kind=X)` alone works at the default 1 kHz `frequency`:
+
+| Field | Read by | Default | Meaning |
+| --- | --- | --- | --- |
+| `end_frequency` | `"chirp"` | `10_000.0` | Sweep stop frequency in Hz |
+| `sweep_time` | `"chirp"` | `0.01` | Seconds per sweep, after which it retraces |
+| `sweep_log` | `"chirp"` | `False` | Sweep logarithmically (equal time per octave) instead of linearly |
+| `tau` | `"exponential"` | `1e-4` | RC time constant in seconds |
+| `pulse_width` | `"pulse"` | `2e-4` | 50%-to-50% width (FWHM) in seconds |
+| `edge_time` | `"pulse"` | `1e-5` | 0-to-100% transition time in seconds; `0` gives an ideal instantaneous edge |
+| `harmonics` | `"multitone"` | `(0.1, 0.05)` | Relative amplitudes of the 2nd, 3rd, ... harmonic |
+
+Three things are easy to get wrong here:
+
+- **`pulse_width` is the 50%-to-50% width (FWHM)**, not the flat-top
+  duration -- it matches the instrument convention
+  (`SOUR{ch}:FUNC:PULS:WIDT`) and the threshold the repo's timing analyzer
+  measures at. The flat top itself runs for `pulse_width - edge_time`.
+  `"pulse"` also **ignores `duty`** entirely; independence from the period is
+  the whole reason it exists alongside `"square"`, whose only shape control
+  *is* `duty`.
+- **For `"multitone"`, `amplitude` is the fundamental's amplitude, not the
+  peak of the sum.** It is deliberately not normalized against the harmonics,
+  because normalizing would make THD depend on which harmonics are present;
+  as generated, THD is exactly `sqrt(sum(h**2))` for `harmonics = (h2, h3,
+  ...)`.
+- **`"chirp"` retraces every `sweep_time`**, with phase carried across the
+  retrace rather than reset, so there is no discontinuity at a sweep
+  boundary. Because it has no stable period, `"chirp"` is deliberately not in
+  `PERIODIC_KINDS`: it is the one kind the mock free-runs rather than
+  trigger-aligns (see [Trigger alignment](#state-coupling) below).
 
 ## Generating Signals Directly
 
@@ -259,7 +305,10 @@ before an acquisition change what comes back:
   fraction of the window, so consecutive captures visibly shift rather than
   repeating. Each channel aligns to its own trigger level and signal; the
   mock does not model `trigger_source` routing (triggering one channel off
-  another channel's crossing) between channels.
+  another channel's crossing) between channels. `"chirp"` is not in
+  `PERIODIC_KINDS` (it has no stable period), so it always free-runs -- never
+  trigger-aligned, even when the configured trigger level/slope is otherwise
+  attainable.
 
 ### Precedence vs. `waveform_payloads`
 

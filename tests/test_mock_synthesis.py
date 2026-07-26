@@ -1,5 +1,7 @@
 """State-coupled mock waveform synthesis: all vendor personalities, trigger alignment, and server mock sessions."""
 
+from dataclasses import replace
+
 import numpy as np
 import pytest
 
@@ -222,3 +224,87 @@ def test_server_mock_connection_synthesizes():
     scope.disconnect()
     assert len(data.voltage) >= 1_000  # real trace, not the old 256-byte ramp
     assert np.ptp(data.voltage) > 1.0  # default CH1 square, ~2 Vpp
+
+
+@pytest.mark.parametrize(
+    "spec",
+    [
+        SignalSpec(kind="pulse", frequency=1_000.0, amplitude=1.0, pulse_width=2e-4, edge_time=1e-5),
+        SignalSpec(kind="exponential", frequency=1_000.0, amplitude=1.0, tau=1e-4),
+        SignalSpec(kind="multitone", frequency=1_000.0, amplitude=1.0),
+        SignalSpec(kind="chirp", frequency=1_000.0, end_frequency=5_000.0, sweep_time=1e-3),
+    ],
+    ids=["pulse", "exponential", "multitone", "chirp"],
+)
+def test_new_kinds_capture_through_a_mock_scope(spec):
+    scope, _ = _scope(signals={1: spec})
+    data = scope.get_waveform(1, provenance=False)
+    scope.disconnect()
+    assert len(data.voltage) == 14_000
+    # int8 codes at 25 per division against the mock's 1 V/div default: a 1 V
+    # amplitude signal survives the volts -> codes -> volts round trip.
+    assert np.max(data.voltage) == pytest.approx(1.0, abs=0.1)
+    assert np.min(data.voltage) == pytest.approx(-1.0, abs=0.1)
+
+
+def test_periodic_kinds_are_trigger_aligned_and_chirp_free_runs():
+    """The one behavioural consequence of the PERIODIC_KINDS classification:
+    a kind with a stable period gets the same trigger-aligned t0 on every
+    acquisition, so two captures of a noiseless signal are identical, while
+    chirp free-runs and drifts between acquisitions."""
+    scope, _ = _scope(signals={1: SignalSpec(kind="pulse", frequency=1_000.0, pulse_width=2e-4, edge_time=1e-5)})
+    first = scope.get_waveform(1, provenance=False)
+    second = scope.get_waveform(1, provenance=False)
+    scope.disconnect()
+    np.testing.assert_array_equal(first.voltage, second.voltage)
+
+    scope, _ = _scope(signals={1: SignalSpec(kind="chirp", frequency=1_000.0, end_frequency=5_000.0, sweep_time=1e-3)})
+    first = scope.get_waveform(1, provenance=False)
+    second = scope.get_waveform(1, provenance=False)
+    scope.disconnect()
+    assert not np.array_equal(first.voltage, second.voltage)
+
+
+def test_new_kinds_still_couple_to_volts_per_division():
+    scope, _ = _scope(signals={1: SignalSpec(kind="multitone", frequency=1_000.0, amplitude=1.0)})
+    scope.write("C1:VDIV 2.0")
+    coarse = scope.get_waveform(1, provenance=False)
+    scope.disconnect()
+    # Wider V/div, same signal: still ~1 V peak in volts, but the mock had to
+    # encode it at half the code density -- so the trace is coarser, not smaller.
+    assert np.max(coarse.voltage) == pytest.approx(1.0, abs=0.15)
+
+
+@pytest.mark.parametrize(
+    "impairment",
+    [
+        {"ringing_frequency": 50_000.0},
+        {"drift_amplitude": 0.5, "drift_frequency": 200.0},
+        {"glitch_rate": 50_000.0, "glitch_amplitude": 2.0, "seed": 3},
+    ],
+    ids=["ringing", "drift", "glitch"],
+)
+def test_trigger_search_ignores_the_impairments(impairment):
+    """The search is for the IDEAL crossing, so every impairment is stripped from
+    it -- an impairment that moved the crossing would move t0 with it, and the
+    alignment would track the impairment settings rather than the signal's own
+    edge. Discriminating: with the impairments left in (noise and seed alone
+    stripped, as before), this exponential's ideal 68.85 us crossing moves to
+    66.41 us with ringing, 64.70 us with drift and 10.25 us with glitches."""
+    from scpi_control.connection.mock.synth import _trigger_crossing
+
+    clean = SignalSpec(kind="exponential", frequency=1_000.0, amplitude=1.0, tau=1e-4, noise_rms=0.0)
+    impaired = replace(clean, **impairment)
+    assert _trigger_crossing(impaired, 0.0, True) == _trigger_crossing(clean, 0.0, True)
+
+
+def test_a_ringing_trigger_aligned_kind_still_displays_stably():
+    """The behavioural half: a trigger-aligned kind with ringing switched on
+    still lands on the same t0 every acquisition, so the trace does not walk."""
+    spec = SignalSpec(kind="exponential", frequency=1_000.0, amplitude=1.0, tau=1e-4, noise_rms=0.0, ringing_frequency=50_000.0)
+    scope, _ = _scope(signals={1: spec})
+    scope.write("C1:TRLV 0.0")
+    first = scope.get_waveform(1, provenance=False)
+    second = scope.get_waveform(1, provenance=False)
+    scope.disconnect()
+    np.testing.assert_array_equal(first.voltage, second.voltage)

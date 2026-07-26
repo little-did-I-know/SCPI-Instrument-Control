@@ -69,7 +69,7 @@ This library provides comprehensive control for SCPI test equipment — oscillos
     - **Protocol Decoding** - Decode I2C, SPI, and UART protocols
     - **Automation** - High-level automation classes for data collection
     - **Data Provenance** - Every capture records the instrument, settings, and timestamp that produced it; read it back with `load_waveform()` or the `scpi-extract` CLI
-    - **Synthetic Signals** - Generate parameterized waveforms (sine, square, triangle, ramp, DC, noise) with no instrument required; mock scopes synthesize state-coupled captures by default
+    - **Synthetic Signals** - Generate parameterized waveforms (sine, square, triangle, ramp, DC, noise, chirp, exponential, pulse, multitone) with no instrument required; mock scopes synthesize state-coupled captures by default
 
 === "GUI Application"
 

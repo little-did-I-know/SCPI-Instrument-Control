@@ -45,7 +45,13 @@ def _trigger_crossing(spec: SignalSpec, level: float, rising: bool) -> Optional[
         return None
     period = 1.0 / spec.frequency
     n = 4096
-    ideal = synthesize(replace(spec, noise_rms=0.0, seed=0), sample_rate=n / period, n_points=n)
+    # Every impairment is stripped, not just the noise: this search is for the
+    # IDEAL crossing, and an impairment that shifts it would shift t0 with it --
+    # trigger alignment would then jitter with the impairment settings instead of
+    # sitting on the signal's own edge. (Ringing moves an exponential's crossing
+    # from 68.85 us to 66.41 us, and re-synthesizing it here costs ~20 ms per
+    # acquisition on the continuous kinds.)
+    ideal = synthesize(replace(spec, noise_rms=0.0, seed=0, ringing_frequency=0.0, drift_amplitude=0.0, glitch_rate=0.0), sample_rate=n / period, n_points=n)
     above = ideal >= level
     # np.roll makes the comparison periodic: a crossing at the period boundary
     # (e.g. a zero-phase sine rising through 0 at t=0/t=P) is not missed.
