@@ -46,10 +46,18 @@ import numpy as np
 
 from scpi_control import Oscilloscope
 from scpi_control.connection import BaseConnection
-from scpi_control.exceptions import SiglentError
+from scpi_control.exceptions import SiglentError, SiglentTimeoutError
 from scpi_control.waveform import WaveformData
 
 logger = logging.getLogger(__name__)
+
+# Acquisition polling. 14 divisions is one full sweep (matching
+# connection/mock/synth.py's DIVISIONS); x5 covers trigger wait plus transfer;
+# the floor keeps a fast timebase from getting an unusably small budget.
+_ACQUISITION_POLL_INTERVAL = 0.1
+_MIN_ACQUISITION_TIMEOUT = 2.0
+_SWEEP_DIVISIONS = 14
+_ACQUISITION_TIMEOUT_FACTOR = 5
 
 
 class DataCollector:
@@ -103,15 +111,56 @@ class DataCollector:
         self.disconnect()
         return False
 
-    def capture_single(self, channels: List[int], auto_setup: bool = False) -> Dict[int, WaveformData]:
+    def _acquisition_timeout(self) -> float:
+        """Budget for one acquisition, derived from the current timebase.
+
+        Reading the timebase is best-effort: falling back to the floor is better
+        than failing a capture because a diagnostic query did.
+        """
+        try:
+            timebase = float(self.scope.timebase)
+        except Exception:
+            # Deliberately broad: this is a best-effort diagnostic read, and any
+            # failure of it (timeout, unsupported query, a dialect that returns
+            # something unparseable) should degrade to the floor rather than
+            # abort a capture that would otherwise have worked.
+            return _MIN_ACQUISITION_TIMEOUT
+        return max(_MIN_ACQUISITION_TIMEOUT, _SWEEP_DIVISIONS * timebase * _ACQUISITION_TIMEOUT_FACTOR)
+
+    def _wait_for_acquisition(self, max_wait: float) -> None:
+        """Poll until the acquisition completes, mirroring wait_for_trigger.
+
+        The NORM branch is load-bearing: in NORMAL mode the scope re-arms after
+        every trigger and never reports STOP, so a `while status != "STOP"` loop
+        would always time out. TriggerWaitCollector.wait_for_trigger already
+        learned this; this is the same rule, not a second opinion.
+        """
+        done_states = {"TRIGD", "STOP"} if self.scope.trigger.mode == "NORM" else {"STOP"}
+        start_time = time.time()
+        status = ""
+        while (time.time() - start_time) < max_wait:
+            status = self.scope.acquisition_status()
+            if status in done_states:
+                return
+            time.sleep(_ACQUISITION_POLL_INTERVAL)
+        raise SiglentTimeoutError(f"Acquisition did not complete within {max_wait:.2f} s (last status: {status or 'unknown'})")
+
+    def capture_single(self, channels: List[int], auto_setup: bool = False, max_wait: Optional[float] = None) -> Dict[int, WaveformData]:
         """Capture waveforms from specified channels.
 
         Args:
             channels: List of channel numbers to capture (e.g., [1, 2, 3])
             auto_setup: If True, run auto-setup before capture
+            max_wait: Seconds to wait for the acquisition to complete. None
+                (default) derives a budget from the current timebase.
 
         Returns:
             Dictionary mapping channel number to WaveformData object
+
+        Raises:
+            SiglentTimeoutError: If the acquisition does not complete in time.
+                Reading anyway would return the PREVIOUS acquisition, which is
+                what this replaced.
 
         Example:
             >>> data = collector.capture_single([1, 2])
@@ -123,11 +172,17 @@ class DataCollector:
 
         if auto_setup:
             self.scope.auto_setup()
-            time.sleep(1)  # Wait for auto-setup to complete
+            # Unlike the trigger wait below, this genuinely is an
+            # unknown-duration sleep: auto-setup reports no status the library
+            # can poll, so there is nothing to wait ON.
+            time.sleep(1)
 
-        # Trigger single acquisition
-        self.scope.trigger_single()
-        time.sleep(0.5)  # Wait for trigger
+        if self.scope.trigger.mode != "NORM":
+            # Mirrors wait_for_trigger: NORMAL mode is already free-running and
+            # re-arms itself, so arming a SINGLE here would stomp the user's
+            # NORM setting and _wait_for_acquisition would never see it.
+            self.scope.trigger_single()
+        self._wait_for_acquisition(self._acquisition_timeout() if max_wait is None else max_wait)
 
         # Capture waveforms
         waveforms = {}
