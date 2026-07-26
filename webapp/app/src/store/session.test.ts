@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { useSession } from "./session";
 import type { ScopeState, SessionInfo } from "../api/types";
 
-const SESSION: SessionInfo = { id: "abc", label: "bench", mock: false, address: "192.168.1.50", state: "connected", idn: "Siglent,SDS824X HD,1,1", model: "SDS824X HD", dialect: "modern", num_channels: 4, viewers: 0, owner: "" };
+const SESSION: SessionInfo = { id: "abc", label: "bench", mock: false, address: "192.168.1.50", state: "connected", idn: "Siglent,SDS824X HD,1,1", model: "SDS824X HD", dialect: "modern", num_channels: 4, viewers: 0, owner: "", kind: "scope" };
 
 const STATE: ScopeState = {
   run_state: "STOP",

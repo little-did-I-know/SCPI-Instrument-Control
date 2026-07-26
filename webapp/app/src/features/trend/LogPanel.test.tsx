@@ -15,7 +15,7 @@ beforeEach(() => {
   clearTrend();
   localStorage.clear();
   useSession.getState().clearSession();
-  useSession.getState().setSession({ id: "abc", label: "x", mock: true, address: null, state: "connected", idn: "", model: "", dialect: "legacy", num_channels: 4, viewers: 0, owner: "" });
+  useSession.getState().setSession({ id: "abc", label: "x", mock: true, address: null, state: "connected", idn: "", model: "", dialect: "legacy", num_channels: 4, viewers: 0, owner: "", kind: "scope" });
   vi.spyOn(api, "getLog").mockResolvedValue(IDLE);
   vi.spyOn(api, "getLogData").mockResolvedValue({ columns: [], rows: [] });
 });

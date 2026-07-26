@@ -11,7 +11,7 @@ export type KindMeta = {
 // device types slot in here + a discovery classifier + a post-connect view).
 export const KIND_META: Record<Kind, KindMeta> = {
   scope: { label: "Oscilloscope", plural: "Oscilloscopes", accent: "var(--ch1)", connectable: true },
-  psu: { label: "Power supply", plural: "Power supplies", accent: "var(--ch2)", connectable: false },
+  psu: { label: "Power supply", plural: "Power supplies", accent: "var(--ch2)", connectable: true },
   awg: { label: "AWG", plural: "AWGs", accent: "var(--warning)", connectable: false },
   daq: { label: "DAQ", plural: "DAQ", accent: "var(--ch3)", connectable: false },
   unknown: { label: "Unknown", plural: "Unknown", accent: "var(--text-muted)", connectable: false },

@@ -10,6 +10,7 @@ import { MeasurePanel } from "./features/measure/MeasurePanel";
 import { ReadoutStrip } from "./features/readout/ReadoutStrip";
 import { ReferencePanel } from "./features/reference/ReferencePanel";
 import { useReferenceSeed } from "./features/reference/useReferenceSeed";
+import { kindMeta } from "./features/home/kinds";
 import { TerminalPanel } from "./features/terminal/TerminalPanel";
 import { LogPanel } from "./features/trend/LogPanel";
 import { TrendCanvas } from "./features/trend/TrendCanvas";
@@ -17,6 +18,7 @@ import { SpectrumCanvas } from "./features/waveform/SpectrumCanvas";
 import { WaveformCanvas } from "./features/waveform/WaveformCanvas";
 import type { ViewMode } from "./features/waveform/ViewModeToggle";
 import { ViewModeToggle } from "./features/waveform/ViewModeToggle";
+import { GroupBox } from "./ds/GroupBox";
 import { StatusIndicator } from "./ds/StatusIndicator";
 import { Tabs } from "./ds/Tabs";
 import { useStream } from "./stream/useStream";
@@ -43,8 +45,8 @@ export default function App() {
         </header>
         <main style={{ flex: 1, padding: "var(--space-3)", color: "var(--lc-text)", display: "flex", flexDirection: "column", gap: "var(--space-3)", minHeight: 0 }}>
           {session === null && <HomeScreen onConnected={(s) => useSession.getState().setSession(s)} />}
-          {session !== null && <ReadoutStrip />}
-          {session !== null && (
+          {session !== null && session.kind === "scope" && <ReadoutStrip />}
+          {session !== null && session.kind === "scope" && (
             <div style={{ flex: 1, display: "flex", gap: "var(--space-3)", minHeight: 0 }}>
               <div style={{ width: "280px", flexShrink: 0, overflowY: "auto" }}>
                 <Tabs tabs={RAIL_TABS} value={railTab} onChange={setRailTab}>
@@ -63,6 +65,11 @@ export default function App() {
                 <ScopeToolbar viewToggle={<ViewModeToggle value={viewMode} onChange={setViewMode} />} />
               </div>
             </div>
+          )}
+          {session !== null && session.kind !== "scope" && (
+            <GroupBox title={kindMeta(session.kind).label}>
+              <p style={{ margin: 0, color: "var(--lc-muted)" }}>A dedicated view for this instrument kind is coming soon.</p>
+            </GroupBox>
           )}
         </main>
       </div>

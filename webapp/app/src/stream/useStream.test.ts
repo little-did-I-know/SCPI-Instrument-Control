@@ -37,7 +37,7 @@ class FakeWebSocket {
   }
 }
 
-const SESSION = { id: "abc", label: "x", mock: true, address: null, state: "connected", idn: "", model: "", dialect: "legacy", num_channels: 4, viewers: 0, owner: "" };
+const SESSION = { id: "abc", label: "x", mock: true, address: null, state: "connected", idn: "", model: "", dialect: "legacy", num_channels: 4, viewers: 0, owner: "", kind: "scope" as const };
 
 beforeEach(() => {
   vi.stubGlobal("WebSocket", FakeWebSocket as unknown as typeof WebSocket);
@@ -86,7 +86,7 @@ describe("useStream", () => {
   });
 
   it("treats a closed message as a clean session end", async () => {
-    useSession.getState().setSession({ id: "abc", label: "x", mock: true, address: null, state: "connected", idn: "", model: "", dialect: "legacy", num_channels: 4, viewers: 0, owner: "" });
+    useSession.getState().setSession({ id: "abc", label: "x", mock: true, address: null, state: "connected", idn: "", model: "", dialect: "legacy", num_channels: 4, viewers: 0, owner: "", kind: "scope" });
     renderHook(() => useStream("abc"));
     FakeWebSocket.last!.emit({ type: "closed" });
     await waitFor(() => expect(useSession.getState().session).toBeNull());

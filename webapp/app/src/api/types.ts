@@ -1,3 +1,5 @@
+import type { Kind } from "../features/home/kinds";
+
 export type ChannelState = {
   enabled: boolean;
   voltage_scale: number;
@@ -34,6 +36,7 @@ export type SessionInfo = {
   num_channels: number;
   viewers: number;
   owner: string;
+  kind: Kind;
 };
 
 export type DiscoveredDevice = {
