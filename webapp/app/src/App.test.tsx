@@ -52,6 +52,13 @@ beforeEach(() => {
           }),
         );
       }
+      if (url.includes("/awg/state")) {
+        return Promise.resolve(
+          jsonResponse({
+            channels: [{ channel: 1, function: "SINE", frequency: null, amplitude: null, offset: null, phase: null, enabled: null, duty_cycle: null, symmetry: null }],
+          }),
+        );
+      }
       return Promise.resolve(jsonResponse({}));
     }),
   );
@@ -146,10 +153,22 @@ describe("App view selection", () => {
   });
 
   it("renders the coming-soon fallback for a kind with no registered view", () => {
-    useSession.getState().setSession({ ...SESSION, kind: "awg" });
+    // awg now has a registered view (AwgPanel/AwgReadout); daq is still the
+    // kind with no entry in KIND_VIEWS, so it is the one that must fall back.
+    useSession.getState().setSession({ ...SESSION, kind: "daq" });
     render(<App />);
     expect(screen.getByText(/coming soon/i)).toBeInTheDocument();
     expect(screen.queryByText("Channels")).not.toBeInTheDocument();
+  });
+
+  it("mounts the AWG readout through the registry, with unreadable values shown as unknown", async () => {
+    // Guards the registry's `readout` half: without it, deleting `readout:`
+    // from the awg entry removes the strip with every test still green.
+    useSession.getState().setSession({ ...SESSION, kind: "awg" });
+    render(<App />);
+    expect(await screen.findByLabelText("Channel 1 frequency")).toBeInTheDocument();
+    expect(screen.getByText("Channel 1 state unknown")).toBeInTheDocument();
+    expect(screen.queryByText("0.000")).not.toBeInTheDocument();
   });
 
   it("offers the SCPI terminal for a psu session, not just a scope", async () => {
