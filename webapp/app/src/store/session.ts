@@ -28,6 +28,7 @@ type SessionStore = {
   applyLogStatus: (status: LogStatus | null) => void;
   setStatus: (status: ConnStatus) => void;
   setError: (error: string | null) => void;
+  dismissError: () => void;
 };
 
 export const useSession = create<SessionStore>((set) => ({
@@ -66,4 +67,9 @@ export const useSession = create<SessionStore>((set) => ({
   applyLogStatus: (logStatus) => set({ logStatus }),
   setStatus: (status) => set({ status }),
   setError: (error) => set({ error, status: error ? "error" : "connected" }),
+  // Clears the message WITHOUT touching status. setError(null) sets status to
+  // "connected", which would make dismissing a message claim the connection
+  // recovered. What the UI says about the connection is the instrument's to
+  // report, not a side effect of closing a notification.
+  dismissError: () => set({ error: null }),
 }));

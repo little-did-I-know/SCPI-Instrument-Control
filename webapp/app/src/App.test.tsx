@@ -192,6 +192,15 @@ describe("App view selection", () => {
     expect(screen.queryByRole("button", { name: /terminal/i })).not.toBeInTheDocument();
   });
 
+  it("surfaces a session error in the app, not just in the store", () => {
+    // Guards the wiring: the banner exists but is useless if the shell never
+    // renders it.
+    useSession.getState().setSession(SESSION);
+    useSession.getState().setError("connection lost");
+    render(<App />);
+    expect(screen.getByRole("alert")).toHaveTextContent("connection lost");
+  });
+
   it("reports its expanded state and target on the terminal toggle button", async () => {
     useSession.getState().setSession(SESSION);
     render(<App />);
