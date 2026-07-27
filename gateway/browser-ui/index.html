@@ -1156,6 +1156,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#scpi-terminal" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SCPI terminal
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#multi-tab-behavior" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3507,6 +3518,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#scpi-terminal" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SCPI terminal
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#multi-tab-behavior" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3583,12 +3605,19 @@ too, so there's never a hardware requirement to get started.</p>
 <li><strong>Measure</strong> — per-channel measurement checkboxes with live values, on every
   supported dialect (see <a href="../../user-guide/scpi-dialects/">SCPI Dialects</a> for
   how each one is wired up).</li>
-<li><strong>Terminal</strong> — send raw SCPI commands. A trailing <code>?</code> sends it as a query
-  and shows the response; anything else is a bare write.</li>
 </ul>
 <h2 id="toolbar">Toolbar<a class="headerlink" href="#toolbar" title="Permanent link">&para;</a></h2>
 <p>Across the top: Run / Stop / Single / Auto acquisition controls, the canvas
 view-mode toggle, CSV / JSON / Screenshot export buttons, and Disconnect.</p>
+<h2 id="scpi-terminal">SCPI terminal<a class="headerlink" href="#scpi-terminal" title="Permanent link">&para;</a></h2>
+<p>The console for sending raw SCPI commands is no longer a rail tab — it lives
+in a <strong>Terminal</strong> button in the header, next to the connection status. Click
+it to open a full-width drawer below the rest of the session (Escape closes
+it too); a trailing <code>?</code> sends your command as a query and shows the response,
+anything else is a bare write. Because it lives in the header rather than the
+scope's rail, it is available for <strong>every</strong> connected instrument kind, not
+just a scope — a power supply session gets the same drawer for anything its
+panel doesn't expose.</p>
 <h2 id="multi-tab-behavior">Multi-tab behavior<a class="headerlink" href="#multi-tab-behavior" title="Permanent link">&para;</a></h2>
 <p>The server is the single source of truth for a session. Open the same
 session in two browser tabs (or two different browsers) and they stay in

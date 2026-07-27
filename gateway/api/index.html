@@ -1151,6 +1151,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#command-console" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Command console
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#scope-configuration" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3518,6 +3529,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#command-console" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Command console
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#scope-configuration" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3629,8 +3651,10 @@
 <p>This is the complete wire reference for the gateway server. All paths below
 are relative to the server root (default <code>http://127.0.0.1:8765</code>); every
 <code>/api/*</code> route accepts and returns JSON. This page mirrors what the browser
-UI itself calls — everything documented here is exercised by the shipping
-frontend.</p>
+UI itself calls, with one noted exception: the older <code>/scope/command</code> route
+(see <a href="#scope-configuration">Scope configuration</a>) is public API that still
+works, but the shipping frontend calls the kind-agnostic
+<a href="#command-console">command console</a> route instead.</p>
 <p>Every route below requires <code>Authorization: Bearer &lt;token&gt;</code> <strong>except</strong>
 <code>GET /api/health</code>. See the <a href="../security/">Gateway security guide</a> for how to
 mint a token, how ownership gates writes, and the WebSocket authentication
@@ -3694,6 +3718,33 @@ handshake.</p>
 <p>A <strong>session object</strong>: <code>{id, label, mock, address, state, idn, model, dialect, num_channels, viewers}</code>. <code>state</code> is one of <code>connecting</code> / <code>connected</code> / <code>error</code> / <code>closed</code>; <code>dialect</code> is <code>"legacy"</code> or <code>"modern"</code> once connected; <code>viewers</code> counts currently-subscribed WebSocket clients.</p>
 <p>A <strong>discover entry</strong> is either a live session — <code>{address, idn, manufacturer, model, dialect, kind, connected: true, session_id, viewers}</code> — or an unconnected device found by the scan — the same shape minus <code>session_id</code>/<code>viewers</code>, with <code>connected: false</code>. <code>kind</code> is <code>"scope"</code>, <code>"psu"</code>, <code>"awg"</code>, <code>"daq"</code>, or <code>"unknown"</code>, guessed from the model prefix.</p>
 <p><code>address</code>/<code>port</code>/<code>mock</code>/<code>model</code> on <code>POST /api/sessions</code> are all optional: pass <code>{"mock": true}</code> for a hardware-free session, or <code>{"address": "192.168.1.100"}</code> for a real instrument (port defaults to 5025).</p>
+<h2 id="command-console">Command console<a class="headerlink" href="#command-console" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Path</th>
+<th>Body / params</th>
+<th>Response</th>
+<th>Errors</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>POST</code></td>
+<td><code>/api/sessions/{id}/command</code></td>
+<td><code>{command}</code> — a raw SCPI string</td>
+<td><code>{command, response}</code> — <code>response</code> is the query reply, or <code>null</code> for a write</td>
+<td>400 empty command; 404 unknown session; 409 if the session is in an error/closed state</td>
+</tr>
+</tbody>
+</table>
+<p>The kind-agnostic console route: it works for any connected instrument kind
+(scope or PSU today), because sending a raw command needs nothing kind-specific
+— both drivers expose <code>write</code>/<code>query</code>. This is what the browser UI's Terminal
+drawer calls (see <a href="../browser-ui/#scpi-terminal">Browser UI Tour</a>). A command
+ending in <code>?</code> is a query and returns the instrument's answer; anything else is
+a write and returns a <code>null</code> response — never a fabricated one.</p>
 <h2 id="scope-configuration">Scope configuration<a class="headerlink" href="#scope-configuration" title="Permanent link">&para;</a></h2>
 <p>All paths below are under <code>/api/sessions/{id}/scope/</code>.</p>
 <table>
@@ -3747,7 +3798,7 @@ handshake.</p>
 <td><code>command</code></td>
 <td><code>{command}</code> — a raw SCPI string</td>
 <td><code>{command, response}</code> — <code>response</code> is the query reply, or <code>null</code> for a write</td>
-<td>400 empty command; 409 if the session is in an error/closed state</td>
+<td>400 empty command or non-scope session; 409 if the session is in an error/closed state</td>
 </tr>
 <tr>
 <td><code>PUT</code></td>
