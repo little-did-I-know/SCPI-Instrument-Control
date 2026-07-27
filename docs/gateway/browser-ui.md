@@ -21,6 +21,26 @@ oscilloscope session. A power supply or function generator session replaces
 all of it with its own panel; see [Power supply session](#power-supply-session)
 and [Function generator session](#function-generator-session) below.
 
+## Header
+
+The header spans the top of the window and looks the same no matter which
+instrument kind is connected: the connection status indicator, a
+**read-only** badge with a **Claim** button when the session belongs to
+someone else (the same control the home screen offers — see
+[Home screen](#home-screen) above), the **Terminal** button (see
+[SCPI terminal](#scpi-terminal) below), and **Disconnect**, which ends the
+session and returns to the home screen. Because it's in the header rather
+than an instrument-specific toolbar, Disconnect is available for every
+session kind — a power supply or function generator session no longer has
+to be abandoned by reloading the page.
+
+Directly under the header, an error banner appears when the session itself
+fails — a dropped stream, or an error frame from the instrument — carrying
+the detail that a red status dot alone can't show. Dismissing the banner
+clears the message but does **not** change what the status indicator
+reports: the connection state is the instrument's to report, not a side
+effect of closing a notification.
+
 ## Canvas modes
 
 Once connected, the main canvas toggles between three modes:
@@ -63,7 +83,9 @@ The side rail holds one tab per feature area:
 ## Toolbar
 
 Across the top: Run / Stop / Single / Auto acquisition controls, the canvas
-view-mode toggle, CSV / JSON / Screenshot export buttons, and Disconnect.
+view-mode toggle, and CSV / JSON / Screenshot export buttons. Disconnect
+lives in the header, not here — see [Header](#header) below, since it applies
+to every session kind, not just an oscilloscope's.
 
 ## Power supply session
 
