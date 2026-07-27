@@ -126,13 +126,17 @@ export function AwgPanel() {
               <div style={{ display: "flex", flexDirection: "column", gap: "10px", minWidth: "240px" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "var(--text-sm)" }}>
                   Function
-                  <ComboBox
-                    aria-label={`Channel ${c.channel} function`}
-                    options={FUNCTIONS}
-                    value={c.function ?? ""}
-                    disabled={busy}
-                    onChange={(value) => sendChannel(c.channel, { function: value })}
-                  />
+                  {c.function === null ? (
+                    <Unreadable what={`Channel ${c.channel} function`} unit="" />
+                  ) : (
+                    <ComboBox
+                      aria-label={`Channel ${c.channel} function`}
+                      options={FUNCTIONS}
+                      value={c.function}
+                      disabled={busy}
+                      onChange={(value) => sendChannel(c.channel, { function: value })}
+                    />
+                  )}
                 </div>
                 <Field label="Frequency" what={`Channel ${c.channel} frequency`} value={c.frequency} unit=" Hz" step={100} min={0} busy={busy} onChange={(v) => sendChannel(c.channel, { frequency: v })} />
                 <Field label="Amplitude" what={`Channel ${c.channel} amplitude`} value={c.amplitude} unit=" Vpp" step={0.1} min={0} busy={busy} onChange={(v) => sendChannel(c.channel, { amplitude: v })} />

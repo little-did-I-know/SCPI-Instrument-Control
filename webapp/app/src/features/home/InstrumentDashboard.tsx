@@ -68,7 +68,7 @@ export function InstrumentDashboard({ devices, scanning, error, busyKey, onConne
         {scanning && devices.length === 0 && <p style={{ color: "var(--lc-muted)" }}>Scanning your network…</p>}
         {error && <p role="alert" style={{ color: "var(--danger)" }}>{error}</p>}
         {!scanning && !error && devices.length === 0 && (
-          <p style={{ color: "var(--lc-muted)" }}>No instruments found on your network. Check the instrument's LAN settings, enter an IP manually, or start a Mock scope.</p>
+          <p style={{ color: "var(--lc-muted)" }}>No instruments found on your network. Check the instrument's LAN settings, enter an IP manually, or start one of the mock instruments.</p>
         )}
         {q && filtered.length === 0 && available.length > 0 && <p style={{ color: "var(--lc-muted)" }}>No instruments match &ldquo;{query.trim()}&rdquo;.</p>}
 
