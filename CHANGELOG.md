@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- The web gateway can now host a power supply (SPD3303X series) alongside oscilloscopes. Connect
+  a PSU from the home screen, control each output's voltage and current limit, switch it on or
+  off, and watch live measurements (voltage, current, power) stream in real time. The web UI shows
+  per-output setpoints, enable toggles, and live readings. Mock PSU sessions work with no
+  hardware, just like mock oscilloscopes do.
+- Session routes now accept an instrument `kind` (`POST /api/sessions` takes an optional `kind`
+  field, defaulting to `"scope"` for backward compatibility). For a real instrument, a session
+  created for a PSU validates the device identity against `*IDN?` rather than assuming a
+  particular type, and routes to the appropriate adapter. The 26 existing `/scope/` routes are
+  unchanged.
+- Internally, construction, connection, polling and kind-specific state moved from the session
+  layer to per-kind adapters. This architecture enables extending to AWG and DAQ sessions without
+  rebuilding the session core each time.
+
 ## [5.7.1] - 2026-07-26
 
 ### Fixed
