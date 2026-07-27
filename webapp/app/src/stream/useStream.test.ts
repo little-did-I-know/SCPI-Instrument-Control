@@ -70,6 +70,18 @@ describe("useStream", () => {
     expect(useSession.getState().scope).toBeNull();
   });
 
+  it("routes an awg state message to the awg store slot, not the scope or psu slot", async () => {
+    renderHook(() => useStream("abc"));
+    FakeWebSocket.last!.emit({
+      type: "state",
+      kind: "awg",
+      channels: [{ channel: 1, function: "SINE", frequency: 1000, amplitude: 2, offset: 0, phase: 0, enabled: true, duty_cycle: null, symmetry: null }],
+    });
+    await waitFor(() => expect(useSession.getState().awg?.channels[0].frequency).toBe(1000));
+    expect(useSession.getState().scope).toBeNull();
+    expect(useSession.getState().psu).toBeNull();
+  });
+
   it("routes waveform frames to the frame buffer, not the store", async () => {
     renderHook(() => useStream("abc"));
     FakeWebSocket.last!.emit({ type: "waveform", channel: 1, t0: 0, dt: 1e-6, points: [0, 0.5, 1] });
