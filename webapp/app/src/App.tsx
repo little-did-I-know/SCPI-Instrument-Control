@@ -1,6 +1,7 @@
 import { TokenGate } from "./features/auth/TokenGate";
 import { HomeScreen } from "./features/home/HomeScreen";
 import { InstrumentShell } from "./features/shell/InstrumentShell";
+import { TERMINAL_DRAWER_ID } from "./features/shell/TerminalDrawer";
 import { useTerminalDrawer } from "./features/shell/useTerminalDrawer";
 import { StatusIndicator } from "./ds/StatusIndicator";
 import { useStream } from "./stream/useStream";
@@ -21,8 +22,10 @@ export default function App() {
           {session !== null && (
             <button
               type="button"
+              id="terminal-toggle"
               onClick={toggleTerminal}
               aria-expanded={terminalOpen}
+              aria-controls={TERMINAL_DRAWER_ID}
               style={{ marginLeft: "auto", fontSize: "var(--text-sm)", fontFamily: "var(--font-ui)", padding: "4px 10px", borderRadius: "var(--lc-radius-sm)", border: "1px solid var(--lc-border-strong)", color: "var(--lc-text)", background: terminalOpen ? "var(--lc-accent-soft)" : "transparent", cursor: "pointer" }}
             >
               Terminal
