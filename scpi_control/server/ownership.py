@@ -31,6 +31,7 @@ from scpi_control.server.sessions import InstrumentSession, SessionError
 WRITE_ROUTES = frozenset(
     {
         ("DELETE", "/sessions/{session_id}"),
+        ("POST", "/sessions/{session_id}/command"),
         ("PATCH", "/sessions/{session_id}/scope/channels/{channel}"),
         ("PATCH", "/sessions/{session_id}/scope/timebase"),
         ("PATCH", "/sessions/{session_id}/scope/trigger"),

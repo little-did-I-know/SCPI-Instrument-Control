@@ -1,21 +1,16 @@
 # scpi_control/server/api/psu.py
-import asyncio
-from typing import Any, Callable
+from typing import Callable
 
 from fastapi import APIRouter, Request
 
 from scpi_control.exceptions import InvalidParameterError
 from scpi_control.server.adapters import read_psu_outputs
-from scpi_control.server.api.sessions import require_kind, require_session
+from scpi_control.server.api.sessions import require_kind, require_session, run_job
 from scpi_control.server.ownership import require_owner
 from scpi_control.server.schemas import PsuEnablePatch, PsuOutputPatch
 from scpi_control.server.sessions import InstrumentSession
 
 router = APIRouter(tags=["psu"])
-
-
-async def run_job(session: InstrumentSession, fn: Callable) -> Any:
-    return await asyncio.wrap_future(session.submit(fn))
 
 
 async def mutate(session: InstrumentSession, fn: Callable) -> dict:

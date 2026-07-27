@@ -75,6 +75,7 @@ _PLACEHOLDERS = {"channel": "1", "n": "1", "name": "ref", "op": "run"}
 # need specific required fields get an explicit entry here.
 _BODIES = {
     ("PATCH", "/sessions/{session_id}/scope/timebase"): {"timebase": 1e-3},
+    ("POST", "/sessions/{session_id}/command"): {"command": "*RST"},
     ("POST", "/sessions/{session_id}/scope/command"): {"command": "*RST"},
     ("PUT", "/sessions/{session_id}/scope/measurements"): [{"channel": 1, "mtype": "PKPK"}],
     ("POST", "/sessions/{session_id}/scope/references"): {"name": "ref", "channel": 1},

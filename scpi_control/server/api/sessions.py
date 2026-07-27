@@ -1,5 +1,7 @@
 # scpi_control/server/api/sessions.py
+import asyncio
 import time
+from typing import Any, Callable
 
 from fastapi import APIRouter, HTTPException, Request, Response
 from fastapi.concurrency import run_in_threadpool
@@ -39,6 +41,16 @@ def require_kind(session, kind: str):
     if session.kind != kind:
         raise InvalidParameterError("session {0} is a {1}, not a {2}".format(session.id, session.kind, kind))
     return session
+
+
+async def run_job(session, fn: Callable) -> Any:
+    """Run `fn(instrument)` on the session's worker thread and await its result.
+
+    Lives here rather than in a router module because every router needs it and
+    this module is the one they all already import (ownership.py imports from
+    here too, so this module must never import require_owner).
+    """
+    return await asyncio.wrap_future(session.submit(fn))
 
 
 @router.get("/models")

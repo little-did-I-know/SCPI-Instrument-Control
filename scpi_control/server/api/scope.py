@@ -1,15 +1,15 @@
 # scpi_control/server/api/scope.py
-import asyncio
 from dataclasses import replace
 from datetime import datetime
-from typing import Any, Callable, List
+from typing import Callable, List
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import PlainTextResponse, Response
 
 from scpi_control.exceptions import InvalidParameterError
-from scpi_control.server.api.sessions import require_kind, require_session
+from scpi_control.server.api.commands import send_command_for
+from scpi_control.server.api.sessions import require_kind, require_session, run_job
 from scpi_control.server.ownership import require_owner
 from scpi_control.server.schemas import (
     ALLOWED_COUPLING,
@@ -30,10 +30,6 @@ from scpi_control.server.schemas import (
 from scpi_control.server.sessions import InstrumentSession, SessionError, read_state
 
 router = APIRouter(tags=["scope"])
-
-
-async def run_job(session: InstrumentSession, fn: Callable) -> Any:
-    return await asyncio.wrap_future(session.submit(fn))
 
 
 async def mutate(session: InstrumentSession, fn: Callable) -> dict:
@@ -112,18 +108,7 @@ async def patch_trigger(session_id: str, body: TriggerPatch, request: Request):
 async def send_command(session_id: str, body: CommandIn, request: Request):
     session = require_owner(request, session_id)
     require_kind(session, "scope")
-    command = body.command.strip()
-    if not command:
-        raise InvalidParameterError("empty command")
-
-    def run(scope):
-        if command.endswith("?"):
-            return scope.query(command)
-        scope.write(command)
-        return None
-
-    response = await run_job(session, run)
-    return {"command": command, "response": response}
+    return await send_command_for(session, body.command)
 
 
 @router.put("/sessions/{session_id}/scope/measurements")
