@@ -81,6 +81,7 @@ _BODIES = {
     ("POST", "/sessions/{session_id}/scope/references"): {"name": "ref", "channel": 1},
     ("POST", "/sessions/{session_id}/owner"): {"name": "carol"},
     ("PATCH", "/sessions/{session_id}/psu/outputs/{n}/enable"): {"enabled": True},
+    ("PATCH", "/sessions/{session_id}/awg/channels/{n}/enable"): {"enabled": True},
 }
 
 

@@ -8,6 +8,7 @@ ALLOWED_MEASUREMENTS = frozenset({"PKPK", "MAX", "MIN", "AMPL", "TOP", "BASE", "
 ALLOWED_COUPLING = frozenset({"DC", "AC", "GND"})
 ALLOWED_WINDOWS = frozenset({"rectangular", "hanning", "hamming", "blackman", "bartlett", "flattop"})
 ALLOWED_FILTER_KINDS = frozenset({"lowpass", "highpass", "bandpass"})
+ALLOWED_FUNCTIONS = frozenset({"SINE", "SQUARE", "RAMP", "PULSE", "NOISE", "ARB", "DC"})
 
 
 class SessionCreate(BaseModel):
@@ -103,6 +104,20 @@ class PsuOutputPatch(BaseModel):
 
 
 class PsuEnablePatch(BaseModel):
+    enabled: bool
+
+
+class AwgChannelPatch(BaseModel):
+    function: Optional[str] = None
+    frequency: Optional[float] = None
+    amplitude: Optional[float] = None
+    offset: Optional[float] = None
+    phase: Optional[float] = None
+    duty_cycle: Optional[float] = None
+    symmetry: Optional[float] = None
+
+
+class AwgEnablePatch(BaseModel):
     enabled: bool
 
 
