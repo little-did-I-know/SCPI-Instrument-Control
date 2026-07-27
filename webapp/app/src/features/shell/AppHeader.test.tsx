@@ -108,6 +108,26 @@ describe("AppHeader ownership", () => {
     await waitFor(() => expect(screen.queryByText(/read-only/i)).not.toBeInTheDocument());
   });
 
+  it("does not leak an unhandled rejection when the post-claim refresh fails, and keeps the badge up with the failure reported", async () => {
+    // The claim itself succeeds (claimSession resolves); the refresh that
+    // would let the header stop claiming read-only fails. Two things must be
+    // true: nothing escapes as an unhandled rejection (if it did, Vitest
+    // itself attaches an "Unhandled Errors" failure to this test -- see the
+    // finding's revert-verification for what that looks like), and the badge
+    // staying up is the honest outcome here -- ownership could not be
+    // re-confirmed locally, and the server enforces it regardless of what
+    // this tab shows.
+    useIdentity.getState().setIdentity("bob");
+    useSession.getState().setSession({ ...SESSION, owner: "alice" });
+    vi.spyOn(api, "claimSession").mockResolvedValue({ ...SESSION, owner: "bob" });
+    vi.spyOn(api, "getSession").mockRejectedValue(new ApiError(500, "Error", "could not refresh session"));
+    render(<AppHeader />);
+    await userEvent.click(screen.getByRole("button", { name: /claim/i }));
+    await waitFor(() => expect(useSession.getState().error).toBe("could not refresh session"));
+    expect(screen.getByText(/read-only/i)).toBeInTheDocument();
+    expect(screen.getByText(/alice/)).toBeInTheDocument();
+  });
+
   it("keeps live instrument readings through a claim", async () => {
     // Claiming changes who owns the session, not what the instrument reads.
     // Blanking the readings would make the panel flash empty for a poll

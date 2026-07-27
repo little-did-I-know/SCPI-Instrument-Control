@@ -1,4 +1,4 @@
-import { api } from "../../api/client";
+import { ApiError, api } from "../../api/client";
 import { Button } from "../../ds/Button";
 import { StatusIndicator } from "../../ds/StatusIndicator";
 import { useIdentity } from "../../store/identity";
@@ -31,9 +31,20 @@ export function AppHeader() {
 
   async function refreshSession() {
     if (!session) return;
-    // Ownership changed; the readings did not. applySessionInfo replaces the
-    // session record without clearing the instrument slices.
-    useSession.getState().applySessionInfo(await api.getSession(session.id));
+    try {
+      // Ownership changed; the readings did not. applySessionInfo replaces the
+      // session record without clearing the instrument slices.
+      useSession.getState().applySessionInfo(await api.getSession(session.id));
+    } catch (caught) {
+      // The claim itself already succeeded server-side -- OwnerBadge only
+      // calls onClaimed after api.claimSession resolves. This refresh is only
+      // what lets *this tab* stop showing read-only; if it fails, leaving the
+      // badge up is the honest state, not a bug: ownership could not be
+      // re-confirmed here, and the server enforces it regardless of what this
+      // tab displays. The failure must still reach the user, through the same
+      // banner every other session-level failure uses.
+      useSession.getState().setError(caught instanceof ApiError ? caught.detail || caught.message : caught instanceof Error ? caught.message : "Could not refresh session after claim.");
+    }
   }
 
   return (
