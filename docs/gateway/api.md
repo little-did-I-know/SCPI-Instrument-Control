@@ -50,7 +50,7 @@ All paths below are under `/api/sessions/{id}/psu/`, and require a session creat
 
 | Method | Path | Body / params | Response | Errors |
 |---|---|---|---|---|
-| `GET` | `state` | — | `{outputs: [{output, voltage, current, enabled, measured_voltage, measured_current, measured_power}, ...]}` | 404 unknown session; 409 if the session is in an error/closed state |
+| `GET` | `state` | — | `{outputs: [{output, voltage, current, enabled, measured_voltage, measured_current, measured_power}, ...]}` | 400 non-psu session; 404 unknown session; 409 if the session is in an error/closed state |
 | `PATCH` | `outputs/{n}` | `{voltage?, current?}` | `{outputs: [...]}` (same shape as `GET state`) | 400 unknown output or non-psu session; 409 not the session owner, or session not accepting jobs |
 | `PATCH` | `outputs/{n}/enable` | `{enabled}` | `{outputs: [...]}` | 400 unknown output or non-psu session; 409 not the session owner, or session not accepting jobs |
 
@@ -67,7 +67,7 @@ All paths below are under `/api/sessions/{id}/awg/`, and require a session creat
 
 | Method | Path | Body / params | Response | Errors |
 |---|---|---|---|---|
-| `GET` | `state` | — | `{channels: [{channel, function, frequency, amplitude, offset, phase, enabled, duty_cycle, symmetry}, ...]}` | 404 unknown session; 409 if the session is in an error/closed state |
+| `GET` | `state` | — | `{channels: [{channel, function, frequency, amplitude, offset, phase, enabled, duty_cycle, symmetry}, ...]}` | 400 non-awg session; 404 unknown session; 409 if the session is in an error/closed state |
 | `PATCH` | `channels/{n}` | `{function?, frequency?, amplitude?, offset?, phase?, duty_cycle?, symmetry?}` — `function` one of `SINE`/`SQUARE`/`RAMP`/`PULSE`/`NOISE`/`ARB`/`DC` | `{channels: [...]}` (same shape as `GET state`) | 400 unsupported `function`, unknown channel, or non-awg session; 409 not the session owner, or session not accepting jobs |
 | `PATCH` | `channels/{n}/enable` | `{enabled}` | `{channels: [...]}` | 400 unknown channel or non-awg session; 409 not the session owner, or session not accepting jobs |
 | `POST` | `outputs/off` | — | `{channels: [...]}` | 400 non-awg session; 409 not the session owner, or session not accepting jobs |
