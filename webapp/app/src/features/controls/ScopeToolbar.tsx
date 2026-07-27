@@ -46,18 +46,6 @@ export function ScopeToolbar({ viewToggle }: { viewToggle?: ReactNode }) {
     }
   }
 
-  async function disconnect() {
-    if (!session) return;
-    setError(null);
-    try {
-      await api.deleteSession(session.id);
-    } catch {
-      // already gone server-side (404) or unreachable — we're disconnecting locally regardless
-    } finally {
-      useSession.getState().clearSession();
-    }
-  }
-
   return (
     <div style={{ display: "flex", flexDirection: "column" }}>
       <Toolbar
@@ -72,7 +60,6 @@ export function ScopeToolbar({ viewToggle }: { viewToggle?: ReactNode }) {
               </button>
             )}
             <ScreenshotButton />
-            <Button variant="danger" onClick={disconnect}>Disconnect</Button>
           </>
         }
       >

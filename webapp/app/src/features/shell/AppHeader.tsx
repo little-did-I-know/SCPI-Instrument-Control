@@ -1,5 +1,9 @@
+import { api } from "../../api/client";
+import { Button } from "../../ds/Button";
 import { StatusIndicator } from "../../ds/StatusIndicator";
+import { useIdentity } from "../../store/identity";
 import { useSession } from "../../store/session";
+import { OwnerBadge } from "../sessions/OwnerBadge";
 import { TERMINAL_DRAWER_ID } from "./TerminalDrawer";
 import { useTerminalDrawer } from "./useTerminalDrawer";
 
@@ -10,8 +14,27 @@ import { useTerminalDrawer } from "./useTerminalDrawer";
 export function AppHeader() {
   const status = useSession((s) => s.status);
   const session = useSession((s) => s.session);
+  const identity = useIdentity((s) => s.identity);
   const terminalOpen = useTerminalDrawer((s) => s.open);
   const toggleTerminal = useTerminalDrawer((s) => s.toggle);
+
+  async function disconnect() {
+    if (!session) return;
+    try {
+      await api.deleteSession(session.id);
+    } catch {
+      // already gone server-side (404) or unreachable — we disconnect locally regardless
+    } finally {
+      useSession.getState().clearSession();
+    }
+  }
+
+  async function refreshSession() {
+    if (!session) return;
+    // Ownership changed; the readings did not. applySessionInfo replaces the
+    // session record without clearing the instrument slices.
+    useSession.getState().applySessionInfo(await api.getSession(session.id));
+  }
 
   return (
     <header style={{ display: "flex", alignItems: "center", gap: "var(--space-3)", padding: "10px 14px", background: "var(--lc-panel)", borderBottom: "1px solid var(--lc-border)" }}>
@@ -20,6 +43,7 @@ export function AppHeader() {
       {/* One right-hand group claims the auto margin, rather than passing it
           between whichever control happens to be rendered. */}
       <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
+        {session !== null && identity != null && <OwnerBadge session={session} identity={identity} onClaimed={() => void refreshSession()} />}
         {session !== null && (
           <button
             type="button"
@@ -33,6 +57,11 @@ export function AppHeader() {
           </button>
         )}
         <StatusIndicator state={status} />
+        {session !== null && (
+          <Button variant="danger" onClick={() => void disconnect()}>
+            Disconnect
+          </Button>
+        )}
       </div>
     </header>
   );
