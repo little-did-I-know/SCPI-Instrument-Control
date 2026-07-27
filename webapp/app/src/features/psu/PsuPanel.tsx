@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { ApiError, api } from "../../api/client";
 import type { PsuOutputState } from "../../api/types";
 import { GroupBox } from "../../ds/GroupBox";
-import { Reading } from "../../ds/Reading";
 import { SpinBox } from "../../ds/SpinBox";
 import { StatusIndicator } from "../../ds/StatusIndicator";
 import { useSession } from "../../store/session";
@@ -11,13 +10,6 @@ import { useSession } from "../../store/session";
 // render, which would loop the zustand selector forever (same issue as
 // ChannelsPanel's NO_CHANNELS).
 const NO_OUTPUTS: PsuOutputState[] = [];
-
-// A reading the instrument could not give us is null, and null is NOT zero.
-// Rendering it as "0.000" is a confident lie about live hardware; "--.--" is
-// the same "no reading" marker ReadoutStrip uses for a failed measurement.
-function fmt(value: number | null | undefined): string {
-  return typeof value === "number" && !Number.isNaN(value) ? value.toFixed(3) : "--.--";
-}
 
 /** A setpoint the instrument would not report. An editable field pre-filled
  *  with 0 would invite the user to "confirm" a value that was never read back,
@@ -48,6 +40,12 @@ export function PsuPanel() {
   // parent's), so without this fetch the panel would sit empty until the
   // stream happens to deliver its first frame. This fetch is what actually
   // populates the store on a cold mount; the stream then keeps it live.
+  //
+  // PsuReadout (the shell's readout slot for this kind) reads the same `psu`
+  // store slice but does not fetch it itself -- it relies on this effect
+  // having already run. That coupling is fine only because the PSU view
+  // always renders both halves together; a future kind that registers a
+  // readout without a body must bring its own fetch.
   useEffect(() => {
     if (!sessionId) return;
     let cancelled = false;
@@ -190,11 +188,6 @@ export function PsuPanel() {
                 >
                   <StatusIndicator state={enableUnknown ? "error" : o.enabled ? "connected" : "disconnected"} label={enableUnknown ? "Output state unknown" : o.enabled ? "Output on" : "Output off"} />
                 </button>
-                <div style={{ display: "flex", gap: "var(--space-3)", paddingTop: "4px", borderTop: "1px solid var(--lc-border)" }}>
-                  <Reading label="V" value={fmt(o.measured_voltage)} unit="V" />
-                  <Reading label="I" value={fmt(o.measured_current)} unit="A" />
-                  <Reading label="P" value={fmt(o.measured_power)} unit="W" />
-                </div>
               </div>
             </GroupBox>
           );

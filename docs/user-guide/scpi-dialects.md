@@ -109,7 +109,7 @@ exact strings sent to each dialect. A sample of the underlying wire commands
 You never need to write these commands yourself for anything the API
 covers — see the [Trigger Control](trigger-control.md) guide for the
 properties that wrap them. For anything the API doesn't expose yet, the
-gateway's Terminal tab (or `scope.write()` / `scope.query()`) lets you send
+gateway's SCPI terminal (or `scope.write()` / `scope.query()`) lets you send
 raw commands in whichever dialect the connected scope speaks.
 
 ## Known dialect gaps

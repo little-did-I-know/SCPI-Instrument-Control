@@ -26,14 +26,6 @@ afterEach(() => {
 });
 
 describe("PsuPanel", () => {
-  it("renders every output with its measured values", async () => {
-    vi.spyOn(api, "psuState").mockResolvedValue(STATE);
-    render(<PsuPanel />);
-    await waitFor(() => expect(screen.getByText(/5\.01/)).toBeInTheDocument());
-    expect(screen.getByText(/0\.12/)).toBeInTheDocument();
-    expect(screen.getByText(/0\.6/)).toBeInTheDocument();
-  });
-
   it("sends a voltage change for the right output", async () => {
     vi.spyOn(api, "psuState").mockResolvedValue(STATE);
     const setOutput = vi.spyOn(api, "setPsuOutput").mockResolvedValue(STATE);
@@ -131,15 +123,6 @@ describe("PsuPanel", () => {
     expect(screen.getByText(/state unknown/i)).toBeInTheDocument();
     await userEvent.click(toggle);
     expect(setEnable).not.toHaveBeenCalled();
-  });
-
-  it("shows a failed measurement as --.--, not as 0.000", async () => {
-    const unread = { outputs: [{ ...STATE.outputs[0], measured_voltage: null, measured_current: null, measured_power: null }] };
-    vi.spyOn(api, "psuState").mockResolvedValue(unread);
-    render(<PsuPanel />);
-    await screen.findByLabelText("Output 1 voltage");
-    expect(screen.queryByText("0.000")).not.toBeInTheDocument();
-    expect(screen.getAllByText("--.--")).toHaveLength(3);
   });
 
   it("shows an unreadable setpoint as --.-- instead of an editable zero", async () => {

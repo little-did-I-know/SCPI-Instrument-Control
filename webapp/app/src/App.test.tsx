@@ -1,7 +1,9 @@
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
 import { setToken } from "./api/token";
+import { useTerminalDrawer } from "./features/shell/useTerminalDrawer";
 import { useSession } from "./store/session";
 
 // TokenGate's own suite (features/auth/TokenGate.test.tsx) already covers its
@@ -30,6 +32,7 @@ beforeEach(() => {
   localStorage.clear();
   setToken("test-token"); // past TokenGate; matches the other suites
   useSession.getState().clearSession();
+  useTerminalDrawer.getState().close();
   vi.stubGlobal("WebSocket", FakeWebSocket as unknown as typeof WebSocket);
   // HomeScreen (no-session case) and useReferenceSeed (scope/psu cases) both
   // hit the network on mount even with the gate mocked out, so fetch needs an
@@ -65,6 +68,29 @@ describe("App view selection", () => {
     expect(screen.getByText("Channels")).toBeInTheDocument();
   });
 
+  // Closes the registry hole from the branch review: kindViews.test.tsx only
+  // ever asserted `typeof view.body === "function"`, so `readout` could be
+  // deleted from a KIND_VIEWS entry -- silently dropping the scope's PKPK/FREQ
+  // strip or the PSU's measured V/I/P -- and the whole suite would stay green.
+  // This renders <App /> end to end (not ReadoutStrip/PsuReadout in isolation)
+  // so the assertion actually exercises InstrumentShell's registry lookup.
+  it("renders the scope readout strip through the registry, not just the rail", () => {
+    useSession.getState().setSession(SESSION);
+    // setSession resets scope/psu to null, so the state must be applied after.
+    useSession.getState().applyState({
+      run_state: "TRIGD",
+      timebase: 0.001,
+      channels: { "1": { enabled: true, voltage_scale: 0.5, voltage_offset: 0, coupling: "DC", probe_ratio: 10 } },
+      trigger: { mode: "AUTO", source: "C1", level: 0, slope: "POS", coupling: "DC" },
+    });
+    useSession.getState().applyMeasurements([{ channel: 1, mtype: "PKPK", value: 2.5 }]);
+    render(<App />);
+    // "C1" alone is ambiguous (ChannelsPanel's own GroupBox title is also
+    // "C1"); the coupling/scale line only ReadoutStrip renders disambiguates it.
+    expect(screen.getByText("DC · 0.5 V/div")).toBeInTheDocument();
+    expect(screen.getByText(/2\.500/)).toBeInTheDocument();
+  });
+
   it("does NOT render the scope rail for a psu session, and renders the PSU panel instead", async () => {
     useSession.getState().setSession({ ...SESSION, kind: "psu" });
     render(<App />);
@@ -72,6 +98,36 @@ describe("App view selection", () => {
     expect(screen.queryByText(/coming soon/i)).not.toBeInTheDocument();
     expect(await screen.findByLabelText("Output 1 voltage")).toBeInTheDocument();
     expect(screen.getByLabelText("Output 1 enable")).not.toBeChecked();
+  });
+
+  // Same registry hole as above, but for the PSU side, and combined with the
+  // two safety properties the branch review flagged as only checked against
+  // <PsuReadout /> in isolation: a measurement the instrument could not give
+  // us must render as "--.--", never "0.000", and an unreadable enable state
+  // must read as unknown, never as a confident "off".
+  it("renders unreadable psu measurements as --.-- (never 0.000) and an unknown enable state, through the registry", async () => {
+    useSession.getState().setSession({ ...SESSION, kind: "psu" });
+    (fetch as unknown as ReturnType<typeof vi.fn>).mockImplementation((input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("/api/whoami")) return Promise.resolve(jsonResponse({ identity: "test" }));
+      if (url.endsWith("/api/sessions")) return Promise.resolve(jsonResponse([]));
+      if (url.includes("/api/discover")) return Promise.resolve(jsonResponse([]));
+      if (url.includes("/psu/state")) {
+        return Promise.resolve(
+          jsonResponse({
+            outputs: [
+              { output: 1, voltage: 3.3, current: 0.5, enabled: null, measured_voltage: null, measured_current: null, measured_power: null },
+            ],
+          }),
+        );
+      }
+      return Promise.resolve(jsonResponse({}));
+    });
+    render(<App />);
+    expect(await screen.findByText("Output 1 state unknown")).toBeInTheDocument();
+    expect(screen.queryByText("Output 1 off")).not.toBeInTheDocument();
+    expect(screen.getAllByText("--.--")).toHaveLength(3);
+    expect(screen.queryByText("0.000")).not.toBeInTheDocument();
   });
 
   it("does not seed the scope reference overlay for a psu session", async () => {
@@ -87,5 +143,47 @@ describe("App view selection", () => {
   it("renders the home screen with no session", () => {
     render(<App />);
     expect(screen.queryByText("Channels")).not.toBeInTheDocument();
+  });
+
+  it("renders the coming-soon fallback for a kind with no registered view", () => {
+    useSession.getState().setSession({ ...SESSION, kind: "awg" });
+    render(<App />);
+    expect(screen.getByText(/coming soon/i)).toBeInTheDocument();
+    expect(screen.queryByText("Channels")).not.toBeInTheDocument();
+  });
+
+  it("offers the SCPI terminal for a psu session, not just a scope", async () => {
+    // The reason this sub-project exists: the console is kind-agnostic code
+    // that only a scope could reach.
+    useSession.getState().setSession({ ...SESSION, kind: "psu" });
+    render(<App />);
+    await userEvent.click(screen.getByRole("button", { name: /terminal/i }));
+    expect(screen.getByRole("region", { name: "SCPI terminal" })).toBeInTheDocument();
+  });
+
+  it("offers the SCPI terminal for a scope session", async () => {
+    useSession.getState().setSession(SESSION);
+    render(<App />);
+    await userEvent.click(screen.getByRole("button", { name: /terminal/i }));
+    expect(screen.getByRole("region", { name: "SCPI terminal" })).toBeInTheDocument();
+  });
+
+  it("does not offer the terminal with no session", () => {
+    render(<App />);
+    expect(screen.queryByRole("button", { name: /terminal/i })).not.toBeInTheDocument();
+  });
+
+  it("reports its expanded state and target on the terminal toggle button", async () => {
+    useSession.getState().setSession(SESSION);
+    render(<App />);
+    const button = screen.getByRole("button", { name: /terminal/i });
+    expect(button).toHaveAttribute("aria-expanded", "false");
+    // aria-controls must name the actual drawer element, not just any id.
+    const controlsId = button.getAttribute("aria-controls");
+    expect(controlsId).toBeTruthy();
+    await userEvent.click(button);
+    expect(button).toHaveAttribute("aria-expanded", "true");
+    const drawer = screen.getByRole("region", { name: "SCPI terminal" });
+    expect(drawer).toHaveAttribute("id", controlsId);
   });
 });

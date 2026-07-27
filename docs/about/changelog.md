@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- The SCPI terminal now works for any connected instrument, not just oscilloscopes. It moved out
+  of the oscilloscope's control rail (eight tabs down to seven) into a drawer across the bottom of
+  the window, opened from a Terminal button in the header and closed with Escape, so a power
+  supply session can be driven by raw SCPI for anything its panel doesn't expose.
+  `POST /api/sessions/{id}/command` is the new kind-agnostic route behind it; the older
+  `/scope/command` is unchanged and still refuses a non-scope session, and both now delegate to
+  one shared implementation of what a command does.
+- A power supply session now has a readout strip like an oscilloscope's: one card per output
+  showing measured voltage, current and power, and whether that rail is live. Unreadable values
+  still show as `--.--`, and an output whose on/off state the supply will not report still shows
+  as unknown rather than a confident off.
+- Internally, which view a session shows is now decided by a per-kind registry instead of a chain
+  of `session.kind` checks in the app shell. No visible change on its own, but it's what makes the
+  next instrument kind a single registry entry instead of another branch threaded through the
+  shell.
+
 ## [5.8.0] - 2026-07-27
 
 ### Added
