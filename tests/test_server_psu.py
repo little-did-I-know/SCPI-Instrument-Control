@@ -6,10 +6,12 @@ none of the scope's domain. These assertions are deliberately the same ones the
 scope session is held to.
 """
 
+import time
+
 import pytest
 
 from scpi_control.connection.mock import MockConnection
-from scpi_control.server.sessions import SessionManager
+from scpi_control.server.sessions import SessionError, SessionManager
 
 fastapi = pytest.importorskip("fastapi")
 pytest.importorskip("httpx")  # fastapi.testclient needs it; raises RuntimeError (not ImportError) without it
@@ -20,6 +22,23 @@ from scpi_control.server.app import create_app  # noqa: E402
 
 def _psu_connection():
     return MockConnection(psu_mode=True, psu_idn="Siglent Technologies,SPD3303X,SPD123456,1.0")
+
+
+class KillablePsuConnection(MockConnection):
+    """A PSU mock whose wire can be pulled mid-session (mirrors the scope's
+    KillableMock in tests/test_server_sessions.py)."""
+
+    def kill(self):
+        self._connected = False
+
+
+def _wait_for(predicate, timeout=5.0):
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        if predicate():
+            return True
+        time.sleep(0.02)
+    return predicate()
 
 
 @pytest.fixture
@@ -70,10 +89,40 @@ def test_a_psu_session_connects_and_reports_its_kind(manager):
 
 
 def test_a_psu_session_closes_within_its_timeout(manager):
-    """Shared lifecycle: the same close path the scope uses."""
+    """Shared lifecycle: the same close path the scope uses.
+
+    Asserting ``state == "closed"`` alone proves nothing: close() sets that
+    unconditionally *after* join(timeout=...), so a worker that ignored _STOP
+    and outlived the join would still satisfy it. The thread and the job queue
+    are what actually have to be dead.
+    """
     session = manager.create("psu", mock=True, kind="psu", _connection=_psu_connection())
     session.close(timeout=10.0)
+    assert session._thread.is_alive() is False, "close() returned but the worker thread is still running"
     assert session.state == "closed"
+    with pytest.raises(SessionError):
+        session.submit(lambda psu: psu.identify())
+
+
+def test_a_psu_session_enters_the_error_state_when_the_wire_drops(manager):
+    """The spec's dropped-wire case, for the PSU. The file's premise is that a
+    PSU session is held to the same assertions as a scope session, and the
+    scope has ``test_idle_poll_detects_dropped_connection``; without the PSU
+    equivalent, the shared error path is only ever proven on one kind."""
+    conn = KillablePsuConnection(psu_mode=True, psu_idn="Siglent Technologies,SPD3303X,SPD123456,1.0")
+    session = manager.create("psu", mock=True, kind="psu", _connection=conn)
+    errors = []
+    # _poll_tick returns early with no subscribers, so the drop is only ever
+    # noticed while something is watching -- exactly as for a scope.
+    unsubscribe = session.subscribe(errors.append)
+    try:
+        conn.kill()
+        assert _wait_for(lambda: session.state == "error"), "poll tick never noticed the dropped PSU connection"
+        assert any(m.get("type") == "error" for m in errors), "the drop must be announced on the stream, not only in session.state"
+        with pytest.raises(SessionError):
+            session.submit(lambda psu: psu.identify())
+    finally:
+        unsubscribe()
 
 
 def test_a_psu_session_counts_viewers_like_any_other(manager):

@@ -2,8 +2,7 @@
 import asyncio
 from typing import Any, Callable
 
-from fastapi import Request
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 
 from scpi_control.exceptions import InvalidParameterError
 from scpi_control.server.adapters import read_psu_outputs

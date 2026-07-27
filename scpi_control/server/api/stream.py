@@ -4,15 +4,17 @@ import contextlib
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
-from scpi_control.server.adapters import read_psu_outputs
 from scpi_control.server.auth import WS_ACCEPT_SUBPROTOCOL
-from scpi_control.server.sessions import read_state
 
 router = APIRouter(tags=["stream"])
 
 # Cap the per-connection outbox so a slow/paused client cannot make the event
 # loop buffer waveform frames without bound. 256 frames ~= a minute at 4 Hz.
 OUTBOX_MAXSIZE = 256
+
+# Distinct from 4404 (unknown session) and 4410 (session ended): the socket was
+# accepted but this session's adapter could not produce its opening frame.
+CLOSE_INITIAL_FRAME_FAILED = 4500
 
 
 def _enqueue(outbox: "asyncio.Queue", message) -> None:
@@ -92,24 +94,28 @@ async def stream(websocket: WebSocket, session_id: str):
     # identity isn't the owner); unmark unconditionally in finally so an
     # abnormal disconnect releases it just like a clean close does.
     identity = getattr(websocket.state, "identity", "")
+    unmark_owner_watching = session.mark_owner_watching(identity)
     receiver = None
     sender = None
     try:
-        unmark_owner_watching = session.mark_owner_watching(identity)
         # The initial frame must match whatever shape this session's adapter
-        # publishes on every subsequent tick (read_state for scope,
-        # read_psu_outputs for psu) -- read_state() assumes an Oscilloscope
-        # and raises AttributeError against a PowerSupply, which used to be
-        # swallowed by the bare except below, leaving the socket open but
-        # silent forever (no initial frame, and polling never starts because
-        # _poll_tick() requires a subscriber that this handler's own
-        # exception prevented from ever seeing a first message).
-        if session.kind == "psu":
-            outputs = await asyncio.wrap_future(session.submit(read_psu_outputs))
-            await websocket.send_json({"type": "state", "kind": "psu", "outputs": outputs})
-        else:
-            initial = await asyncio.wrap_future(session.submit(read_state))
-            await websocket.send_json({"type": "state", "state": initial})
+        # publishes on every subsequent tick, so the adapter -- not a `kind`
+        # branch here -- decides it. A kind that forgets the hook raises
+        # NotImplementedError and gets the loud path below.
+        try:
+            initial = await asyncio.wrap_future(session.submit(session.adapter.initial_frame))
+        except Exception as exc:
+            # NOT a bare `except: pass`. Swallowing this used to leave the
+            # socket open but silent forever: no initial frame, and polling
+            # never starts either because _poll_tick() requires a subscriber
+            # that has seen a first message. A client that gets nothing cannot
+            # tell a broken adapter from an idle instrument, so say so and
+            # close with a code that names the failure.
+            with contextlib.suppress(Exception):
+                await websocket.send_json({"type": "error", "detail": "initial frame failed: {0}".format(exc)})
+                await websocket.close(code=CLOSE_INITIAL_FRAME_FAILED)
+            return
+        await websocket.send_json(initial)
         # Run the receiver (disconnect detection) and sender concurrently; whichever
         # finishes first tears the connection down.
         receiver = asyncio.ensure_future(_receive_until_disconnect(websocket))

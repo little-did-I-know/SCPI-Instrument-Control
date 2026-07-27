@@ -112,6 +112,19 @@ class InstrumentAdapter:
         """Publish whatever this kind emits per tick. Called on the worker thread."""
         raise NotImplementedError
 
+    def initial_frame(self, instrument) -> Dict[str, Any]:
+        """The first frame a newly-opened live stream receives.
+
+        It must have the same shape this kind publishes on every subsequent
+        tick, otherwise a client that discriminates on the frame shape sees
+        one thing at connect and another a quarter-second later. Declared
+        here (rather than branched on ``session.kind`` in the stream handler)
+        so a new kind cannot be wired up while quietly inheriting some other
+        kind's frame -- NotImplementedError is loud, and the stream handler
+        turns it into an error frame plus a distinct close code.
+        """
+        raise NotImplementedError
+
     def close(self, instrument) -> None:
         raise NotImplementedError
 
@@ -199,6 +212,9 @@ class ScopeAdapter(InstrumentAdapter):
             if reference is not None:
                 publish(compute.reference_stats(reference, acquired))
 
+    def initial_frame(self, instrument):
+        return {"type": "state", "state": read_state(instrument)}
+
     def close(self, instrument):
         instrument.disconnect()
 
@@ -241,30 +257,54 @@ class ScopeAdapter(InstrumentAdapter):
         publish({"type": "reference", **self.reference_overlay()})
 
 
-def read_psu_outputs(psu: PowerSupply) -> List[Dict[str, Any]]:
+MEASURED_KEYS = ("measured_voltage", "measured_current", "measured_power")
+UNKNOWN_MEASURED: Dict[str, Any] = {key: None for key in MEASURED_KEYS}
+
+
+def read_psu_outputs(psu: PowerSupply, measure: bool = True) -> List[Dict[str, Any]]:
     """One dict per output. Shared by PsuAdapter.poll and GET /psu/state so the
-    streamed shape and the fetched shape cannot drift apart."""
+    streamed shape and the fetched shape cannot drift apart.
+
+    ``measure=False`` skips the three measured readings (leaving them None) so
+    a caller that only needs setpoints and enable state can do it in half the
+    queries; PsuAdapter.poll uses that to throttle the measured triplet.
+
+    Every field is read through _safe, so a query the model does not implement
+    or a timeout yields None rather than a fabricated value. ``enabled`` in
+    particular MUST NOT default to False: an SPD3303X's CH3 has no documented
+    status bit and falls through to an OUTP3? that the model does not answer,
+    so a False default would render an energised output as a confident "off".
+    None means "unknown", and the UI is required to show it as unknown.
+    """
     outputs = []
     for n in psu.supported_outputs:
         out = psu.get_output(n)
         if out is None:
             continue
-        outputs.append(
-            {
-                "output": n,
-                "voltage": _safe(lambda: out.voltage),
-                "current": _safe(lambda: out.current),
-                "enabled": _safe(lambda: out.enabled, default=False),
-                "measured_voltage": _safe(lambda: out.measure_voltage()),
-                "measured_current": _safe(lambda: out.measure_current()),
-                "measured_power": _safe(lambda: out.measure_power()),
-            }
-        )
+        row = {
+            "output": n,
+            "voltage": _safe(lambda: out.voltage),
+            "current": _safe(lambda: out.current),
+            "enabled": _safe(lambda: out.enabled),
+        }
+        if measure:
+            row["measured_voltage"] = _safe(lambda: out.measure_voltage())
+            row["measured_current"] = _safe(lambda: out.measure_current())
+            row["measured_power"] = _safe(lambda: out.measure_power())
+        else:
+            row.update(UNKNOWN_MEASURED)
+        outputs.append(row)
     return outputs
 
 
 class PsuAdapter(InstrumentAdapter):
     kind = "psu"
+
+    def __init__(self) -> None:
+        # Last known measured triplet per output, so the throttled ticks can
+        # still emit the full frame shape instead of blanking the readings
+        # three ticks out of four. Worker-thread-only, like ScopeAdapter._shown.
+        self._measured: Dict[int, Dict[str, Any]] = {}
 
     def build(self, address, port, mock, model, allowed_ports, connection):
         if mock:
@@ -286,7 +326,23 @@ class PsuAdapter(InstrumentAdapter):
         }
 
     def poll(self, instrument, publish, tick):
-        publish({"type": "state", "kind": "psu", "outputs": read_psu_outputs(instrument)})
+        # The measured triplet is 3 of the ~6 queries an output costs, and on a
+        # 3-output SPD3303X that is 18 queries every 250 ms. Setpoints and the
+        # enable state stay live on every tick (they are what a user is
+        # watching when they flip a switch); the measurements ride the same
+        # every-Nth-tick budget the scope's measurements do. The first tick
+        # always measures so a fresh stream is never briefly blank.
+        measure = tick % MEASUREMENT_EVERY_N_POLLS == 0 or not self._measured
+        outputs = read_psu_outputs(instrument, measure=measure)
+        for row in outputs:
+            if measure:
+                self._measured[row["output"]] = {key: row[key] for key in MEASURED_KEYS}
+            else:
+                row.update(self._measured.get(row["output"], UNKNOWN_MEASURED))
+        publish({"type": "state", "kind": "psu", "outputs": outputs})
+
+    def initial_frame(self, instrument):
+        return {"type": "state", "kind": "psu", "outputs": read_psu_outputs(instrument)}
 
     def close(self, instrument):
         instrument.disconnect()
