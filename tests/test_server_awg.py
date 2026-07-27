@@ -153,3 +153,37 @@ def test_an_awg_route_rejects_a_scope_session(scope_client):
 def test_a_scope_route_rejects_an_awg_session(awg_client):
     response = awg_client.get("/api/sessions/{0}/scope/state".format(awg_client.session_id))
     assert response.status_code == 400
+
+
+def test_patching_function_and_duty_cycle_together_writes_the_function_first(gateway_auth):
+    """apply() in awg.py sets ``function`` before ``duty_cycle``/``symmetry`` on
+    purpose: duty belongs to PULSE and symmetry to RAMP, so the shape
+    parameter must land on the wire only after the function that makes it
+    meaningful. A state round-trip can't tell the two orders apart -- the mock
+    stores pulse_duty unconditionally either way -- but MockConnection records
+    every write, so the order actually placed on the wire is directly
+    observable. Built with an explicit _connection so the connection object
+    (and its .writes log) is held here rather than built anonymously inside
+    the adapter.
+    """
+    store, headers, _raw = gateway_auth
+    manager = SessionManager()
+    conn = _awg_connection()
+    session = manager.create("awg", mock=True, kind="awg", _connection=conn)
+    app = create_app(manager, token_store=store)
+    try:
+        with TestClient(app) as test_client:
+            test_client.headers.update(headers)
+            response = test_client.patch(
+                "/api/sessions/{0}/awg/channels/1".format(session.id),
+                json={"function": "PULSE", "duty_cycle": 25.0},
+            )
+            assert response.status_code == 200, response.text
+    finally:
+        manager.close_all()
+
+    function_writes = [i for i, w in enumerate(conn.writes) if w.startswith("C1:BSWV WVTP,PULSE")]
+    duty_writes = [i for i, w in enumerate(conn.writes) if w.startswith("C1:BSWV DUTY,")]
+    assert function_writes, "the function write never reached the wire: {0}".format(conn.writes)
+    assert duty_writes, "the duty_cycle write never reached the wire: {0}".format(conn.writes)
+    assert function_writes[0] < duty_writes[0], "function must be written before duty_cycle: {0}".format(conn.writes)
