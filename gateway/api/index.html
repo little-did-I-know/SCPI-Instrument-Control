@@ -1162,6 +1162,28 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#power-supply-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Power supply configuration
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#function-generator-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Function generator configuration
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#scope-configuration" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3540,6 +3562,28 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#power-supply-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Power supply configuration
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#function-generator-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Function generator configuration
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#scope-configuration" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3740,11 +3784,104 @@ handshake.</p>
 </tbody>
 </table>
 <p>The kind-agnostic console route: it works for any connected instrument kind
-(scope or PSU today), because sending a raw command needs nothing kind-specific
-— both drivers expose <code>write</code>/<code>query</code>. This is what the browser UI's Terminal
+(scope, PSU, or AWG today), because sending a raw command needs nothing
+kind-specific — every driver exposes <code>write</code>/<code>query</code>. This is what the browser UI's Terminal
 drawer calls (see <a href="../browser-ui/#scpi-terminal">Browser UI Tour</a>). A command
 ending in <code>?</code> is a query and returns the instrument's answer; anything else is
 a write and returns a <code>null</code> response — never a fabricated one.</p>
+<h2 id="power-supply-configuration">Power supply configuration<a class="headerlink" href="#power-supply-configuration" title="Permanent link">&para;</a></h2>
+<p>All paths below are under <code>/api/sessions/{id}/psu/</code>, and require a session created with
+<code>kind: "psu"</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Path</th>
+<th>Body / params</th>
+<th>Response</th>
+<th>Errors</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>GET</code></td>
+<td><code>state</code></td>
+<td>—</td>
+<td><code>{outputs: [{output, voltage, current, enabled, measured_voltage, measured_current, measured_power}, ...]}</code></td>
+<td>400 non-psu session; 404 unknown session; 409 if the session is in an error/closed state</td>
+</tr>
+<tr>
+<td><code>PATCH</code></td>
+<td><code>outputs/{n}</code></td>
+<td><code>{voltage?, current?}</code></td>
+<td><code>{outputs: [...]}</code> (same shape as <code>GET state</code>)</td>
+<td>400 unknown output or non-psu session; 409 not the session owner, or session not accepting jobs</td>
+</tr>
+<tr>
+<td><code>PATCH</code></td>
+<td><code>outputs/{n}/enable</code></td>
+<td><code>{enabled}</code></td>
+<td><code>{outputs: [...]}</code></td>
+<td>400 unknown output or non-psu session; 409 not the session owner, or session not accepting jobs</td>
+</tr>
+</tbody>
+</table>
+<p>Every field in an output is read through the driver, never fabricated: a value the supply will not
+answer (an SPD3303X's CH3 has no output-state query at all) comes back as <code>null</code>, and the browser
+UI shows that as <code>--.--</code>, or as an unknown output state rather than a confident off. Every mutation
+also broadcasts the fresh <code>outputs</code> list to the session's WebSocket subscribers as a <code>state</code>
+message with <code>"kind": "psu"</code>.</p>
+<h2 id="function-generator-configuration">Function generator configuration<a class="headerlink" href="#function-generator-configuration" title="Permanent link">&para;</a></h2>
+<p>All paths below are under <code>/api/sessions/{id}/awg/</code>, and require a session created with
+<code>kind: "awg"</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Path</th>
+<th>Body / params</th>
+<th>Response</th>
+<th>Errors</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>GET</code></td>
+<td><code>state</code></td>
+<td>—</td>
+<td><code>{channels: [{channel, function, frequency, amplitude, offset, phase, enabled, duty_cycle, symmetry}, ...]}</code></td>
+<td>400 non-awg session; 404 unknown session; 409 if the session is in an error/closed state</td>
+</tr>
+<tr>
+<td><code>PATCH</code></td>
+<td><code>channels/{n}</code></td>
+<td><code>{function?, frequency?, amplitude?, offset?, phase?, duty_cycle?, symmetry?}</code> — <code>function</code> one of <code>SINE</code>/<code>SQUARE</code>/<code>RAMP</code>/<code>PULSE</code>/<code>NOISE</code>/<code>ARB</code>/<code>DC</code></td>
+<td><code>{channels: [...]}</code> (same shape as <code>GET state</code>)</td>
+<td>400 unsupported <code>function</code>, unknown channel, or non-awg session; 409 not the session owner, or session not accepting jobs</td>
+</tr>
+<tr>
+<td><code>PATCH</code></td>
+<td><code>channels/{n}/enable</code></td>
+<td><code>{enabled}</code></td>
+<td><code>{channels: [...]}</code></td>
+<td>400 unknown channel or non-awg session; 409 not the session owner, or session not accepting jobs</td>
+</tr>
+<tr>
+<td><code>POST</code></td>
+<td><code>outputs/off</code></td>
+<td>—</td>
+<td><code>{channels: [...]}</code></td>
+<td>400 non-awg session; 409 not the session owner, or session not accepting jobs</td>
+</tr>
+</tbody>
+</table>
+<p><code>duty_cycle</code> is only read back while <code>function</code> is <code>PULSE</code>, and <code>symmetry</code> only while it is <code>RAMP</code>
+— both come back <code>null</code> otherwise, matching what the channel panel shows. Every other field is
+read through the driver like the PSU's, so a value the generator will not answer, or an enable
+state a model cannot query, comes back as <code>null</code>/unknown rather than a guess. <code>outputs/off</code> kills
+every channel in one request rather than one <code>PATCH</code> per channel, because turning outputs off one
+at a time on a live circuit races. Every mutation also broadcasts the fresh <code>channels</code> list to the
+session's WebSocket subscribers as a <code>state</code> message with <code>"kind": "awg"</code>.</p>
 <h2 id="scope-configuration">Scope configuration<a class="headerlink" href="#scope-configuration" title="Permanent link">&para;</a></h2>
 <p>All paths below are under <code>/api/sessions/{id}/scope/</code>.</p>
 <table>
