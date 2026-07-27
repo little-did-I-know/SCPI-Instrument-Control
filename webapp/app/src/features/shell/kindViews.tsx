@@ -1,5 +1,6 @@
 import type { ComponentType } from "react";
 import type { Kind } from "../home/kinds";
+import { AwgPanel } from "../awg/AwgPanel";
 import { PsuPanel } from "../psu/PsuPanel";
 import { PsuReadout } from "../psu/PsuReadout";
 import { ReadoutStrip } from "../readout/ReadoutStrip";
@@ -20,4 +21,5 @@ export type KindView = {
 export const KIND_VIEWS: Partial<Record<Kind, KindView>> = {
   scope: { readout: ReadoutStrip, body: ScopeBody },
   psu: { readout: PsuReadout, body: PsuPanel },
+  awg: { body: AwgPanel },
 };

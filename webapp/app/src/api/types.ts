@@ -75,6 +75,7 @@ export type LogData = { columns: { channel: number; mtype: string }[]; rows: (nu
 export type StreamMessage =
   | { type: "state"; state: ScopeState }
   | { type: "state"; kind: "psu"; outputs: PsuOutputState[] }
+  | { type: "state"; kind: "awg"; channels: AwgChannelState[] }
   | { type: "waveform"; channel: number | string; t0: number; dt: number; points: number[] }
   | { type: "measurements"; values: MeasurementValue[]; timestamp?: number }
   | { type: "measurements_config"; items: { channel: number; mtype: string }[] }
@@ -103,6 +104,29 @@ export type PsuOutputState = {
 export type PsuState = { outputs: PsuOutputState[] };
 
 export type PsuOutputPatch = Partial<{ voltage: number; current: number }>;
+
+// Every field bar `channel` is read through the server's _safe(): a query the
+// model does not implement, or a timeout, yields null. `enabled` in particular
+// is boolean|null and NEVER defaults to false -- AWGOutput.enabled raises when
+// an SDG's OUTPut? response carries no STATE field, and a live output rendered
+// as a confident "off" is the dangerous direction. duty_cycle is null unless
+// the function is PULSE, and symmetry null unless it is RAMP: the server reads
+// each only for the function it belongs to.
+export type AwgChannelState = {
+  channel: number;
+  function: string | null;
+  frequency: number | null;
+  amplitude: number | null;
+  offset: number | null;
+  phase: number | null;
+  enabled: boolean | null;
+  duty_cycle: number | null;
+  symmetry: number | null;
+};
+
+export type AwgState = { channels: AwgChannelState[] };
+
+export type AwgChannelPatch = Partial<{ function: string; frequency: number; amplitude: number; offset: number; phase: number; duty_cycle: number; symmetry: number }>;
 
 // `kind` is optional and the server defaults it to "scope", so an older client
 // that omits it keeps the pre-5.8 behaviour. Sending it is how the UI creates
