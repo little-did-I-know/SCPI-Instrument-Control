@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { Button } from "../../ds/Button";
+import { KIND_META, KIND_ORDER, type Kind } from "./kinds";
 
-type Props = { busy: boolean; onConnectAddress: (address: string) => void; onConnectMock: () => void; onConnectMockPsu: () => void };
+type Props = { busy: boolean; onConnectAddress: (address: string) => void; onConnectMock: (kind: Kind) => void };
 
-export function ManualConnect({ busy, onConnectAddress, onConnectMock, onConnectMockPsu }: Props) {
+export function ManualConnect({ busy, onConnectAddress, onConnectMock }: Props) {
   const [address, setAddress] = useState("");
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
@@ -19,15 +20,16 @@ export function ManualConnect({ busy, onConnectAddress, onConnectMock, onConnect
           Connect
         </Button>
       </div>
-      <Button disabled={busy} onClick={onConnectMock}>
-        Mock scope
-      </Button>
-      {/* Without this there is no way to reach a PSU session with no hardware:
+      {/* One button per connectable kind in KIND_META, not a hardcoded pair:
           discovery finds nothing on a bench with no instruments, and the
-          address field can only make a scope. */}
-      <Button disabled={busy} onClick={onConnectMockPsu}>
-        Mock power supply
-      </Button>
+          address field can only make a scope, so this is the only route to a
+          session of a given kind without hardware. A new connectable kind
+          needs no change here — it just needs an entry in KIND_META. */}
+      {KIND_ORDER.filter((kind) => KIND_META[kind].connectable).map((kind) => (
+        <Button key={kind} disabled={busy} onClick={() => onConnectMock(kind)}>
+          Mock {KIND_META[kind].label}
+        </Button>
+      ))}
     </div>
   );
 }

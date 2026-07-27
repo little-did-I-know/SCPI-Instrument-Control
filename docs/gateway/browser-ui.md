@@ -12,10 +12,9 @@ LAN (each with a **Connect** button to start a session). Both zones group
 entries by kind — oscilloscope, power supply, or AWG — and support search. A
 recent-connections list remembers addresses you've used before, and a
 manual-connect field lets you type an IP directly if discovery doesn't find
-it. A mock scope and a mock power supply are always available here too, so
-there's never a hardware requirement to get started with either; a mock
-function generator session exists too, but for now it's reached through the
-API (`{"mock": true, "kind": "awg"}`) rather than a home-screen button.
+it. A mock oscilloscope, mock power supply and mock function generator are
+all available here too — one button per connectable instrument kind — so
+there's never a hardware requirement to get started with any of them.
 
 The next three sections — Canvas modes, Rail tabs, and Toolbar — describe an
 oscilloscope session. A power supply or function generator session replaces

@@ -28,8 +28,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   supplies. Connect one discovered on the network from the home screen, set each channel's
   waveform, frequency, amplitude, offset and phase, switch outputs on and off, and kill every
   output with one button. Duty cycle appears for a pulse and symmetry for a ramp, only where they
-  apply. Unlike the power supply, the home screen has no one-click mock generator yet; a mock AWG
-  session still has to be started via the API (`{"mock": true, "kind": "awg"}`).
+  apply. The home screen's "Connect manually" panel gained a one-click mock generator button
+  alongside the mock scope and mock power supply, so an AWG session is reachable with no hardware
+  and no direct API call.
 - The readout strip shows what the generator reports back rather than what was sent — an AWG
   clamps amplitude against its load setting and snaps frequency to its resolution — and every
   channel appears, including disabled ones, so which outputs are live is answerable at a glance. A

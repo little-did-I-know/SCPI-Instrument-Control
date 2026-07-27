@@ -9,7 +9,7 @@ import { InstrumentDashboard } from "./InstrumentDashboard";
 import { ManualConnect } from "./ManualConnect";
 import { RecentBar } from "./RecentBar";
 import { pushRecent, type RecentEntry } from "./recent";
-import { asKind } from "./kinds";
+import { asKind, kindMeta, type Kind } from "./kinds";
 import { useIdentity } from "../../store/identity";
 
 type Props = { onConnected: (session: SessionInfo) => void };
@@ -116,8 +116,9 @@ export function HomeScreen({ onConnected }: Props) {
   // Manual IP entry carries no discovery result, so it stays a scope — the
   // only kind a bare address can be assumed to be.
   const onConnectAddress = (address: string) => connect({ address, label: address, kind: "scope" }, { address, label: address, kind: "scope", model: address, mock: false }, address);
-  const onConnectMock = () => connect({ mock: true, kind: "scope" }, { address: null, label: "Mock scope", kind: "scope", model: "Mock", mock: true }, null);
-  const onConnectMockPsu = () => connect({ mock: true, kind: "psu" }, { address: null, label: "Mock power supply", kind: "psu", model: "Mock", mock: true }, null);
+  // One handler for every connectable kind, not one prop per kind: the mock
+  // button that calls this lives in ManualConnect, driven off KIND_META.
+  const onConnectMock = (kind: Kind) => connect({ mock: true, kind }, { address: null, label: `Mock ${kindMeta(kind).label}`, kind, model: "Mock", mock: true }, null);
 
   return (
     <div>
@@ -129,7 +130,7 @@ export function HomeScreen({ onConnected }: Props) {
           <InstrumentDashboard devices={devices} scanning={scanning} error={error} busyKey={busyKey} onConnect={onConnectDevice} onOpen={onOpenDevice} sessions={sessions} identity={identity} onClaimed={scan} />
         </div>
         <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "var(--space-2)", minWidth: 220 }}>
-          <GroupBox title="Connect manually"><ManualConnect busy={busy} onConnectAddress={onConnectAddress} onConnectMock={onConnectMock} onConnectMockPsu={onConnectMockPsu} /></GroupBox>
+          <GroupBox title="Connect manually"><ManualConnect busy={busy} onConnectAddress={onConnectAddress} onConnectMock={onConnectMock} /></GroupBox>
           <GroupBox title="Help"><GettingStarted /></GroupBox>
         </div>
       </div>
