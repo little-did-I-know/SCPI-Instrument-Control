@@ -52,13 +52,22 @@ The side rail holds one tab per feature area:
 - **Measure** — per-channel measurement checkboxes with live values, on every
   supported dialect (see [SCPI Dialects](../user-guide/scpi-dialects.md) for
   how each one is wired up).
-- **Terminal** — send raw SCPI commands. A trailing `?` sends it as a query
-  and shows the response; anything else is a bare write.
 
 ## Toolbar
 
 Across the top: Run / Stop / Single / Auto acquisition controls, the canvas
 view-mode toggle, CSV / JSON / Screenshot export buttons, and Disconnect.
+
+## SCPI terminal
+
+The console for sending raw SCPI commands is no longer a rail tab — it lives
+in a **Terminal** button in the header, next to the connection status. Click
+it to open a full-width drawer below the rest of the session (Escape closes
+it too); a trailing `?` sends your command as a query and shows the response,
+anything else is a bare write. Because it lives in the header rather than the
+scope's rail, it is available for **every** connected instrument kind, not
+just a scope — a power supply session gets the same drawer for anything its
+panel doesn't expose.
 
 ## Multi-tab behavior
 

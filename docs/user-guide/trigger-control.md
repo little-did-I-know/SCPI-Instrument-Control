@@ -563,7 +563,7 @@ property, and don't expect a `scope.trigger.holdoff` example on this page.
 
 For now, set trigger holdoff from the instrument's front panel, or through
 its vendor-supplied UI. If you need to script it in the meantime, the
-gateway's Terminal tab (or `scope.write()`/`scope.query()`) lets you send
+gateway's SCPI terminal (or `scope.write()`/`scope.query()`) lets you send
 whatever raw command your instrument actually uses — see
 [SCPI Dialects](scpi-dialects.md) for the difference between the legacy and
 modern command sets.

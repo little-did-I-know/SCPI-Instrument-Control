@@ -3,8 +3,10 @@
 This is the complete wire reference for the gateway server. All paths below
 are relative to the server root (default `http://127.0.0.1:8765`); every
 `/api/*` route accepts and returns JSON. This page mirrors what the browser
-UI itself calls — everything documented here is exercised by the shipping
-frontend.
+UI itself calls, with one noted exception: the older `/scope/command` route
+(see [Scope configuration](#scope-configuration)) is public API that still
+works, but the shipping frontend calls the kind-agnostic
+[command console](#command-console) route instead.
 
 Every route below requires `Authorization: Bearer <token>` **except**
 `GET /api/health`. See the [Gateway security guide](security.md) for how to
@@ -28,6 +30,19 @@ A **discover entry** is either a live session — `{address, idn, manufacturer, 
 
 `address`/`port`/`mock`/`model` on `POST /api/sessions` are all optional: pass `{"mock": true}` for a hardware-free session, or `{"address": "192.168.1.100"}` for a real instrument (port defaults to 5025).
 
+## Command console
+
+| Method | Path | Body / params | Response | Errors |
+|---|---|---|---|---|
+| `POST` | `/api/sessions/{id}/command` | `{command}` — a raw SCPI string | `{command, response}` — `response` is the query reply, or `null` for a write | 400 empty command; 404 unknown session; 409 if the session is in an error/closed state |
+
+The kind-agnostic console route: it works for any connected instrument kind
+(scope or PSU today), because sending a raw command needs nothing kind-specific
+— both drivers expose `write`/`query`. This is what the browser UI's Terminal
+drawer calls (see [Browser UI Tour](browser-ui.md#scpi-terminal)). A command
+ending in `?` is a query and returns the instrument's answer; anything else is
+a write and returns a `null` response — never a fabricated one.
+
 ## Scope configuration
 
 All paths below are under `/api/sessions/{id}/scope/`.
@@ -39,7 +54,7 @@ All paths below are under `/api/sessions/{id}/scope/`.
 | `PATCH` | `timebase` | `{timebase}` (seconds/div, required) | State snapshot | 409 session not accepting jobs |
 | `PATCH` | `trigger` | `{mode?, source?, level?, slope?, coupling?}` | State snapshot | 400 invalid value (trigger coupling must be `DC`/`AC`/`HFREJ`/`LFREJ`); 409 session not accepting jobs |
 | `POST` | `run` \| `stop` \| `single` \| `auto` | — | State snapshot | 400 unknown operation (any other `{op}` value); 409 session not accepting jobs |
-| `POST` | `command` | `{command}` — a raw SCPI string | `{command, response}` — `response` is the query reply, or `null` for a write | 400 empty command; 409 if the session is in an error/closed state |
+| `POST` | `command` | `{command}` — a raw SCPI string | `{command, response}` — `response` is the query reply, or `null` for a write | 400 empty command or non-scope session; 409 if the session is in an error/closed state |
 | `PUT` | `measurements` | `[{channel, mtype}]` — `mtype` one of the 17 supported types (`PKPK`, `MAX`, `MIN`, `AMPL`, `TOP`, `BASE`, `CMEAN`, `MEAN`, `RMS`, `CRMS`, `FREQ`, `PER`, `RISE`, `FALL`, `WID`, `NWID`, `DUTY`) | `{measurements: [{channel, mtype}]}` | 400 unknown `mtype` or out-of-range channel; **409 while a trend recording is active** (selection is locked) |
 | `GET` | `measurements` | — | `{measurements: [{channel, mtype}]}` | — |
 
