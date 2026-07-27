@@ -7,7 +7,6 @@ import { TriggerPanel } from "../controls/TriggerPanel";
 import { MeasurePanel } from "../measure/MeasurePanel";
 import { ReferencePanel } from "../reference/ReferencePanel";
 import { useReferenceSeed } from "../reference/useReferenceSeed";
-import { TerminalPanel } from "../terminal/TerminalPanel";
 import { LogPanel } from "../trend/LogPanel";
 import { TrendCanvas } from "../trend/TrendCanvas";
 import { SpectrumCanvas } from "../waveform/SpectrumCanvas";
@@ -17,7 +16,7 @@ import { ViewModeToggle } from "../waveform/ViewModeToggle";
 import { Tabs } from "../../ds/Tabs";
 import { useSession } from "../../store/session";
 
-const RAIL_TABS = ["Channels", "Trigger", "Math", "Analysis", "Reference", "Log", "Measure", "Terminal"];
+const RAIL_TABS = ["Channels", "Trigger", "Math", "Analysis", "Reference", "Log", "Measure"];
 
 /** Everything below the readout strip for an oscilloscope session: the control
  *  rail and the canvas. Only this component knows a scope has a rail -- the
@@ -40,7 +39,6 @@ export function ScopeBody() {
           {railTab === "Reference" && <ReferencePanel />}
           {railTab === "Log" && <LogPanel />}
           {railTab === "Measure" && <MeasurePanel />}
-          {railTab === "Terminal" && <TerminalPanel />}
         </Tabs>
       </div>
       <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "var(--space-3)", minWidth: 0 }}>

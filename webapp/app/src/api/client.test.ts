@@ -78,3 +78,14 @@ describe("api client", () => {
     expect(headers.get("Authorization")).toBe("Bearer scpi_abc123");
   });
 });
+
+describe("api.command", () => {
+  it("posts to the kind-agnostic session route, not the scope one", async () => {
+    // The /scope/ route is behind require_kind, so a PSU session's terminal
+    // would 400 on every command if the client still used it.
+    const fetchMock = vi.fn((_input: RequestInfo | URL) => Promise.resolve(new Response(JSON.stringify({ command: "*IDN?", response: "x" }), { status: 200, headers: { "Content-Type": "application/json" } })));
+    vi.stubGlobal("fetch", fetchMock);
+    await api.command("abc", "*IDN?");
+    expect(String(fetchMock.mock.calls[0][0])).toBe("/api/sessions/abc/command");
+  });
+});

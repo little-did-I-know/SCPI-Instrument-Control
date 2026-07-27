@@ -1,7 +1,9 @@
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
 import { setToken } from "./api/token";
+import { useTerminalDrawer } from "./features/shell/useTerminalDrawer";
 import { useSession } from "./store/session";
 
 // TokenGate's own suite (features/auth/TokenGate.test.tsx) already covers its
@@ -30,6 +32,7 @@ beforeEach(() => {
   localStorage.clear();
   setToken("test-token"); // past TokenGate; matches the other suites
   useSession.getState().clearSession();
+  useTerminalDrawer.getState().close();
   vi.stubGlobal("WebSocket", FakeWebSocket as unknown as typeof WebSocket);
   // HomeScreen (no-session case) and useReferenceSeed (scope/psu cases) both
   // hit the network on mount even with the gate mocked out, so fetch needs an
@@ -94,5 +97,26 @@ describe("App view selection", () => {
     render(<App />);
     expect(screen.getByText(/coming soon/i)).toBeInTheDocument();
     expect(screen.queryByText("Channels")).not.toBeInTheDocument();
+  });
+
+  it("offers the SCPI terminal for a psu session, not just a scope", async () => {
+    // The reason this sub-project exists: the console is kind-agnostic code
+    // that only a scope could reach.
+    useSession.getState().setSession({ ...SESSION, kind: "psu" });
+    render(<App />);
+    await userEvent.click(screen.getByRole("button", { name: /terminal/i }));
+    expect(screen.getByRole("region", { name: "SCPI terminal" })).toBeInTheDocument();
+  });
+
+  it("offers the SCPI terminal for a scope session", async () => {
+    useSession.getState().setSession(SESSION);
+    render(<App />);
+    await userEvent.click(screen.getByRole("button", { name: /terminal/i }));
+    expect(screen.getByRole("region", { name: "SCPI terminal" })).toBeInTheDocument();
+  });
+
+  it("does not offer the terminal with no session", () => {
+    render(<App />);
+    expect(screen.queryByRole("button", { name: /terminal/i })).not.toBeInTheDocument();
   });
 });
