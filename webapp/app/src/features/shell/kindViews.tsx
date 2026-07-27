@@ -1,6 +1,7 @@
 import type { ComponentType } from "react";
 import type { Kind } from "../home/kinds";
 import { PsuPanel } from "../psu/PsuPanel";
+import { PsuReadout } from "../psu/PsuReadout";
 import { ReadoutStrip } from "../readout/ReadoutStrip";
 import { ScopeBody } from "../scope/ScopeBody";
 
@@ -18,5 +19,5 @@ export type KindView = {
  *  shell's "coming soon" box, which is what AWG and DAQ get until they land. */
 export const KIND_VIEWS: Partial<Record<Kind, KindView>> = {
   scope: { readout: ReadoutStrip, body: ScopeBody },
-  psu: { body: PsuPanel },
+  psu: { readout: PsuReadout, body: PsuPanel },
 };
