@@ -1,3 +1,5 @@
+import type { Kind } from "../features/home/kinds";
+
 export type ChannelState = {
   enabled: boolean;
   voltage_scale: number;
@@ -34,6 +36,7 @@ export type SessionInfo = {
   num_channels: number;
   viewers: number;
   owner: string;
+  kind: Kind;
 };
 
 export type DiscoveredDevice = {
@@ -71,6 +74,7 @@ export type LogData = { columns: { channel: number; mtype: string }[]; rows: (nu
 
 export type StreamMessage =
   | { type: "state"; state: ScopeState }
+  | { type: "state"; kind: "psu"; outputs: PsuOutputState[] }
   | { type: "waveform"; channel: number | string; t0: number; dt: number; points: number[] }
   | { type: "measurements"; values: MeasurementValue[]; timestamp?: number }
   | { type: "measurements_config"; items: { channel: number; mtype: string }[] }
@@ -81,7 +85,31 @@ export type StreamMessage =
   | { type: "closed" }
   | ({ type: "log_status" } & LogStatus);
 
-export type SessionCreate = { label?: string; address?: string; port?: number; mock?: boolean; model?: string };
+// Every field bar `output` is read through the server's _safe(): a query the
+// model does not implement, or a timeout, yields null. `enabled` in particular
+// is null-not-false by design — an SPD3303X's CH3 has no status bit and no
+// OUTP3?, and rendering an energised rail as a confident "off" is the exact
+// safety failure the UI must not commit. null means "unknown"; show it as such.
+export type PsuOutputState = {
+  output: number;
+  voltage: number | null;
+  current: number | null;
+  enabled: boolean | null;
+  measured_voltage: number | null;
+  measured_current: number | null;
+  measured_power: number | null;
+};
+
+export type PsuState = { outputs: PsuOutputState[] };
+
+export type PsuOutputPatch = Partial<{ voltage: number; current: number }>;
+
+// `kind` is optional and the server defaults it to "scope", so an older client
+// that omits it keeps the pre-5.8 behaviour. Sending it is how the UI creates
+// anything other than a scope: discovery already knows the kind, and without
+// passing it through, clicking Connect on a discovered PSU builds an
+// Oscilloscope against a power supply and 409s on the server's kind guard.
+export type SessionCreate = { label?: string; kind?: Kind; address?: string; port?: number; mock?: boolean; model?: string };
 export type ChannelPatch = Partial<{ enabled: boolean; voltage_scale: number; voltage_offset: number; coupling: string; probe_ratio: number }>;
 export type TriggerPatch = Partial<{ mode: string; source: string; level: number; slope: string; coupling: string }>;
 export type RunOp = "run" | "stop" | "single" | "auto";

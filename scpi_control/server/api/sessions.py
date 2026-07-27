@@ -4,6 +4,7 @@ import time
 from fastapi import APIRouter, HTTPException, Request, Response
 from fastapi.concurrency import run_in_threadpool
 
+from scpi_control.exceptions import InvalidParameterError
 from scpi_control.models import MODEL_REGISTRY
 from scpi_control.server.schemas import ModelOut, OwnerPut, SessionCreate, session_out
 
@@ -29,6 +30,17 @@ def require_session(request: Request, session_id: str):
     return session
 
 
+def require_kind(session, kind: str):
+    """A route for one instrument kind must refuse a session of another.
+
+    Without this the driver call fails deep inside the worker thread with an
+    AttributeError naming a method the caller never mentioned.
+    """
+    if session.kind != kind:
+        raise InvalidParameterError("session {0} is a {1}, not a {2}".format(session.id, session.kind, kind))
+    return session
+
+
 @router.get("/models")
 def list_models():
     caps = sorted(MODEL_REGISTRY.values(), key=lambda c: c.model_name)
@@ -49,7 +61,9 @@ def get_session(session_id: str, request: Request):
 async def create_session(body: SessionCreate, request: Request):
     label = body.label or (body.model or ("Mock scope" if body.mock else body.address or ""))
     # InstrumentSession.open blocks on connect; keep the event loop free.
-    session = await run_in_threadpool(get_manager(request).create, label, address=body.address, port=body.port, mock=body.mock, model=body.model, owner=getattr(request.state, "identity", ""))
+    session = await run_in_threadpool(
+        get_manager(request).create, label, kind=body.kind, address=body.address, port=body.port, mock=body.mock, model=body.model, owner=getattr(request.state, "identity", "")
+    )
     return session_out(session)
 
 

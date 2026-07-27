@@ -11,7 +11,7 @@ const OVERLAY = { name: "golden", channel: 1, t0: 0, dt: 1, points: [1] };
 
 beforeEach(() => {
   useSession.getState().clearSession();
-  useSession.getState().setSession({ id: "abc", label: "x", mock: true, address: null, state: "connected", idn: "", model: "", dialect: "legacy", num_channels: 4, viewers: 0, owner: "" });
+  useSession.getState().setSession({ id: "abc", label: "x", mock: true, address: null, state: "connected", idn: "", model: "", dialect: "legacy", num_channels: 4, viewers: 0, owner: "", kind: "scope" });
 });
 afterEach(() => vi.restoreAllMocks());
 

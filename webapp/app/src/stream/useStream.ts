@@ -21,7 +21,15 @@ export function useStream(sessionId: string | null): void {
     socket.onmessage = (event: MessageEvent) => {
       const message = JSON.parse(event.data as string) as StreamMessage;
       const store = useSession.getState();
-      if (message.type === "state") store.applyState(message.state);
+      if (message.type === "state") {
+        // Two shapes share "type":"state" -- a scope's {state:...} and a
+        // psu's {kind:"psu", outputs:...} (see PsuAdapter.poll /
+        // stream.py's kind dispatch on the initial frame). Discriminate on
+        // the "outputs" key rather than "kind" so the check stays a plain
+        // property test with no cast.
+        if ("outputs" in message) store.applyPsuState({ outputs: message.outputs });
+        else store.applyState(message.state);
+      }
       else if (message.type === "waveform") setFrame(message.channel, { t0: message.t0, dt: message.dt, points: message.points });
       else if (message.type === "measurements") {
         store.applyMeasurements(message.values);

@@ -79,6 +79,7 @@ _BODIES = {
     ("PUT", "/sessions/{session_id}/scope/measurements"): [{"channel": 1, "mtype": "PKPK"}],
     ("POST", "/sessions/{session_id}/scope/references"): {"name": "ref", "channel": 1},
     ("POST", "/sessions/{session_id}/owner"): {"name": "carol"},
+    ("PATCH", "/sessions/{session_id}/psu/outputs/{n}/enable"): {"enabled": True},
 }
 
 
@@ -367,7 +368,7 @@ def test_watcher_released_on_abnormal_disconnect(two_users_ws, monkeypatch):
     even when the connection tears down abnormally -- the handler raises
     before ever sending a frame -- rather than via a clean client close.
     """
-    from scpi_control.server.api import stream as stream_module
+    from scpi_control.server.adapters import ScopeAdapter
 
     client, alice, bob, alice_ws, _bob_ws = two_users_ws
     sid = _make_session(client, alice)["id"]
@@ -376,7 +377,7 @@ def test_watcher_released_on_abnormal_disconnect(two_users_ws, monkeypatch):
     raised = []
     reached = threading.Event()
 
-    def _boom(_scope):
+    def _boom(_self, _scope):
         # Recording the call is inside the same body as the raise, so if a
         # future edit swaps this helper for a non-raising stand-in (e.g.
         # ``return {}``), the whole body -- including this append -- goes
@@ -386,24 +387,24 @@ def test_watcher_released_on_abnormal_disconnect(two_users_ws, monkeypatch):
         reached.set()
         raise RuntimeError("simulated mid-stream failure")
 
-    monkeypatch.setattr(stream_module, "read_state", _boom)
-    # No receive_json here: the handler crashes before it ever sends a
-    # frame, so waiting on one would hang forever waiting for a message
-    # that never arrives.
+    # The stream handler now asks the session's *adapter* for its opening
+    # frame (adapter.initial_frame), so that is the seam to break.
+    monkeypatch.setattr(ScopeAdapter, "initial_frame", _boom)
+    # No receive_json for a *state* frame here: the handler never gets one.
     #
     # But we cannot just close immediately either. The handler reaches
-    # read_state via ``session.submit(...)`` onto the session's worker thread
-    # (stream.py:98), so it runs asynchronously relative to the handshake --
-    # closing the socket right away races that dispatch, and the job may never
-    # run. That race made this test fail intermittently in CI on whichever
+    # initial_frame via ``session.submit(...)`` onto the session's worker
+    # thread, so it runs asynchronously relative to the handshake -- closing
+    # the socket right away races that dispatch, and the job may never run.
+    # That race made this test fail intermittently in CI on whichever
     # interpreter happened to lose it (3.10 on one run, 3.11 on the next, each
     # time passing on the others). Waiting for the helper to actually fire
     # removes the timing dependency; the timeout keeps a genuine regression
     # from hanging the suite.
     with client.websocket_connect("/api/sessions/{0}/stream".format(sid), subprotocols=alice_ws):
-        assert reached.wait(timeout=10.0), "handler never reached read_state within 10s"
+        assert reached.wait(timeout=10.0), "handler never reached initial_frame within 10s"
 
-    assert raised, "abnormal path never exercised -- read_state must raise, not return"
+    assert raised, "abnormal path never exercised -- initial_frame must raise, not return"
 
     # If the watcher slot leaked, alice would still read as "watching" and
     # this claim (owner idle, threshold 0) would be wrongly refused.

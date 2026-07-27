@@ -37,7 +37,7 @@ class FakeWebSocket {
   }
 }
 
-const SESSION = { id: "abc", label: "x", mock: true, address: null, state: "connected", idn: "", model: "", dialect: "legacy", num_channels: 4, viewers: 0, owner: "" };
+const SESSION = { id: "abc", label: "x", mock: true, address: null, state: "connected", idn: "", model: "", dialect: "legacy", num_channels: 4, viewers: 0, owner: "", kind: "scope" as const };
 
 beforeEach(() => {
   vi.stubGlobal("WebSocket", FakeWebSocket as unknown as typeof WebSocket);
@@ -57,6 +57,17 @@ describe("useStream", () => {
 
     FakeWebSocket.last!.emit({ type: "state", state: STATE });
     await waitFor(() => expect(useSession.getState().scope?.timebase).toBe(0.001));
+  });
+
+  it("routes a psu state message to the psu store slot, not the scope slot", async () => {
+    renderHook(() => useStream("abc"));
+    FakeWebSocket.last!.emit({
+      type: "state",
+      kind: "psu",
+      outputs: [{ output: 1, voltage: 3.3, current: 0.5, enabled: false, measured_voltage: 3.31, measured_current: 0.12, measured_power: 0.4 }],
+    });
+    await waitFor(() => expect(useSession.getState().psu?.outputs[0].measured_voltage).toBe(3.31));
+    expect(useSession.getState().scope).toBeNull();
   });
 
   it("routes waveform frames to the frame buffer, not the store", async () => {
@@ -86,7 +97,7 @@ describe("useStream", () => {
   });
 
   it("treats a closed message as a clean session end", async () => {
-    useSession.getState().setSession({ id: "abc", label: "x", mock: true, address: null, state: "connected", idn: "", model: "", dialect: "legacy", num_channels: 4, viewers: 0, owner: "" });
+    useSession.getState().setSession({ id: "abc", label: "x", mock: true, address: null, state: "connected", idn: "", model: "", dialect: "legacy", num_channels: 4, viewers: 0, owner: "", kind: "scope" });
     renderHook(() => useStream("abc"));
     FakeWebSocket.last!.emit({ type: "closed" });
     await waitFor(() => expect(useSession.getState().session).toBeNull());

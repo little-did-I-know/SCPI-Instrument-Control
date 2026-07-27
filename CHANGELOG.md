@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- The web gateway can now host a power supply (SPD3303X series) alongside oscilloscopes. A power
+  supply found by the network scan shows up under "Power supplies" with its own Connect button,
+  and "Mock power supply" in the Connect-manually rail opens a PSU session with no hardware at
+  all. The panel gives every output a voltage setpoint, a current limit, an on/off switch, and
+  live voltage/current/power readings that update as the instrument does.
+- The output switch reflects what the instrument actually reports, never what was just asked for,
+  and a reading the supply will not answer shows as `--.--` or "state unknown" rather than as a
+  confident zero or a confident "off". An SPD3303X's CH3 has no output-state query at all, so
+  this is the normal case there, not an edge case.
+- `POST /api/sessions` accepts an optional `kind` field (`"scope"` by default, so an existing
+  caller that omits it is unaffected), and the new `/api/sessions/{id}/psu/...` routes read and
+  control PSU outputs. A session refuses to start if the connected instrument identifies as a
+  different kind than the one asked for. The 26 existing `/scope/` routes are unchanged, as is
+  every public name on `InstrumentSession`.
+
 ## [5.7.1] - 2026-07-26
 
 ### Fixed

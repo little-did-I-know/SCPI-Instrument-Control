@@ -16,6 +16,14 @@ from scpi_control.server.app import create_app  # noqa: E402
 from scpi_control.server.auth import WS_ACCEPT_SUBPROTOCOL  # noqa: E402
 from scpi_control.server.sessions import SessionManager  # noqa: E402
 
+# Every ws.receive_json() below blocks with no deadline of its own. The failure
+# mode these tests exist to catch -- a stream that accepts the socket and then
+# never sends anything -- therefore presents as a HANG, not a red test, which
+# would wedge CI instead of reporting. A module-level timeout converts it back
+# into an ordinary failure. 30 s is far above the slowest test here (the
+# disconnect test's 5 s poll loop).
+pytestmark = pytest.mark.timeout(30)
+
 
 @pytest.fixture()
 def client(gateway_auth):
@@ -53,6 +61,12 @@ def _create_mock(client):
     return response.json()["id"]
 
 
+def _create_psu_mock(client):
+    response = client.post("/api/sessions", json={"mock": True, "kind": "psu"})
+    assert response.status_code == 201
+    return response.json()["id"]
+
+
 def test_stream_sends_initial_state_then_waveforms(client, ws_subprotocols):
     sid = _create_mock(client)
     with client.websocket_connect("/api/sessions/{0}/stream".format(sid), subprotocols=ws_subprotocols) as ws:
@@ -82,6 +96,65 @@ def test_stream_relays_state_broadcast_after_mutation(client, ws_subprotocols):
                 break
         else:
             pytest.fail("no state broadcast observed")
+
+
+# --- psu kind dispatch: the initial frame must match the psu shape --------
+# (previously read_state() assumed an Oscilloscope, raised AttributeError
+# against a PowerSupply, and the bare except in the handler swallowed it --
+# no initial frame was ever sent and the connection just sat there silent).
+
+
+def test_stream_sends_initial_psu_state(client, ws_subprotocols):
+    sid = _create_psu_mock(client)
+    with client.websocket_connect("/api/sessions/{0}/stream".format(sid), subprotocols=ws_subprotocols) as ws:
+        first = ws.receive_json()
+        assert first["type"] == "state"
+        assert first["kind"] == "psu"
+        assert isinstance(first["outputs"], list) and first["outputs"]
+        assert first["outputs"][0]["output"] == 1
+        assert "measured_voltage" in first["outputs"][0]
+
+
+def test_stream_relays_psu_state_broadcast_after_mutation(client, ws_subprotocols):
+    sid = _create_psu_mock(client)
+    with client.websocket_connect("/api/sessions/{0}/stream".format(sid), subprotocols=ws_subprotocols) as ws:
+        first = ws.receive_json()
+        assert first["kind"] == "psu"
+        response = client.patch("/api/sessions/{0}/psu/outputs/1".format(sid), json={"voltage": 7.5})
+        assert response.status_code == 200
+        for _ in range(20):
+            msg = ws.receive_json()
+            if msg["type"] == "state" and msg.get("kind") == "psu":
+                out1 = next(o for o in msg["outputs"] if o["output"] == 1)
+                if out1["voltage"] == 7.5:
+                    break
+        else:
+            pytest.fail("no psu state broadcast observed")
+
+
+def test_an_adapter_that_cannot_produce_an_initial_frame_fails_loudly(client, ws_subprotocols, monkeypatch):
+    """The opening frame comes from ``adapter.initial_frame``. When that hook
+    raises -- a new kind that never implemented it, or a read that fails -- the
+    handler used to swallow it with a bare ``except Exception: pass``, leaving
+    the socket accepted, silent, and indistinguishable from an idle instrument
+    forever (polling never starts either: _poll_tick needs a subscriber that
+    has seen a first message). It must instead say what went wrong and close
+    with a code that names the failure."""
+    from scpi_control.server.adapters import ScopeAdapter
+    from scpi_control.server.api.stream import CLOSE_INITIAL_FRAME_FAILED
+
+    def _boom(_self, _instrument):
+        raise NotImplementedError("initial_frame")
+
+    monkeypatch.setattr(ScopeAdapter, "initial_frame", _boom)
+    sid = _create_mock(client)
+    with pytest.raises(WebSocketDisconnect) as exc_info:
+        with client.websocket_connect("/api/sessions/{0}/stream".format(sid), subprotocols=ws_subprotocols) as ws:
+            first = ws.receive_json()
+            assert first["type"] == "error", "a silent socket is the bug; an error frame is the fix"
+            assert "initial frame failed" in first["detail"]
+            ws.receive_json()  # the close arrives here
+    assert exc_info.value.code == CLOSE_INITIAL_FRAME_FAILED
 
 
 def test_stream_unknown_session_closes(client, ws_subprotocols):

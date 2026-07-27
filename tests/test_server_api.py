@@ -111,6 +111,21 @@ class TestSessionEndpoints:
         assert client.delete("/api/sessions/" + body["id"]).status_code == 404
         assert client.get("/api/sessions").json() == []
 
+    def test_create_session_with_psu_kind_reports_its_kind(self, client):
+        # kind is threaded from SessionCreate.kind through SessionManager.create
+        # to the session and back out through SessionOut.kind -- prove the full
+        # round trip over HTTP, not just at the adapter/session layer.
+        response = client.post("/api/sessions", json={"mock": True, "kind": "psu"})
+        assert response.status_code == 201, response.text
+        body = response.json()
+        assert body["kind"] == "psu"
+
+    def test_create_session_with_bogus_kind_fails_cleanly(self, client):
+        # An unknown kind must fail as a client/domain error (SessionError -> 409),
+        # never as an unhandled KeyError surfacing as a 500.
+        response = client.post("/api/sessions", json={"mock": True, "kind": "bogus"})
+        assert 400 <= response.status_code < 500, response.text
+
 
 def test_models_endpoint_lists_registry(client):
     response = client.get("/api/models")
@@ -601,9 +616,9 @@ class TestTrendLog:
         client.put("/api/sessions/{0}/scope/measurements".format(sid), json=[{"channel": 1, "mtype": "PKPK"}, {"channel": 2, "mtype": "FREQ"}])
         client.post("/api/sessions/{0}/scope/log/start".format(sid))
         session = manager.get(sid)
-        started = session.recorder.started_at
-        session.recorder.append(started + 1.0, [1.5, None])
-        session.recorder.append(started + 2.0, [1.25, 50.0])
+        started = session.adapter.recorder.started_at
+        session.adapter.recorder.append(started + 1.0, [1.5, None])
+        session.adapter.recorder.append(started + 2.0, [1.25, 50.0])
 
         data = client.get("/api/sessions/{0}/scope/log/data".format(sid)).json()
         assert data["columns"] == [{"channel": 1, "mtype": "PKPK"}, {"channel": 2, "mtype": "FREQ"}]

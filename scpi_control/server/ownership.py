@@ -39,6 +39,8 @@ WRITE_ROUTES = frozenset(
         ("PATCH", "/sessions/{session_id}/scope/math/{n}"),
         ("PATCH", "/sessions/{session_id}/scope/spectrum"),
         ("PATCH", "/sessions/{session_id}/scope/filters/{n}"),
+        ("PATCH", "/sessions/{session_id}/psu/outputs/{n}"),
+        ("PATCH", "/sessions/{session_id}/psu/outputs/{n}/enable"),
         ("POST", "/sessions/{session_id}/scope/references"),
         ("DELETE", "/sessions/{session_id}/scope/references/{name}"),
         ("PUT", "/sessions/{session_id}/scope/reference"),

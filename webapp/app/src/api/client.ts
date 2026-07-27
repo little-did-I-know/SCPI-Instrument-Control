@@ -1,4 +1,4 @@
-import type { ChannelPatch, DiscoveredDevice, FilterConfig, LogData, LogInfo, MeasurementValue, ModelInfo, ReferenceInfo, ReferenceOverlay, RunOp, ScopeState, SessionCreate, SessionInfo, SpectrumConfig, TriggerPatch } from "./types";
+import type { ChannelPatch, DiscoveredDevice, FilterConfig, LogData, LogInfo, MeasurementValue, ModelInfo, PsuOutputPatch, PsuState, ReferenceInfo, ReferenceOverlay, RunOp, ScopeState, SessionCreate, SessionInfo, SpectrumConfig, TriggerPatch } from "./types";
 import { getToken } from "./token";
 
 export class ApiError extends Error {
@@ -41,6 +41,7 @@ function json(method: string, body: unknown): RequestInit {
 }
 
 const scope = (id: string) => `/api/sessions/${id}/scope`;
+const psu = (id: string) => `/api/sessions/${id}/psu`;
 
 export const api = {
   whoami: () => request<{ identity: string }>("/api/whoami"),
@@ -78,6 +79,9 @@ export const api = {
   getLog: (id: string) => request<LogInfo>(`${scope(id)}/log`),
   getLogData: (id: string, since = 0) => request<LogData>(`${scope(id)}/log/data?since=${since}`),
   logCsvUrl: (id: string) => `${scope(id)}/log.csv`,
+  psuState: (id: string) => request<PsuState>(`${psu(id)}/state`),
+  setPsuOutput: (id: string, n: number, body: PsuOutputPatch) => request<PsuState>(`${psu(id)}/outputs/${n}`, json("PATCH", body)),
+  setPsuOutputEnable: (id: string, n: number, enabled: boolean) => request<PsuState>(`${psu(id)}/outputs/${n}/enable`, json("PATCH", { enabled })),
 };
 
 export type { MeasurementValue };

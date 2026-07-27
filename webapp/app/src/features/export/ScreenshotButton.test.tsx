@@ -13,7 +13,7 @@ afterEach(() => vi.unstubAllGlobals());
 
 describe("ScreenshotButton", () => {
   it("downloads the screenshot URL with the bearer token when connected", async () => {
-    useSession.getState().setSession({ id: "abc", label: "x", mock: true, address: null, state: "connected", idn: "", model: "", dialect: "legacy", num_channels: 4, viewers: 0, owner: "" });
+    useSession.getState().setSession({ id: "abc", label: "x", mock: true, address: null, state: "connected", idn: "", model: "", dialect: "legacy", num_channels: 4, viewers: 0, owner: "", kind: "scope" });
     setToken("scpi_shot");
     const fetchMock = vi.fn().mockResolvedValue(new Response(new Blob(["data"]), { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);
@@ -35,7 +35,7 @@ describe("ScreenshotButton", () => {
   });
 
   it("surfaces a download failure instead of silently doing nothing", async () => {
-    useSession.getState().setSession({ id: "abc", label: "x", mock: true, address: null, state: "connected", idn: "", model: "", dialect: "legacy", num_channels: 4, viewers: 0, owner: "" });
+    useSession.getState().setSession({ id: "abc", label: "x", mock: true, address: null, state: "connected", idn: "", model: "", dialect: "legacy", num_channels: 4, viewers: 0, owner: "", kind: "scope" });
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ error: "Unauthorized", detail: "missing bearer token" }), { status: 401 })));
 
     render(<ScreenshotButton />);

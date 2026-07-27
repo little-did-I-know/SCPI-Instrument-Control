@@ -89,7 +89,7 @@ def test_measurement_poll_reports_none_on_timeout():
     with patch.object(Measurement, "measure", side_effect=SiglentTimeoutError("forced")):
         session = make_session(idn=MODERN_IDN)
         try:
-            session.set_measurements([(1, "PKPK")])
+            session.adapter.set_measurements([(1, "PKPK")], session.publish)
             msgs = collect(session, "measurements", n=1, timeout=8.0)
             assert msgs, "expected a measurements message"
             entry = msgs[0]["values"][0]
@@ -207,7 +207,7 @@ def test_set_measurements_broadcasts_config():
                 got.append(msg)
 
         unsubscribe = session.subscribe(cb)
-        session.set_measurements([(1, "PKPK"), (2, "FREQ")])
+        session.adapter.set_measurements([(1, "PKPK"), (2, "FREQ")], session.publish)
         unsubscribe()
         assert got and got[0]["items"] == [{"channel": 1, "mtype": "PKPK"}, {"channel": 2, "mtype": "FREQ"}]
     finally:
@@ -217,7 +217,7 @@ def test_set_measurements_broadcasts_config():
 def test_poll_publishes_spectrum_frame_when_enabled():
     session = make_session()
     try:
-        session.spectrum_config = {**session.spectrum_config, "enabled": True}
+        session.adapter.spectrum_config = {**session.adapter.spectrum_config, "enabled": True}
         frames = collect(session, "spectrum", n=1, timeout=8.0)
         assert frames, "expected a spectrum frame"
         frame = frames[0]
@@ -231,11 +231,11 @@ def test_poll_publishes_spectrum_frame_when_enabled():
 def test_poll_clears_spectrum_frame_when_disabled():
     session = make_session()
     try:
-        session.spectrum_config = {**session.spectrum_config, "enabled": True}
+        session.adapter.spectrum_config = {**session.adapter.spectrum_config, "enabled": True}
         assert collect(session, "spectrum", n=1, timeout=8.0), "expected a live spectrum frame first"
         cleared = []
         unsubscribe = session.subscribe(lambda m: cleared.append(m) if m["type"] == "spectrum" and m["points"] == [] else None)
-        session.spectrum_config = {**session.spectrum_config, "enabled": False}
+        session.adapter.spectrum_config = {**session.adapter.spectrum_config, "enabled": False}
         deadline = time.time() + 8.0
         while not cleared and time.time() < deadline:
             time.sleep(0.02)
@@ -248,7 +248,7 @@ def test_poll_clears_spectrum_frame_when_disabled():
 def test_poll_publishes_filtered_trace():
     session = make_session()
     try:
-        session.filters = {**session.filters, 1: {**session.filters[1], "enabled": True, "cutoff_high": 100.0}}
+        session.adapter.filters = {**session.adapter.filters, 1: {**session.adapter.filters[1], "enabled": True, "cutoff_high": 100.0}}
         frames = collect(session, "waveform", n=6, timeout=8.0)
         f1 = [f for f in frames if f["channel"] == "F1"]
         assert f1, "expected an F1 filtered frame"
@@ -260,11 +260,11 @@ def test_poll_publishes_filtered_trace():
 def test_poll_clears_filtered_trace_when_disabled():
     session = make_session()
     try:
-        session.filters = {**session.filters, 1: {**session.filters[1], "enabled": True, "cutoff_high": 100.0}}
+        session.adapter.filters = {**session.adapter.filters, 1: {**session.adapter.filters[1], "enabled": True, "cutoff_high": 100.0}}
         assert [f for f in collect(session, "waveform", n=6, timeout=8.0) if f["channel"] == "F1"]
         cleared = []
         unsubscribe = session.subscribe(lambda m: cleared.append(m) if m["type"] == "waveform" and m["channel"] == "F1" and m["points"] == [] else None)
-        session.filters = {**session.filters, 1: {**session.filters[1], "enabled": False}}
+        session.adapter.filters = {**session.adapter.filters, 1: {**session.adapter.filters[1], "enabled": False}}
         deadline = time.time() + 8.0
         while not cleared and time.time() < deadline:
             time.sleep(0.02)
@@ -280,8 +280,8 @@ def test_set_active_reference_broadcasts_overlay_and_clear():
         got = []
         unsubscribe = session.subscribe(lambda m: got.append(m) if m["type"] == "reference" else None)
         data = session.submit(lambda scope: scope.get_waveform(1)).result(timeout=5)
-        session.set_active_reference("golden", 1, {"time": data.time, "voltage": data.voltage})
-        session.set_active_reference(None, None, None)
+        session.adapter.set_active_reference("golden", 1, {"time": data.time, "voltage": data.voltage}, session.publish)
+        session.adapter.set_active_reference(None, None, None, session.publish)
         unsubscribe()
         assert got[0]["name"] == "golden" and got[0]["channel"] == 1
         assert 0 < len(got[0]["points"]) <= 2000
@@ -297,7 +297,7 @@ def test_poll_publishes_reference_stats_for_active_reference():
     session = make_session(waveform_payloads={1: bytes([0, 25, 50, 75])})
     try:
         data = session.submit(lambda scope: scope.get_waveform(1)).result(timeout=5)
-        session.set_active_reference("golden", 1, {"time": data.time, "voltage": data.voltage})
+        session.adapter.set_active_reference("golden", 1, {"time": data.time, "voltage": data.voltage}, session.publish)
         msgs = collect(session, "reference_stats", n=1, timeout=8.0)
         assert msgs, "expected a reference_stats message"
         assert msgs[0]["correlation"] is not None and msgs[0]["correlation"] > 0.99
@@ -318,8 +318,8 @@ def test_poll_survives_unexpected_analysis_exception(monkeypatch):
     monkeypatch.setattr(compute, "spectrum_frame", boom)
     session = make_session()
     try:
-        session.filters = {**session.filters, 1: {**session.filters[1], "enabled": True, "cutoff_high": 100.0}}
-        session.spectrum_config = {**session.spectrum_config, "enabled": True}
+        session.adapter.filters = {**session.adapter.filters, 1: {**session.adapter.filters[1], "enabled": True, "cutoff_high": 100.0}}
+        session.adapter.spectrum_config = {**session.adapter.spectrum_config, "enabled": True}
         # n=8: this mock's default enables all 4 channels, so one healthy tick
         # already yields 4 "waveform" messages; require two full ticks' worth
         # so the assertion actually distinguishes "died after tick 1" from
@@ -334,7 +334,7 @@ def test_poll_survives_unexpected_analysis_exception(monkeypatch):
 def test_measurements_message_carries_timestamp():
     session = make_session()
     try:
-        session.set_measurements([(1, "PKPK")])
+        session.adapter.set_measurements([(1, "PKPK")], session.publish)
         before = time.time()
         msgs = collect(session, "measurements", n=1, timeout=8.0)
         assert msgs, "expected a measurements message"
@@ -347,13 +347,13 @@ def test_measurements_message_carries_timestamp():
 def test_recorder_accumulates_rows_while_recording():
     session = make_session()
     try:
-        session.set_measurements([(1, "PKPK")])
-        session.start_recording()
+        session.adapter.set_measurements([(1, "PKPK")], session.publish)
+        session.adapter.start_recording(session.publish)
         msgs = collect(session, "measurements", n=2, timeout=12.0)
         assert msgs
-        status = session.recorder.status()
+        status = session.adapter.recorder.status()
         assert status["row_count"] >= 1
-        rows = session.recorder.rows_since()
+        rows = session.adapter.recorder.rows_since()
         assert len(rows[0]) == 2  # [timestamp, one column value]
         assert rows[0][0] == msgs[0]["timestamp"]  # same clock stamp feeds both
     finally:
@@ -363,9 +363,9 @@ def test_recorder_accumulates_rows_while_recording():
 def test_recorder_ignores_measurements_when_idle():
     session = make_session()
     try:
-        session.set_measurements([(1, "PKPK")])
+        session.adapter.set_measurements([(1, "PKPK")], session.publish)
         assert collect(session, "measurements", n=1, timeout=8.0)
-        assert session.recorder.status()["row_count"] == 0
+        assert session.adapter.recorder.status()["row_count"] == 0
     finally:
         session.close()
 
@@ -375,9 +375,9 @@ def test_start_and_stop_recording_broadcast_log_status():
     try:
         got = []
         unsubscribe = session.subscribe(lambda m: got.append(m) if m["type"] == "log_status" else None)
-        session.set_measurements([(1, "PKPK")])
-        session.start_recording()
-        session.stop_recording()
+        session.adapter.set_measurements([(1, "PKPK")], session.publish)
+        session.adapter.start_recording(session.publish)
+        session.adapter.stop_recording(session.publish)
         unsubscribe()
         assert [m["state"] for m in got] == ["recording", "idle"]
         assert got[0]["started_at"] is not None and got[0]["row_count"] == 0
@@ -390,7 +390,7 @@ def test_start_recording_requires_a_selection():
     session = make_session()
     try:
         with pytest.raises(InvalidParameterError):
-            session.start_recording()
+            session.adapter.start_recording(session.publish)
     finally:
         session.close()
 
@@ -398,9 +398,9 @@ def test_start_recording_requires_a_selection():
 def test_double_start_recording_raises_session_error():
     session = make_session()
     try:
-        session.set_measurements([(1, "PKPK")])
-        session.start_recording()
+        session.adapter.set_measurements([(1, "PKPK")], session.publish)
+        session.adapter.start_recording(session.publish)
         with pytest.raises(SessionError):
-            session.start_recording()
+            session.adapter.start_recording(session.publish)
     finally:
         session.close()

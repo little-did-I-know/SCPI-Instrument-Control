@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { useSession } from "./session";
 import type { ScopeState, SessionInfo } from "../api/types";
 
-const SESSION: SessionInfo = { id: "abc", label: "bench", mock: false, address: "192.168.1.50", state: "connected", idn: "Siglent,SDS824X HD,1,1", model: "SDS824X HD", dialect: "modern", num_channels: 4, viewers: 0, owner: "" };
+const SESSION: SessionInfo = { id: "abc", label: "bench", mock: false, address: "192.168.1.50", state: "connected", idn: "Siglent,SDS824X HD,1,1", model: "SDS824X HD", dialect: "modern", num_channels: 4, viewers: 0, owner: "", kind: "scope" };
 
 const STATE: ScopeState = {
   run_state: "STOP",
@@ -50,5 +50,25 @@ describe("session store", () => {
   it("applyMeasurements stores nulls as-is", () => {
     useSession.getState().applyMeasurements([{ channel: 1, mtype: "FREQ", value: null }]);
     expect(useSession.getState().measurements[0].value).toBeNull();
+  });
+
+  it("setSession clears both kind slices, so a switch never shows the previous instrument", () => {
+    // Both, not just the one belonging to the outgoing kind: with two kinds a
+    // psu -> psu switch would otherwise paint the previous supply's outputs
+    // under the new supply's name until its first frame lands.
+    useSession.getState().setSession(SESSION);
+    useSession.getState().applyState(STATE);
+    useSession.getState().applyPsuState({ outputs: [{ output: 1, voltage: 3.3, current: 0.5, enabled: false, measured_voltage: 0, measured_current: 0, measured_power: 0 }] });
+    useSession.getState().setSession({ ...SESSION, id: "next", kind: "psu" });
+    expect(useSession.getState().scope).toBeNull();
+    expect(useSession.getState().psu).toBeNull();
+    expect(useSession.getState().session?.id).toBe("next");
+  });
+
+  it("applyPsuState replaces the psu snapshot, and clearSession resets it", () => {
+    useSession.getState().applyPsuState({ outputs: [{ output: 1, voltage: 3.3, current: 0.5, enabled: false, measured_voltage: 0, measured_current: 0, measured_power: 0 }] });
+    expect(useSession.getState().psu?.outputs[0].output).toBe(1);
+    useSession.getState().clearSession();
+    expect(useSession.getState().psu).toBeNull();
   });
 });

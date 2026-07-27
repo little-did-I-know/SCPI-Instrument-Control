@@ -65,12 +65,14 @@ def create_app(
     app.state.abandon_after = abandon_after
 
     from scpi_control.server.api import discovery as discovery_api
+    from scpi_control.server.api import psu as psu_api
     from scpi_control.server.api import scope as scope_api
     from scpi_control.server.api import sessions as sessions_api
     from scpi_control.server.api import stream as stream_api
 
     app.include_router(sessions_api.router, prefix="/api")
     app.include_router(scope_api.router, prefix="/api")
+    app.include_router(psu_api.router, prefix="/api")
     app.include_router(stream_api.router, prefix="/api")
     app.include_router(discovery_api.router, prefix="/api")
 
