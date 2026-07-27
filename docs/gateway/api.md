@@ -37,11 +37,48 @@ A **discover entry** is either a live session — `{address, idn, manufacturer, 
 | `POST` | `/api/sessions/{id}/command` | `{command}` — a raw SCPI string | `{command, response}` — `response` is the query reply, or `null` for a write | 400 empty command; 404 unknown session; 409 if the session is in an error/closed state |
 
 The kind-agnostic console route: it works for any connected instrument kind
-(scope or PSU today), because sending a raw command needs nothing kind-specific
-— both drivers expose `write`/`query`. This is what the browser UI's Terminal
+(scope, PSU, or AWG today), because sending a raw command needs nothing
+kind-specific — every driver exposes `write`/`query`. This is what the browser UI's Terminal
 drawer calls (see [Browser UI Tour](browser-ui.md#scpi-terminal)). A command
 ending in `?` is a query and returns the instrument's answer; anything else is
 a write and returns a `null` response — never a fabricated one.
+
+## Power supply configuration
+
+All paths below are under `/api/sessions/{id}/psu/`, and require a session created with
+`kind: "psu"`.
+
+| Method | Path | Body / params | Response | Errors |
+|---|---|---|---|---|
+| `GET` | `state` | — | `{outputs: [{output, voltage, current, enabled, measured_voltage, measured_current, measured_power}, ...]}` | 400 non-psu session; 404 unknown session; 409 if the session is in an error/closed state |
+| `PATCH` | `outputs/{n}` | `{voltage?, current?}` | `{outputs: [...]}` (same shape as `GET state`) | 400 unknown output or non-psu session; 409 not the session owner, or session not accepting jobs |
+| `PATCH` | `outputs/{n}/enable` | `{enabled}` | `{outputs: [...]}` | 400 unknown output or non-psu session; 409 not the session owner, or session not accepting jobs |
+
+Every field in an output is read through the driver, never fabricated: a value the supply will not
+answer (an SPD3303X's CH3 has no output-state query at all) comes back as `null`, and the browser
+UI shows that as `--.--`, or as an unknown output state rather than a confident off. Every mutation
+also broadcasts the fresh `outputs` list to the session's WebSocket subscribers as a `state`
+message with `"kind": "psu"`.
+
+## Function generator configuration
+
+All paths below are under `/api/sessions/{id}/awg/`, and require a session created with
+`kind: "awg"`.
+
+| Method | Path | Body / params | Response | Errors |
+|---|---|---|---|---|
+| `GET` | `state` | — | `{channels: [{channel, function, frequency, amplitude, offset, phase, enabled, duty_cycle, symmetry}, ...]}` | 400 non-awg session; 404 unknown session; 409 if the session is in an error/closed state |
+| `PATCH` | `channels/{n}` | `{function?, frequency?, amplitude?, offset?, phase?, duty_cycle?, symmetry?}` — `function` one of `SINE`/`SQUARE`/`RAMP`/`PULSE`/`NOISE`/`ARB`/`DC` | `{channels: [...]}` (same shape as `GET state`) | 400 unsupported `function`, unknown channel, or non-awg session; 409 not the session owner, or session not accepting jobs |
+| `PATCH` | `channels/{n}/enable` | `{enabled}` | `{channels: [...]}` | 400 unknown channel or non-awg session; 409 not the session owner, or session not accepting jobs |
+| `POST` | `outputs/off` | — | `{channels: [...]}` | 400 non-awg session; 409 not the session owner, or session not accepting jobs |
+
+`duty_cycle` is only read back while `function` is `PULSE`, and `symmetry` only while it is `RAMP`
+— both come back `null` otherwise, matching what the channel panel shows. Every other field is
+read through the driver like the PSU's, so a value the generator will not answer, or an enable
+state a model cannot query, comes back as `null`/unknown rather than a guess. `outputs/off` kills
+every channel in one request rather than one `PATCH` per channel, because turning outputs off one
+at a time on a live circuit races. Every mutation also broadcasts the fresh `channels` list to the
+session's WebSocket subscribers as a `state` message with `"kind": "awg"`.
 
 ## Scope configuration
 

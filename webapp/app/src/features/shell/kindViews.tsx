@@ -1,5 +1,7 @@
 import type { ComponentType } from "react";
 import type { Kind } from "../home/kinds";
+import { AwgPanel } from "../awg/AwgPanel";
+import { AwgReadout } from "../awg/AwgReadout";
 import { PsuPanel } from "../psu/PsuPanel";
 import { PsuReadout } from "../psu/PsuReadout";
 import { ReadoutStrip } from "../readout/ReadoutStrip";
@@ -16,8 +18,9 @@ export type KindView = {
 
 /** The single mapping from an instrument kind to its view. A new kind is an
  *  entry here, not a branch in App.tsx. A kind with no entry falls back to the
- *  shell's "coming soon" box, which is what AWG and DAQ get until they land. */
+ *  shell's "coming soon" box, which is what DAQ gets until it lands. */
 export const KIND_VIEWS: Partial<Record<Kind, KindView>> = {
   scope: { readout: ReadoutStrip, body: ScopeBody },
   psu: { readout: PsuReadout, body: PsuPanel },
+  awg: { readout: AwgReadout, body: AwgPanel },
 };

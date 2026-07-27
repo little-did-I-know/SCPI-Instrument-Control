@@ -6,7 +6,7 @@ export function GettingStarted() {
         <li>Find your instrument's IP (its Utility / I/O menu).</li>
         <li>Enable LAN / SCPI on the instrument.</li>
         <li>The API schema is served at /api/openapi.json and needs the same bearer token as the rest of the API; the interactive docs UI is disabled.</li>
-        <li>No hardware? Start a <b>Mock scope</b>.</li>
+        <li>No hardware? Start a <b>Mock</b> instrument from the Connect manually panel — an oscilloscope, power supply or function generator.</li>
       </ul>
     </details>
   );

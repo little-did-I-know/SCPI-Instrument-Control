@@ -26,8 +26,11 @@ describe("DeviceCard", () => {
   });
 
   it("non-connectable kind shows a disabled coming-soon control", () => {
-    const awg = scope({ kind: "awg", model: "SDG2042X", address: "192.168.1.60" });
-    render(<DeviceCard device={awg} variant="available" onConnect={vi.fn()} onOpen={vi.fn()} />);
+    // awg is connectable now (it has a registered gateway view); daq is the
+    // still-not-yet-connectable kind, so it is the one that must show the
+    // coming-soon fallback here.
+    const daq = scope({ kind: "daq", model: "USB-6002", address: "192.168.1.60" });
+    render(<DeviceCard device={daq} variant="available" onConnect={vi.fn()} onOpen={vi.fn()} />);
     expect(screen.getByText(/viewer coming soon/i)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /connect/i })).toBeNull();
   });

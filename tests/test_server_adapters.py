@@ -11,6 +11,8 @@ point of the seam: the expensive parts of a session are not needed to check that
 an instrument kind is wired up correctly.
 """
 
+import logging
+
 import pytest
 
 from scpi_control.connection.mock import MockConnection
@@ -244,3 +246,111 @@ def test_the_psu_adapter_throttles_the_measured_triplet_without_changing_the_fra
     keys = [set(frame["outputs"][0]) for frame in frames]
     assert all(k == keys[0] for k in keys)
     assert all(frame["outputs"][0]["measured_voltage"] is not None for frame in frames), "throttled ticks must reuse the last known reading"
+
+
+def test_the_awg_adapter_builds_and_connects_a_mock():
+    from scpi_control.server.adapters import AwgAdapter
+
+    adapter = AwgAdapter()
+    conn = MockConnection("mock", awg_mode=True, awg_idn="Siglent Technologies,SDG1032X,SDG1XXXXX,2.01.01.37R1")
+    instrument = adapter.build(address=None, port=5025, mock=True, model=None, allowed_ports=None, connection=conn)
+    try:
+        identity = adapter.connect(instrument)
+        assert "SDG1032X" in identity["idn"]
+        assert identity["num_channels"] >= 1, "num_channels carries the AWG's channel count"
+    finally:
+        adapter.close(instrument)
+
+
+def test_the_awg_adapter_publishes_channel_state():
+    from scpi_control.server.adapters import AwgAdapter
+
+    adapter = AwgAdapter()
+    conn = MockConnection("mock", awg_mode=True, awg_idn="Siglent Technologies,SDG1032X,SDG1XXXXX,2.01.01.37R1")
+    instrument = adapter.build(address=None, port=5025, mock=True, model=None, allowed_ports=None, connection=conn)
+    published = []
+    try:
+        adapter.connect(instrument)
+        adapter.poll(instrument, published.append, 1)
+    finally:
+        adapter.close(instrument)
+    assert len(published) == 1, "an AWG emits one state message per tick, like a PSU and unlike a scope's frame-per-channel"
+    state = published[0]
+    assert state["kind"] == "awg"
+    first = state["channels"][0]
+    assert {"channel", "function", "frequency", "amplitude", "offset", "phase", "enabled", "duty_cycle", "symmetry"} <= set(first)
+
+
+def test_the_awg_initial_frame_matches_the_polled_shape():
+    """A client that discriminates on frame shape must not see one thing at
+    connect and another a quarter-second later."""
+    from scpi_control.server.adapters import AwgAdapter
+
+    adapter = AwgAdapter()
+    conn = MockConnection("mock", awg_mode=True, awg_idn="Siglent Technologies,SDG1032X,SDG1XXXXX,2.01.01.37R1")
+    instrument = adapter.build(address=None, port=5025, mock=True, model=None, allowed_ports=None, connection=conn)
+    published = []
+    try:
+        adapter.connect(instrument)
+        adapter.poll(instrument, published.append, 1)
+        opening = adapter.initial_frame(instrument)
+    finally:
+        adapter.close(instrument)
+    assert set(opening) == set(published[0])
+    assert set(opening["channels"][0]) == set(published[0]["channels"][0])
+
+
+def test_the_awg_adapter_has_no_scope_or_psu_state():
+    from scpi_control.server.adapters import AwgAdapter
+
+    adapter = AwgAdapter()
+    for foreign in ("measurements", "spectrum_config", "filters", "active_reference", "recorder", "_measured"):
+        assert not hasattr(adapter, foreign), "{0} belongs to another kind and must not be on the AWG adapter".format(foreign)
+
+
+def test_the_awg_reader_skips_shape_parameters_that_do_not_apply(caplog):
+    """pulse_duty_cycle and ramp_symmetry each log a warning on every read when
+    the current function does not match (awg_output.py:281,320). At four polls
+    a second that is a warning flood, so the reader must not ask for a
+    parameter the current function ignores.
+
+    The mock's C1:BSWV? only ever emits DUTY for SQUARE/PULSE and SYM for RAMP,
+    and _read_basic_wave raises CommandError on a field the response is
+    missing, which _safe swallows to None -- so a value-only assertion here
+    passes whether or not the reader's own "if function == ..." guards exist;
+    it would just be re-proving what the mock already does. The log assertion
+    is the one that actually depends on the reader's guard: without it,
+    reading a SINE channel still triggers pulse_duty_cycle's own "only
+    applicable" warning even though the value that comes back is still None.
+    """
+    from scpi_control.server.adapters import read_awg_channels
+    from scpi_control import FunctionGenerator
+
+    conn = MockConnection("mock", awg_mode=True, awg_idn="Siglent Technologies,SDG1032X,SDG1XXXXX,2.01.01.37R1")
+    awg = FunctionGenerator("mock", connection=conn)
+    awg.connect()
+    try:
+        channel = awg.get_channel(1)
+        channel.function = "SINE"
+        with caplog.at_level(logging.WARNING, logger="scpi_control.awg_output"):
+            caplog.clear()
+            rows = read_awg_channels(awg)
+        assert rows[0]["duty_cycle"] is None, "duty cycle is meaningless for SINE and must not be read"
+        assert rows[0]["symmetry"] is None, "symmetry is meaningless for SINE and must not be read"
+        assert "only applicable" not in caplog.text, (
+            "reading a SINE channel logged pulse_duty_cycle/ramp_symmetry's own "
+            "warning -- the reader asked for a shape parameter the function does "
+            "not have, which is exactly the warning flood this reader must avoid"
+        )
+
+        channel.function = "PULSE"
+        rows = read_awg_channels(awg)
+        assert rows[0]["duty_cycle"] is not None, "duty cycle must be read when the function IS PULSE"
+        assert rows[0]["symmetry"] is None
+
+        channel.function = "RAMP"
+        rows = read_awg_channels(awg)
+        assert rows[0]["symmetry"] is not None, "symmetry must be read when the function IS RAMP"
+        assert rows[0]["duty_cycle"] is None
+    finally:
+        awg.disconnect()

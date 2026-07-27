@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { HomeScreen } from "./HomeScreen";
@@ -6,6 +6,7 @@ import { api } from "../../api/client";
 import { getRecent } from "./recent";
 import type { DiscoveredDevice, SessionInfo } from "../../api/types";
 import { useIdentity } from "../../store/identity";
+import { KIND_META } from "./kinds";
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -107,8 +108,20 @@ describe("HomeScreen", () => {
     const createSession = vi.spyOn(api, "createSession").mockResolvedValue({ ...SESSION, mock: true, address: null });
     const onConnected = vi.fn();
     render(<HomeScreen onConnected={onConnected} />);
-    await userEvent.click(await screen.findByRole("button", { name: /mock scope/i }));
+    await userEvent.click(await screen.findByRole("button", { name: `Mock ${KIND_META.scope.label}` }));
     await waitFor(() => expect(createSession).toHaveBeenCalledWith({ mock: true, kind: "scope" }));
+    await waitFor(() => expect(onConnected).toHaveBeenCalled());
+  });
+
+  it("connects a mock AWG from the rail", async () => {
+    // Same no-hardware route as scope/PSU above, for the third connectable kind.
+    vi.spyOn(api, "listSessions").mockResolvedValue([]);
+    vi.spyOn(api, "discover").mockResolvedValue([]);
+    const createSession = vi.spyOn(api, "createSession").mockResolvedValue({ ...SESSION, mock: true, address: null, kind: "awg" });
+    const onConnected = vi.fn();
+    render(<HomeScreen onConnected={onConnected} />);
+    await userEvent.click(await screen.findByRole("button", { name: `Mock ${KIND_META.awg.label}` }));
+    await waitFor(() => expect(createSession).toHaveBeenCalledWith({ mock: true, kind: "awg" }));
     await waitFor(() => expect(onConnected).toHaveBeenCalled());
   });
 
@@ -157,12 +170,16 @@ describe("HomeScreen", () => {
   it("labels a held PSU session as a power supply, not an oscilloscope", async () => {
     // sessionAsDevice used to hardcode kind:"scope", so every live session —
     // PSU included — was rendered with the oscilloscope label and accent.
+    // Scoped to the "Your sessions" section: the "Connect manually" panel now
+    // also has a "Mock Power supply" button, which would otherwise collide
+    // with a page-wide text query.
     vi.spyOn(api, "listSessions").mockResolvedValue([PSU_SESSION]);
     vi.spyOn(api, "discover").mockResolvedValue([]);
     render(<HomeScreen onConnected={vi.fn()} />);
     await screen.findByRole("button", { name: "Open SPD3303X" });
-    expect(screen.getByText(/Power supply/)).toBeInTheDocument();
-    expect(screen.queryByText(/Oscilloscope/)).not.toBeInTheDocument();
+    const yourSessions = screen.getByRole("heading", { name: /your sessions/i }).closest("section") as HTMLElement;
+    expect(within(yourSessions).getByText(/Power supply/)).toBeInTheDocument();
+    expect(within(yourSessions).queryByText(/Oscilloscope/)).not.toBeInTheDocument();
   });
 
   it("surfaces a connect error detail", async () => {

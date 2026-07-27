@@ -9,10 +9,17 @@ are no screenshots yet — read this alongside a running gateway
 The home screen is split into two zones: sessions already held by the server
 (each with an **Open** button to jump back in) and devices discovered on the
 LAN (each with a **Connect** button to start a session). Both zones group
-entries by kind and support search. A recent-connections list remembers
-addresses you've used before, and a manual-connect field lets you type an IP
-directly if discovery doesn't find it. A mock scope is always available here
-too, so there's never a hardware requirement to get started.
+entries by kind — oscilloscope, power supply, or AWG — and support search. A
+recent-connections list remembers addresses you've used before, and a
+manual-connect field lets you type an IP directly if discovery doesn't find
+it. A mock oscilloscope, mock power supply and mock function generator are
+all available here too — one button per connectable instrument kind — so
+there's never a hardware requirement to get started with any of them.
+
+The next three sections — Canvas modes, Rail tabs, and Toolbar — describe an
+oscilloscope session. A power supply or function generator session replaces
+all of it with its own panel; see [Power supply session](#power-supply-session)
+and [Function generator session](#function-generator-session) below.
 
 ## Canvas modes
 
@@ -57,6 +64,37 @@ The side rail holds one tab per feature area:
 
 Across the top: Run / Stop / Single / Auto acquisition controls, the canvas
 view-mode toggle, CSV / JSON / Screenshot export buttons, and Disconnect.
+
+## Power supply session
+
+A power supply session's panel gives every output a voltage setpoint, a
+current-limit setpoint, and an on/off switch, one group box per output. A
+readout strip above the panel shows what the supply actually reports —
+measured voltage, current, and power for each output, and whether it's live —
+which is not the same as the setpoints just entered: the readout reflects the
+instrument's own measurement, not an echo of what was sent. A setpoint the
+supply won't answer shows as `--.--`, and an output whose on/off state it
+won't report (an SPD3303X's CH3 has no output-state query at all) shows as
+unknown rather than a confident off.
+
+## Function generator session
+
+A function generator session's panel gives every channel a waveform picker
+(sine, square, ramp, pulse, noise, arbitrary, or DC), and setpoints for
+frequency, amplitude, offset, and phase, plus an on/off switch — one group box
+per channel. Duty cycle appears only when that channel's waveform is a pulse,
+and symmetry only when it's a ramp; neither field appears for any other
+waveform. One "All outputs off" button below the channels kills every output
+in a single request, rather than one click per channel.
+
+Above the panel, a readout strip shows one card per channel with what the
+generator reports back, including channels that are currently off — for a
+source, "is this output driving my circuit?" is exactly what the strip
+answers. These are read-back values, not echoes of the setpoints: an AWG
+clamps amplitude against its load setting and snaps frequency to its
+resolution, so the reading can differ from what was asked for. A value the
+generator won't answer shows as `--.--`, and a channel whose on/off state it
+won't report shows as unknown rather than a confident off.
 
 ## SCPI terminal
 

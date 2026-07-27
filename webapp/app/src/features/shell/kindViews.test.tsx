@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { KIND_META } from "../home/kinds";
 import { KIND_VIEWS } from "./kindViews";
 
 // The registry is the ONLY mapping from an instrument kind to a view. Adding a
@@ -12,12 +13,15 @@ describe("KIND_VIEWS", () => {
     }
   });
 
-  it("covers the kinds the gateway can connect to today", () => {
-    expect(Object.keys(KIND_VIEWS).sort()).toEqual(["psu", "scope"]);
-  });
-
-  it("does not register a kind the gateway cannot connect to yet", () => {
-    expect(KIND_VIEWS.awg).toBeUndefined();
-    expect(KIND_VIEWS.daq).toBeUndefined();
+  it("registers a view for every kind the home screen offers to connect", () => {
+    // Derived rather than a hardcoded key list: a kind flipped to
+    // connectable:true without a registry entry puts a Connect button on the
+    // home screen that lands the user on "coming soon". That is the failure
+    // worth guarding, and it survives the next kind being added.
+    const connectable = Object.entries(KIND_META)
+      .filter(([, meta]) => meta.connectable)
+      .map(([kind]) => kind)
+      .sort();
+    expect(Object.keys(KIND_VIEWS).sort()).toEqual(connectable);
   });
 });

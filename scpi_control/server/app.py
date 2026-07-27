@@ -64,6 +64,7 @@ def create_app(
     # drive it to 0 instead of sleeping for a real timeout.
     app.state.abandon_after = abandon_after
 
+    from scpi_control.server.api import awg as awg_api
     from scpi_control.server.api import commands as commands_api
     from scpi_control.server.api import discovery as discovery_api
     from scpi_control.server.api import psu as psu_api
@@ -74,6 +75,7 @@ def create_app(
     app.include_router(sessions_api.router, prefix="/api")
     app.include_router(scope_api.router, prefix="/api")
     app.include_router(psu_api.router, prefix="/api")
+    app.include_router(awg_api.router, prefix="/api")
     app.include_router(commands_api.router, prefix="/api")
     app.include_router(stream_api.router, prefix="/api")
     app.include_router(discovery_api.router, prefix="/api")

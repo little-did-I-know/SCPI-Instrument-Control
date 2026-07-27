@@ -1,4 +1,4 @@
-import type { ChannelPatch, DiscoveredDevice, FilterConfig, LogData, LogInfo, MeasurementValue, ModelInfo, PsuOutputPatch, PsuState, ReferenceInfo, ReferenceOverlay, RunOp, ScopeState, SessionCreate, SessionInfo, SpectrumConfig, TriggerPatch } from "./types";
+import type { AwgChannelPatch, AwgState, ChannelPatch, DiscoveredDevice, FilterConfig, LogData, LogInfo, MeasurementValue, ModelInfo, PsuOutputPatch, PsuState, ReferenceInfo, ReferenceOverlay, RunOp, ScopeState, SessionCreate, SessionInfo, SpectrumConfig, TriggerPatch } from "./types";
 import { getToken } from "./token";
 
 export class ApiError extends Error {
@@ -42,6 +42,7 @@ function json(method: string, body: unknown): RequestInit {
 
 const scope = (id: string) => `/api/sessions/${id}/scope`;
 const psu = (id: string) => `/api/sessions/${id}/psu`;
+const awg = (id: string) => `/api/sessions/${id}/awg`;
 
 export const api = {
   whoami: () => request<{ identity: string }>("/api/whoami"),
@@ -82,6 +83,10 @@ export const api = {
   psuState: (id: string) => request<PsuState>(`${psu(id)}/state`),
   setPsuOutput: (id: string, n: number, body: PsuOutputPatch) => request<PsuState>(`${psu(id)}/outputs/${n}`, json("PATCH", body)),
   setPsuOutputEnable: (id: string, n: number, enabled: boolean) => request<PsuState>(`${psu(id)}/outputs/${n}/enable`, json("PATCH", { enabled })),
+  awgState: (id: string) => request<AwgState>(`${awg(id)}/state`),
+  setAwgChannel: (id: string, n: number, body: AwgChannelPatch) => request<AwgState>(`${awg(id)}/channels/${n}`, json("PATCH", body)),
+  setAwgChannelEnable: (id: string, n: number, enabled: boolean) => request<AwgState>(`${awg(id)}/channels/${n}/enable`, json("PATCH", { enabled })),
+  allAwgOutputsOff: (id: string) => request<AwgState>(`${awg(id)}/outputs/off`, { method: "POST" }),
 };
 
 export type { MeasurementValue };
