@@ -1123,6 +1123,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#header" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Header
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#canvas-modes" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3507,6 +3518,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#header" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Header
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#canvas-modes" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3617,10 +3639,29 @@ manual-connect field lets you type an IP directly if discovery doesn't find
 it. A mock oscilloscope, mock power supply and mock function generator are
 all available here too — one button per connectable instrument kind — so
 there's never a hardware requirement to get started with any of them.</p>
-<p>The next three sections — Canvas modes, Rail tabs, and Toolbar — describe an
-oscilloscope session. A power supply or function generator session replaces
-all of it with its own panel; see <a href="#power-supply-session">Power supply session</a>
-and <a href="#function-generator-session">Function generator session</a> below.</p>
+<p>The next section, Header, describes chrome that looks the same no matter
+which instrument kind is connected. The three sections after it — Canvas
+modes, Rail tabs, and Toolbar — describe an oscilloscope session
+specifically. A power supply or function generator session replaces all of
+it with its own panel; see <a href="#power-supply-session">Power supply session</a> and
+<a href="#function-generator-session">Function generator session</a> below.</p>
+<h2 id="header">Header<a class="headerlink" href="#header" title="Permanent link">&para;</a></h2>
+<p>The header spans the top of the window and looks the same no matter which
+instrument kind is connected: the connection status indicator, a
+<strong>read-only</strong> badge with a <strong>Claim</strong> button when the session belongs to
+someone else (the same control the home screen offers — see
+<a href="#home-screen">Home screen</a> above), the <strong>Terminal</strong> button (see
+<a href="#scpi-terminal">SCPI terminal</a> below), and <strong>Disconnect</strong>, which ends the
+session and returns to the home screen. Because it's in the header rather
+than an instrument-specific toolbar, Disconnect is available for every
+session kind — a power supply or function generator session no longer has
+to be abandoned by reloading the page.</p>
+<p>Directly under the header, an error banner appears when the session itself
+fails — a dropped stream, or an error frame from the instrument — carrying
+the detail that a red status dot alone can't show. Dismissing the banner
+clears the message but does <strong>not</strong> change what the status indicator
+reports: the connection state is the instrument's to report, not a side
+effect of closing a notification.</p>
 <h2 id="canvas-modes">Canvas modes<a class="headerlink" href="#canvas-modes" title="Permanent link">&para;</a></h2>
 <p>Once connected, the main canvas toggles between three modes:</p>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>[ Time | Spectrum | Trend ]
@@ -3658,7 +3699,9 @@ and <a href="#function-generator-session">Function generator session</a> below.<
 </ul>
 <h2 id="toolbar">Toolbar<a class="headerlink" href="#toolbar" title="Permanent link">&para;</a></h2>
 <p>Across the top: Run / Stop / Single / Auto acquisition controls, the canvas
-view-mode toggle, CSV / JSON / Screenshot export buttons, and Disconnect.</p>
+view-mode toggle, and CSV / JSON / Screenshot export buttons. Disconnect
+lives in the header, not here — see <a href="#header">Header</a> above, since it applies
+to every session kind, not just an oscilloscope's.</p>
 <h2 id="power-supply-session">Power supply session<a class="headerlink" href="#power-supply-session" title="Permanent link">&para;</a></h2>
 <p>A power supply session's panel gives every output a voltage setpoint, a
 current-limit setpoint, and an on/off switch, one group box per output. A
