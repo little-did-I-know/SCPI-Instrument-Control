@@ -16,7 +16,10 @@ from concurrent.futures import TimeoutError as FuturesTimeoutError
 from typing import Any, Callable, Dict, List, Optional
 
 from scpi_control.exceptions import SiglentConnectionError, SiglentError
-from scpi_control.server.adapters import ADAPTERS, MAX_FRAME_POINTS, _waveform_frame, read_state  # noqa: F401  (re-exported: stream.py/api/scope.py and tests import these from here)
+
+# Re-exported: all five were public names in this module in 5.7.1, and
+# api/scope.py plus several tests still import them from here.
+from scpi_control.server.adapters import ADAPTERS, DEFAULT_MOCK_IDN, MAX_FRAME_POINTS, MEASUREMENT_EVERY_N_POLLS, _waveform_frame, read_state  # noqa: F401
 from scpi_control.server.adapters import make_mock_scope_connection as _make_mock_connection  # noqa: F401  (re-exported for backward compatibility)
 from scpi_control.server.discovery import classify
 
@@ -28,7 +31,12 @@ class SessionError(RuntimeError):
 
 
 class InstrumentSession:
-    def __init__(self, label: str, instrument: Any, mock: bool, address: Optional[str], poll_interval: float, adapter: Any):
+    def __init__(self, label: str, instrument: Any, mock: bool, address: Optional[str], poll_interval: float, adapter: Any = None):
+        # ``adapter`` defaults to a scope adapter so the pre-5.8 five-argument
+        # constructor keeps working unchanged for anyone who built a session
+        # by hand rather than through open()/SessionManager.create().
+        if adapter is None:
+            adapter = ADAPTERS["scope"]()
         self.id = uuid.uuid4().hex[:8]
         self.label = label
         self.mock = mock
@@ -140,8 +148,60 @@ class InstrumentSession:
 
     @property
     def _scope(self) -> Any:
-        """Alias kept for the mechanical Task 3 rename; use ``_instrument``."""
+        """Backward-compatible alias for ``_instrument``; prefer ``_instrument``."""
         return self._instrument
+
+    # --- backward-compatible scope surface --------------------------------
+    # These moved onto ScopeAdapter in 5.8.0. They stay here as *thin
+    # delegations* -- never a second copy of the state -- so code written
+    # against 5.7.1 (the shipped trend-logging example, embedders) keeps
+    # working. Nothing scope-shaped is stored on the session, so a PSU
+    # session still carries no recorder, filter bank or spectrum config;
+    # touching one of these on a non-scope session raises AttributeError
+    # from its adapter, which is the honest answer.
+
+    @property
+    def recorder(self) -> Any:
+        return self.adapter.recorder
+
+    @property
+    def measurements(self) -> Any:
+        return self.adapter.measurements
+
+    @property
+    def spectrum_config(self) -> Any:
+        return self.adapter.spectrum_config
+
+    @spectrum_config.setter
+    def spectrum_config(self, value: Any) -> None:
+        self.adapter.spectrum_config = value
+
+    @property
+    def filters(self) -> Any:
+        return self.adapter.filters
+
+    @filters.setter
+    def filters(self, value: Any) -> None:
+        self.adapter.filters = value
+
+    @property
+    def active_reference(self) -> Any:
+        return self.adapter.active_reference
+
+    def set_measurements(self, items: Any) -> None:
+        return self.adapter.set_measurements(items, self.publish)
+
+    def start_recording(self) -> Dict[str, Any]:
+        return self.adapter.start_recording(self.publish)
+
+    def stop_recording(self) -> Dict[str, Any]:
+        return self.adapter.stop_recording(self.publish)
+
+    def reference_overlay(self) -> Dict[str, Any]:
+        return self.adapter.reference_overlay()
+
+    def set_active_reference(self, name: Optional[str], channel: Optional[int], data: Optional[Dict[str, Any]]) -> None:
+        return self.adapter.set_active_reference(name, channel, data, self.publish)
 
     def _connect_job(self, instrument: Any) -> None:
         info = self.adapter.connect(instrument)
@@ -150,8 +210,15 @@ class InstrumentSession:
         self.dialect = info["dialect"]
         self.num_channels = info["num_channels"]
         if not self.mock and self.model:
+            # The guard exists to stop driving a PSU with a scope driver -- NOT
+            # to whitelist models. classify() returns "unknown" for anything
+            # outside MODEL_REGISTRY's 22 entries, and plenty of scopes that
+            # connected fine before the per-kind split (a Rigol DS1054Z, a Tek
+            # TBS1052B, any unlisted Siglent) land there via the generic/legacy
+            # dialect fallback. Only a *positive* identification as some other
+            # kind is a mismatch; an unrecognised model is not.
             detected = classify(self.model)
-            if detected != self.kind:
+            if detected not in ("unknown", self.kind):
                 raise SessionError("connected instrument is a {0}, not a {1}".format(detected, self.kind))
         self.state = "connected"
 
@@ -239,7 +306,11 @@ class InstrumentSession:
                 continue
             future.set_exception(SessionError("session {0} is closed".format(self.id)))
         try:
-            self._scope.disconnect()
+            # Teardown goes through the adapter, not straight to disconnect():
+            # both current kinds only disconnect, but a kind whose teardown
+            # needs more (an AWG de-energising its outputs first) must not be
+            # silently skipped because the session bypassed the hook.
+            self.adapter.close(self._instrument)
         except SiglentError:
             pass
 
@@ -261,6 +332,13 @@ class InstrumentSession:
             self.publish({"type": "error", "detail": str(exc)})
             if not self._instrument.is_connected:
                 self.state = "error"
+        except Exception as exc:  # noqa: BLE001 - see below
+            # Anything an adapter's poll() raises that is NOT a SiglentError
+            # used to escape _worker entirely: the thread died, no error frame
+            # was ever published, and the session sat "connected" forever with
+            # a stream that had gone quiet. A new kind's poll bug must surface
+            # as a visible error state, not a silent dead session.
+            self._enter_error_state("poll failed: {0}".format(exc))
 
 
 class SessionManager:

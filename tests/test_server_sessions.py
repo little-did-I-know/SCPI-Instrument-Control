@@ -463,3 +463,131 @@ class TestKindMismatchGuard:
         assert session.kind == "scope"  # the untouched __init__ default
         with pytest.raises(SessionError):
             session._connect_job(instrument)
+
+    def test_an_unregistered_scope_model_still_connects(self):
+        # The guard must reject a POSITIVE identification as another kind, not
+        # whitelist MODEL_REGISTRY. classify() answers "unknown" for every
+        # model outside the registry's 22 entries -- a Rigol DS1054Z, a Tek
+        # TBS1052B, an unlisted Siglent -- and all of those connected fine via
+        # the generic/legacy dialect fallback before the per-kind split. If the
+        # guard compares `detected != self.kind` they all start failing with
+        # "connected instrument is a unknown, not a scope", which would be a
+        # breaking change to the pre-existing scope path.
+        #
+        # Non-mock (mock=True skips the guard entirely) and constructed
+        # directly so no socket is opened, same technique as the test above.
+        from scpi_control.oscilloscope import Oscilloscope
+        from scpi_control.server.adapters import ScopeAdapter
+        from scpi_control.server.discovery import classify
+
+        conn = MockConnection("mock", idn="RIGOL TECHNOLOGIES,DS1054Z,DS1ZA000000000,00.04.04", channel_states={1: True}, trigger_status=["Stop"], sample_rate=1_000.0, timebase=1e-3)
+        instrument = Oscilloscope("mock", connection=conn)
+        session = InstrumentSession("bench-1", instrument, False, "10.0.0.5", 0.25, ScopeAdapter())
+        session._connect_job(instrument)
+        assert session.model == "DS1054Z"
+        assert classify(session.model) == "unknown", "fixture no longer exercises the unregistered-model path"
+        assert session.state == "connected"
+
+
+class TestBackwardCompatibleScopeSurface:
+    """5.8.0 moved scope-only state onto ScopeAdapter. It must stay reachable.
+
+    ``set_measurements``/``start_recording``/``stop_recording``/``recorder``/
+    ``measurements``/``spectrum_config``/``filters``/``active_reference``/
+    ``reference_overlay``/``set_active_reference`` were public names on a
+    public class in 5.7.1 -- the shipped trend-logging example used four of
+    them. Removing them would make this release a MAJOR, so they survive as
+    thin delegations to the adapter.
+    """
+
+    def test_the_v5_7_1_scope_surface_still_works(self):
+        session, _ = make_mock_session()
+        try:
+            session.set_measurements([(1, "PKPK"), (1, "FREQ")])
+            assert session.measurements == [(1, "PKPK"), (1, "FREQ")]
+            assert session.recorder is session.adapter.recorder
+            assert session.start_recording()["state"] == "recording"
+            assert session.stop_recording()["state"] == "idle"
+            assert session.recorder.rows_since() == []
+            assert session.reference_overlay()["name"] is None
+            session.set_active_reference("golden", 1, {"time": [0.0, 1.0], "voltage": [0.5, 1.5]})
+            assert session.active_reference["name"] == "golden"
+            assert session.reference_overlay()["name"] == "golden"
+            assert session.spectrum_config["enabled"] is False
+            session.spectrum_config = {**session.spectrum_config, "enabled": True}
+            assert session.spectrum_config["enabled"] is True
+            assert sorted(session.filters) == [1, 2]
+            session.filters = {**session.filters, 1: {**session.filters[1], "enabled": True}}
+            assert session.filters[1]["enabled"] is True
+        finally:
+            session.close()
+
+    def test_the_shims_delegate_and_keep_no_state_on_the_session(self):
+        # A shim that stored its own copy would undo the point of the move: a
+        # PSU session would carry scope state again, and the two copies would
+        # drift the moment a route wrote through session.adapter (which every
+        # /scope/ route does). Assert the write lands on the ADAPTER and that
+        # the session's own __dict__ never grows the attribute.
+        session, _ = make_mock_session()
+        try:
+            session.set_measurements([(2, "RMS")])
+            session.spectrum_config = {**session.spectrum_config, "channel": 3}
+            for name in ("measurements", "spectrum_config", "filters", "active_reference", "recorder"):
+                assert name not in vars(session), "{0} must live on the adapter, not on the session".format(name)
+            assert session.adapter.measurements == [(2, "RMS")]
+            assert session.adapter.spectrum_config["channel"] == 3
+            # And the read side really is the adapter's object, not a copy.
+            assert session.measurements is session.adapter.measurements
+            assert session.filters is session.adapter.filters
+        finally:
+            session.close()
+
+    def test_the_adapter_argument_is_optional(self):
+        # The pre-5.8 constructor took five positional arguments. Anyone who
+        # built a session by hand must not have to learn about adapters.
+        conn = MockConnection("mock", idn=LEGACY_IDN, channel_states={1: True}, trigger_status=["Stop"], sample_rate=1_000.0, timebase=1e-3)
+        from scpi_control.oscilloscope import Oscilloscope
+
+        session = InstrumentSession("bench-1", Oscilloscope("mock", connection=conn), True, None, 0.25)
+        assert session.adapter.kind == "scope"
+        assert session.kind == "scope"
+
+
+class TestAdapterLifecycleHooks:
+    def test_worker_teardown_goes_through_the_adapters_close_hook(self):
+        # _worker used to call self._scope.disconnect() directly. Identical
+        # behaviour for the two kinds that exist -- both adapters only
+        # disconnect -- but it left InstrumentAdapter.close() dead, so a kind
+        # whose teardown needs more (an AWG de-energising before disconnect)
+        # would silently skip it.
+        session, _ = make_mock_session()
+        closed = []
+        real_close = session.adapter.close
+
+        def recording_close(instrument):
+            closed.append(instrument)
+            real_close(instrument)
+
+        session.adapter.close = recording_close
+        session.close()
+        assert closed == [session._instrument], "teardown must call adapter.close(), not the instrument's disconnect() directly"
+
+    def test_a_non_siglent_error_from_poll_becomes_a_visible_error_state(self):
+        # _poll_tick only caught SiglentError, so anything else out of
+        # adapter.poll escaped _worker: the thread died, no error frame was
+        # ever published, and the session read "connected" forever behind a
+        # stream that had simply gone quiet.
+        session, _ = make_mock_session()
+        frames = []
+        try:
+            session.subscribe(frames.append)  # _poll_tick is a no-op with no subscribers
+
+            def _boom(_instrument, _publish, _tick):
+                raise ValueError("a numpy edge case, not a wire problem")
+
+            session.adapter.poll = _boom
+            assert _wait_for(lambda: session.state == "error"), "a poll failure must surface as an error state, not a dead worker thread"
+            assert any(m.get("type") == "error" for m in frames), "the streams must be told, not just session.state"
+            assert session._thread.is_alive(), "the worker must survive to report the failure"
+        finally:
+            session.close()
