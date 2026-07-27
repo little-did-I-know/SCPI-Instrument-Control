@@ -52,6 +52,19 @@ describe("session store", () => {
     expect(useSession.getState().measurements[0].value).toBeNull();
   });
 
+  it("setSession clears both kind slices, so a switch never shows the previous instrument", () => {
+    // Both, not just the one belonging to the outgoing kind: with two kinds a
+    // psu -> psu switch would otherwise paint the previous supply's outputs
+    // under the new supply's name until its first frame lands.
+    useSession.getState().setSession(SESSION);
+    useSession.getState().applyState(STATE);
+    useSession.getState().applyPsuState({ outputs: [{ output: 1, voltage: 3.3, current: 0.5, enabled: false, measured_voltage: 0, measured_current: 0, measured_power: 0 }] });
+    useSession.getState().setSession({ ...SESSION, id: "next", kind: "psu" });
+    expect(useSession.getState().scope).toBeNull();
+    expect(useSession.getState().psu).toBeNull();
+    expect(useSession.getState().session?.id).toBe("next");
+  });
+
   it("applyPsuState replaces the psu snapshot, and clearSession resets it", () => {
     useSession.getState().applyPsuState({ outputs: [{ output: 1, voltage: 3.3, current: 0.5, enabled: false, measured_voltage: 0, measured_current: 0, measured_power: 0 }] });
     expect(useSession.getState().psu?.outputs[0].output).toBe(1);

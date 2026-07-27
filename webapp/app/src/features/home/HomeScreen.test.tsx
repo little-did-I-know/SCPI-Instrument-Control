@@ -28,7 +28,7 @@ describe("HomeScreen", () => {
     await screen.findByRole("button", { name: "Connect SDS1104X-E" });
     await userEvent.click(screen.getByRole("button", { name: "Connect SDS1104X-E" }));
 
-    await waitFor(() => expect(createSession).toHaveBeenCalledWith({ address: "192.168.1.51", label: "SDS1104X-E" }));
+    await waitFor(() => expect(createSession).toHaveBeenCalledWith({ address: "192.168.1.51", label: "SDS1104X-E", kind: "scope" }));
     await waitFor(() => expect(onConnected).toHaveBeenCalledWith(created));
   });
 
@@ -76,7 +76,7 @@ describe("HomeScreen", () => {
     await userEvent.type(await screen.findByLabelText("IP address"), "10.0.0.9");
     await userEvent.click(screen.getByRole("button", { name: "Connect" }));
 
-    await waitFor(() => expect(createSession).toHaveBeenCalledWith({ address: "10.0.0.9", label: "10.0.0.9" }));
+    await waitFor(() => expect(createSession).toHaveBeenCalledWith({ address: "10.0.0.9", label: "10.0.0.9", kind: "scope" }));
     await waitFor(() => expect(onConnected).toHaveBeenCalledWith(created));
   });
 
@@ -108,8 +108,61 @@ describe("HomeScreen", () => {
     const onConnected = vi.fn();
     render(<HomeScreen onConnected={onConnected} />);
     await userEvent.click(await screen.findByRole("button", { name: /mock scope/i }));
-    await waitFor(() => expect(createSession).toHaveBeenCalledWith({ mock: true }));
+    await waitFor(() => expect(createSession).toHaveBeenCalledWith({ mock: true, kind: "scope" }));
     await waitFor(() => expect(onConnected).toHaveBeenCalled());
+  });
+
+  // --- the kind has to reach the server, or no UI path can make a PSU -------
+
+  const PSU_DEVICE: DiscoveredDevice = { address: "192.168.1.60", idn: "Siglent,SPD3303X,1,1", manufacturer: "Siglent", model: "SPD3303X", dialect: "", kind: "psu", connected: false };
+  const PSU_SESSION: SessionInfo = { ...SESSION, id: "psu1", address: "192.168.1.60", model: "SPD3303X", dialect: "", num_channels: 3, kind: "psu" };
+
+  it("sends the discovered kind when connecting a power supply", async () => {
+    // Without kind on the create call the server defaults to "scope", builds
+    // an Oscilloscope against a PSU, and 409s on its own kind guard — so the
+    // shipped UI could not create a PSU session at all.
+    vi.spyOn(api, "listSessions").mockResolvedValue([]);
+    vi.spyOn(api, "discover").mockResolvedValue([PSU_DEVICE]);
+    const createSession = vi.spyOn(api, "createSession").mockResolvedValue(PSU_SESSION);
+    const onConnected = vi.fn();
+    render(<HomeScreen onConnected={onConnected} />);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Connect SPD3303X" }));
+
+    await waitFor(() => expect(createSession).toHaveBeenCalledWith({ address: "192.168.1.60", label: "SPD3303X", kind: "psu" }));
+    await waitFor(() => expect(onConnected).toHaveBeenCalledWith(PSU_SESSION));
+  });
+
+  it("connects a mock power supply from the rail", async () => {
+    vi.spyOn(api, "listSessions").mockResolvedValue([]);
+    vi.spyOn(api, "discover").mockResolvedValue([]);
+    const createSession = vi.spyOn(api, "createSession").mockResolvedValue({ ...PSU_SESSION, mock: true, address: null });
+    const onConnected = vi.fn();
+    render(<HomeScreen onConnected={onConnected} />);
+    await userEvent.click(await screen.findByRole("button", { name: /mock power supply/i }));
+    await waitFor(() => expect(createSession).toHaveBeenCalledWith({ mock: true, kind: "psu" }));
+    await waitFor(() => expect(onConnected).toHaveBeenCalled());
+  });
+
+  it("replays the recorded kind when reconnecting a recent power supply", async () => {
+    localStorage.setItem("scpi.recent", JSON.stringify([{ address: "192.168.1.60", label: "SPD3303X", kind: "psu", model: "SPD3303X", mock: false }]));
+    vi.spyOn(api, "listSessions").mockResolvedValue([]);
+    vi.spyOn(api, "discover").mockResolvedValue([]);
+    const createSession = vi.spyOn(api, "createSession").mockResolvedValue(PSU_SESSION);
+    render(<HomeScreen onConnected={vi.fn()} />);
+    await userEvent.click(await screen.findByRole("button", { name: /SPD3303X/ }));
+    await waitFor(() => expect(createSession).toHaveBeenCalledWith({ address: "192.168.1.60", label: "SPD3303X", kind: "psu" }));
+  });
+
+  it("labels a held PSU session as a power supply, not an oscilloscope", async () => {
+    // sessionAsDevice used to hardcode kind:"scope", so every live session —
+    // PSU included — was rendered with the oscilloscope label and accent.
+    vi.spyOn(api, "listSessions").mockResolvedValue([PSU_SESSION]);
+    vi.spyOn(api, "discover").mockResolvedValue([]);
+    render(<HomeScreen onConnected={vi.fn()} />);
+    await screen.findByRole("button", { name: "Open SPD3303X" });
+    expect(screen.getByText(/Power supply/)).toBeInTheDocument();
+    expect(screen.queryByText(/Oscilloscope/)).not.toBeInTheDocument();
   });
 
   it("surfaces a connect error detail", async () => {

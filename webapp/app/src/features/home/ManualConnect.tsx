@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { Button } from "../../ds/Button";
 
-type Props = { busy: boolean; onConnectAddress: (address: string) => void; onConnectMock: () => void };
+type Props = { busy: boolean; onConnectAddress: (address: string) => void; onConnectMock: () => void; onConnectMockPsu: () => void };
 
-export function ManualConnect({ busy, onConnectAddress, onConnectMock }: Props) {
+export function ManualConnect({ busy, onConnectAddress, onConnectMock, onConnectMockPsu }: Props) {
   const [address, setAddress] = useState("");
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
@@ -21,6 +21,12 @@ export function ManualConnect({ busy, onConnectAddress, onConnectMock }: Props) 
       </div>
       <Button disabled={busy} onClick={onConnectMock}>
         Mock scope
+      </Button>
+      {/* Without this there is no way to reach a PSU session with no hardware:
+          discovery finds nothing on a bench with no instruments, and the
+          address field can only make a scope. */}
+      <Button disabled={busy} onClick={onConnectMockPsu}>
+        Mock power supply
       </Button>
     </div>
   );

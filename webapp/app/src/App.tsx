@@ -33,7 +33,9 @@ export default function App() {
   const [railTab, setRailTab] = useState("Channels");
   const [viewMode, setViewMode] = useState<ViewMode>("Time");
   useStream(session?.id ?? null);
-  useReferenceSeed(session?.id ?? null);
+  // Scope-only: /scope/reference is now behind require_kind, so seeding it for
+  // any other kind is a guaranteed 400 on every mount.
+  useReferenceSeed(session?.kind === "scope" ? session.id : null);
   return (
     <TokenGate>
       <div style={{ display: "flex", flexDirection: "column", height: "100vh", background: "var(--lc-bg)", fontFamily: "var(--font-ui)" }}>

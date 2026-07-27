@@ -114,6 +114,45 @@ describe("PsuPanel", () => {
     await waitFor(() => expect(field).toHaveValue("9.900 V"));
   });
 
+  // --- a read that failed must render as unknown, never as a value ---------
+
+  it("shows an unreadable enable state as unknown, not as off", async () => {
+    // enabled === null means the instrument would not tell us. On an SPD3303X
+    // that is CH3's normal answer (no status bit, no OUTP3?), and painting a
+    // live rail as a confident "off" is the dangerous half of the safety
+    // invariant. It must read as mixed and refuse the flip.
+    const unknown = { outputs: [{ ...STATE.outputs[0], enabled: null }] };
+    vi.spyOn(api, "psuState").mockResolvedValue(unknown);
+    const setEnable = vi.spyOn(api, "setPsuOutputEnable").mockResolvedValue(unknown);
+    render(<PsuPanel />);
+    const toggle = await screen.findByLabelText("Output 1 enable");
+    expect(toggle).toHaveAttribute("aria-checked", "mixed");
+    expect(toggle).toBeDisabled();
+    expect(screen.getByText(/state unknown/i)).toBeInTheDocument();
+    await userEvent.click(toggle);
+    expect(setEnable).not.toHaveBeenCalled();
+  });
+
+  it("shows a failed measurement as --.--, not as 0.000", async () => {
+    const unread = { outputs: [{ ...STATE.outputs[0], measured_voltage: null, measured_current: null, measured_power: null }] };
+    vi.spyOn(api, "psuState").mockResolvedValue(unread);
+    render(<PsuPanel />);
+    await screen.findByLabelText("Output 1 voltage");
+    expect(screen.queryByText("0.000")).not.toBeInTheDocument();
+    expect(screen.getAllByText("--.--")).toHaveLength(3);
+  });
+
+  it("shows an unreadable setpoint as --.-- instead of an editable zero", async () => {
+    const unread = { outputs: [{ ...STATE.outputs[0], voltage: null }] };
+    vi.spyOn(api, "psuState").mockResolvedValue(unread);
+    render(<PsuPanel />);
+    const voltage = await screen.findByLabelText("Output 1 voltage");
+    expect(voltage).not.toHaveValue("0.000 V");
+    expect(voltage).toHaveTextContent("--.--");
+    // the current limit was readable, so it stays editable
+    expect(screen.getByLabelText("Output 1 current")).toHaveValue("0.500 A");
+  });
+
   it("ignores a second click on the same toggle while its request is in flight", async () => {
     vi.spyOn(api, "psuState").mockResolvedValue(STATE);
     let resolveEnable: (value: typeof STATE) => void = () => {};

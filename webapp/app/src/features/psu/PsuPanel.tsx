@@ -12,8 +12,22 @@ import { useSession } from "../../store/session";
 // ChannelsPanel's NO_CHANNELS).
 const NO_OUTPUTS: PsuOutputState[] = [];
 
-function fmt(value: number): string {
-  return (typeof value === "number" && !Number.isNaN(value) ? value : 0).toFixed(3);
+// A reading the instrument could not give us is null, and null is NOT zero.
+// Rendering it as "0.000" is a confident lie about live hardware; "--.--" is
+// the same "no reading" marker ReadoutStrip uses for a failed measurement.
+function fmt(value: number | null | undefined): string {
+  return typeof value === "number" && !Number.isNaN(value) ? value.toFixed(3) : "--.--";
+}
+
+/** A setpoint the instrument would not report. An editable field pre-filled
+ *  with 0 would invite the user to "confirm" a value that was never read back,
+ *  so show the unreadable marker instead of a spin box. */
+function Unreadable({ what, unit }: { what: string; unit: string }) {
+  return (
+    <span aria-label={what} title="This value could not be read from the instrument" style={{ fontFamily: "var(--font-mono)", fontSize: "var(--text-sm)", color: "var(--lc-muted)" }}>
+      --.-- {unit}
+    </span>
+  );
 }
 
 export function PsuPanel() {
@@ -110,41 +124,56 @@ export function PsuPanel() {
       <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--space-3)" }}>
         {outputs.map((o) => {
           const busy = pending.has(o.output);
+          // enabled === null means the instrument could not tell us. The
+          // toggle must not claim "off" (an SPD3303X's CH3 answers no
+          // output-state query at all, and an energised rail shown as off is
+          // the dangerous direction), and it must not offer a flip whose
+          // starting point we do not know: aria-checked="mixed" + disabled.
+          const enableUnknown = o.enabled === null;
           return (
             <GroupBox key={o.output} title={`Output ${o.output}`}>
               <div style={{ display: "flex", flexDirection: "column", gap: "10px", minWidth: "220px" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "var(--text-sm)" }}>
                   Voltage
-                  <SpinBox
-                    aria-label={`Output ${o.output} voltage`}
-                    value={o.voltage}
-                    step={0.1}
-                    min={0}
-                    decimals={3}
-                    suffix=" V"
-                    disabled={busy}
-                    onChange={(value) => sendOutput(o.output, { voltage: value })}
-                  />
+                  {o.voltage === null ? (
+                    <Unreadable what={`Output ${o.output} voltage`} unit="V" />
+                  ) : (
+                    <SpinBox
+                      aria-label={`Output ${o.output} voltage`}
+                      value={o.voltage}
+                      step={0.1}
+                      min={0}
+                      decimals={3}
+                      suffix=" V"
+                      disabled={busy}
+                      onChange={(value) => sendOutput(o.output, { voltage: value })}
+                    />
+                  )}
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "var(--text-sm)" }}>
                   Current limit
-                  <SpinBox
-                    aria-label={`Output ${o.output} current`}
-                    value={o.current}
-                    step={0.1}
-                    min={0}
-                    decimals={3}
-                    suffix=" A"
-                    disabled={busy}
-                    onChange={(value) => sendOutput(o.output, { current: value })}
-                  />
+                  {o.current === null ? (
+                    <Unreadable what={`Output ${o.output} current`} unit="A" />
+                  ) : (
+                    <SpinBox
+                      aria-label={`Output ${o.output} current`}
+                      value={o.current}
+                      step={0.1}
+                      min={0}
+                      decimals={3}
+                      suffix=" A"
+                      disabled={busy}
+                      onChange={(value) => sendOutput(o.output, { current: value })}
+                    />
+                  )}
                 </div>
                 <button
                   type="button"
                   role="switch"
-                  aria-checked={o.enabled}
+                  aria-checked={enableUnknown ? "mixed" : o.enabled === true}
                   aria-label={`Output ${o.output} enable`}
-                  disabled={busy}
+                  disabled={busy || enableUnknown}
+                  title={enableUnknown ? "This model does not report the output state; read it off the instrument's own display." : undefined}
                   onClick={() => sendEnable(o.output, !o.enabled)}
                   style={{
                     display: "inline-flex",
@@ -155,11 +184,11 @@ export function PsuPanel() {
                     border: "1px solid var(--lc-border-strong)",
                     borderRadius: "var(--lc-radius-sm)",
                     background: "var(--lc-control)",
-                    cursor: busy ? "not-allowed" : "pointer",
-                    opacity: busy ? 0.6 : 1,
+                    cursor: busy || enableUnknown ? "not-allowed" : "pointer",
+                    opacity: busy || enableUnknown ? 0.6 : 1,
                   }}
                 >
-                  <StatusIndicator state={o.enabled ? "connected" : "disconnected"} label={o.enabled ? "Output on" : "Output off"} />
+                  <StatusIndicator state={enableUnknown ? "error" : o.enabled ? "connected" : "disconnected"} label={enableUnknown ? "Output state unknown" : o.enabled ? "Output on" : "Output off"} />
                 </button>
                 <div style={{ display: "flex", gap: "var(--space-3)", paddingTop: "4px", borderTop: "1px solid var(--lc-border)" }}>
                   <Reading label="V" value={fmt(o.measured_voltage)} unit="V" />

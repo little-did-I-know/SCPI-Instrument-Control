@@ -74,6 +74,16 @@ describe("App view selection", () => {
     expect(screen.getByLabelText("Output 1 enable")).not.toBeChecked();
   });
 
+  it("does not seed the scope reference overlay for a psu session", async () => {
+    // /scope/reference is behind require_kind now, so seeding it on a PSU
+    // mount is a guaranteed 400 on every single mount.
+    useSession.getState().setSession({ ...SESSION, kind: "psu" });
+    render(<App />);
+    await screen.findByLabelText("Output 1 voltage");
+    const urls = (fetch as unknown as ReturnType<typeof vi.fn>).mock.calls.map((c: unknown[]) => String(c[0]));
+    expect(urls.some((u: string) => u.includes("/scope/"))).toBe(false);
+  });
+
   it("renders the home screen with no session", () => {
     render(<App />);
     expect(screen.queryByText("Channels")).not.toBeInTheDocument();

@@ -38,7 +38,11 @@ export const useSession = create<SessionStore>((set) => ({
   activeReference: null,
   referenceStats: null,
   logStatus: null,
-  setSession: (session) => set({ session, status: "connected", error: null }),
+  // Both kind-specific slices are cleared: switching sessions must not leave
+  // the previous instrument's readings on screen while the new one's first
+  // frame is still in flight — and with two kinds, a psu→psu switch would
+  // otherwise show the old supply's outputs under the new supply's name.
+  setSession: (session) => set({ session, scope: null, psu: null, status: "connected", error: null }),
   clearSession: () => set({ session: null, scope: null, psu: null, status: "disconnected", error: null, measurements: [], measurementConfig: [], activeReference: null, referenceStats: null, logStatus: null }),
   applyState: (scope) => set({ scope }),
   applyPsuState: (psu) => set({ psu }),
