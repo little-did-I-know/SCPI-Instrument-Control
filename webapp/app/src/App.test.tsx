@@ -88,4 +88,11 @@ describe("App view selection", () => {
     render(<App />);
     expect(screen.queryByText("Channels")).not.toBeInTheDocument();
   });
+
+  it("renders the coming-soon fallback for a kind with no registered view", () => {
+    useSession.getState().setSession({ ...SESSION, kind: "awg" });
+    render(<App />);
+    expect(screen.getByText(/coming soon/i)).toBeInTheDocument();
+    expect(screen.queryByText("Channels")).not.toBeInTheDocument();
+  });
 });
