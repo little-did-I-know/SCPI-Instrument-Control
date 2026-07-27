@@ -12,7 +12,7 @@ much worse failure than a little indirection.
 import time
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
-from scpi_control import Oscilloscope, PowerSupply
+from scpi_control import FunctionGenerator, Oscilloscope, PowerSupply
 from scpi_control.connection.mock import MockConnection
 from scpi_control.exceptions import InvalidParameterError, SiglentError
 from scpi_control.server import compute
@@ -24,6 +24,7 @@ MEASUREMENT_EVERY_N_POLLS = 4
 
 DEFAULT_MOCK_IDN = "Siglent Technologies,SDS1104X-E,MOCK0001,1.0.0.0"
 DEFAULT_MOCK_PSU_IDN = "Siglent Technologies,SPD3303X,SPD123456,1.0"
+DEFAULT_MOCK_AWG_IDN = "Siglent Technologies,SDG1032X,SDG1XXXXX,2.01.01.37R1"
 
 
 def _safe(fn, default=None):
@@ -94,6 +95,11 @@ def make_mock_scope_connection(model: Optional[str]) -> MockConnection:
 def make_mock_psu_connection(model: Optional[str]) -> MockConnection:
     idn = DEFAULT_MOCK_PSU_IDN if model is None else "Siglent Technologies,{0},MOCK0001,1.0.0.0".format(model)
     return MockConnection("mock", psu_mode=True, psu_idn=idn)
+
+
+def make_mock_awg_connection(model: Optional[str]) -> MockConnection:
+    idn = DEFAULT_MOCK_AWG_IDN if model is None else "Siglent Technologies,{0},MOCK0001,1.0.0.0".format(model)
+    return MockConnection("mock", awg_mode=True, awg_idn=idn)
 
 
 class InstrumentAdapter:
@@ -297,6 +303,83 @@ def read_psu_outputs(psu: PowerSupply, measure: bool = True) -> List[Dict[str, A
     return outputs
 
 
+def read_awg_channels(awg: FunctionGenerator) -> List[Dict[str, Any]]:
+    """One dict per channel. Shared by AwgAdapter.poll and GET /awg/state so the
+    streamed shape and the fetched shape cannot drift apart.
+
+    Unlike the PSU reader there is nothing to throttle: an AWG measures nothing,
+    every field is a setting. Those settings still change without the UI asking
+    -- someone can turn a knob on the instrument's front panel -- so reading the
+    full set every tick is what keeps the panel honest about the instrument's
+    actual state.
+
+    duty_cycle and symmetry are read ONLY for the function they belong to.
+    AWGOutput.pulse_duty_cycle logs a warning and reads DUTY anyway when the
+    current function is not PULSE (awg_output.py:281); at four polls a second
+    that is a warning flood for a value the UI would not show.
+
+    Every field goes through _safe, so a query the model does not implement or a
+    timeout yields None rather than a fabricated value. ``enabled`` in
+    particular MUST NOT default to False -- AWGOutput.enabled raises
+    CommandError when an SDG's OUTPut? response carries no STATE field
+    (awg_output.py:249), and a False default would render a live output driving
+    a circuit as a confident "off". None means "unknown", and the UI is required
+    to show it as unknown.
+    """
+    channels = []
+    for n in awg.supported_channels:
+        channel = awg.get_channel(n)
+        if channel is None:
+            continue
+        function = _safe(lambda: channel.function)
+        channels.append(
+            {
+                "channel": n,
+                "function": function,
+                "frequency": _safe(lambda: channel.frequency),
+                "amplitude": _safe(lambda: channel.amplitude),
+                "offset": _safe(lambda: channel.offset),
+                "phase": _safe(lambda: channel.phase),
+                "enabled": _safe(lambda: channel.enabled),
+                "duty_cycle": _safe(lambda: channel.pulse_duty_cycle) if function == "PULSE" else None,
+                "symmetry": _safe(lambda: channel.ramp_symmetry) if function == "RAMP" else None,
+            }
+        )
+    return channels
+
+
+class AwgAdapter(InstrumentAdapter):
+    kind = "awg"
+
+    def build(self, address, port, mock, model, allowed_ports, connection):
+        if mock:
+            conn = connection if connection is not None else make_mock_awg_connection(model)
+            return FunctionGenerator("mock", connection=conn)
+        if not address:
+            raise ValueError("address is required for a non-mock session")
+        validate_target(address, port, allowed_ports=allowed_ports)
+        return FunctionGenerator(address, port=port)
+
+    def connect(self, instrument):
+        instrument.connect()
+        info = instrument.device_info or {}
+        return {
+            "idn": instrument.identify(),
+            "model": info.get("model", ""),
+            "dialect": "",  # an AWG has no scope-style dialect; the field stays for payload compatibility
+            "num_channels": len(instrument.supported_channels),
+        }
+
+    def poll(self, instrument, publish, tick):
+        publish({"type": "state", "kind": "awg", "channels": read_awg_channels(instrument)})
+
+    def initial_frame(self, instrument):
+        return {"type": "state", "kind": "awg", "channels": read_awg_channels(instrument)}
+
+    def close(self, instrument):
+        instrument.disconnect()
+
+
 class PsuAdapter(InstrumentAdapter):
     kind = "psu"
 
@@ -348,4 +431,4 @@ class PsuAdapter(InstrumentAdapter):
         instrument.disconnect()
 
 
-ADAPTERS: Dict[str, type] = {"scope": ScopeAdapter, "psu": PsuAdapter}
+ADAPTERS: Dict[str, type] = {"scope": ScopeAdapter, "psu": PsuAdapter, "awg": AwgAdapter}
