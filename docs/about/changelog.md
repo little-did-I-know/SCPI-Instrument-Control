@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.8.0] - 2026-07-27
+
 ### Added
 
 - The web gateway can now host a power supply (SPD3303X series) alongside oscilloscopes. A power
