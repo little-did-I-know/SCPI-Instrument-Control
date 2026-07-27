@@ -2,9 +2,11 @@
 
 The web gateway is a lab-gateway server built on FastAPI: run it on a PC that
 sits near your instruments, and any browser on the LAN gets a full
-oscilloscope UI — no client install, no drivers, just a URL. V1 is
-scope-only, and the server supports named multi-sessions, so several
-instruments (or several views of the same instrument) can be open at once.
+instrument UI — no client install, no drivers, just a URL. It started
+scope-only; the gateway can now also host a power supply or a function
+generator, each with its own control panel, and the server supports named
+multi-sessions, so several instruments (or several views of the same
+instrument) can be open at once.
 
 > **Security first:** every request needs a bearer token. Read the
 > **[Gateway security guide](security.md)** for tokens, session ownership, the
@@ -70,6 +72,8 @@ ever plugging in an instrument.
 - **Measurement trend recording**, with CSV export
 - **A SCPI terminal** for raw commands
 - **Screenshot, CSV, and JSON export** of the current waveform
+- **Power supply and function generator sessions**, each with their own
+  control panel and live readout strip, alongside the oscilloscope
 
 ## Where to next
 
