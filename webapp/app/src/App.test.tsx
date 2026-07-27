@@ -75,6 +75,16 @@ describe("App view selection", () => {
     expect(screen.getByText("Channels")).toBeInTheDocument();
   });
 
+  // Disconnect moved from ScopeToolbar to AppHeader so every session kind
+  // gets it, not just a scope's. Nothing else pins it out of ScopeToolbar --
+  // a future edit could re-add a Disconnect button there and give a scope
+  // session two, with the rest of the suite still green.
+  it("renders exactly one Disconnect control for a scope session", () => {
+    useSession.getState().setSession(SESSION);
+    render(<App />);
+    expect(screen.getAllByRole("button", { name: /disconnect/i })).toHaveLength(1);
+  });
+
   // Closes the registry hole from the branch review: kindViews.test.tsx only
   // ever asserted `typeof view.body === "function"`, so `readout` could be
   // deleted from a KIND_VIEWS entry -- silently dropping the scope's PKPK/FREQ
@@ -190,6 +200,15 @@ describe("App view selection", () => {
   it("does not offer the terminal with no session", () => {
     render(<App />);
     expect(screen.queryByRole("button", { name: /terminal/i })).not.toBeInTheDocument();
+  });
+
+  it("surfaces a session error in the app, not just in the store", () => {
+    // Guards the wiring: the banner exists but is useless if the shell never
+    // renders it.
+    useSession.getState().setSession(SESSION);
+    useSession.getState().setError("connection lost");
+    render(<App />);
+    expect(screen.getByRole("alert")).toHaveTextContent("connection lost");
   });
 
   it("reports its expanded state and target on the terminal toggle button", async () => {

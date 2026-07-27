@@ -38,6 +38,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   report shows as unknown rather than off.
 - `POST /api/sessions` accepts `kind: "awg"`, and the new `/api/sessions/{id}/awg/...` routes read
   and control the channels.
+- A session that fails now says why. A dropped stream or an error from the instrument shows as a
+  banner under the header carrying the detail, instead of only turning the status dot red.
+  Dismissing the banner clears the message but does not change what the status dot reports — the
+  connection state is the instrument's to report, not a side effect of closing a notification.
+- Any session can be disconnected from the header. Disconnect moved out of the oscilloscope
+  toolbar, so a power supply or function generator session no longer has to be left by reloading
+  the page.
+- A non-owner is now told, in session, that it's read-only and who owns it, with the same Claim
+  action the home screen offers. Previously they found out by having a write rejected.
+
+### Fixed
+
+- An AWG channel whose waveform the instrument will not report now shows the same `--.--` marker
+  every other unreadable field uses, instead of a blank dropdown.
+- The home screen's no-instruments-found message no longer singles out "start a Mock scope" — it
+  points at the mock button for whichever instrument kind, since a mock power supply and mock
+  function generator are just as available.
 
 ## [5.8.0] - 2026-07-27
 

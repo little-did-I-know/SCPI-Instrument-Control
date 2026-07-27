@@ -134,4 +134,16 @@ describe("AwgPanel", () => {
     expect(frequency).not.toHaveValue("0.000 Hz");
     expect(frequency).toHaveTextContent("--.--");
   });
+
+  it("shows an unreadable function as unknown, not as a blank dropdown", async () => {
+    // Every other field says WHY it is empty. A blank <select> is the one
+    // control that leaves the user guessing whether the instrument reported
+    // nothing or the app simply failed to render.
+    const unread = { channels: [{ ...STATE.channels[0], function: null }] };
+    vi.spyOn(api, "awgState").mockResolvedValue(unread);
+    render(<AwgPanel />);
+    const field = await screen.findByLabelText("Channel 1 function");
+    expect(field).toHaveTextContent("--.--");
+    expect(field.tagName).not.toBe("SELECT");
+  });
 });
