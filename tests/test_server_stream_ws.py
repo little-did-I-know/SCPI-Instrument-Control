@@ -16,6 +16,14 @@ from scpi_control.server.app import create_app  # noqa: E402
 from scpi_control.server.auth import WS_ACCEPT_SUBPROTOCOL  # noqa: E402
 from scpi_control.server.sessions import SessionManager  # noqa: E402
 
+# Every ws.receive_json() below blocks with no deadline of its own. The failure
+# mode these tests exist to catch -- a stream that accepts the socket and then
+# never sends anything -- therefore presents as a HANG, not a red test, which
+# would wedge CI instead of reporting. A module-level timeout converts it back
+# into an ordinary failure. 30 s is far above the slowest test here (the
+# disconnect test's 5 s poll loop).
+pytestmark = pytest.mark.timeout(30)
+
 
 @pytest.fixture()
 def client(gateway_auth):
@@ -122,6 +130,31 @@ def test_stream_relays_psu_state_broadcast_after_mutation(client, ws_subprotocol
                     break
         else:
             pytest.fail("no psu state broadcast observed")
+
+
+def test_an_adapter_that_cannot_produce_an_initial_frame_fails_loudly(client, ws_subprotocols, monkeypatch):
+    """The opening frame comes from ``adapter.initial_frame``. When that hook
+    raises -- a new kind that never implemented it, or a read that fails -- the
+    handler used to swallow it with a bare ``except Exception: pass``, leaving
+    the socket accepted, silent, and indistinguishable from an idle instrument
+    forever (polling never starts either: _poll_tick needs a subscriber that
+    has seen a first message). It must instead say what went wrong and close
+    with a code that names the failure."""
+    from scpi_control.server.adapters import ScopeAdapter
+    from scpi_control.server.api.stream import CLOSE_INITIAL_FRAME_FAILED
+
+    def _boom(_self, _instrument):
+        raise NotImplementedError("initial_frame")
+
+    monkeypatch.setattr(ScopeAdapter, "initial_frame", _boom)
+    sid = _create_mock(client)
+    with pytest.raises(WebSocketDisconnect) as exc_info:
+        with client.websocket_connect("/api/sessions/{0}/stream".format(sid), subprotocols=ws_subprotocols) as ws:
+            first = ws.receive_json()
+            assert first["type"] == "error", "a silent socket is the bug; an error frame is the fix"
+            assert "initial frame failed" in first["detail"]
+            ws.receive_json()  # the close arrives here
+    assert exc_info.value.code == CLOSE_INITIAL_FRAME_FAILED
 
 
 def test_stream_unknown_session_closes(client, ws_subprotocols):
