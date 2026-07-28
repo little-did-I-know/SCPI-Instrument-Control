@@ -10,6 +10,7 @@ import hmac
 import json
 import os
 import secrets
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -28,6 +29,39 @@ def _hash(raw: str) -> str:
 
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def _atomic_write_json(path: Path, payload: Any) -> None:
+    """Publish ``payload`` to ``path`` so no reader ever sees a partial file.
+
+    The file is read live by a second process (the serving gateway reloads it
+    when it changes), while it is written by the CLI. A plain write truncates
+    first, and a truncated read is a hard startup failure by design -- see
+    TokenStore.__init__. Writing a sibling temp file and renaming it over the
+    target makes publication atomic, so a reader sees either the whole old
+    file or the whole new one. It also means a crash mid-write can no longer
+    leave a store that refuses to load.
+
+    The temp file is a sibling, not a file in the system temp directory,
+    because os.replace is only atomic within a single filesystem.
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, temp_name = tempfile.mkstemp(dir=str(path.parent), prefix=path.name + ".", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            json.dump(payload, handle, indent=2)
+        try:
+            os.chmod(temp_name, 0o600)
+        except OSError:
+            pass  # best effort; Windows ACLs do not map onto POSIX modes
+        os.replace(temp_name, str(path))
+    except BaseException:
+        # Leave the existing file untouched and take the temp file with us.
+        try:
+            os.unlink(temp_name)
+        except OSError:
+            pass
+        raise
 
 
 class TokenStore:
@@ -64,12 +98,7 @@ class TokenStore:
         return tokens
 
     def _save(self) -> None:
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        self.path.write_text(json.dumps({"tokens": self._tokens}, indent=2), encoding="utf-8")
-        try:
-            os.chmod(self.path, 0o600)
-        except OSError:
-            pass  # best effort; Windows ACLs do not map onto POSIX modes
+        _atomic_write_json(self.path, {"tokens": self._tokens})
 
     def mint(self, name: str) -> str:
         if not name or not name.strip():

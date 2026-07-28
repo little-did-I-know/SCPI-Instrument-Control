@@ -173,3 +173,48 @@ def test_no_argument_defaults_never_touch_the_real_home(tmp_path):
     reference = ReferenceWaveform()
     assert tmp_path in reference.storage_dir.parents
     assert reference.storage_dir != real_default_reference_dir
+
+
+def test_save_never_leaves_a_truncated_store(tmp_path, monkeypatch):
+    # The failure this guards: _save() used to truncate tokens.json before
+    # writing it. Once a second process reads the file live (hot reload), a
+    # read landing in that window sees invalid JSON -- and __init__ treats
+    # that as a hard refusal to start. Simulate a crash at the moment of
+    # publication and assert the previous store survived intact.
+    path = tmp_path / "tokens.json"
+    store = TokenStore(str(path))
+    raw = store.mint("robin")
+    good = path.read_bytes()
+
+    def boom(src, dst):
+        raise OSError("simulated crash during publish")
+
+    monkeypatch.setattr("os.replace", boom)
+    with pytest.raises(OSError):
+        store.mint("bench-laptop")
+    assert path.read_bytes() == good
+    assert TokenStore(str(path)).verify(raw) == "robin"
+
+
+def test_save_leaves_no_temp_file_behind(tmp_path):
+    path = tmp_path / "tokens.json"
+    TokenStore(str(path)).mint("robin")
+    # tmp_path also holds the autouse `_no_real_home` fixture's "fake-home"
+    # directory (see conftest.py) -- unrelated to this store. Filter it out;
+    # the point of this test is that _save() leaves no leftover temp file
+    # alongside tokens.json.
+    assert [p.name for p in tmp_path.iterdir() if p.name != "fake-home"] == ["tokens.json"]
+
+
+def test_each_save_publishes_a_new_file_identity(tmp_path):
+    # Task 2's reload check keys on (st_ino, st_mtime_ns, st_size). st_ino is
+    # the reliable term: an atomic replace always publishes a different file,
+    # even when two writes land inside one filesystem timestamp tick and
+    # happen to produce the same size.
+    path = tmp_path / "tokens.json"
+    store = TokenStore(str(path))
+    store.mint("aaaa")
+    first = path.stat().st_ino
+    store.revoke("aaaa")
+    store.mint("bbbb")  # same length name -> same file size
+    assert path.stat().st_ino != first
