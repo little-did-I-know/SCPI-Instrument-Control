@@ -634,8 +634,10 @@ scpi-web invite bob                        # a 10-minute link + code for someone
 
 The gateway prints its URL every time it starts, and serves an **admin panel**
 on the gateway machine only (`http://127.0.0.1:8766/`) for managing who has
-access — invite, revoke, cancel a pending invitation. It has no sign-in because
-it binds loopback: physical access to the machine is the credential. On the very
+access — invite, revoke, cancel a pending invitation. It has no sign-in: it
+binds loopback, so physical access to the machine is the credential, and it
+refuses any request whose `Host` or `Origin` is not its own, so a web page the
+admin visits cannot reach it either. On the very
 first run, when nobody has access yet, the gateway opens that panel so you can
 name yourself; nothing is minted automatically. **Every request to the gateway
 itself needs a token**, but nobody except the admin has to handle one: the

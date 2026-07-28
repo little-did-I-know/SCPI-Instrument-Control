@@ -75,8 +75,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The gateway now serves an admin panel on the machine it runs on, at `http://127.0.0.1:8766/`.
   It lists who has access with device counts and last-seen, issues an invitation showing the
   link and code together with a countdown, cancels one sent to the wrong person, and revokes
-  someone with a confirmation that names how many devices it signs out. There is no sign-in:
-  the listener binds loopback, so the operating system refuses every non-local connection.
+  someone with a confirmation that names how many devices it signs out. There is no sign-in,
+  and three independent things stand in for one: the listener binds loopback, so the operating
+  system refuses every non-local connection; requests must carry a `Host` of `127.0.0.1` or
+  `localhost`, which is what stops a DNS-rebound page the bind would let through; and any
+  request carrying a foreign `Origin` is refused, which is what stops an ordinary cross-origin
+  page that satisfies both of the others.
   `--admin-port` moves it; `--no-admin` switches it off. There is deliberately no flag to bind
   it to another address.
 - Cancelling a pending invitation is new — previously the only remedy for one sent to the wrong
