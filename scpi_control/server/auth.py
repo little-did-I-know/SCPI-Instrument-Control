@@ -197,6 +197,11 @@ class TokenStore:
         return None
 
     def revoke(self, name: str) -> bool:
+        # Without this, a stale in-memory snapshot gets rewritten verbatim
+        # (minus `name`) over whatever another process wrote in the
+        # meantime -- silently resurrecting names this process already
+        # thinks are gone, or erasing tokens it never even saw minted.
+        self._reload_if_changed()
         remaining = [entry for entry in self._tokens if entry["name"] != name]
         if len(remaining) == len(self._tokens):
             return False
@@ -214,6 +219,7 @@ class TokenStore:
         last_used is best-effort: verify() updates it in memory only, so it
         reflects this process's view and resets when the store reloads.
         """
+        self._reload_if_changed()
         rows: Dict[str, Dict[str, Any]] = {}
         for entry in self._tokens:
             name = str(entry["name"])

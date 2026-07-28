@@ -13,7 +13,10 @@ def admin(tmp_path):
     tokens = TokenStore(str(tmp_path / "tokens.json"))
     invitations = InvitationStore(str(tmp_path / "invitations.json"))
     app = create_admin_app(token_store=tokens, invitation_store=invitations, base_url="http://192.168.1.50:8765/")
-    with TestClient(app) as client:
+    # base_url is 127.0.0.1, not the httpx default "testserver": TrustedHostMiddleware
+    # only allows 127.0.0.1/localhost, and the Host header httpx sends is derived
+    # from base_url unless a test overrides it.
+    with TestClient(app, base_url="http://127.0.0.1") as client:
         yield client, tokens, invitations
 
 
@@ -112,3 +115,50 @@ def test_every_route_answers_without_a_token(admin):
     tokens.mint("bob")
     assert client.get("/api/identities").status_code == 200
     assert client.get("/api/invitations").status_code == 200
+
+
+def test_a_spoofed_host_header_is_rejected(admin):
+    # The loopback bind stops non-local sockets, not a browser: a page open
+    # on the gateway machine can rebind its own hostname to 127.0.0.1 and
+    # become same-origin with this unauthenticated app. TrustedHostMiddleware
+    # is the second, independent defence -- it must reject anything that does
+    # not present as this host, regardless of what socket it arrived on.
+    client, _tokens, _invitations = admin
+    response = client.get("/api/identities", headers={"Host": "evil.example"})
+    assert response.status_code == 400
+
+
+def test_localhost_and_loopback_hosts_still_work(admin):
+    client, _tokens, _invitations = admin
+    assert client.get("/api/identities", headers={"Host": "127.0.0.1"}).status_code == 200
+    assert client.get("/api/identities", headers={"Host": "localhost"}).status_code == 200
+
+
+def test_admin_spa_traversal_is_contained(tmp_path):
+    # admin/static/ does not exist yet (no bundle has been built), so the
+    # SPA route -- including its path-traversal guard -- has never actually
+    # run in this test file. Build a throwaway static dir and monkeypatch it
+    # in, mirroring tests/test_server_spa.py::test_encoded_traversal_is_contained
+    # for the main app, so the admin app's own wiring gets the same proof.
+    import scpi_control.server.admin.app as admin_app_module
+
+    secret = tmp_path / "outside" / "secret.txt"
+    secret.parent.mkdir()
+    secret.write_text("TOP SECRET", encoding="utf-8")
+    static_dir = tmp_path / "static"
+    static_dir.mkdir()
+    (static_dir / "index.html").write_text("<!doctype html><title>admin</title>", encoding="utf-8")
+
+    original = admin_app_module.ADMIN_STATIC_DIR
+    admin_app_module.ADMIN_STATIC_DIR = static_dir
+    try:
+        tokens = TokenStore(str(tmp_path / "tokens.json"))
+        invitations = InvitationStore(str(tmp_path / "invitations.json"))
+        app = admin_app_module.create_admin_app(token_store=tokens, invitation_store=invitations)
+        with TestClient(app, base_url="http://127.0.0.1") as client:
+            for payload in ("/%2e%2e/outside/secret.txt", "/../outside/secret.txt", "/%2e%2e%2foutside/secret.txt"):
+                response = client.get(payload)
+                assert response.status_code in (200, 404), payload
+                assert "TOP SECRET" not in response.text, payload
+    finally:
+        admin_app_module.ADMIN_STATIC_DIR = original
