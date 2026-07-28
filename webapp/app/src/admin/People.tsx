@@ -219,8 +219,9 @@ export function People() {
                   The code is shown again here, not just on the invitation you
                   happen to have just created. GET /api/invitations returns it
                   for exactly this reason: an admin who closed the window, or
-                  who is back at the bench an hour later, would otherwise have
-                  no way to recover it and would have to cancel and re-invite.
+                  who steps away and comes back a few minutes later, would
+                  otherwise have no way to recover it and would have to cancel
+                  and re-invite.
                   The link is deliberately absent -- only the nonce's hash is
                   stored, so it cannot be reconstructed after creation.
                 */}

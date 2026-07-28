@@ -105,9 +105,9 @@ everything still pending and cancels it outright.
 
 ### A code can be shown again; a link cannot
 
-Reopen the panel an hour later and a pending invitation still shows its code, so
-an admin who closed the window can read it out without cancelling and starting
-over.
+Reopen the panel five minutes later and a pending invitation still shows its
+code, so an admin who closed the window can read it out without cancelling and
+starting over.
 
 The link is not shown again, and this is not an oversight. Only a **hash** of
 the link's nonce is stored, so the link genuinely exists once, at the moment of
