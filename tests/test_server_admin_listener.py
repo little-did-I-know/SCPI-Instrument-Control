@@ -1,10 +1,13 @@
 """The admin listener: where it binds, and that it can be switched off."""
 
 import asyncio
+import signal
 
 import pytest
+import uvicorn
+from fastapi import FastAPI
 
-from scpi_control.server.__main__ import ADMIN_HOST, main
+from scpi_control.server.__main__ import ADMIN_HOST, _QuietServer, main
 
 
 @pytest.fixture
@@ -47,6 +50,22 @@ def test_there_is_no_admin_host_flag(tmp_path):
         main(["--config-dir", str(tmp_path), "--admin-host", "0.0.0.0"])
 
 
+def test_port_colliding_with_admin_port_exits_cleanly(captured, tmp_path):
+    # Without this check, --port and --admin-port landing on the same number
+    # fails deep inside uvicorn's socket bind with a bare traceback instead of
+    # a sentence explaining the operator's typo.
+    with pytest.raises(SystemExit):
+        main(["--config-dir", str(tmp_path), "--port", "8766"])
+
+
+def test_port_colliding_with_admin_port_is_fine_under_no_admin(captured, tmp_path):
+    # The collision only matters when the admin listener is actually going to
+    # start on that port.
+    main(["--config-dir", str(tmp_path), "--port", "8766", "--no-admin"])
+    assert captured["port"] == 8766
+    assert captured["admin_app"] is None
+
+
 # --- Ctrl+C: both servers actually stop -------------------------------------
 #
 # The tests above cover binding and flags but not the thing most likely to be
@@ -82,17 +101,53 @@ def test_main_server_returning_stops_the_admin_server_too(monkeypatch):
                 await asyncio.sleep(0)
                 return
             # The admin server: keep "running" until told to stop, exactly
-            # like the real server would while waiting on should_exit.
-            while not self.should_exit:
+            # like the real server would while waiting on should_exit. Bounded
+            # rather than an unconditional while loop: a missing should_exit
+            # propagation then fails in milliseconds with a clear message
+            # instead of hanging the test session (the @pytest.mark.timeout
+            # above is only a backstop).
+            for _ in range(1000):
+                if self.should_exit:
+                    break
                 await asyncio.sleep(0)
+            else:
+                raise AssertionError("should_exit was never set")
+            # One more yield before marking exited: if _run_servers stopped
+            # awaiting this task after setting should_exit, asyncio.run's own
+            # cleanup would cancel it while it's asleep here, and exited would
+            # never become True. That turns "forgot to await admin_task" into
+            # a real assertion failure instead of passing by accident.
+            await asyncio.sleep(0.05)
             self.exited = True
 
     monkeypatch.setattr(mod.uvicorn, "Server", FakeServer)
     monkeypatch.setattr(mod, "_QuietServer", FakeServer)
 
-    mod._run_servers(main_app=object(), host="127.0.0.1", port=1234, admin_app=object(), admin_port=5678)
+    # The main host deliberately differs from ADMIN_HOST so the config
+    # assertions below can tell "the admin server got its own host" apart
+    # from "it got whatever host the main server got".
+    mod._run_servers(main_app=object(), host="0.0.0.0", port=1234, admin_app=object(), admin_port=5678)
 
     assert len(created) == 2
     main_server, admin_server = created
     assert admin_server.should_exit is True
     assert admin_server.exited is True
+    # The line that decides the security boundary: uvicorn.Config(admin_app,
+    # host=ADMIN_HOST, ...). If that ever regresses to host=host, this is the
+    # only thing in the suite that would notice.
+    assert admin_server.config.host == ADMIN_HOST
+    assert main_server.config.host == "0.0.0.0"
+
+
+def test_the_admin_server_leaves_signal_handling_alone():
+    # The brief's original approach (assigning install_signal_handlers) was a
+    # silent no-op on uvicorn 0.34.3, which captures signals through a context
+    # manager instead. This asserts the override actually overrides
+    # something, so a future uvicorn that restructures signal capture fails
+    # here rather than leaving both servers fighting over SIGINT.
+    assert "capture_signals" in vars(uvicorn.Server)
+    handler = signal.getsignal(signal.SIGINT)
+    server = _QuietServer(uvicorn.Config(FastAPI(), host="127.0.0.1", port=0))
+    with server.capture_signals():
+        assert signal.getsignal(signal.SIGINT) is handler
+    assert signal.getsignal(signal.SIGINT) is handler

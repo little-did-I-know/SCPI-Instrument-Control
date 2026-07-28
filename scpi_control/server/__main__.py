@@ -65,6 +65,13 @@ def _run_servers(main_app, host: str, port: int, admin_app, admin_port: int) -> 
             admin_server.should_exit = True
             await admin_task
 
+    # Server.run() calls this for the single-server (--no-admin) path above;
+    # asyncio.run() alone skips it, so without this line the default path
+    # (both servers) would silently run on a different event loop
+    # implementation than --no-admin -- uvloop is the installed default on
+    # Linux/macOS with uvicorn[standard], so --no-admin would get uvloop while
+    # the normal path got the stdlib loop.
+    main_server.config.setup_event_loop()
     asyncio.run(_serve_both())
 
 
@@ -193,6 +200,12 @@ def main(argv=None) -> None:
     # a clear message and exits before any of that happens.
     if args.max_sessions < 1:
         parser.error("--max-sessions must be at least 1 (got {0})".format(args.max_sessions))
+
+    # Same reasoning as --max-sessions above: without this check, --port and
+    # --admin-port colliding fails deep inside uvicorn's socket bind with a
+    # bare traceback instead of a sentence explaining the mistake.
+    if not args.no_admin and args.port == args.admin_port:
+        parser.error("--port and --admin-port must differ (both are {0})".format(args.port))
 
     store = _store(args)
     # Built here, not inline in the create_app(...) call below, for the same
