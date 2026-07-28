@@ -62,6 +62,43 @@ jobs:
         run: npm run build
         working-directory: webapp/app
 
+      - name: Build the admin bundle
+        run: npm run build:admin
+        working-directory: webapp/app
+
+      - name: The LAN bundle must not contain admin code
+        # The admin panel is served only on a loopback-bound listener and has no
+        # authentication. If admin code reaches the LAN bundle, every browser in
+        # the lab is served the UI for administering access.
+        #
+        # Vite's default single entry means admin.html cannot be swept in by
+        # accident, so this guards the deliberate case: an import from
+        # src/admin/* into the main app's module graph. That leaves the
+        # filenames untouched and only shows up inside the emitted chunks, which
+        # is why this greps content rather than listing files.
+        #
+        # "/api/identities" is an admin-only route string; it is a plain string
+        # literal in src/admin/api.ts and esbuild's minifier leaves it intact
+        # (verified against both built bundles).
+        run: |
+          # Assert the haystacks exist first. A missing dist/ would make grep
+          # exit 2, which the `if` below reads as "no match" -- so the negative
+          # assertion would pass without having looked at anything.
+          test -f dist/index.html
+          test -f dist-admin/admin.html
+          if grep -rl "/api/identities" dist/; then
+            echo "::error::admin code reached the LAN bundle — see webapp/app/vite.admin.config.ts"
+            exit 1
+          fi
+          # And prove the needle is still findable, so a rename of the route
+          # cannot turn this gate into one that silently always passes.
+          grep -rq "/api/identities" dist-admin/ || {
+            echo "::error::'/api/identities' is not in the admin bundle — this check no longer proves anything; update the search string"
+            exit 1
+          }
+          echo "LAN bundle clean; admin bundle built"
+        working-directory: webapp/app
+
   build:
     name: Build Package
     runs-on: ubuntu-latest
