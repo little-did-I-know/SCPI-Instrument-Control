@@ -17,6 +17,10 @@ def captured(monkeypatch):
         "scpi_control.server.__main__._run_servers",
         lambda main_app, host, port, admin_app, admin_port: calls.update(host=host, port=port, admin_app=admin_app, admin_port=admin_port),
     )
+    # These tests use a fresh, empty tmp_path store, which now opens the
+    # setup screen in a real browser unless stubbed -- see
+    # tests/test_server_first_run.py for the behaviour itself.
+    monkeypatch.setattr("scpi_control.server.__main__._open_browser", lambda url: True)
     return calls
 
 

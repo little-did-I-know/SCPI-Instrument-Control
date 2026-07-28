@@ -75,6 +75,21 @@ def _run_servers(main_app, host: str, port: int, admin_app, admin_port: int) -> 
     asyncio.run(_serve_both())
 
 
+def _open_browser(url: str) -> bool:
+    """Open ``url`` in the host's browser. False if that was not possible.
+
+    Never raises: a headless box, an SSH session or a machine with no
+    associated browser must still start a gateway. The caller prints the URL
+    either way.
+    """
+    import webbrowser
+
+    try:
+        return bool(webbrowser.open(url))
+    except Exception:
+        return False
+
+
 def _config_dir(args) -> Path:
     return Path(args.config_dir) if args.config_dir else DEFAULT_CONFIG_DIR
 
@@ -219,11 +234,23 @@ def main(argv=None) -> None:
     except ValueError as exc:
         sys.exit(str(exc))
     url = write_base_url(_config_dir(args), args.host, args.port)
+    admin_url = "http://{0}:{1}/".format(ADMIN_HOST, args.admin_port)
     if store.is_empty():
-        raw = store.mint("default")
-        print("\nGateway ready. Open:\n\n    {0}?token={1}\n".format(url, raw))
-    else:
+        if args.no_admin:
+            print("\nGateway ready at {0}\nNo one has access yet, and the admin panel is disabled (--no-admin).\nCreate the first identity with: scpi-web invite <name>\n".format(url))
+        else:
+            print("\nGateway ready at {0}\nNo one has access yet — finish setup at {1}\n".format(url, admin_url))
+            try:
+                _open_browser(admin_url)
+            except Exception:
+                # _open_browser already swallows what it can; this is the
+                # belt-and-braces guard that a browser problem can never stop a
+                # gateway starting.
+                pass
+    elif args.no_admin:
         print("\nGateway ready at {0}\nHand out access with: scpi-web invite <name>\n".format(url))
+    else:
+        print("\nGateway ready at {0}\nAdmin panel (this machine only) at {1}\nHand out access with: scpi-web invite <name>\n".format(url, admin_url))
     allowed_ports = frozenset(args.allow_port) | DEFAULT_ALLOWED_PORTS if args.allow_port else None
     main_app = create_app(token_store=store, invitation_store=invitations, abandon_after=args.abandon_after, allowed_ports=allowed_ports, max_sessions=args.max_sessions)
     admin_app = None if args.no_admin else create_admin_app(token_store=store, invitation_store=invitations, base_url=url)
