@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { People } from "./People";
@@ -38,6 +38,31 @@ describe("People", () => {
     expect(revoke).not.toHaveBeenCalled();
   });
 
+  it("revokes the identity and reloads the roster when the confirmation is accepted", async () => {
+    // The identities() stub returns bob on mount, then an empty list on the
+    // reload that must follow a successful revoke. A local optimistic splice
+    // (removing bob from state without calling the server again) would leave
+    // the call count flat, so that assertion catches it even though the
+    // screen would look right either way.
+    const identities = vi
+      .spyOn(adminApi, "identities")
+      .mockResolvedValueOnce([identity("bob", 2)])
+      .mockResolvedValueOnce([]);
+    vi.spyOn(adminApi, "invitations").mockResolvedValue([]);
+    const revoke = vi.spyOn(adminApi, "revokeIdentity").mockResolvedValue(undefined);
+    render(<People />);
+    await screen.findByText(/bob/);
+    const callsAfterMount = identities.mock.calls.length;
+
+    await userEvent.click(screen.getByRole("button", { name: /revoke/i }));
+    const dialog = screen.getByRole("alertdialog");
+    await userEvent.click(within(dialog).getByRole("button", { name: /revoke/i }));
+
+    expect(revoke).toHaveBeenCalledWith("bob");
+    await waitFor(() => expect(identities.mock.calls.length).toBeGreaterThan(callsAfterMount));
+    expect(await screen.findByText(/no one has access yet/i)).toBeInTheDocument();
+  });
+
   it("shows the link and the code after inviting", async () => {
     vi.spyOn(adminApi, "identities").mockResolvedValue([]);
     vi.spyOn(adminApi, "invitations").mockResolvedValue([]);
@@ -49,6 +74,28 @@ describe("People", () => {
     expect(screen.getByText(/\?invite=xyz/)).toBeInTheDocument();
   });
 
+  it("reloads invitations from the server after creating one", async () => {
+    // invitations() returns nothing on mount, then the new invite on the
+    // reload that must follow a successful create. If create only appended
+    // the returned invitation to local state instead of reloading, the call
+    // count would stay flat even though the row would still appear.
+    vi.spyOn(adminApi, "identities").mockResolvedValue([]);
+    const invitations = vi
+      .spyOn(adminApi, "invitations")
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([invitation("a1", "bob")]);
+    vi.spyOn(adminApi, "createInvitation").mockResolvedValue({ ...invitation("a1", "bob"), link: "http://192.168.1.50:8765/?invite=xyz" });
+    render(<People />);
+    await screen.findByLabelText(/name/i);
+    const callsAfterMount = invitations.mock.calls.length;
+
+    await userEvent.type(screen.getByLabelText(/name/i), "bob");
+    await userEvent.click(screen.getByRole("button", { name: /invite/i }));
+
+    await waitFor(() => expect(invitations.mock.calls.length).toBeGreaterThan(callsAfterMount));
+    expect(await screen.findByRole("button", { name: /cancel invitation/i })).toBeInTheDocument();
+  });
+
   it("cancels a pending invitation by id", async () => {
     vi.spyOn(adminApi, "identities").mockResolvedValue([]);
     vi.spyOn(adminApi, "invitations").mockResolvedValue([invitation("a1b2c3d4", "bob")]);
@@ -56,6 +103,27 @@ describe("People", () => {
     render(<People />);
     await userEvent.click(await screen.findByRole("button", { name: /cancel invitation/i }));
     expect(cancel).toHaveBeenCalledWith("a1b2c3d4");
+  });
+
+  it("reloads invitations from the server after cancelling one", async () => {
+    // invitations() returns bob's pending invite on mount, then an empty
+    // list on the reload that must follow a successful cancel. A local
+    // splice would leave the call count flat even though the row would
+    // still disappear.
+    vi.spyOn(adminApi, "identities").mockResolvedValue([]);
+    const invitations = vi
+      .spyOn(adminApi, "invitations")
+      .mockResolvedValueOnce([invitation("a1b2c3d4", "bob")])
+      .mockResolvedValueOnce([]);
+    vi.spyOn(adminApi, "cancelInvitation").mockResolvedValue(undefined);
+    render(<People />);
+    await screen.findByRole("button", { name: /cancel invitation/i });
+    const callsAfterMount = invitations.mock.calls.length;
+
+    await userEvent.click(screen.getByRole("button", { name: /cancel invitation/i }));
+
+    await waitFor(() => expect(invitations.mock.calls.length).toBeGreaterThan(callsAfterMount));
+    await waitFor(() => expect(screen.queryByRole("button", { name: /cancel invitation/i })).not.toBeInTheDocument());
   });
 
   it("reports a failure instead of silently doing nothing", async () => {
