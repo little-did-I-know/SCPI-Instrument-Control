@@ -171,3 +171,47 @@ def test_the_admin_server_leaves_signal_handling_alone():
     with server.capture_signals():
         assert signal.getsignal(signal.SIGINT) is handler
     assert signal.getsignal(signal.SIGINT) is handler
+
+
+def test_uvicorn_run_still_delegates_to_self_serve(monkeypatch):
+    # _run_servers never names a uvicorn private API (Config.setup_event_loop()
+    # up to 0.35, Config.get_loop_factory() from 0.36) to stay valid across the
+    # uvicorn[standard]>=0.30 range pyproject.toml declares. Instead it swaps
+    # `serve` on the main Server instance and lets run() call it -- which only
+    # works because uvicorn.Server.run() is `asyncio.run(self.serve(...))`. If
+    # a future uvicorn routes run() straight to self._serve(...) instead (that
+    # method already exists on 0.51), this delegation silently stops: the
+    # process starts the LAN-facing gateway alone, `run()` still returns
+    # cleanly, and the admin panel that first-run setup just printed and
+    # opened a browser to (http://127.0.0.1:8766/) simply never exists. This
+    # test drives a *real* uvicorn.Server, not the FakeServer used above, so a
+    # uvicorn upgrade that breaks this contract fails here instead of in a
+    # user's terminal.
+    #
+    # No socket may be bound while proving that: the sentinel replaces serve()
+    # entirely, so Server.startup() (the thing that actually listens, via
+    # loop.create_server(...)) should never run. Assert that directly rather
+    # than trust it, by making listener creation explode if anything on this
+    # path still reaches for one. (Patching socket.socket itself is too broad
+    # here -- on Windows, asyncio's own ProactorEventLoop opens a loopback
+    # socket pair for its internal self-pipe before our code runs at all, so
+    # that would fail for a reason unrelated to what this test checks.)
+    def _no_listeners_allowed(*args, **kwargs):
+        raise AssertionError("run() reached loop.create_server(); serve() was not overridden")
+
+    monkeypatch.setattr(asyncio.base_events.BaseEventLoop, "create_server", _no_listeners_allowed)
+
+    # loop="asyncio" keeps Config's event-loop setup from installing the
+    # uvloop policy process-wide on Linux/macOS, which would otherwise leak
+    # into whichever test runs next in this worker.
+    server = uvicorn.Server(uvicorn.Config(FastAPI(), host="127.0.0.1", port=0, loop="asyncio"))
+
+    calls = []
+
+    async def sentinel(sockets=None):
+        calls.append(sockets)
+
+    server.serve = sentinel
+    server.run()
+
+    assert calls == [None]
