@@ -22,10 +22,12 @@ First, install the library:
     scpi-web
     `
 
-    On first run this prints a ready-to-open URL with an access token
-    (`http://127.0.0.1:8765/?token=…`) — open that in your browser. Every
-    request needs a token; see the
-    [Gateway security guide](../gateway/security.md) for details.
+    The gateway prints its URL every time it starts; on the very first run
+    that URL carries an access token
+    (`http://127.0.0.1:8765/?token=…`) — open it in your browser. To let a
+    colleague in, run `scpi-web invite <their name>`: it prints a link and a
+    six-digit code, either of which signs them in, both good for ten minutes.
+    See the [Gateway security guide](../gateway/security.md) for details.
 
 === "Everything"
 `bash

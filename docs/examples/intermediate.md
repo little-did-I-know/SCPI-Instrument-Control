@@ -515,10 +515,11 @@ python examples/gateway_rest_client.py
 Start the gateway first (in another terminal):
 
     pip install "SCPI-Instrument-Control[web]"
-    scpi-web            # prints a URL with a token on first run
+    scpi-web            # prints the gateway's URL on every start
 
-Every gateway request needs a bearer token. Mint one and export it before
-running this script:
+Every gateway request needs a bearer token. People sign in with an invitation
+(`scpi-web invite <name>`), but a script wants a credential it can keep, so
+mint one by hand and export it before running this:
 
     scpi-web token add rest-demo     # prints the token once
     export SCPI_WEB_TOKEN=scpi_...   # the token it printed

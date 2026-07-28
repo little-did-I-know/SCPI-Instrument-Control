@@ -134,7 +134,15 @@ def safe_connect(ip_str):
 ### Web gateway
 
 - The optional web gateway (`scpi-web`) authenticates every `/api/*` request
-  with a bearer token, except the unauthenticated `GET /api/health` probe
+  with a bearer token, except the unauthenticated `GET /api/health` probe and
+  `POST /api/join`, which exchanges a short-lived invitation for a token
+- Invitations (`scpi-web invite <name>`) expire after ten minutes and are
+  consumed on first use; failed join attempts are rate limited globally, and
+  every failure returns an identical 401 so the route cannot be used as an
+  oracle
+- Revoking a name (`scpi-web token revoke <name>`) removes every token it
+  holds and takes effect immediately — the gateway reloads its token store
+  when the file changes
 - Instrument sessions are owned by the token that created them — only the
   owner may issue writes; other tokens may read and watch
 - Outbound connection targets are validated (an SSRF gate) before the gateway

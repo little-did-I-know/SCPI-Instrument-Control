@@ -4,6 +4,15 @@ This page walks through the gateway's browser interface tab by tab. There
 are no screenshots yet — read this alongside a running gateway
 (`scpi-web`) and follow along.
 
+## Signing in
+
+Before the home screen there is a **Sign in** panel with a single **Join code**
+field: type the six digits your lab admin read out and press **Connect**. An
+invitation link (`…/?invite=…`) skips this screen entirely — it redeems itself
+as the page loads. Automation authors, who hold an `scpi_…` token rather than a
+code, will find an **I have an access token** disclosure below the field. See
+[Gateway security](security.md#inviting-someone) for where codes come from.
+
 ## Home screen
 
 The home screen is split into two zones: sessions already held by the server
