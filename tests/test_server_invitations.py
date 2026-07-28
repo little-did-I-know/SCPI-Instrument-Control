@@ -129,6 +129,25 @@ def test_a_corrupt_invitation_file_is_not_silently_empty(tmp_path):
         InvitationStore(str(path))
 
 
+def test_a_pre_id_invitation_file_fails_loudly_with_a_way_out(tmp_path):
+    # A legacy file -- valid JSON, valid old schema, just missing "id" -- is
+    # not corrupt, but strict validation still refuses to load it, and
+    # _validate runs before _prune, so even entries that have long since
+    # expired cannot rescue the load. That is a deliberate choice, not an
+    # oversight: this feature is unreleased, the file is only ever created by
+    # running `scpi-web invite`, and a tolerant load or migration path was
+    # considered and declined as speculative work for a population of
+    # approximately zero existing files. What is not optional is that the
+    # operator who hits this be told what to do about it: delete the file and
+    # restart, since nothing in it outlives ten minutes anyway.
+    path = tmp_path / "invitations.json"
+    legacy_entry = {"name": "bob", "link_hash": "x" * 64, "code": "417902", "expires": 1.0}
+    path.write_text(json.dumps({"invitations": [legacy_entry]}))
+    with pytest.raises(ValueError) as excinfo:
+        InvitationStore(str(path))
+    assert "delete" in str(excinfo.value)
+
+
 def test_a_store_corrupted_while_running_keeps_failing(tmp_path):
     # The same ordering guard TokenStore needed: if _load() commits the stat
     # key before the read succeeds, a corrupt file raises loudly exactly once

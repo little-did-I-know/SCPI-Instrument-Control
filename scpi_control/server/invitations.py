@@ -79,7 +79,19 @@ class InvitationStore:
             # would be less dangerous than silently discarding tokens, but
             # the surprise -- "I sent Bob a link and it just did not work" --
             # is exactly the failure this whole feature exists to remove.
-            raise ValueError("invitation store {0} is unreadable: {1}".format(self.path, exc))
+            #
+            # Unlike a genuinely corrupt file, an unreadable-but-parseable
+            # file (e.g. one written before the "id" field existed) has an
+            # easy way out, and the operator should not have to guess it:
+            # nothing in here outlives ten minutes, so the file can simply be
+            # deleted and the gateway restarted -- any invitation that was
+            # still pending just needs reissuing.
+            raise ValueError(
+                "invitation store {0} is unreadable: {1}. If this file predates "
+                "an upgrade, it is safe to delete: invitations expire in minutes, "
+                "so nothing in it outlives a restart -- reissue any that were still "
+                "pending.".format(self.path, exc)
+            )
         self._invitations = invitations
         self._stat = stat
 
