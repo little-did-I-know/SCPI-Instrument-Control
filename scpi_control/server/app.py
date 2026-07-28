@@ -10,7 +10,9 @@ from fastapi.responses import FileResponse, JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from scpi_control.exceptions import InvalidParameterError, SiglentError, SiglentTimeoutError
+from scpi_control.server.api.join import FailureLimiter
 from scpi_control.server.auth import AuthMiddleware, TokenStore
+from scpi_control.server.invitations import InvitationStore
 from scpi_control.server.sessions import SessionError, SessionManager
 
 STATIC_DIR = Path(__file__).parent / "static"
@@ -24,6 +26,7 @@ def create_app(
     manager: Optional[SessionManager] = None,
     references_dir: Optional[str] = None,
     token_store: Optional[TokenStore] = None,
+    invitation_store: Optional[InvitationStore] = None,
     abandon_after: float = 300.0,
     allowed_ports: Optional[frozenset] = None,
     max_sessions: Optional[int] = None,
@@ -55,6 +58,12 @@ def create_app(
     # ValueError) rather than be caught here and silently degrade to an empty
     # store, which would open the gateway to anonymous access.
     app.state.tokens = token_store if token_store is not None else TokenStore()
+    # Like the token store, a malformed invitation file must fail loudly
+    # rather than degrade to "no invitations" and leave the admin wondering
+    # why a link they just sent does nothing.
+    app.state.invitations = invitation_store if invitation_store is not None else InvitationStore()
+    # One limiter per app, so the window is shared across all clients.
+    app.state.join_limiter = FailureLimiter()
     # Reference store is created lazily on first use: ReferenceWaveform.__init__
     # mkdirs its storage directory, and most requests never need it.
     app.state.references_dir = references_dir
@@ -67,6 +76,7 @@ def create_app(
     from scpi_control.server.api import awg as awg_api
     from scpi_control.server.api import commands as commands_api
     from scpi_control.server.api import discovery as discovery_api
+    from scpi_control.server.api import join as join_api
     from scpi_control.server.api import psu as psu_api
     from scpi_control.server.api import scope as scope_api
     from scpi_control.server.api import sessions as sessions_api
@@ -79,6 +89,7 @@ def create_app(
     app.include_router(commands_api.router, prefix="/api")
     app.include_router(stream_api.router, prefix="/api")
     app.include_router(discovery_api.router, prefix="/api")
+    app.include_router(join_api.router, prefix="/api")
 
     @app.get("/api/health")
     async def health():

@@ -213,7 +213,10 @@ class TokenStore:
         return not self._tokens
 
 
-EXEMPT_PATHS = frozenset({"/api/health"})
+# /api/join is exempt because it is how a client with no credential gets one;
+# it defends itself (see api/join.py). /api/health is exempt so an uptime
+# probe does not need a token.
+EXEMPT_PATHS = frozenset({"/api/health", "/api/join"})
 WS_SUBPROTOCOL_PREFIX = "scpi-token."
 WS_ACCEPT_SUBPROTOCOL = "scpi"
 
