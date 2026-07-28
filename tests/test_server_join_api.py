@@ -75,6 +75,38 @@ def test_every_failure_looks_identical(gateway):
     assert wrong.content == already.content == gone.content == missing.content
 
 
+def test_a_unicode_digit_code_is_rejected_like_any_other(gateway):
+    # str.isdigit() is True for "²" and "٣"; hmac.compare_digest raises
+    # TypeError on a non-ASCII str. Because the comparison only runs when an
+    # invitation is live, an unhandled error here reported gateway state to an
+    # anonymous caller: 401 with nothing pending, 500 with something pending.
+    # The live invitation is the whole point of this test -- without it, it
+    # passes even with the bug present.
+    client, _tokens, invitations = gateway
+    invitations.create("bob")
+    plain = client.post("/api/join", json={"code": "000000"})
+    unicode_digits = client.post("/api/join", json={"code": "²²²²²²"})
+    arabic = client.post("/api/join", json={"code": "٤٥٦٧٨٩"})
+    assert plain.status_code == unicode_digits.status_code == arabic.status_code == 401
+    assert plain.content == unicode_digits.content == arabic.content
+
+
+def test_a_corrupt_invitation_store_is_indistinguishable_from_a_wrong_code(gateway, tmp_path):
+    # A ValueError out of redeem() used to reach the app-wide handler and come
+    # back as 400 {"detail": "invitation store C:\\Users\\...\\invitations.json
+    # is unreadable: ..."} -- an absolute path handed to an anonymous caller,
+    # and a third distinguishable status on a route whose whole contract is one
+    # response. The serve path now refuses to start on a corrupt store, but the
+    # file can still be damaged while the gateway is running.
+    client, _tokens, _invitations = gateway
+    wrong = client.post("/api/join", json={"code": "000000"})
+    (tmp_path / "invitations.json").write_text("{ truncated")
+    broken = client.post("/api/join", json={"code": "000000"})
+    assert broken.status_code == wrong.status_code == 401
+    assert broken.content == wrong.content
+    assert "invitations.json" not in broken.text
+
+
 def test_a_failed_join_mints_no_token(gateway):
     client, tokens, _invitations = gateway
     client.post("/api/join", json={"code": "000000"})
@@ -83,9 +115,12 @@ def test_a_failed_join_mints_no_token(gateway):
 
 def test_the_limiter_stops_a_burst_of_wrong_codes(gateway):
     client, _tokens, _invitations = gateway
+    # Pinned exactly, not just "starts 401, ends 429": join.py's comment does
+    # the brute-force arithmetic against FAILURE_LIMIT = 10, and a loose
+    # assertion passes for any limit from 1 to 11 -- so nothing would have
+    # caught someone quietly widening the budget.
     statuses = [client.post("/api/join", json={"code": "000000"}).status_code for _ in range(12)]
-    assert statuses[0] == 401
-    assert statuses[-1] == 429
+    assert statuses == [401] * 10 + [429] * 2
 
 
 def test_successful_joins_are_not_counted_by_the_limiter(gateway):

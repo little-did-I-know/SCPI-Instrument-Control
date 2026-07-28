@@ -50,7 +50,11 @@ def test_a_wrong_code_redeems_nothing_and_consumes_nothing(tmp_path):
 def test_codes_are_six_digits_and_links_are_long(tmp_path):
     store = InvitationStore(str(tmp_path / "invitations.json"))
     link, code = store.create("bob")
-    assert len(code) == 6 and code.isdigit()
+    # Explicit ASCII rather than code.isdigit(): "²".isdigit() is True, and
+    # that idiom in _normalize_code was a live oracle (see the join API tests).
+    # Harmless here -- generated codes are ASCII -- but the idiom should not
+    # survive anywhere near this file.
+    assert len(code) == 6 and all(char in "0123456789" for char in code)
     assert len(link) >= 32
 
 

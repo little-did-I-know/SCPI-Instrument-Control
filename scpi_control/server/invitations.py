@@ -38,8 +38,18 @@ def format_code(code: str) -> str:
 
 
 def _normalize_code(value: str) -> str:
-    """Accept the code however it comes back: spaces, hyphens, stray padding."""
-    return "".join(char for char in value if char.isdigit())
+    """Accept the code however it comes back: spaces, hyphens, stray padding.
+
+    The ASCII set is written out rather than using ``str.isdigit()`` on
+    purpose, and must stay that way. ``"²".isdigit()`` and ``"٣".isdigit()``
+    are both True, but ``hmac.compare_digest`` raises TypeError on a str with
+    any non-ASCII character -- and that comparison only runs when at least one
+    invitation is live. Letting a non-ASCII digit through therefore turned an
+    anonymous request into a free oracle for gateway state: 401 with nothing
+    pending, 500 with an invitation waiting. Keep the comparison fed with
+    ASCII only.
+    """
+    return "".join(char for char in value if char in "0123456789")
 
 
 class InvitationStore:
