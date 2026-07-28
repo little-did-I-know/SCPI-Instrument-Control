@@ -138,8 +138,9 @@ def safe_connect(ip_str):
   `POST /api/join`, which exchanges a short-lived invitation for a token
 - Invitations (`scpi-web invite <name>`) expire after ten minutes and are
   consumed on first use; failed join attempts are rate limited globally, and
-  every failure returns an identical 401 so the route cannot be used as an
-  oracle
+  every rejected invitation — wrong code, expired, already redeemed — returns
+  the same 401 with byte-identical wording, so the route cannot be used to
+  probe for which invitations exist
 - Revoking a name (`scpi-web token revoke <name>`) removes every token it
   holds and takes effect immediately — the gateway reloads its token store
   when the file changes

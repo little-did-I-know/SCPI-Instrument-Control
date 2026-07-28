@@ -141,8 +141,16 @@ revoked 'alice'
 
 **Revocation takes effect immediately.** The gateway watches `tokens.json` and
 reloads it when it changes on disk, so a token revoked from another terminal
-stops working on the very next request — no restart, no window in which a
-leaked token still opens the door.
+stops working on the very next request — no restart needed.
+
+> **One exception: a live-stream WebSocket already open.** A stream
+> authenticates once, at the handshake, and nothing re-checks it afterwards, so
+> revoking the token does not tear the connection down — it keeps receiving
+> waveform data until it closes. Worse, a watching stream marks its session as
+> owner-watching, and that *refuses* a claim outright however long the owner has
+> been idle, so the revoked tab also keeps you from taking over the session it
+> is holding. If you need a leaked credential cut off mid-capture, close that
+> stream (or restart the gateway); revoking the token alone is not enough.
 
 Every token is equal: there are no roles or scopes. Anyone with a valid token can
 create sessions and read any session; ownership (below) governs who may *write*.
@@ -387,7 +395,7 @@ directory, when you run the command explicitly.
 |---|---|---|
 | `--host` | `127.0.0.1` | Bind address; `0.0.0.0` exposes on the LAN |
 | `--port` | `8765` | Listen port |
-| `--config-dir` | `~/.siglent` | Where `tokens.json` lives |
+| `--config-dir` | `~/.siglent` | Where `tokens.json`, `gateway.json` and `invitations.json` live |
 | `--allow-port <n>` | `{5025}` | Extra instrument port(s) the gateway may connect to (repeatable) |
 | `--max-sessions` | `8` | Concurrent instrument-session cap |
 | `--abandon-after` | `300` | Seconds of owner inactivity before a session can be claimed |
