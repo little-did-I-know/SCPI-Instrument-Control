@@ -64,19 +64,58 @@ def _atomic_write_json(path: Path, payload: Any) -> None:
         raise
 
 
+def _stat_key(path: Path):
+    """Cheap identity of a file's current contents, or None if absent.
+
+    st_ino is the load-bearing term. Timestamp granularity is coarse on some
+    platforms (a Windows filesystem timestamp can be shared by writes ~15ms
+    apart), so two edits inside one tick that happen to produce the same byte
+    count would be indistinguishable by (mtime, size) alone. Every save
+    publishes a fresh temp file via os.replace, so the file identity always
+    changes -- see _atomic_write_json. mtime and size are kept as belt and
+    braces for any platform that does not populate st_ino.
+    """
+    try:
+        info = path.stat()
+    except OSError:
+        return None
+    return (info.st_ino, info.st_mtime_ns, info.st_size)
+
+
 class TokenStore:
     """Named bearer tokens persisted as {name, hash, created, last_used}."""
 
     def __init__(self, path: Optional[str] = None) -> None:
         self.path = Path(path) if path is not None else DEFAULT_CONFIG_DIR / "tokens.json"
         self._tokens: List[Dict[str, Any]] = []
-        if self.path.exists():
-            try:
-                raw = json.loads(self.path.read_text(encoding="utf-8"))
-                self._tokens = self._validate_tokens(raw)
-            except (ValueError, OSError) as exc:
-                # Never fall back to "no tokens" — that would silently open the gateway.
-                raise ValueError("token store {0} is unreadable: {1}".format(self.path, exc))
+        self._stat = None
+        self._load()
+
+    def _load(self) -> None:
+        self._stat = _stat_key(self.path)
+        if self._stat is None:
+            self._tokens = []
+            return
+        try:
+            raw = json.loads(self.path.read_text(encoding="utf-8"))
+            self._tokens = self._validate_tokens(raw)
+        except (ValueError, OSError) as exc:
+            # Never fall back to "no tokens" — that would silently open the gateway.
+            raise ValueError("token store {0} is unreadable: {1}".format(self.path, exc))
+
+    def _reload_if_changed(self) -> None:
+        """Pick up writes made by another process (the CLI mints and revokes).
+
+        Called on the verify path, so this runs once per authenticated
+        request: a stat is microseconds, and it is what makes `token revoke`
+        take effect immediately instead of at the next gateway restart.
+
+        Reloading discards the in-memory last_used updates. That is already
+        the documented contract -- see verify() -- because last_used is
+        ephemeral metadata, not an audit record.
+        """
+        if _stat_key(self.path) != self._stat:
+            self._load()
 
     @staticmethod
     def _validate_tokens(raw: Any) -> List[Dict[str, Any]]:
@@ -99,6 +138,7 @@ class TokenStore:
 
     def _save(self) -> None:
         _atomic_write_json(self.path, {"tokens": self._tokens})
+        self._stat = _stat_key(self.path)
 
     def mint(self, name: str) -> str:
         if not name or not name.strip():
@@ -119,6 +159,7 @@ class TokenStore:
     def verify(self, raw: str) -> Optional[str]:
         if not raw:
             return None
+        self._reload_if_changed()
         candidate = _hash(raw)
         for entry in self._tokens:
             if hmac.compare_digest(entry["hash"], candidate):

@@ -218,3 +218,66 @@ def test_each_save_publishes_a_new_file_identity(tmp_path):
     store.revoke("aaaa")
     store.mint("bbbb")  # same length name -> same file size
     assert path.stat().st_ino != first
+
+
+def test_revocation_by_another_process_takes_effect_without_restart(tmp_path):
+    # Two TokenStore instances on one path stand in for the serving gateway
+    # and the CLI, which really are separate processes. Before hot reload, the
+    # gateway kept honouring a revoked token until someone restarted it --
+    # which made the documented remedy for a leaked credential a no-op.
+    path = str(tmp_path / "tokens.json")
+    gateway = TokenStore(path)
+    raw = gateway.mint("robin")
+    assert gateway.verify(raw) == "robin"
+
+    cli = TokenStore(path)
+    assert cli.revoke("robin") is True
+
+    assert gateway.verify(raw) is None
+
+
+def test_a_token_minted_by_another_process_verifies_without_restart(tmp_path):
+    path = str(tmp_path / "tokens.json")
+    gateway = TokenStore(path)
+    gateway.mint("robin")
+
+    raw = TokenStore(path).mint("bob")
+
+    assert gateway.verify(raw) == "bob"
+
+
+def test_reload_still_does_not_write_on_the_verify_path(tmp_path):
+    path = tmp_path / "tokens.json"
+    store = TokenStore(str(path))
+    raw = store.mint("robin")
+    TokenStore(str(path)).mint("bob")  # force a reload on the next verify
+    before = path.read_bytes()
+    assert store.verify(raw) == "robin"
+    assert path.read_bytes() == before
+
+
+def test_a_store_whose_file_vanishes_verifies_nothing(tmp_path):
+    # Deleting tokens.json must fail closed, not freeze the last known good
+    # set in memory.
+    path = tmp_path / "tokens.json"
+    store = TokenStore(str(path))
+    raw = store.mint("robin")
+    path.unlink()
+    assert store.verify(raw) is None
+
+
+def test_a_store_corrupted_while_running_fails_closed_and_loudly(tmp_path):
+    # verify() could not raise before hot reload; now it can, because the
+    # file it re-reads may have been damaged since startup. That is the
+    # correct behaviour and must stay: __init__ already treats a corrupt
+    # store as a hard error precisely because "no tokens" is
+    # indistinguishable from a fresh install and would open the gateway.
+    # Catching this inside verify() and returning None would look like
+    # failing closed while actually turning a loud, fixable problem into
+    # every request mysteriously returning 401.
+    path = tmp_path / "tokens.json"
+    store = TokenStore(str(path))
+    raw = store.mint("robin")
+    path.write_text("{ truncated")
+    with pytest.raises(ValueError):
+        store.verify(raw)
