@@ -109,4 +109,12 @@ pip install "SCPI-Instrument-Control[web]"
 scpi-web
 ```
 
-Then run the client script.
+Then, back in your first terminal, mint a token for the script (`token add` is
+the credential for scripts and CI; people sign in with `scpi-web invite <name>`
+instead) and export it before running the client:
+
+```bash
+scpi-web token add rest-demo     # prints the token once
+export SCPI_WEB_TOKEN=scpi_...   # the token it printed
+python examples/gateway_rest_client.py
+```

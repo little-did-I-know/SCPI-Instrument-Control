@@ -8,12 +8,21 @@ import uvicorn
 
 from scpi_control.server.app import create_app
 from scpi_control.server.auth import DEFAULT_CONFIG_DIR, TokenStore
+from scpi_control.server.gateway_url import read_base_url, write_base_url
+from scpi_control.server.invitations import InvitationStore, format_code
 from scpi_control.server.netpolicy import DEFAULT_ALLOWED_PORTS
 
 
+def _config_dir(args) -> Path:
+    return Path(args.config_dir) if args.config_dir else DEFAULT_CONFIG_DIR
+
+
+def _invitations(args) -> InvitationStore:
+    return InvitationStore(str(_config_dir(args) / "invitations.json"))
+
+
 def _store(args) -> TokenStore:
-    config_dir = Path(args.config_dir) if args.config_dir else DEFAULT_CONFIG_DIR
-    return TokenStore(str(config_dir / "tokens.json"))
+    return TokenStore(str(_config_dir(args) / "tokens.json"))
 
 
 def _add_config_dir(parser, default=None) -> None:
@@ -60,6 +69,11 @@ def main(argv=None) -> None:
     revoke.add_argument("name")
     _add_config_dir(revoke, default=argparse.SUPPRESS)
 
+    invite = sub.add_parser("invite", help="create a join link and code for someone")
+    invite.add_argument("name")
+    invite.add_argument("--url", default=None, help="base URL to print (default: the URL the gateway last recorded)")
+    _add_config_dir(invite, default=argparse.SUPPRESS)
+
     references = sub.add_parser("references", help="reference file maintenance").add_subparsers(dest="references_command", required=True)
     migrate = references.add_parser("migrate", help="convert pre-5.0 pickled reference files")
     migrate.add_argument("--dir", default=None, help="reference storage directory (default: ~/.siglent/references)")
@@ -74,20 +88,40 @@ def main(argv=None) -> None:
         print("converted {converted}, skipped {skipped}, failed {failed} in {0}".format(target, **result))
         return
 
+    if args.command == "invite":
+        base = args.url or read_base_url(_config_dir(args))
+        fallback = base is None
+        if fallback:
+            base = "http://{0}:{1}/".format(args.host, args.port)
+        try:
+            link, code = _invitations(args).create(args.name)
+        except ValueError as exc:
+            sys.exit(str(exc))
+        print("\nInvitation for {0!r} — expires in 10 minutes.\n".format(args.name))
+        print("  Send this link:          {0}?invite={1}".format(base, link))
+        print("  Or read out this code:   {0}\n".format(format_code(code)))
+        if fallback:
+            print("(No gateway has started from this config directory yet, so that link assumes")
+            print(" {0}. If the gateway runs elsewhere, pass --url.)\n".format(base))
+        return
+
     if args.command == "token":
         store = _store(args)
         if args.token_command == "add":
             try:
                 print("token {0!r} created. Copy it now, it is not stored:\n\n    {1}\n".format(args.name, store.mint(args.name)))
             except ValueError as exc:
-                # Covers DuplicateTokenName (a ValueError subclass) as well as
-                # the bare ValueError mint() raises for an empty or
-                # whitespace-only name -- both must exit cleanly with a
-                # message, not surface as an uncaught traceback.
+                # mint() rejects an empty or whitespace-only name; exit cleanly
+                # with the message rather than surfacing a traceback.
                 sys.exit(str(exc))
         elif args.token_command == "list":
-            names = store.names()
-            print("\n".join(names) if names else "no tokens")
+            rows = store.summary()
+            if not rows:
+                print("no tokens")
+            else:
+                for row in rows:
+                    devices = "{0} device{1}".format(row["devices"], "" if row["devices"] == 1 else "s")
+                    print("{0:<20} {1:<11} last used {2}".format(row["name"], devices, row["last_used"] or "never"))
         elif args.token_command == "revoke":
             if not store.revoke(args.name):
                 sys.exit("no token named {0!r}".format(args.name))
@@ -104,11 +138,28 @@ def main(argv=None) -> None:
         parser.error("--max-sessions must be at least 1 (got {0})".format(args.max_sessions))
 
     store = _store(args)
+    # Built here, not inline in the create_app(...) call below, for the same
+    # reason --max-sessions is checked above: InvitationStore.__init__ raises
+    # ValueError on a corrupt invitations.json, and constructing it after the
+    # mint meant the admin saw "Gateway ready. Open: ...?token=..." for a
+    # server that then died -- leaving a live token in tokens.json that, since
+    # the store is no longer empty, no later start would ever print again.
+    try:
+        invitations = _invitations(args)
+    except ValueError as exc:
+        sys.exit(str(exc))
+    url = write_base_url(_config_dir(args), args.host, args.port)
     if store.is_empty():
         raw = store.mint("default")
-        print("\nGateway ready. Open:\n\n    http://{0}:{1}/?token={2}\n".format(args.host, args.port, raw))
+        print("\nGateway ready. Open:\n\n    {0}?token={1}\n".format(url, raw))
+    else:
+        print("\nGateway ready at {0}\nHand out access with: scpi-web invite <name>\n".format(url))
     allowed_ports = frozenset(args.allow_port) | DEFAULT_ALLOWED_PORTS if args.allow_port else None
-    uvicorn.run(create_app(token_store=store, abandon_after=args.abandon_after, allowed_ports=allowed_ports, max_sessions=args.max_sessions), host=args.host, port=args.port)
+    uvicorn.run(
+        create_app(token_store=store, invitation_store=invitations, abandon_after=args.abandon_after, allowed_ports=allowed_ports, max_sessions=args.max_sessions),
+        host=args.host,
+        port=args.port,
+    )
 
 
 if __name__ == "__main__":

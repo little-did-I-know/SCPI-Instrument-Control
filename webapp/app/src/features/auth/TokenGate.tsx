@@ -9,6 +9,7 @@ type Status = "checking" | "needs-token" | "ready";
 
 const UNAUTHORIZED = "That token was not accepted.";
 const UNREACHABLE = "Could not reach the server. Check your connection and try again.";
+const CODE_REJECTED = "That code is not valid or has expired. Ask for a new one.";
 
 /**
  * Gates the app behind a verified bearer token. Every request already
@@ -24,6 +25,7 @@ const UNREACHABLE = "Could not reach the server. Check your connection and try a
 export function TokenGate({ children }: { children: React.ReactNode }) {
   const [status, setStatus] = useState<Status>("checking");
   const [value, setValue] = useState("");
+  const [code, setCode] = useState("");
   const [error, setError] = useState("");
   const [hasStoredToken, setHasStoredToken] = useState(false);
 
@@ -62,6 +64,26 @@ export function TokenGate({ children }: { children: React.ReactNode }) {
     void check();
   }, [check]);
 
+  /**
+   * Exchange a join code for a token. The gateway's own wording is preferred
+   * over ours for anything it chose to say (a wrong code, a rate limit): it
+   * knows which of those happened and we do not.
+   */
+  const join = useCallback(async () => {
+    const digits = code.replace(/\D/g, "");
+    if (!digits) return;
+    setStatus("checking");
+    try {
+      const { token } = await api.join({ code: digits });
+      setToken(token);
+      setCode("");
+      await check();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.detail || CODE_REJECTED : UNREACHABLE);
+      setStatus("needs-token");
+    }
+  }, [code, check]);
+
   if (status === "ready") return <>{children}</>;
   // aria-live so a screen-reader user hears the wait; without it the first
   // screen of the app is silent until it resolves.
@@ -80,27 +102,22 @@ export function TokenGate({ children }: { children: React.ReactNode }) {
             style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}
             onSubmit={(event) => {
               event.preventDefault();
-              const trimmed = value.trim();
-              if (!trimmed) return;
-              setToken(trimmed);
-              setValue("");
-              setStatus("checking");
-              void check();
+              void join();
             }}
           >
-            <label htmlFor="token" style={{ fontSize: "var(--text-sm)", color: "var(--lc-text)" }}>
-              Access token
+            <label htmlFor="join-code" style={{ fontSize: "var(--text-sm)", color: "var(--lc-text)" }}>
+              Join code
             </label>
             <input
-              id="token"
-              type="password"
-              value={value}
-              onChange={(event) => setValue(event.target.value)}
-              autoComplete="off"
-              style={{ padding: "6px 8px", fontFamily: "var(--font-mono)", fontSize: "var(--text-sm)", border: "1px solid var(--lc-border-strong)", borderRadius: "var(--lc-radius-sm)", background: "var(--lc-control)", color: "var(--lc-text)" }}
+              id="join-code"
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              value={code}
+              onChange={(event) => setCode(event.target.value)}
+              style={{ padding: "6px 8px", fontFamily: "var(--font-mono)", fontSize: "var(--text-sm)", letterSpacing: "0.15em", border: "1px solid var(--lc-border-strong)", borderRadius: "var(--lc-radius-sm)", background: "var(--lc-control)", color: "var(--lc-text)" }}
             />
             <div style={{ display: "flex", gap: "var(--space-1)" }}>
-              <Button type="submit" variant="primary" disabled={!value.trim()} fullWidth>
+              <Button type="submit" variant="primary" disabled={!code.replace(/\D/g, "")} fullWidth>
                 Connect
               </Button>
               {hasStoredToken && (
@@ -121,9 +138,42 @@ export function TokenGate({ children }: { children: React.ReactNode }) {
               </p>
             ) : null}
             <p style={{ margin: 0, fontSize: "var(--text-xs)", color: "var(--lc-muted)" }}>
-              No token? Run <code>scpi-web token add &lt;name&gt;</code> on the gateway host to mint one.
+              No code? Ask your lab admin to send you a join link or read you a code.
             </p>
           </form>
+          {/* A scientist should never see an scpi_ string. An automation
+              author still needs one, so the field stays — just not in the
+              way of the ninety-nine percent case. */}
+          <details>
+            <summary style={{ fontSize: "var(--text-xs)", color: "var(--lc-muted)", cursor: "pointer" }}>I have an access token</summary>
+            <form
+              style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)", marginTop: "var(--space-2)" }}
+              onSubmit={(event) => {
+                event.preventDefault();
+                const trimmed = value.trim();
+                if (!trimmed) return;
+                setToken(trimmed);
+                setValue("");
+                setStatus("checking");
+                void check();
+              }}
+            >
+              <label htmlFor="token" style={{ fontSize: "var(--text-sm)", color: "var(--lc-text)" }}>
+                Access token
+              </label>
+              <input
+                id="token"
+                type="password"
+                value={value}
+                onChange={(event) => setValue(event.target.value)}
+                autoComplete="off"
+                style={{ padding: "6px 8px", fontFamily: "var(--font-mono)", fontSize: "var(--text-sm)", border: "1px solid var(--lc-border-strong)", borderRadius: "var(--lc-radius-sm)", background: "var(--lc-control)", color: "var(--lc-text)" }}
+              />
+              <Button type="submit" disabled={!value.trim()} fullWidth>
+                Use token
+              </Button>
+            </form>
+          </details>
         </GroupBox>
       </div>
     </div>

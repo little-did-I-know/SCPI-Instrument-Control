@@ -7,8 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### ⚠️ Breaking Changes
+
+- A token name is now an identity rather than a unique credential. `scpi-web token add <name>`
+  no longer fails when that name already exists — it mints an additional token, so one person can
+  hold several devices, and `scpi-web token revoke <name>` cuts off every one of them at once.
+  Anything that relied on the duplicate-name error to detect an existing name should call
+  `TokenStore.names()` instead.
+- `DuplicateTokenName` has been removed from `scpi_control.server.auth`. It can no longer be
+  raised, so any `except DuplicateTokenName` clause is now an `ImportError` waiting to happen.
+- `TokenStore.names()` now returns distinct names, sorted. It previously returned one entry per
+  token, which is one entry per device under the new model.
+
 ### Added
 
+- Handing out gateway access no longer means sending someone a permanent secret. `scpi-web invite
+  <name>` prints a link and a six-digit code for the same ten-minute invitation: send the link, or
+  read the code down the phone. Either one is exchanged in the browser for a real token, so a
+  scientist never sees an `scpi_…` string and a leaked chat message stops working in minutes. The
+  same command is how you get someone back in after they clear their browser or switch laptops.
+  The sign-in screen now asks for a join code first, with the raw-token field kept for scripts and
+  CI.
+- `scpi-web token list` now shows how many devices each identity holds and when it was last used.
 - The SCPI terminal now works for any connected instrument, not just oscilloscopes. It moved out
   of the oscilloscope's control rail (eight tabs down to seven) into a drawer across the bottom of
   the window, opened from a Terminal button in the header and closed with Escape, so a power
@@ -50,6 +70,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Revoking a token now takes effect immediately. The gateway reloads its token store when the file
+  changes, so `scpi-web token revoke` no longer requires restarting the server to lock someone out
+  — which meant the documented remedy for a leaked credential silently did nothing until someone
+  remembered to restart.
+- The token store is now written atomically, so a crash or a concurrent read during a write can no
+  longer leave a `tokens.json` that the gateway refuses to start from.
 - An AWG channel whose waveform the instrument will not report now shows the same `--.--` marker
   every other unreadable field uses, instead of a blank dropdown.
 - The home screen's no-instruments-found message no longer singles out "start a Mock scope" — it

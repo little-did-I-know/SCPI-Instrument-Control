@@ -10,16 +10,13 @@ import hmac
 import json
 import os
 import secrets
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 DEFAULT_CONFIG_DIR = Path.home() / ".siglent"
 TOKEN_PREFIX = "scpi_"
-
-
-class DuplicateTokenName(ValueError):
-    """Raised when minting a token with a name that already exists."""
 
 
 def _hash(raw: str) -> str:
@@ -30,19 +27,109 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def _atomic_write_json(path: Path, payload: Any) -> None:
+    """Publish ``payload`` to ``path`` so no reader ever sees a partial file.
+
+    The file is read live by a second process (the serving gateway reloads it
+    when it changes), while it is written by the CLI. A plain write truncates
+    first, and a truncated read is a hard startup failure by design -- see
+    TokenStore.__init__. Writing a sibling temp file and renaming it over the
+    target makes publication atomic, so a reader sees either the whole old
+    file or the whole new one. It also means a crash mid-write can no longer
+    leave a store that refuses to load.
+
+    The temp file is a sibling, not a file in the system temp directory,
+    because os.replace is only atomic within a single filesystem.
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, temp_name = tempfile.mkstemp(dir=str(path.parent), prefix=path.name + ".", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            json.dump(payload, handle, indent=2)
+        try:
+            os.chmod(temp_name, 0o600)
+        except OSError:
+            pass  # best effort; Windows ACLs do not map onto POSIX modes
+        os.replace(temp_name, str(path))
+    except BaseException:
+        # Leave the existing file untouched and take the temp file with us.
+        try:
+            os.unlink(temp_name)
+        except OSError:
+            pass
+        raise
+
+
+def _stat_key(path: Path):
+    """Cheap identity of a file's current contents, or None if absent.
+
+    No single term here is reliable on its own, and which one carries the
+    detection differs by platform:
+
+    * On Windows, filesystem timestamps are coarse -- two writes ~15ms apart
+      can share an mtime -- but os.replace publishes a file with a different
+      file index, so st_ino changes.
+    * On Linux the opposite holds. mtime is nanosecond-resolution, but
+      os.replace unlinks the old file and the next mkstemp in the same
+      directory can immediately reuse the freed inode number, so st_ino
+      repeats. CI caught exactly this: a revoke followed by a same-length mint
+      produced an identical st_ino AND an identical st_size.
+
+    So the tuple is the guarantee, not any one field, and an earlier version of
+    this docstring claiming "the file identity always changes" was wrong.
+
+    Residual, accepted rather than engineered around: on a platform with coarse
+    timestamp granularity that also reuses inodes, two writes inside one tick
+    producing byte-identical file sizes would be indistinguishable. That needs
+    two separate processes writing same-sized content within a few
+    milliseconds; the writers here are human-driven CLI commands, and a writer
+    in *this* process updates self._stat directly rather than going through a
+    stat comparison.
+    """
+    try:
+        info = path.stat()
+    except OSError:
+        return None
+    return (info.st_ino, info.st_mtime_ns, info.st_size)
+
+
 class TokenStore:
     """Named bearer tokens persisted as {name, hash, created, last_used}."""
 
     def __init__(self, path: Optional[str] = None) -> None:
         self.path = Path(path) if path is not None else DEFAULT_CONFIG_DIR / "tokens.json"
         self._tokens: List[Dict[str, Any]] = []
-        if self.path.exists():
-            try:
-                raw = json.loads(self.path.read_text(encoding="utf-8"))
-                self._tokens = self._validate_tokens(raw)
-            except (ValueError, OSError) as exc:
-                # Never fall back to "no tokens" — that would silently open the gateway.
-                raise ValueError("token store {0} is unreadable: {1}".format(self.path, exc))
+        self._stat = None
+        self._load()
+
+    def _load(self) -> None:
+        stat = _stat_key(self.path)
+        if stat is None:
+            self._stat = stat
+            self._tokens = []
+            return
+        try:
+            raw = json.loads(self.path.read_text(encoding="utf-8"))
+            tokens = self._validate_tokens(raw)
+        except (ValueError, OSError) as exc:
+            # Never fall back to "no tokens" — that would silently open the gateway.
+            raise ValueError("token store {0} is unreadable: {1}".format(self.path, exc))
+        self._tokens = tokens
+        self._stat = stat
+
+    def _reload_if_changed(self) -> None:
+        """Pick up writes made by another process (the CLI mints and revokes).
+
+        Called on the verify path, so this runs once per authenticated
+        request: a stat is microseconds, and it is what makes `token revoke`
+        take effect immediately instead of at the next gateway restart.
+
+        Reloading discards the in-memory last_used updates. That is already
+        the documented contract -- see verify() -- because last_used is
+        ephemeral metadata, not an audit record.
+        """
+        if _stat_key(self.path) != self._stat:
+            self._load()
 
     @staticmethod
     def _validate_tokens(raw: Any) -> List[Dict[str, Any]]:
@@ -64,14 +151,17 @@ class TokenStore:
         return tokens
 
     def _save(self) -> None:
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        self.path.write_text(json.dumps({"tokens": self._tokens}, indent=2), encoding="utf-8")
-        try:
-            os.chmod(self.path, 0o600)
-        except OSError:
-            pass  # best effort; Windows ACLs do not map onto POSIX modes
+        _atomic_write_json(self.path, {"tokens": self._tokens})
+        self._stat = _stat_key(self.path)
 
     def mint(self, name: str) -> str:
+        """Mint one more token for ``name``.
+
+        A name is an identity, not a credential: one person can hold several
+        tokens (laptop, bench tablet, a reinstalled browser) and every one of
+        them reports the same owner. revoke(name) removes all of them, which
+        is what makes "someone left" a single command.
+        """
         if not name or not name.strip():
             # An empty (or whitespace-only) name mints a token whose identity
             # is "" -- and require_owner() in ownership.py treats owner == ""
@@ -80,8 +170,6 @@ class TokenStore:
             # boundary, so reject it outright rather than normalize it (e.g.
             # by stripping): the operator needs to know and pick a real name.
             raise ValueError("token name must not be empty or whitespace-only")
-        if any(entry["name"] == name for entry in self._tokens):
-            raise DuplicateTokenName("a token named {0!r} already exists".format(name))
         raw = TOKEN_PREFIX + secrets.token_urlsafe(32)
         self._tokens.append({"name": name, "hash": _hash(raw), "created": _now(), "last_used": None})
         self._save()
@@ -90,6 +178,7 @@ class TokenStore:
     def verify(self, raw: str) -> Optional[str]:
         if not raw:
             return None
+        self._reload_if_changed()
         candidate = _hash(raw)
         for entry in self._tokens:
             if hmac.compare_digest(entry["hash"], candidate):
@@ -116,13 +205,33 @@ class TokenStore:
         return True
 
     def names(self) -> List[str]:
-        return [str(entry["name"]) for entry in self._tokens]
+        """Distinct identities, sorted. One entry per person, not per device."""
+        return sorted({str(entry["name"]) for entry in self._tokens})
+
+    def summary(self) -> List[Dict[str, Any]]:
+        """Per-identity device count and most recent use. Never includes hashes.
+
+        last_used is best-effort: verify() updates it in memory only, so it
+        reflects this process's view and resets when the store reloads.
+        """
+        rows: Dict[str, Dict[str, Any]] = {}
+        for entry in self._tokens:
+            name = str(entry["name"])
+            row = rows.setdefault(name, {"name": name, "devices": 0, "last_used": None})
+            row["devices"] += 1
+            used = entry.get("last_used")
+            if used is not None and (row["last_used"] is None or used > row["last_used"]):
+                row["last_used"] = used
+        return [rows[name] for name in sorted(rows)]
 
     def is_empty(self) -> bool:
         return not self._tokens
 
 
-EXEMPT_PATHS = frozenset({"/api/health"})
+# /api/join is exempt because it is how a client with no credential gets one;
+# it defends itself (see api/join.py). /api/health is exempt so an uptime
+# probe does not need a token.
+EXEMPT_PATHS = frozenset({"/api/health", "/api/join"})
 WS_SUBPROTOCOL_PREFIX = "scpi-token."
 WS_ACCEPT_SUBPROTOCOL = "scpi"
 

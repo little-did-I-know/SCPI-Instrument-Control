@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 from scpi_control.server.__main__ import main
-from scpi_control.server.auth import DuplicateTokenName, TokenStore
+from scpi_control.server.auth import TokenStore
 
 
 def test_minted_token_verifies_to_its_name(tmp_path):
@@ -36,13 +36,6 @@ def test_revoked_token_stops_verifying(tmp_path):
     assert store.revoke("robin") is True
     assert store.verify(raw) is None
     assert store.revoke("robin") is False
-
-
-def test_duplicate_name_rejected(tmp_path):
-    store = TokenStore(str(tmp_path / "tokens.json"))
-    store.mint("robin")
-    with pytest.raises(DuplicateTokenName):
-        store.mint("robin")
 
 
 def test_mint_rejects_empty_name(tmp_path):
@@ -173,3 +166,162 @@ def test_no_argument_defaults_never_touch_the_real_home(tmp_path):
     reference = ReferenceWaveform()
     assert tmp_path in reference.storage_dir.parents
     assert reference.storage_dir != real_default_reference_dir
+
+
+def test_save_never_leaves_a_truncated_store(tmp_path, monkeypatch):
+    # The failure this guards: _save() used to truncate tokens.json before
+    # writing it. Once a second process reads the file live (hot reload), a
+    # read landing in that window sees invalid JSON -- and __init__ treats
+    # that as a hard refusal to start. Simulate a crash at the moment of
+    # publication and assert the previous store survived intact.
+    path = tmp_path / "tokens.json"
+    store = TokenStore(str(path))
+    raw = store.mint("robin")
+    good = path.read_bytes()
+
+    def boom(src, dst):
+        raise OSError("simulated crash during publish")
+
+    monkeypatch.setattr("os.replace", boom)
+    with pytest.raises(OSError):
+        store.mint("bench-laptop")
+    assert path.read_bytes() == good
+    assert TokenStore(str(path)).verify(raw) == "robin"
+
+
+def test_save_leaves_no_temp_file_behind(tmp_path):
+    path = tmp_path / "tokens.json"
+    TokenStore(str(path)).mint("robin")
+    # tmp_path also holds the autouse `_no_real_home` fixture's "fake-home"
+    # directory (see conftest.py) -- unrelated to this store. Filter it out;
+    # the point of this test is that _save() leaves no leftover temp file
+    # alongside tokens.json.
+    assert [p.name for p in tmp_path.iterdir() if p.name != "fake-home"] == ["tokens.json"]
+
+
+# A test asserting that every save changes st_ino used to live here. It was
+# wrong, and CI on Linux proved it: os.replace frees the old inode and the next
+# mkstemp in the same directory reuses the number, so a revoke followed by a
+# same-length mint produced an identical st_ino and an identical st_size. It
+# passed only on Windows, where the file index does change.
+#
+# It was not rewritten to assert the whole _stat_key tuple instead, because that
+# would be flaky by construction: with the inode reused and the size equal,
+# detection rests on st_mtime_ns alone, and Linux's coarse clock granularity
+# (~1-4ms) lets two rapid saves share a timestamp legitimately.
+#
+# What the reload mechanism actually has to do is covered behaviourally by the
+# four cross-process tests below, which is the right altitude for it. See
+# _stat_key's docstring for which term carries detection on which platform, and
+# for the residual this leaves.
+
+
+def test_revocation_by_another_process_takes_effect_without_restart(tmp_path):
+    # Two TokenStore instances on one path stand in for the serving gateway
+    # and the CLI, which really are separate processes. Before hot reload, the
+    # gateway kept honouring a revoked token until someone restarted it --
+    # which made the documented remedy for a leaked credential a no-op.
+    path = str(tmp_path / "tokens.json")
+    gateway = TokenStore(path)
+    raw = gateway.mint("robin")
+    assert gateway.verify(raw) == "robin"
+
+    cli = TokenStore(path)
+    assert cli.revoke("robin") is True
+
+    assert gateway.verify(raw) is None
+
+
+def test_a_token_minted_by_another_process_verifies_without_restart(tmp_path):
+    path = str(tmp_path / "tokens.json")
+    gateway = TokenStore(path)
+    gateway.mint("robin")
+
+    raw = TokenStore(path).mint("bob")
+
+    assert gateway.verify(raw) == "bob"
+
+
+def test_reload_still_does_not_write_on_the_verify_path(tmp_path):
+    path = tmp_path / "tokens.json"
+    store = TokenStore(str(path))
+    raw = store.mint("robin")
+    TokenStore(str(path)).mint("bob")  # force a reload on the next verify
+    before = path.read_bytes()
+    assert store.verify(raw) == "robin"
+    assert path.read_bytes() == before
+
+
+def test_a_store_whose_file_vanishes_verifies_nothing(tmp_path):
+    # Deleting tokens.json must fail closed, not freeze the last known good
+    # set in memory.
+    path = tmp_path / "tokens.json"
+    store = TokenStore(str(path))
+    raw = store.mint("robin")
+    path.unlink()
+    assert store.verify(raw) is None
+
+
+def test_a_store_corrupted_while_running_fails_closed_and_loudly(tmp_path):
+    # verify() could not raise before hot reload; now it can, because the
+    # file it re-reads may have been damaged since startup. That is the
+    # correct behaviour and must stay: __init__ already treats a corrupt
+    # store as a hard error precisely because "no tokens" is
+    # indistinguishable from a fresh install and would open the gateway.
+    # Catching this inside verify() and returning None would look like
+    # failing closed while actually turning a loud, fixable problem into
+    # every request mysteriously returning 401.
+    path = tmp_path / "tokens.json"
+    store = TokenStore(str(path))
+    raw = store.mint("robin")
+    path.write_text("{ truncated")
+    with pytest.raises(ValueError):
+        store.verify(raw)
+    # And again: a corrupt store must keep failing loudly, not fail once and
+    # then silently resume serving the stale pre-corruption token list. The
+    # first version of this test called verify() only once, which is exactly
+    # how that bug survived the suite.
+    with pytest.raises(ValueError):
+        store.verify(raw)
+
+
+def test_a_name_can_hold_several_device_tokens(tmp_path):
+    # Bob has a laptop and a bench tablet. Both are Bob.
+    store = TokenStore(str(tmp_path / "tokens.json"))
+    laptop = store.mint("bob")
+    tablet = store.mint("bob")
+    assert laptop != tablet
+    assert store.verify(laptop) == "bob"
+    assert store.verify(tablet) == "bob"
+
+
+def test_revoking_a_name_cuts_off_every_device(tmp_path):
+    store = TokenStore(str(tmp_path / "tokens.json"))
+    laptop = store.mint("bob")
+    tablet = store.mint("bob")
+    assert store.revoke("bob") is True
+    assert store.verify(laptop) is None
+    assert store.verify(tablet) is None
+
+
+def test_names_are_unique_and_sorted(tmp_path):
+    # api/sessions.py's ownership handoff tests membership in names(); a name
+    # repeated once per device would also make `token list` misleading.
+    store = TokenStore(str(tmp_path / "tokens.json"))
+    store.mint("robin")
+    store.mint("bob")
+    store.mint("bob")
+    assert store.names() == ["bob", "robin"]
+
+
+def test_summary_counts_devices_without_revealing_secrets(tmp_path):
+    store = TokenStore(str(tmp_path / "tokens.json"))
+    raw = store.mint("bob")
+    store.mint("bob")
+    store.mint("robin")
+    store.verify(raw)
+    rows = {row["name"]: row for row in store.summary()}
+    assert rows["bob"]["devices"] == 2
+    assert rows["robin"]["devices"] == 1
+    assert rows["bob"]["last_used"] is not None
+    assert "hash" not in rows["bob"]

@@ -46,6 +46,7 @@ const awg = (id: string) => `/api/sessions/${id}/awg`;
 
 export const api = {
   whoami: () => request<{ identity: string }>("/api/whoami"),
+  join: (body: { code?: string; invite?: string }) => request<{ token: string; identity: string }>("/api/join", json("POST", body)),
   models: () => request<ModelInfo[]>("/api/models"),
   discover: (cidr?: string) => request<DiscoveredDevice[]>(cidr ? `/api/discover?cidr=${encodeURIComponent(cidr)}` : "/api/discover"),
   createSession: (body: SessionCreate) => request<SessionInfo>("/api/sessions", json("POST", body)),

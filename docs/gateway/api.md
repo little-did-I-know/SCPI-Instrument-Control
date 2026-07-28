@@ -9,9 +9,18 @@ works, but the shipping frontend calls the kind-agnostic
 [command console](#command-console) route instead.
 
 Every route below requires `Authorization: Bearer <token>` **except**
-`GET /api/health`. See the [Gateway security guide](security.md) for how to
-mint a token, how ownership gates writes, and the WebSocket authentication
-handshake.
+`GET /api/health` and `POST /api/join`. The latter exchanges an invitation for
+a token — `{"code": "417902"}` or `{"invite": "<nonce from an invite link>"}`
+in, `{"token", "identity"}` back — so it cannot require the credential it
+issues. Every rejected invitation — wrong code, expired, already redeemed —
+returns the same **401** with byte-identical wording, so the route cannot be
+used to probe for which invitations exist; too many failures return **429**,
+and a body that is not valid JSON of the shape above is rejected **422** by
+request validation before the handler runs (which reveals nothing: the answer
+is the same whether or not an invitation is live). See the
+[Gateway security guide](security.md) for how to
+invite someone or mint a token, how ownership gates writes, and the WebSocket
+authentication handshake.
 
 ## Sessions & discovery
 
@@ -183,10 +192,10 @@ Every error response is JSON: `{"error": "<ExceptionClassName>", "detail": "<mes
 
 ## Curl quickstart
 
-Create a mock session, configure a channel, and fetch its waveform as JSON — no hardware required. Start the gateway first (`scpi-web` prints a token on first run; mint another with `scpi-web token add <name>`) and export it:
+Create a mock session, configure a channel, and fetch its waveform as JSON — no hardware required. Start the gateway first, then mint a token for this script with `scpi-web token add curl-demo` (that is what `token add` is for: scripts and CI, where a long-lived secret is the right answer) and export it:
 
 ```bash
-export TOKEN=scpi_...   # from the gateway's startup output
+export TOKEN=scpi_...   # printed once by `scpi-web token add curl-demo`
 
 # 1. Create a mock scope session
 curl -s -X POST http://127.0.0.1:8765/api/sessions \

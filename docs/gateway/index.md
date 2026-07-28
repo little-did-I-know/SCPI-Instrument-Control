@@ -9,9 +9,9 @@ multi-sessions, so several instruments (or several views of the same
 instrument) can be open at once.
 
 > **Security first:** every request needs a bearer token. Read the
-> **[Gateway security guide](security.md)** for tokens, session ownership, the
-> SSRF gate, and deployment guidance before exposing the gateway beyond
-> `127.0.0.1`.
+> **[Gateway security guide](security.md)** for invitations, tokens, session
+> ownership, the SSRF gate, and deployment guidance before exposing the
+> gateway beyond `127.0.0.1`.
 
 ## Install and run
 
@@ -27,14 +27,20 @@ scpi-web
 python -m scpi_control.server
 ```
 
-By default the gateway listens on `http://127.0.0.1:8765`. On first run it
-mints an access token and prints a ready-to-open URL
-(`http://127.0.0.1:8765/?token=…`) — open that to reach the browser UI.
+By default the gateway listens on `http://127.0.0.1:8765`, and prints that URL
+every time it starts. On the very first run — when no tokens exist yet — it
+also mints one and prints it in the URL (`http://127.0.0.1:8765/?token=…`);
+open that to reach the browser UI.
+
+To give someone else access, run `scpi-web invite <name>` on the gateway host.
+It prints a link and a six-digit code, both good for ten minutes and for one
+sign-in; send either. Nobody but you needs to handle a raw token.
 
 ## Security posture
 
-Every `/api/*` route (other than `GET /api/health`) requires a valid bearer
-token — there is no unauthenticated path. The server also binds to
+Every `/api/*` route requires a valid bearer token, except `GET /api/health`
+and `POST /api/join` (which redeems an invitation, and so cannot require the
+credential it hands out). The server also binds to
 `127.0.0.1` by default, so it is not reachable from the network until you opt
 in. Exposing it to the LAN is an explicit choice:
 
@@ -77,8 +83,8 @@ ever plugging in an instrument.
 
 ## Where to next
 
-- [Gateway security](security.md) — tokens, session ownership, the SSRF gate,
-  and deployment guidance
+- [Gateway security](security.md) — invitations, tokens, session ownership,
+  the SSRF gate, and deployment guidance
 - [Browser UI Tour](browser-ui.md) — a walkthrough of the home screen, canvas
   modes, and rail tabs
 - [REST & WebSocket API](api.md) — the complete wire reference, with a curl
