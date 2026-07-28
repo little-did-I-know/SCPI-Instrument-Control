@@ -6,6 +6,7 @@ from fastapi.testclient import TestClient
 from scpi_control.server.admin.app import create_admin_app
 from scpi_control.server.auth import TokenStore
 from scpi_control.server.invitations import InvitationStore
+from tests.route_introspection import iter_http_routes
 
 
 @pytest.fixture
@@ -138,7 +139,7 @@ def test_localhost_and_loopback_hosts_still_work(admin):
     assert client.get("/api/identities", headers={"Host": "localhost"}).status_code == 200
 
 
-def test_the_main_app_serves_no_admin_routes(tmp_path):
+def test_the_main_app_serves_no_admin_routes(gateway_auth, tmp_path):
     # The mirror image of test_the_admin_app_has_no_auth_middleware, and the
     # more important half: that one checks the admin app for auth, which is not
     # where the mistake gets made. The mistake gets made in create_app, as one
@@ -149,12 +150,34 @@ def test_the_main_app_serves_no_admin_routes(tmp_path):
     # equal" to admin, so it is asserted in the language it would be written in.
     from scpi_control.server.app import create_app
 
-    tokens = TokenStore(str(tmp_path / "tokens.json"))
+    store, headers, _raw = gateway_auth
     invitations = InvitationStore(str(tmp_path / "invitations.json"))
-    app = create_app(token_store=tokens, invitation_store=invitations)
-    paths = {route.path for route in app.routes}
-    leaked = sorted(path for path in paths if path.startswith("/api/identities") or path.startswith("/api/invitations"))
+    app = create_app(token_store=store, invitation_store=invitations)
+
+    # Enumerated through tests/route_introspection.py, NOT as
+    # `{route.path for route in app.routes}` -- and emphatically not via the
+    # `getattr(route, "path", "")` that silences the AttributeError that
+    # spelling started raising. From Starlette 1.x each include_router() call
+    # leaves one opaque _IncludedRouter in app.routes that has no .path and
+    # holds the real routes inside itself, so skipping the objects without a
+    # .path would skip every included router: the guard would go blind to
+    # precisely the one-line mistake it exists to catch, and pass on the three
+    # routes create_app declares inline. iter_http_routes reads the generated
+    # schema instead, which reports full paths whatever the nesting.
+    leaked = sorted({path for _method, path in iter_http_routes(app) if path.startswith("/api/identities") or path.startswith("/api/invitations")})
     assert not leaked, "create_app serves admin routes: {0}".format(leaked)
+
+    # The same question put to the running app, which no route-object or schema
+    # representation can misreport: an inclusion carrying include_in_schema=False
+    # would be invisible above and still answer here. 404 is create_app's own
+    # shape for an unknown /api/ path; a 200 means the admin surface is live on
+    # the LAN-facing port. The client is authenticated on purpose -- an
+    # unauthenticated request is refused by AuthMiddleware before routing, so it
+    # would return the same 401 whether or not the routes existed.
+    with TestClient(app) as client:
+        client.headers.update(headers)
+        assert client.get("/api/identities").status_code == 404
+        assert client.get("/api/invitations").status_code == 404
 
 
 def test_the_two_apps_never_share_a_static_directory(tmp_path):
