@@ -92,16 +92,19 @@ class TokenStore:
         self._load()
 
     def _load(self) -> None:
-        self._stat = _stat_key(self.path)
-        if self._stat is None:
+        stat = _stat_key(self.path)
+        if stat is None:
+            self._stat = stat
             self._tokens = []
             return
         try:
             raw = json.loads(self.path.read_text(encoding="utf-8"))
-            self._tokens = self._validate_tokens(raw)
+            tokens = self._validate_tokens(raw)
         except (ValueError, OSError) as exc:
             # Never fall back to "no tokens" — that would silently open the gateway.
             raise ValueError("token store {0} is unreadable: {1}".format(self.path, exc))
+        self._tokens = tokens
+        self._stat = stat
 
     def _reload_if_changed(self) -> None:
         """Pick up writes made by another process (the CLI mints and revokes).

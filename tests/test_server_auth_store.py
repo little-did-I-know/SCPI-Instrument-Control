@@ -281,3 +281,9 @@ def test_a_store_corrupted_while_running_fails_closed_and_loudly(tmp_path):
     path.write_text("{ truncated")
     with pytest.raises(ValueError):
         store.verify(raw)
+    # And again: a corrupt store must keep failing loudly, not fail once and
+    # then silently resume serving the stale pre-corruption token list. The
+    # first version of this test called verify() only once, which is exactly
+    # how that bug survived the suite.
+    with pytest.raises(ValueError):
+        store.verify(raw)
