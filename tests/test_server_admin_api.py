@@ -9,9 +9,13 @@ from scpi_control.server.invitations import InvitationStore
 
 
 @pytest.fixture
-def admin(tmp_path):
-    tokens = TokenStore(str(tmp_path / "tokens.json"))
-    invitations = InvitationStore(str(tmp_path / "invitations.json"))
+def admin_stores(tmp_path):
+    return TokenStore(str(tmp_path / "tokens.json")), InvitationStore(str(tmp_path / "invitations.json"))
+
+
+@pytest.fixture
+def admin(admin_stores):
+    tokens, invitations = admin_stores
     app = create_admin_app(token_store=tokens, invitation_store=invitations, base_url="http://192.168.1.50:8765/")
     # base_url is 127.0.0.1, not the httpx default "testserver": TrustedHostMiddleware
     # only allows 127.0.0.1/localhost, and the Host header httpx sends is derived
@@ -132,6 +136,76 @@ def test_localhost_and_loopback_hosts_still_work(admin):
     client, _tokens, _invitations = admin
     assert client.get("/api/identities", headers={"Host": "127.0.0.1"}).status_code == 200
     assert client.get("/api/identities", headers={"Host": "localhost"}).status_code == 200
+
+
+def test_a_foreign_origin_is_rejected_on_a_read(admin):
+    # The attack neither the bind nor the Host allowlist touches: a page on any
+    # site the admin visits does fetch("http://127.0.0.1:8766/api/identities").
+    # The socket is genuinely local and the Host genuinely is 127.0.0.1, so both
+    # of the other defences wave it through. Only the Origin gives it away.
+    client, tokens, _invitations = admin
+    tokens.mint("bob")
+    response = client.get("/api/identities", headers={"Origin": "http://evil.example"})
+    assert response.status_code == 403
+    assert "bob" not in response.text
+
+
+def test_a_foreign_origin_is_rejected_on_a_write(admin):
+    client, _tokens, invitations = admin
+    response = client.post("/api/invitations", json={"name": "bob"}, headers={"Origin": "http://evil.example"})
+    assert response.status_code == 403
+    # The refusal must happen before the handler, not merely hide its output.
+    assert invitations.pending() == 0
+
+
+def test_a_rebound_origin_on_the_panels_own_port_is_rejected(admin):
+    # The rebinding variant: the attacker's page reaches the panel on the right
+    # port, so its Origin carries the panel's port but the attacker's hostname.
+    client, _tokens, invitations = admin
+    assert client.post("/api/invitations", json={"name": "bob"}, headers={"Origin": "http://evil.example:8766"}).status_code == 403
+    assert invitations.pending() == 0
+
+
+def test_the_panels_own_origin_is_accepted(admin):
+    # Both spellings TrustedHostMiddleware allows: the banner opens 127.0.0.1,
+    # an SSH port-forward reaches the same panel as localhost.
+    client, _tokens, _invitations = admin
+    for origin in ("http://127.0.0.1:8766", "http://localhost:8766"):
+        assert client.get("/api/identities", headers={"Origin": origin}).status_code == 200, origin
+        assert client.post("/api/invitations", json={"name": "bob"}, headers={"Origin": origin}).status_code == 200, origin
+
+
+def test_a_request_with_no_origin_is_accepted(admin):
+    # curl, scripts, and same-origin browser fetches that omit the header. An
+    # Origin is what a *cross*-origin request is obliged to carry; refusing its
+    # absence would break the panel itself.
+    client, _tokens, invitations = admin
+    assert client.get("/api/identities").status_code == 200
+    assert client.post("/api/invitations", json={"name": "bob"}).status_code == 200
+    assert invitations.pending() == 1
+
+
+def test_the_origin_allowlist_follows_the_configured_admin_port(admin_stores):
+    # The port is not hardcoded: run the panel on --admin-port 9001 and 9001 is
+    # what its own Origin must be, while the default 8766 becomes foreign.
+    tokens, invitations = admin_stores
+    app = create_admin_app(token_store=tokens, invitation_store=invitations, admin_port=9001)
+    with TestClient(app, base_url="http://127.0.0.1") as client:
+        assert client.get("/api/identities", headers={"Origin": "http://127.0.0.1:9001"}).status_code == 200
+        assert client.get("/api/identities", headers={"Origin": "http://127.0.0.1:8766"}).status_code == 403
+
+
+def test_a_safelisted_content_type_cannot_create_an_invitation(admin):
+    # The third defence's other half, pinned so it stops being accidental. A
+    # form/text body is what a cross-origin page can send with no preflight at
+    # all; FastAPI's JSON-only body parsing is what refuses it. If someone
+    # teaches this endpoint to read form bodies, this test fails before the
+    # Origin check is the only thing left standing.
+    client, _tokens, invitations = admin
+    for content_type in ("text/plain;charset=UTF-8", "application/x-www-form-urlencoded", "multipart/form-data; boundary=x"):
+        response = client.post("/api/invitations", content=b'{"name": "bob"}', headers={"Content-Type": content_type})
+        assert response.status_code != 200, content_type
+    assert invitations.pending() == 0
 
 
 def test_admin_spa_traversal_is_contained(tmp_path):

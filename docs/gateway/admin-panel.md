@@ -20,8 +20,8 @@ the panel is a second way in, not a replacement.
 ## Why there is no sign-in
 
 The panel asks for no password and no token. That is deliberate, and it rests on
-**two independent defences** — which is worth spelling out, because each one
-looks redundant until you see the attacker the other misses. Removing either
+**three independent defences** — which is worth spelling out, because each one
+looks redundant until you see the attacker the others miss. Removing any of them
 opens the panel up.
 
 **1. The listener binds `127.0.0.1`.** The operating system refuses every
@@ -38,11 +38,42 @@ rebinding — and become same-origin with the panel. The connection then really
 does arrive on loopback, so the bind is satisfied and waves it through; without
 this check that page could quietly issue an invitation and read the redeemable
 link straight back out of the response. A `Host` allowlist breaks it, because
-the request still carries the attacker's hostname. CORS does not help here:
-rebinding defeats it by construction.
+the request still carries the attacker's hostname — which rebinding, by
+construction, cannot launder.
 
-So: **the bind stops the lab; the `Host` check stops the web.** Neither covers
-the other's attacker.
+**3. Requests must carry no `Origin`, or the panel's own.** Rebinding is the
+elaborate attack. The plain one needs none of it: a page on any site the admin
+happens to visit does
+`fetch("http://127.0.0.1:8766/api/invitations", {method: "POST", …})`. The
+socket really is local, so the bind is satisfied; the `Host` really is
+`127.0.0.1:8766`, so the allowlist is too. **Neither of the defences above
+applies at all.** What gives it away is the `Origin` header, which a browser
+attaches to every cross-origin request and a page cannot forge. The panel
+refuses anything whose `Origin` is not `http://127.0.0.1:8766` or
+`http://localhost:8766` (following `--admin-port` if you moved it). Requests
+with no `Origin` — `curl`, scripts, the panel's own same-origin fetches — are
+unaffected, because an `Origin` is precisely what a *cross*-origin request is
+obliged to carry. This also catches the rebinding variant, whose `Origin` would
+name the attacker's host.
+
+So: **the bind stops the lab; the `Host` check stops rebinding; the `Origin`
+check stops the ordinary web page.** None covers the others' attacker.
+
+There is a fourth thing helping, and it is worth naming so nobody mistakes it
+for the plan: the browser's CORS preflight, plus the fact that these endpoints
+read only JSON bodies. A cross-origin page cannot send `application/json`
+without a preflight the panel never answers, and a body it *can* send without
+one — `text/plain`, a form post — is rejected as malformed. That is genuine, and
+it is what stood between the panel and the attack above before the `Origin`
+check existed. But it is a property of the request parsers rather than a
+decision, so it would quietly evaporate the day an endpoint learns to read a
+form body or a `GET` learns to change something. Treat it as a backstop, not a
+defence you are relying on.
+
+If you are hacking on the panel with `npm run dev:admin`, the Vite proxy
+rewrites `Origin` alongside `Host` so the dev server keeps working. Do not
+instead reach for `CORSMiddleware` — adding one is precisely how this boundary
+would be lost.
 
 What this model does *not* survive is someone who can already run a browser on
 the gateway machine as you. If that is in your threat model, do not run the
@@ -73,7 +104,12 @@ the allowlist is too:
 $ ssh -L 8766:127.0.0.1:8766 you@gateway-pc
 ```
 
-Then open `http://localhost:8766/` on your own machine. This does move the
+Then open `http://localhost:8766/` on your own machine. **Forward it to the same
+port number**, as above: your browser's `Origin` carries the local port, so
+`-L 9999:127.0.0.1:8766` would present as `http://localhost:9999` and be refused
+by the `Origin` check.
+
+This does move the
 boundary — anyone who can SSH to the gateway as you can now administer it — but
 that is a boundary you already chose, authenticated by SSH keys rather than by
 an unauthenticated port on the LAN.

@@ -9,7 +9,7 @@ from pathlib import Path
 
 import uvicorn
 
-from scpi_control.server.admin.app import create_admin_app
+from scpi_control.server.admin.app import DEFAULT_ADMIN_PORT, create_admin_app
 from scpi_control.server.app import create_app
 from scpi_control.server.auth import DEFAULT_CONFIG_DIR, TokenStore
 from scpi_control.server.gateway_url import read_base_url, write_base_url
@@ -19,8 +19,10 @@ from scpi_control.server.netpolicy import DEFAULT_ALLOWED_PORTS
 # The host-only boundary. Not a flag, and deliberately so: the admin app has no
 # authentication because the OS refuses non-local connections before it runs.
 # A configurable host would turn that guarantee into a footgun.
+# DEFAULT_ADMIN_PORT lives in admin/app.py, not here: the app itself needs it
+# to build the Origin allowlist, and two copies could drift apart into a panel
+# that refuses its own requests.
 ADMIN_HOST = "127.0.0.1"
-DEFAULT_ADMIN_PORT = 8766
 
 
 class _QuietServer(uvicorn.Server):
@@ -253,7 +255,7 @@ def main(argv=None) -> None:
         print("\nGateway ready at {0}\nAdmin panel (this machine only) at {1}\nHand out access with: scpi-web invite <name>\n".format(url, admin_url))
     allowed_ports = frozenset(args.allow_port) | DEFAULT_ALLOWED_PORTS if args.allow_port else None
     main_app = create_app(token_store=store, invitation_store=invitations, abandon_after=args.abandon_after, allowed_ports=allowed_ports, max_sessions=args.max_sessions)
-    admin_app = None if args.no_admin else create_admin_app(token_store=store, invitation_store=invitations, base_url=url)
+    admin_app = None if args.no_admin else create_admin_app(token_store=store, invitation_store=invitations, base_url=url, admin_port=args.admin_port)
     _run_servers(main_app, args.host, args.port, admin_app, args.admin_port)
 
 
