@@ -39,8 +39,9 @@ def test_serve_never_mints_a_token(tmp_path, capsys, monkeypatch):
     # The old behaviour bootstrapped an identity literally called "default"
     # on an empty store; an empty store now mints nothing at all -- see
     # tests/test_server_first_run.py for what actually happens instead.
+    # (conftest.py's autouse _no_real_browser fixture keeps the empty-store
+    # path here from popping a real browser window.)
     monkeypatch.setattr("scpi_control.server.__main__._run_servers", lambda main_app, host, port, admin_app, admin_port: None)
-    monkeypatch.setattr("scpi_control.server.__main__._open_browser", lambda url: True)
     main(["--config-dir", str(tmp_path)])
     assert TokenStore(str(tmp_path / "tokens.json")).names() == []
 

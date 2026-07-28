@@ -43,6 +43,35 @@ def _no_real_home(monkeypatch, tmp_path):
     yield fake_home
 
 
+@pytest.fixture(autouse=True)
+def _no_real_browser(monkeypatch):
+    """Never let a test pop a real browser window (or whatever a headless CI
+    runner does when asked to open one).
+
+    Per-test discipline is not enough here, the same lesson as _no_real_home
+    above: scpi_control.server.__main__._open_browser is reachable from any
+    test that calls main() against a fresh (empty) config dir -- a first-run
+    gateway opens the setup screen unless told not to. Two tests already hit
+    this by accident once that path started doing real browser I/O, each
+    stubbing it individually. This is the backstop so a third one cannot slip
+    through the same way ~/.siglent did.
+
+    Patches ``webbrowser.open`` itself, not our own ``_open_browser``
+    wrapper. ``webbrowser.open`` is the actual OS boundary -- patching it
+    also covers any future code path that reaches the stdlib directly,
+    something patching our wrapper could never do -- and it leaves
+    ``_open_browser``'s own try/except doing real work against a stubbed
+    call instead of being bypassed entirely.
+
+    This does not stop a test from asserting its own behaviour: a test can
+    still monkeypatch ``_open_browser`` directly, to capture the URL it was
+    given or to force it to raise. Fixtures run before the test body, so a
+    test's own monkeypatch.setattr on the same or a different target simply
+    layers on top of (or replaces) this one -- it is never overridden by it.
+    """
+    monkeypatch.setattr("webbrowser.open", lambda url, *args, **kwargs: True)
+
+
 @contextmanager
 def ollama_sdk(capabilities=("completion", "tools")):
     """Patch the ollama SDK class so nothing reaches the network.

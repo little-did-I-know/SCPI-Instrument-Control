@@ -32,9 +32,8 @@ def test_the_printed_code_actually_redeems(tmp_path, capsys):
 
 def test_invite_uses_the_url_the_gateway_recorded(tmp_path, capsys, monkeypatch):
     monkeypatch.setattr("scpi_control.server.__main__._run_servers", lambda main_app, host, port, admin_app, admin_port: None)
-    # The store is empty here, so main() would otherwise try to open a real
-    # browser on the setup screen -- stub it the same as the first-run tests do.
-    monkeypatch.setattr("scpi_control.server.__main__._open_browser", lambda url: True)
+    # The store is empty here, so main() opens the setup screen; conftest.py's
+    # autouse _no_real_browser fixture keeps that from popping a real browser.
     main(["--config-dir", str(tmp_path), "--host", "192.168.1.50", "--port", "9000"])
     capsys.readouterr()
     main(["invite", "bob", "--config-dir", str(tmp_path)])
