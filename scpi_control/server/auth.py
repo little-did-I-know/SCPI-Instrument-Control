@@ -19,10 +19,6 @@ DEFAULT_CONFIG_DIR = Path.home() / ".siglent"
 TOKEN_PREFIX = "scpi_"
 
 
-class DuplicateTokenName(ValueError):
-    """Raised when minting a token with a name that already exists."""
-
-
 def _hash(raw: str) -> str:
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
@@ -144,6 +140,13 @@ class TokenStore:
         self._stat = _stat_key(self.path)
 
     def mint(self, name: str) -> str:
+        """Mint one more token for ``name``.
+
+        A name is an identity, not a credential: one person can hold several
+        tokens (laptop, bench tablet, a reinstalled browser) and every one of
+        them reports the same owner. revoke(name) removes all of them, which
+        is what makes "someone left" a single command.
+        """
         if not name or not name.strip():
             # An empty (or whitespace-only) name mints a token whose identity
             # is "" -- and require_owner() in ownership.py treats owner == ""
@@ -152,8 +155,6 @@ class TokenStore:
             # boundary, so reject it outright rather than normalize it (e.g.
             # by stripping): the operator needs to know and pick a real name.
             raise ValueError("token name must not be empty or whitespace-only")
-        if any(entry["name"] == name for entry in self._tokens):
-            raise DuplicateTokenName("a token named {0!r} already exists".format(name))
         raw = TOKEN_PREFIX + secrets.token_urlsafe(32)
         self._tokens.append({"name": name, "hash": _hash(raw), "created": _now(), "last_used": None})
         self._save()
@@ -189,7 +190,24 @@ class TokenStore:
         return True
 
     def names(self) -> List[str]:
-        return [str(entry["name"]) for entry in self._tokens]
+        """Distinct identities, sorted. One entry per person, not per device."""
+        return sorted({str(entry["name"]) for entry in self._tokens})
+
+    def summary(self) -> List[Dict[str, Any]]:
+        """Per-identity device count and most recent use. Never includes hashes.
+
+        last_used is best-effort: verify() updates it in memory only, so it
+        reflects this process's view and resets when the store reloads.
+        """
+        rows: Dict[str, Dict[str, Any]] = {}
+        for entry in self._tokens:
+            name = str(entry["name"])
+            row = rows.setdefault(name, {"name": name, "devices": 0, "last_used": None})
+            row["devices"] += 1
+            used = entry.get("last_used")
+            if used is not None and (row["last_used"] is None or used > row["last_used"]):
+                row["last_used"] = used
+        return [rows[name] for name in sorted(rows)]
 
     def is_empty(self) -> bool:
         return not self._tokens

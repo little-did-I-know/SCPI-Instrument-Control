@@ -35,13 +35,6 @@ def test_revoking_unknown_name_exits_nonzero(tmp_path):
     assert excinfo.value.code != 0
 
 
-def test_duplicate_name_exits_nonzero(tmp_path):
-    main(["token", "add", "robin", "--config-dir", str(tmp_path)])
-    with pytest.raises(SystemExit) as excinfo:
-        main(["token", "add", "robin", "--config-dir", str(tmp_path)])
-    assert excinfo.value.code != 0
-
-
 def test_serve_bootstraps_a_token_and_prints_url(tmp_path, capsys, monkeypatch):
     started = {}
     monkeypatch.setattr("uvicorn.run", lambda app, host, port: started.update(host=host, port=port))
@@ -135,3 +128,26 @@ def test_config_dir_before_bare_serve_bootstraps_into_given_directory(tmp_path, 
     main(["--config-dir", str(tmp_path), "--port", "9999"])
     assert (tmp_path / "tokens.json").exists()
     assert TokenStore(str(tmp_path / "tokens.json")).names() == ["default"]
+
+
+def test_token_add_twice_adds_a_device_instead_of_failing(tmp_path, capsys):
+    main(["token", "add", "bob", "--config-dir", str(tmp_path)])
+    main(["token", "add", "bob", "--config-dir", str(tmp_path)])
+    printed = capsys.readouterr().out
+    raws = [word for word in printed.split() if word.startswith("scpi_")]
+    store = TokenStore(str(tmp_path / "tokens.json"))
+    assert len(raws) == 2
+    assert store.verify(raws[0]) == "bob"
+    assert store.verify(raws[1]) == "bob"
+    assert store.names() == ["bob"]
+
+
+def test_token_list_shows_device_counts(tmp_path, capsys):
+    main(["token", "add", "bob", "--config-dir", str(tmp_path)])
+    main(["token", "add", "bob", "--config-dir", str(tmp_path)])
+    capsys.readouterr()
+    main(["token", "list", "--config-dir", str(tmp_path)])
+    printed = capsys.readouterr().out
+    assert "bob" in printed
+    assert "2" in printed
+    assert "scpi_" not in printed

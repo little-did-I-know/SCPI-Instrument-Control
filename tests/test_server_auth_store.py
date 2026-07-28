@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 from scpi_control.server.__main__ import main
-from scpi_control.server.auth import DuplicateTokenName, TokenStore
+from scpi_control.server.auth import TokenStore
 
 
 def test_minted_token_verifies_to_its_name(tmp_path):
@@ -36,13 +36,6 @@ def test_revoked_token_stops_verifying(tmp_path):
     assert store.revoke("robin") is True
     assert store.verify(raw) is None
     assert store.revoke("robin") is False
-
-
-def test_duplicate_name_rejected(tmp_path):
-    store = TokenStore(str(tmp_path / "tokens.json"))
-    store.mint("robin")
-    with pytest.raises(DuplicateTokenName):
-        store.mint("robin")
 
 
 def test_mint_rejects_empty_name(tmp_path):
@@ -287,3 +280,45 @@ def test_a_store_corrupted_while_running_fails_closed_and_loudly(tmp_path):
     # how that bug survived the suite.
     with pytest.raises(ValueError):
         store.verify(raw)
+
+
+def test_a_name_can_hold_several_device_tokens(tmp_path):
+    # Bob has a laptop and a bench tablet. Both are Bob.
+    store = TokenStore(str(tmp_path / "tokens.json"))
+    laptop = store.mint("bob")
+    tablet = store.mint("bob")
+    assert laptop != tablet
+    assert store.verify(laptop) == "bob"
+    assert store.verify(tablet) == "bob"
+
+
+def test_revoking_a_name_cuts_off_every_device(tmp_path):
+    store = TokenStore(str(tmp_path / "tokens.json"))
+    laptop = store.mint("bob")
+    tablet = store.mint("bob")
+    assert store.revoke("bob") is True
+    assert store.verify(laptop) is None
+    assert store.verify(tablet) is None
+
+
+def test_names_are_unique_and_sorted(tmp_path):
+    # api/sessions.py's ownership handoff tests membership in names(); a name
+    # repeated once per device would also make `token list` misleading.
+    store = TokenStore(str(tmp_path / "tokens.json"))
+    store.mint("robin")
+    store.mint("bob")
+    store.mint("bob")
+    assert store.names() == ["bob", "robin"]
+
+
+def test_summary_counts_devices_without_revealing_secrets(tmp_path):
+    store = TokenStore(str(tmp_path / "tokens.json"))
+    raw = store.mint("bob")
+    store.mint("bob")
+    store.mint("robin")
+    store.verify(raw)
+    rows = {row["name"]: row for row in store.summary()}
+    assert rows["bob"]["devices"] == 2
+    assert rows["robin"]["devices"] == 1
+    assert rows["bob"]["last_used"] is not None
+    assert "hash" not in rows["bob"]
