@@ -63,13 +63,28 @@ def _atomic_write_json(path: Path, payload: Any) -> None:
 def _stat_key(path: Path):
     """Cheap identity of a file's current contents, or None if absent.
 
-    st_ino is the load-bearing term. Timestamp granularity is coarse on some
-    platforms (a Windows filesystem timestamp can be shared by writes ~15ms
-    apart), so two edits inside one tick that happen to produce the same byte
-    count would be indistinguishable by (mtime, size) alone. Every save
-    publishes a fresh temp file via os.replace, so the file identity always
-    changes -- see _atomic_write_json. mtime and size are kept as belt and
-    braces for any platform that does not populate st_ino.
+    No single term here is reliable on its own, and which one carries the
+    detection differs by platform:
+
+    * On Windows, filesystem timestamps are coarse -- two writes ~15ms apart
+      can share an mtime -- but os.replace publishes a file with a different
+      file index, so st_ino changes.
+    * On Linux the opposite holds. mtime is nanosecond-resolution, but
+      os.replace unlinks the old file and the next mkstemp in the same
+      directory can immediately reuse the freed inode number, so st_ino
+      repeats. CI caught exactly this: a revoke followed by a same-length mint
+      produced an identical st_ino AND an identical st_size.
+
+    So the tuple is the guarantee, not any one field, and an earlier version of
+    this docstring claiming "the file identity always changes" was wrong.
+
+    Residual, accepted rather than engineered around: on a platform with coarse
+    timestamp granularity that also reuses inodes, two writes inside one tick
+    producing byte-identical file sizes would be indistinguishable. That needs
+    two separate processes writing same-sized content within a few
+    milliseconds; the writers here are human-driven CLI commands, and a writer
+    in *this* process updates self._stat directly rather than going through a
+    stat comparison.
     """
     try:
         info = path.stat()

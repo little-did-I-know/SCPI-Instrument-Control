@@ -199,18 +199,21 @@ def test_save_leaves_no_temp_file_behind(tmp_path):
     assert [p.name for p in tmp_path.iterdir() if p.name != "fake-home"] == ["tokens.json"]
 
 
-def test_each_save_publishes_a_new_file_identity(tmp_path):
-    # Task 2's reload check keys on (st_ino, st_mtime_ns, st_size). st_ino is
-    # the reliable term: an atomic replace always publishes a different file,
-    # even when two writes land inside one filesystem timestamp tick and
-    # happen to produce the same size.
-    path = tmp_path / "tokens.json"
-    store = TokenStore(str(path))
-    store.mint("aaaa")
-    first = path.stat().st_ino
-    store.revoke("aaaa")
-    store.mint("bbbb")  # same length name -> same file size
-    assert path.stat().st_ino != first
+# A test asserting that every save changes st_ino used to live here. It was
+# wrong, and CI on Linux proved it: os.replace frees the old inode and the next
+# mkstemp in the same directory reuses the number, so a revoke followed by a
+# same-length mint produced an identical st_ino and an identical st_size. It
+# passed only on Windows, where the file index does change.
+#
+# It was not rewritten to assert the whole _stat_key tuple instead, because that
+# would be flaky by construction: with the inode reused and the size equal,
+# detection rests on st_mtime_ns alone, and Linux's coarse clock granularity
+# (~1-4ms) lets two rapid saves share a timestamp legitimately.
+#
+# What the reload mechanism actually has to do is covered behaviourally by the
+# four cross-process tests below, which is the right altitude for it. See
+# _stat_key's docstring for which term carries detection on which platform, and
+# for the residual this leaves.
 
 
 def test_revocation_by_another_process_takes_effect_without_restart(tmp_path):
