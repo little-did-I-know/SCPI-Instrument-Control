@@ -1049,6 +1049,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../gateway/admin-panel/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Admin Panel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../gateway/browser-ui/" class="md-nav__link">
         
   
@@ -6735,6 +6763,11 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   raised, so any <code>except DuplicateTokenName</code> clause is now an <code>ImportError</code> waiting to happen.</li>
 <li><code>TokenStore.names()</code> now returns distinct names, sorted. It previously returned one entry per
   token, which is one entry per device under the new model.</li>
+<li>A fresh gateway no longer mints an identity called <code>default</code>, and no longer prints a
+  <code>?token=…</code> bootstrap URL on first start. Instead it opens a host-only admin panel and asks
+  what to call you, so the first identity is a real person rather than an anonymous credential
+  that ends up owning every session it creates. Existing installations are unaffected — this
+  changes only what happens when the token store is empty.</li>
 </ul>
 <h3 id="added">Added<a class="headerlink" href="#added" title="Permanent link">&para;</a></h3>
 <ul>
@@ -6784,6 +6817,19 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   the page.</li>
 <li>A non-owner is now told, in session, that it's read-only and who owns it, with the same Claim
   action the home screen offers. Previously they found out by having a write rejected.</li>
+<li>The gateway now serves an admin panel on the machine it runs on, at <code>http://127.0.0.1:8766/</code>.
+  It lists who has access with device counts and last-seen, issues an invitation showing the
+  link and code together with a countdown, cancels one sent to the wrong person, and revokes
+  someone with a confirmation that names how many devices it signs out. There is no sign-in,
+  and three independent things stand in for one: the listener binds loopback, so the operating
+  system refuses every non-local connection; requests must carry a <code>Host</code> of <code>127.0.0.1</code> or
+  <code>localhost</code>, which is what stops a DNS-rebound page the bind would let through; and any
+  request carrying a foreign <code>Origin</code> is refused, which is what stops an ordinary cross-origin
+  page that satisfies both of the others.
+  <code>--admin-port</code> moves it; <code>--no-admin</code> switches it off. There is deliberately no flag to bind
+  it to another address.</li>
+<li>Cancelling a pending invitation is new — previously the only remedy for one sent to the wrong
+  person was waiting ten minutes for it to expire.</li>
 </ul>
 <h3 id="fixed">Fixed<a class="headerlink" href="#fixed" title="Permanent link">&para;</a></h3>
 <ul>

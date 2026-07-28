@@ -1154,6 +1154,34 @@
   
   
     <li class="md-nav__item">
+      <a href="admin-panel/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Admin Panel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="browser-ui/" class="md-nav__link">
         
   
@@ -3560,12 +3588,16 @@ gateway beyond <code>127.0.0.1</code>.</p>
 </span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>python<span class="w"> </span>-m<span class="w"> </span>scpi_control.server
 </span></code></pre></div>
 <p>By default the gateway listens on <code>http://127.0.0.1:8765</code>, and prints that URL
-every time it starts. On the very first run — when no tokens exist yet — it
-also mints one and prints it in the URL (<code>http://127.0.0.1:8765/?token=…</code>);
-open that to reach the browser UI.</p>
-<p>To give someone else access, run <code>scpi-web invite &lt;name&gt;</code> on the gateway host.
-It prints a link and a six-digit code, both good for ten minutes and for one
-sign-in; send either. Nobody but you needs to handle a raw token.</p>
+every time it starts. Alongside it, on the gateway machine only, it serves an
+<a href="admin-panel/">admin panel</a> at <code>http://127.0.0.1:8766</code> for managing who has
+access.</p>
+<p>On the <strong>very first</strong> run — when nobody has access yet — the gateway opens that
+panel for you. Invite yourself, open the link it gives you, and you are in under
+your own name. Nothing is minted automatically.</p>
+<p>To give someone else access, invite them from the panel, or run
+<code>scpi-web invite &lt;name&gt;</code> on the gateway host. Either way they get a link and a
+six-digit code, both good for ten minutes and for one sign-in; send either.
+Nobody but you needs to handle a raw token.</p>
 <h2 id="security-posture">Security posture<a class="headerlink" href="#security-posture" title="Permanent link">&para;</a></h2>
 <p>Every <code>/api/*</code> route requires a valid bearer token, except <code>GET /api/health</code>
 and <code>POST /api/join</code> (which redeems an invitation, and so cannot require the
@@ -3574,6 +3606,10 @@ credential it hands out). The server also binds to
 in. Exposing it to the LAN is an explicit choice:</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>scpi-web<span class="w"> </span>--host<span class="w"> </span><span class="m">0</span>.0.0.0
 </span></code></pre></div>
+<p>The admin panel is the exception, and a deliberate one: it has no sign-in, and
+it binds <code>127.0.0.1</code> unconditionally so that only someone at the gateway machine
+can reach it. See <a href="admin-panel/">Admin panel</a> for why that is the boundary and
+how to turn it off.</p>
 <p>See the <strong><a href="security/">Gateway security guide</a></strong> for the full model: tokens,
 session ownership, the SSRF gate that validates outbound connection targets,
 the session cap, and deployment guidance (TLS, reverse proxies).</p>
@@ -3608,6 +3644,8 @@ ever plugging in an instrument.</p>
 <ul>
 <li><a href="security/">Gateway security</a> — invitations, tokens, session ownership,
   the SSRF gate, and deployment guidance</li>
+<li><a href="admin-panel/">Admin panel</a> — the host-only screen for managing who has
+  access, and first-run setup</li>
 <li><a href="browser-ui/">Browser UI Tour</a> — a walkthrough of the home screen, canvas
   modes, and rail tabs</li>
 <li><a href="api/">REST &amp; WebSocket API</a> — the complete wire reference, with a curl

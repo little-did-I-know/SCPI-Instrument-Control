@@ -1215,6 +1215,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../gateway/admin-panel/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Admin Panel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../gateway/browser-ui/" class="md-nav__link">
         
   
@@ -3685,12 +3713,13 @@
 <p><code>bash
     pip install "SCPI-Instrument-Control[web]"
     scpi-web</code></p>
-<div class="language-text highlight"><pre><span></span><code>The gateway prints its URL every time it starts; on the very first run
-that URL carries an access token
-(`http://127.0.0.1:8765/?token=…`) — open it in your browser. To let a
-colleague in, run `scpi-web invite &lt;their name&gt;`: it prints a link and a
-six-digit code, either of which signs them in, both good for ten minutes.
-See the [Gateway security guide](../gateway/security.md) for details.
+<div class="language-text highlight"><pre><span></span><code>The gateway prints its URL every time it starts. On the very first run it
+also opens an [admin panel](../gateway/admin-panel.md) on this machine
+(`http://127.0.0.1:8766/`) so you can name yourself: type your name, press
+**Invite**, and open the link it gives you. To let a colleague in, invite
+them from the same screen or run `scpi-web invite &lt;their name&gt;` — either
+prints a link and a six-digit code, both good for ten minutes. See the
+[Gateway security guide](../gateway/security.md) for details.
 </code></pre></div>
 <div class="tabbed-set tabbed-alternate" data-tabs="4:1"><input checked="checked" id="__tabbed_4_1" name="__tabbed_4" type="radio" /><div class="tabbed-labels"><label for="__tabbed_4_1">Everything</label></div>
 <div class="tabbed-content">

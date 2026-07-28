@@ -18,7 +18,7 @@
         <link rel="prev" href="../">
       
       
-        <link rel="next" href="../browser-ui/">
+        <link rel="next" href="../admin-panel/">
       
       
         
@@ -1103,6 +1103,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Starting the gateway">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-very-first-start" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The very first start
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -1308,6 +1325,34 @@
   
 </nav>
       
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../admin-panel/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Admin Panel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
     </li>
   
 
@@ -3648,6 +3693,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Starting the gateway">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-very-first-start" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The very first start
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -3892,43 +3954,62 @@ given (see <a href="#inviting-someone">Inviting someone</a>). It does <strong>no
 traffic; for that, put the gateway
 behind a reverse proxy or keep it on a network you trust. See
 <a href="#deployment">Deployment</a> for the specifics.</p>
+<p>Everything on this page describes the <strong>gateway</strong> listener, the one your
+colleagues reach. The <a href="../admin-panel/">admin panel</a> is a second listener with a
+different model: it is unauthenticated, and it is bound to <code>127.0.0.1</code> so that
+only someone sitting at the gateway machine can reach it at all. Physical access
+is its credential.</p>
 <h2 id="starting-the-gateway">Starting the gateway<a class="headerlink" href="#starting-the-gateway" title="Permanent link">&para;</a></h2>
-<p>Every start prints where the gateway can be reached:</p>
+<p>Every start prints where the gateway can be reached, and where to administer it:</p>
 <div class="language-console highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="gp">$ </span>scpi-web
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
 </span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="go">Gateway ready at http://127.0.0.1:8765/</span>
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="go">Hand out access with: scpi-web invite &lt;name&gt;</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="go">Admin panel (this machine only) at http://127.0.0.1:8766/</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="go">Hand out access with: scpi-web invite &lt;name&gt;</span>
 </span></code></pre></div>
-<p>The URL is the address you bound to, with one adjustment: a wildcard bind
+<p>The first URL is the address you bound to, with one adjustment: a wildcard bind
 (<code>--host 0.0.0.0</code>) prints this machine's LAN address, because <code>0.0.0.0</code> is not
 something a colleague can open. A concrete <code>--host</code> is used verbatim, and
 loopback stays loopback. The gateway also records this URL in <code>gateway.json</code>
 under its config directory, which is how <code>invite</code> (below) knows what link to
 print.</p>
-<p>The <strong>very first</strong> start is different: with no tokens on disk there is nobody
-to invite you, so the gateway mints a token named <code>default</code> and prints a URL
-carrying it:</p>
+<p>The second is the <a href="../admin-panel/">admin panel</a> — a screen for managing who has
+access, served on a <strong>loopback-bound</strong> listener so it is reachable only from the
+gateway machine itself. Start with <code>--no-admin</code> to leave it off entirely.</p>
+<h3 id="the-very-first-start">The very first start<a class="headerlink" href="#the-very-first-start" title="Permanent link">&para;</a></h3>
+<p>With no tokens on disk there is nobody to invite you, so the gateway sends you
+to the panel to name yourself:</p>
 <div class="language-console highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="gp">$ </span>scpi-web
 </span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
-</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="go">Gateway ready. Open:</span>
-</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>
-</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="go">    http://127.0.0.1:8765/?token=scpi_Qy8…f3A</span>
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="go">Gateway ready at http://127.0.0.1:8765/</span>
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="go">No one has access yet — finish setup at http://127.0.0.1:8766/</span>
 </span></code></pre></div>
-<p>Open that URL. The web UI lifts the token out of the address bar, stores it in
-the browser, and immediately strips it from the URL — so it does not linger in
-your history or leak through the <code>Referer</code> header of any link you click. From
-then on the UI sends the token automatically.</p>
-<p>That <code>?token=</code> bootstrap happens only while the token store is empty. Once it
-holds anything, every start prints the plain banner above instead.</p>
-<h2 id="inviting-someone">Inviting someone<a class="headerlink" href="#inviting-someone" title="Permanent link">&para;</a></h2>
-<p>Nobody in the lab should ever have to handle a <code>scpi_…</code> string. To give a
-colleague access, run one command on the gateway host:</p>
-<div class="language-console highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="gp">$ </span>scpi-web<span class="w"> </span>invite<span class="w"> </span>bob
+<p>It also tries to open that address in the host's browser. Invite yourself, open
+the link the panel gives you, and you have an identity under your own name.</p>
+<p>Nothing is minted for you. <strong>There is no auto-created <code>default</code> identity and no
+<code>?token=…</code> bootstrap URL</strong> — a placeholder identity would end up owning real
+instrument sessions, which makes "who is driving this scope?" unanswerable at
+exactly the moment it matters.</p>
+<p>If you started with <code>--no-admin</code> there is no panel to send you to, so the
+gateway tells you the other way in instead:</p>
+<div class="language-console highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="gp">$ </span>scpi-web<span class="w"> </span>--no-admin
 </span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
-</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="go">Invitation for &#39;bob&#39; — expires in 10 minutes.</span>
-</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>
-</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="go">  Send this link:          http://127.0.0.1:8765/?invite=Vb2…9tQ</span>
-</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="go">  Or read out this code:   417 902</span>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="go">Gateway ready at http://127.0.0.1:8765/</span>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="go">No one has access yet, and the admin panel is disabled (--no-admin).</span>
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="go">Create the first identity with: scpi-web invite &lt;name&gt;</span>
+</span></code></pre></div>
+<p>That is the headless and containerised path: run <code>scpi-web invite &lt;name&gt;</code> once
+against the same <code>--config-dir</code>.</p>
+<h2 id="inviting-someone">Inviting someone<a class="headerlink" href="#inviting-someone" title="Permanent link">&para;</a></h2>
+<p>Nobody in the lab should ever have to handle a <code>scpi_…</code> string. The
+<a href="../admin-panel/">admin panel</a> does this from a screen; from a terminal, it is
+one command on the gateway host:</p>
+<div class="language-console highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="gp">$ </span>scpi-web<span class="w"> </span>invite<span class="w"> </span>bob
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="go">Invitation for &#39;bob&#39; — expires in 10 minutes.</span>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="go">  Send this link:          http://127.0.0.1:8765/?invite=Vb2…9tQ</span>
+</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="go">  Or read out this code:   417 902</span>
 </span></code></pre></div>
 <p>Send the link, or read the six digits down the phone — the two are <strong>one</strong>
 invitation with two ways in, and whichever is used first consumes it. Opening
@@ -3940,6 +4021,9 @@ sessions from then on.</p>
 <li>The invitation lives <strong>ten minutes</strong>. That is deliberate: a link pasted into
   a chat channel is worthless long before anyone scrolls back to it.</li>
 <li>It is good for <strong>one</strong> person. Two colleagues, two <code>invite</code> commands.</li>
+<li>Sent to the wrong person, or with a typo in the name? <strong>Cancel it</strong> in the
+  <a href="../admin-panel/">admin panel</a>. The CLI has no cancel, so from a terminal the
+  only remedy is waiting the ten minutes out.</li>
 <li>Someone locked out — new laptop, cleared browser, no idea where the token
   went — is the same command again: <code>scpi-web invite bob</code>. Their existing
   tokens keep working alongside the new one. If they should not, run
@@ -3960,17 +4044,17 @@ invitation redeems into one of these.</p>
 long-lived secret that can be copied into a config or a secret store is
 exactly the right answer, and where nobody is sitting at a browser to type a
 join code.</p>
-<div class="language-console highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="gp">$ </span>scpi-web<span class="w"> </span>token<span class="w"> </span>add<span class="w"> </span>ci-nightly
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="go">token &#39;ci-nightly&#39; created. Copy it now, it is not stored:</span>
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>
-</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="go">    scpi_7dK…2mР</span>
-</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>
-</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="gp">$ </span>scpi-web<span class="w"> </span>token<span class="w"> </span>list
-</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="go">alice                2 devices   last used 2026-07-28T09:14:02+00:00</span>
-</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="go">ci-nightly           1 device    last used never</span>
-</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>
-</span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="gp">$ </span>scpi-web<span class="w"> </span>token<span class="w"> </span>revoke<span class="w"> </span>alice
-</span><span id="__span-3-11"><a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a><span class="go">revoked &#39;alice&#39;</span>
+<div class="language-console highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="gp">$ </span>scpi-web<span class="w"> </span>token<span class="w"> </span>add<span class="w"> </span>ci-nightly
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="go">token &#39;ci-nightly&#39; created. Copy it now, it is not stored:</span>
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="go">    scpi_7dK…2mР</span>
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>
+</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="gp">$ </span>scpi-web<span class="w"> </span>token<span class="w"> </span>list
+</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="go">alice                2 devices   last used 2026-07-28T09:14:02+00:00</span>
+</span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="go">ci-nightly           1 device    last used never</span>
+</span><span id="__span-4-9"><a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>
+</span><span id="__span-4-10"><a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a><span class="gp">$ </span>scpi-web<span class="w"> </span>token<span class="w"> </span>revoke<span class="w"> </span>alice
+</span><span id="__span-4-11"><a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a><span class="go">revoked &#39;alice&#39;</span>
 </span></code></pre></div>
 <ul>
 <li><strong><code>token add &lt;name&gt;</code></strong> mints a token and prints it <strong>once</strong>. Copy it then; it
@@ -4019,27 +4103,27 @@ handed out.</p>
 <p>The token travels differently over HTTP and WebSocket, because browsers cannot
 set an <code>Authorization</code> header on a WebSocket handshake.</p>
 <h3 id="http-authorization-bearer">HTTP — <code>Authorization: Bearer</code><a class="headerlink" href="#http-authorization-bearer" title="Permanent link">&para;</a></h3>
-<div class="language-console highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="gp">$ </span>curl<span class="w"> </span>-H<span class="w"> </span><span class="s2">&quot;Authorization: Bearer scpi_7dK…2mР&quot;</span><span class="w"> </span>http://127.0.0.1:8765/api/sessions
+<div class="language-console highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="gp">$ </span>curl<span class="w"> </span>-H<span class="w"> </span><span class="s2">&quot;Authorization: Bearer scpi_7dK…2mР&quot;</span><span class="w"> </span>http://127.0.0.1:8765/api/sessions
 </span></code></pre></div>
 <p>A query-parameter token (<code>?token=…</code>) is accepted <strong>only</strong> on the initial page
 load of the web UI, and is <strong>rejected</strong> on every <code>/api/*</code> route. Putting a
 credential in an API URL would leak it into logs and history, so there is exactly
 one way in for the API: the header.</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
-</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>
-</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="kn">import</span><span class="w"> </span><span class="nn">requests</span>
-</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>
-</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="c1"># Mint it once with `scpi-web token add my-script`, then export it:</span>
-</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="c1">#     export SCPI_WEB_TOKEN=scpi_...</span>
-</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="n">s</span> <span class="o">=</span> <span class="n">requests</span><span class="o">.</span><span class="n">Session</span><span class="p">()</span>
-</span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="n">s</span><span class="o">.</span><span class="n">headers</span><span class="p">[</span><span class="s2">&quot;Authorization&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;Bearer </span><span class="si">{</span><span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s1">&#39;SCPI_WEB_TOKEN&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span>
-</span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a>
-</span><span id="__span-5-10"><a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a><span class="n">s</span><span class="o">.</span><span class="n">post</span><span class="p">(</span><span class="s2">&quot;http://127.0.0.1:8765/api/sessions&quot;</span><span class="p">,</span> <span class="n">json</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;label&quot;</span><span class="p">:</span> <span class="s2">&quot;bench&quot;</span><span class="p">,</span> <span class="s2">&quot;mock&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">})</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="kn">import</span><span class="w"> </span><span class="nn">requests</span>
+</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>
+</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="c1"># Mint it once with `scpi-web token add my-script`, then export it:</span>
+</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="c1">#     export SCPI_WEB_TOKEN=scpi_...</span>
+</span><span id="__span-6-7"><a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a><span class="n">s</span> <span class="o">=</span> <span class="n">requests</span><span class="o">.</span><span class="n">Session</span><span class="p">()</span>
+</span><span id="__span-6-8"><a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a><span class="n">s</span><span class="o">.</span><span class="n">headers</span><span class="p">[</span><span class="s2">&quot;Authorization&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;Bearer </span><span class="si">{</span><span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s1">&#39;SCPI_WEB_TOKEN&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span>
+</span><span id="__span-6-9"><a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a>
+</span><span id="__span-6-10"><a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a><span class="n">s</span><span class="o">.</span><span class="n">post</span><span class="p">(</span><span class="s2">&quot;http://127.0.0.1:8765/api/sessions&quot;</span><span class="p">,</span> <span class="n">json</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;label&quot;</span><span class="p">:</span> <span class="s2">&quot;bench&quot;</span><span class="p">,</span> <span class="s2">&quot;mock&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">})</span>
 </span></code></pre></div>
 <h3 id="websocket-the-scpi-token-subprotocol">WebSocket — the <code>scpi-token</code> subprotocol<a class="headerlink" href="#websocket-the-scpi-token-subprotocol" title="Permanent link">&para;</a></h3>
 <p>The live-waveform stream authenticates through the WebSocket subprotocol list.
 Offer <strong>two</strong> entries — the token-bearing one and the plain <code>scpi</code> fallback:</p>
-<div class="language-javascript highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="ow">new</span><span class="w"> </span><span class="nx">WebSocket</span><span class="p">(</span><span class="nx">url</span><span class="p">,</span><span class="w"> </span><span class="p">[</span><span class="sb">`scpi-token.</span><span class="si">${</span><span class="nx">token</span><span class="si">}</span><span class="sb">`</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;scpi&quot;</span><span class="p">]);</span>
+<div class="language-javascript highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="ow">new</span><span class="w"> </span><span class="nx">WebSocket</span><span class="p">(</span><span class="nx">url</span><span class="p">,</span><span class="w"> </span><span class="p">[</span><span class="sb">`scpi-token.</span><span class="si">${</span><span class="nx">token</span><span class="si">}</span><span class="sb">`</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;scpi&quot;</span><span class="p">]);</span>
 </span></code></pre></div>
 <p>The server reads the token from the <code>scpi-token.</code> entry and, on success, accepts
 the socket selecting the non-secret <code>scpi</code> subprotocol — it never echoes your
@@ -4107,8 +4191,8 @@ owner; your view stays live, only the controls are gated.</p>
 <p>If an owner walks away, their session should not stay locked forever. Any
 authenticated user can take it over once the owner has been inactive past a
 threshold:</p>
-<div class="language-console highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="gp">$ </span>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>-H<span class="w"> </span><span class="s2">&quot;Authorization: Bearer </span><span class="nv">$TOKEN</span><span class="s2">&quot;</span><span class="w"> </span><span class="se">\</span>
-</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">    </span>http://127.0.0.1:8765/api/sessions/&lt;id&gt;/claim
+<div class="language-console highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="gp">$ </span>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>-H<span class="w"> </span><span class="s2">&quot;Authorization: Bearer </span><span class="nv">$TOKEN</span><span class="s2">&quot;</span><span class="w"> </span><span class="se">\</span>
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="w">    </span>http://127.0.0.1:8765/api/sessions/&lt;id&gt;/claim
 </span></code></pre></div>
 <ul>
 <li>The threshold is <strong><code>--abandon-after</code> seconds</strong> (default <strong>300</strong>). Before it
@@ -4122,9 +4206,9 @@ threshold:</p>
 </ul>
 <h3 id="handing-off-explicitly">Handing off explicitly<a class="headerlink" href="#handing-off-explicitly" title="Permanent link">&para;</a></h3>
 <p>The current owner can pass a session to a named user:</p>
-<div class="language-console highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="gp">$ </span>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>-H<span class="w"> </span><span class="s2">&quot;Authorization: Bearer </span><span class="nv">$OWNER_TOKEN</span><span class="s2">&quot;</span><span class="w"> </span><span class="se">\</span>
-</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="w">    </span>-H<span class="w"> </span><span class="s2">&quot;Content-Type: application/json&quot;</span><span class="w"> </span>-d<span class="w"> </span><span class="s1">&#39;{&quot;name&quot;: &quot;bob&quot;}&#39;</span><span class="w"> </span><span class="se">\</span>
-</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="w">    </span>http://127.0.0.1:8765/api/sessions/&lt;id&gt;/owner
+<div class="language-console highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="gp">$ </span>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>-H<span class="w"> </span><span class="s2">&quot;Authorization: Bearer </span><span class="nv">$OWNER_TOKEN</span><span class="s2">&quot;</span><span class="w"> </span><span class="se">\</span>
+</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="w">    </span>-H<span class="w"> </span><span class="s2">&quot;Content-Type: application/json&quot;</span><span class="w"> </span>-d<span class="w"> </span><span class="s1">&#39;{&quot;name&quot;: &quot;bob&quot;}&#39;</span><span class="w"> </span><span class="se">\</span>
+</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="w">    </span>http://127.0.0.1:8765/api/sessions/&lt;id&gt;/owner
 </span></code></pre></div>
 <p>The <code>name</code> must be an existing token name; an unknown name is rejected with
 <strong>400</strong> and ownership does not change. Passing <code>""</code> <strong>releases</strong> the session
@@ -4166,8 +4250,8 @@ the gate entirely — use them for hardware-free work.</p>
 stored as JSON and files load without unpickling — closing that path.</p>
 <p><strong>Files saved by 4.x are in the old format and will not load</strong> until converted.
 The gateway tells you so, naming the file. Convert them once:</p>
-<div class="language-console highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="gp">$ </span>scpi-web<span class="w"> </span>references<span class="w"> </span>migrate
-</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="go">converted 3, skipped 0, failed 0 in /home/you/.siglent/references</span>
+<div class="language-console highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="gp">$ </span>scpi-web<span class="w"> </span>references<span class="w"> </span>migrate
+</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="go">converted 3, skipped 0, failed 0 in /home/you/.siglent/references</span>
 </span></code></pre></div>
 <ul>
 <li>Conversion is <strong>atomic</strong> — a file that fails to convert is left exactly as it
@@ -4191,6 +4275,10 @@ directory, when you run the command explicitly.</p>
 <tr>
 <td><strong>Bind address</strong></td>
 <td>Defaults to <code>127.0.0.1</code> (local only). Use <code>--host 0.0.0.0</code> to reach it from the LAN — and only then does the token boundary matter.</td>
+</tr>
+<tr>
+<td><strong>Admin panel</strong></td>
+<td>Always on <code>127.0.0.1</code>, whatever <code>--host</code> says, and there is deliberately no <code>--admin-host</code>. It is unauthenticated, so a non-loopback bind would put access management on the LAN. Reach it from elsewhere with an SSH port-forward, or disable it with <code>--no-admin</code>.</td>
 </tr>
 <tr>
 <td><strong>TLS / encryption</strong></td>
@@ -4240,6 +4328,16 @@ directory, when you run the command explicitly.</p>
 <td><code>--port</code></td>
 <td><code>8765</code></td>
 <td>Listen port</td>
+</tr>
+<tr>
+<td><code>--admin-port</code></td>
+<td><code>8766</code></td>
+<td>Port for the host-only <a href="../admin-panel/">admin panel</a> (must differ from <code>--port</code>)</td>
+</tr>
+<tr>
+<td><code>--no-admin</code></td>
+<td><em>(off)</em></td>
+<td>Do not start the admin panel listener</td>
 </tr>
 <tr>
 <td><code>--config-dir</code></td>

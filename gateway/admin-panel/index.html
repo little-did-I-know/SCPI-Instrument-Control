@@ -12,13 +12,13 @@
         <meta name="author" content="Robin Mumm">
       
       
-        <link rel="canonical" href="https://little-did-I-know.github.io/SCPI-Instrument-Control/development/ICON_SETUP/">
+        <link rel="canonical" href="https://little-did-I-know.github.io/SCPI-Instrument-Control/gateway/admin-panel/">
       
       
-        <link rel="prev" href="../CODE_SIGNING/">
+        <link rel="prev" href="../security/">
       
       
-        <link rel="next" href="../PYPI_DEPLOYMENT/">
+        <link rel="next" href="../browser-ui/">
       
       
         
@@ -29,7 +29,7 @@
     
     
       
-        <title>Icon Setup - SCPI Instrument Control</title>
+        <title>Admin Panel - SCPI Instrument Control</title>
       
     
     
@@ -82,7 +82,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#executable-icon-configuration" class="md-skip">
+        <a href="#admin-panel" class="md-skip">
           Skip to content
         </a>
       
@@ -122,7 +122,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Icon Setup
+              Admin Panel
             
           </span>
         </div>
@@ -286,11 +286,13 @@
   
   
   
+    
+  
   
     
     
-      <li class="md-tabs__item">
-        <a href="../../gateway/" class="md-tabs__link">
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../" class="md-tabs__link">
           
   
   
@@ -386,13 +388,11 @@
   
   
   
-    
-  
   
     
     
-      <li class="md-tabs__item md-tabs__item--active">
-        <a href="../contributing/" class="md-tabs__link">
+      <li class="md-tabs__item">
+        <a href="../../development/contributing/" class="md-tabs__link">
           
   
   
@@ -936,28 +936,31 @@
       
   
   
+    
   
   
+  
     
     
     
     
+      
+        
+        
       
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
       
         
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
         
           
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
-        
-          
-          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
             
   
   
@@ -975,7 +978,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_4">
             <span class="md-nav__icon md-icon"></span>
             
@@ -993,7 +996,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../gateway/" class="md-nav__link">
+      <a href="../" class="md-nav__link">
         
   
   
@@ -1021,7 +1024,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../gateway/security/" class="md-nav__link">
+      <a href="../security/" class="md-nav__link">
         
   
   
@@ -1046,10 +1049,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../../gateway/admin-panel/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Admin Panel
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -1065,6 +1095,120 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#why-there-is-no-sign-in" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why there is no sign-in
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#where-it-is-and-moving-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Where it is, and moving it
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-people-screen" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The People screen
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The People screen">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#a-code-can-be-shown-again-a-link-cannot" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A code can be shown again; a link cannot
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#first-run" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        First run
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#turning-it-off" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Turning it off
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#for-maintainers-the-panel-is-a-separate-bundle" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        For maintainers: the panel is a separate bundle
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#where-to-next" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Where to next
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -1077,7 +1221,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../gateway/browser-ui/" class="md-nav__link">
+      <a href="../browser-ui/" class="md-nav__link">
         
   
   
@@ -1105,7 +1249,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../gateway/api/" class="md-nav__link">
+      <a href="../api/" class="md-nav__link">
         
   
   
@@ -2731,31 +2875,28 @@
       
   
   
-    
   
   
-  
     
     
     
     
-      
-        
-        
       
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" checked>
         
           
-          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="">
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
             
   
   
@@ -2773,7 +2914,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_9">
             <span class="md-nav__icon md-icon"></span>
             
@@ -2791,7 +2932,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../contributing/" class="md-nav__link">
+      <a href="../../development/contributing/" class="md-nav__link">
         
   
   
@@ -2819,7 +2960,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../building/" class="md-nav__link">
+      <a href="../../development/building/" class="md-nav__link">
         
   
   
@@ -2847,7 +2988,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../structure/" class="md-nav__link">
+      <a href="../../development/structure/" class="md-nav__link">
         
   
   
@@ -2875,7 +3016,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../testing/" class="md-nav__link">
+      <a href="../../development/testing/" class="md-nav__link">
         
   
   
@@ -2900,31 +3041,28 @@
                 
   
   
-    
   
   
-  
     
     
     
     
       
       
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
         
           
-          
         
-      
-    
-    
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
-      
-        
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9_5" checked>
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_9_5" >
         
           
-          <label class="md-nav__link" for="__nav_9_5" id="__nav_9_5_label" tabindex="">
+          <label class="md-nav__link" for="__nav_9_5" id="__nav_9_5_label" tabindex="0">
             
   
   
@@ -2942,7 +3080,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_9_5_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_9_5_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_9_5">
             <span class="md-nav__icon md-icon"></span>
             
@@ -2960,7 +3098,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../PRE_COMMIT_CHECKS/" class="md-nav__link">
+      <a href="../../development/PRE_COMMIT_CHECKS/" class="md-nav__link">
         
   
   
@@ -2988,7 +3126,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../BUILDING_EXECUTABLES/" class="md-nav__link">
+      <a href="../../development/BUILDING_EXECUTABLES/" class="md-nav__link">
         
   
   
@@ -3016,7 +3154,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../CODE_SIGNING/" class="md-nav__link">
+      <a href="../../development/CODE_SIGNING/" class="md-nav__link">
         
   
   
@@ -3041,37 +3179,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Icon Setup
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../../development/ICON_SETUP/" class="md-nav__link">
         
   
   
@@ -3087,270 +3198,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#icon-files" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Icon Files
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#configured-executables" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Configured Executables
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Configured Executables">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#1-gui-application-siglent-guispec" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        1. GUI Application (siglent-gui.spec)
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#2-report-generator-windows-report-generator-windowsspec" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        2. Report Generator - Windows (report-generator-windows.spec)
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#3-report-generator-linux-report-generator-linuxspec" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        3. Report Generator - Linux (report-generator-linux.spec)
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#icon-file-requirements" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Icon File Requirements
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Icon File Requirements">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#windows-ico" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Windows (.ico)
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#macos-icns" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        macOS (.icns)
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#linux-png" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Linux (.png)
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#testing-the-icons" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Testing the Icons
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Testing the Icons">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#windows" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Windows
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#macos" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        macOS
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#linux" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Linux
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#troubleshooting" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Troubleshooting
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Troubleshooting">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#icon-not-appearing-on-windows" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Icon Not Appearing on Windows
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#icon-not-appearing-on-macos" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Icon Not Appearing on macOS
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#appimage-icon-not-appearing-on-linux" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        AppImage Icon Not Appearing on Linux
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#icon-in-application-code-pyqt6" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Icon in Application Code (PyQt6)
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#build-automation" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Build Automation
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#related-files" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Related Files
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -3363,7 +3210,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../PYPI_DEPLOYMENT/" class="md-nav__link">
+      <a href="../../development/PYPI_DEPLOYMENT/" class="md-nav__link">
         
   
   
@@ -3391,7 +3238,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../VERSION_BUMPING/" class="md-nav__link">
+      <a href="../../development/VERSION_BUMPING/" class="md-nav__link">
         
   
   
@@ -3419,7 +3266,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../TESTING_BUILD_WORKFLOW/" class="md-nav__link">
+      <a href="../../development/TESTING_BUILD_WORKFLOW/" class="md-nav__link">
         
   
   
@@ -3447,7 +3294,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../EXPERIMENTAL_FEATURES/" class="md-nav__link">
+      <a href="../../development/EXPERIMENTAL_FEATURES/" class="md-nav__link">
         
   
   
@@ -3475,7 +3322,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../PROJECT_STRUCTURE/" class="md-nav__link">
+      <a href="../../development/PROJECT_STRUCTURE/" class="md-nav__link">
         
   
   
@@ -3683,10 +3530,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#icon-files" class="md-nav__link">
+  <a href="#why-there-is-no-sign-in" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Icon Files
+        Why there is no sign-in
       
     </span>
   </a>
@@ -3694,44 +3541,33 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#configured-executables" class="md-nav__link">
+  <a href="#where-it-is-and-moving-it" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Configured Executables
+        Where it is, and moving it
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Configured Executables">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-people-screen" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The People screen
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The People screen">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#1-gui-application-siglent-guispec" class="md-nav__link">
+  <a href="#a-code-can-be-shown-again-a-link-cannot" class="md-nav__link">
     <span class="md-ellipsis">
       
-        1. GUI Application (siglent-gui.spec)
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#2-report-generator-windows-report-generator-windowsspec" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        2. Report Generator - Windows (report-generator-windows.spec)
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#3-report-generator-linux-report-generator-linuxspec" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        3. Report Generator - Linux (report-generator-linux.spec)
+        A code can be shown again; a link cannot
       
     </span>
   </a>
@@ -3744,160 +3580,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#icon-file-requirements" class="md-nav__link">
+  <a href="#first-run" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Icon File Requirements
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Icon File Requirements">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#windows-ico" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Windows (.ico)
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#macos-icns" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        macOS (.icns)
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#linux-png" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Linux (.png)
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#testing-the-icons" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Testing the Icons
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Testing the Icons">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#windows" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Windows
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#macos" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        macOS
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#linux" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Linux
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#troubleshooting" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Troubleshooting
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Troubleshooting">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#icon-not-appearing-on-windows" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Icon Not Appearing on Windows
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#icon-not-appearing-on-macos" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Icon Not Appearing on macOS
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#appimage-icon-not-appearing-on-linux" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        AppImage Icon Not Appearing on Linux
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#icon-in-application-code-pyqt6" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Icon in Application Code (PyQt6)
+        First run
       
     </span>
   </a>
@@ -3905,10 +3591,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#build-automation" class="md-nav__link">
+  <a href="#turning-it-off" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Build Automation
+        Turning it off
       
     </span>
   </a>
@@ -3916,10 +3602,21 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#related-files" class="md-nav__link">
+  <a href="#for-maintainers-the-panel-is-a-separate-bundle" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Related Files
+        For maintainers: the panel is a separate bundle
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#where-to-next" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Where to next
       
     </span>
   </a>
@@ -3946,182 +3643,220 @@
   
 
 
-<h1 id="executable-icon-configuration">Executable Icon Configuration<a class="headerlink" href="#executable-icon-configuration" title="Permanent link">&para;</a></h1>
-<p>This document describes how the application icons are configured for different platforms when building standalone executables with PyInstaller.</p>
-<h2 id="icon-files">Icon Files<a class="headerlink" href="#icon-files" title="Permanent link">&para;</a></h2>
-<p>All PyInstaller spec files use the "Test Equipment" icon set in <code>resources/</code>:</p>
-<ul>
-<li><strong>Windows</strong>: <code>resources/Test Equipment.ico</code></li>
-<li><strong>macOS</strong>: <code>resources/Test Equipment.icns</code></li>
-<li><strong>Linux</strong>: <code>resources/Test Equipment.png</code></li>
-</ul>
-<h2 id="configured-executables">Configured Executables<a class="headerlink" href="#configured-executables" title="Permanent link">&para;</a></h2>
-<h3 id="1-gui-application-siglent-guispec">1. GUI Application (<code>siglent-gui.spec</code>)<a class="headerlink" href="#1-gui-application-siglent-guispec" title="Permanent link">&para;</a></h3>
-<p><strong>Icons Configured</strong>:
-- Windows: <code>resources/Test Equipment.ico</code>
-- macOS: <code>resources/Test Equipment.icns</code> (for the .app bundle)
-- Linux: no icon embedded (Linux doesn't support icons in bare executables)</p>
-<p><strong>Build Command</strong>:
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>pyinstaller<span class="w"> </span>siglent-gui.spec
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="c1"># or: make build-exe</span>
-</span></code></pre></div></p>
-<p><strong>Output</strong>:
-- Windows: <code>dist/SiglentGUI.exe</code> with embedded icon
-- macOS: <code>dist/SiglentGUI.app</code> with icon in bundle
-- Linux: <code>dist/SiglentGUI</code> (no embedded icon)</p>
-<hr />
-<h3 id="2-report-generator-windows-report-generator-windowsspec">2. Report Generator - Windows (<code>report-generator-windows.spec</code>)<a class="headerlink" href="#2-report-generator-windows-report-generator-windowsspec" title="Permanent link">&para;</a></h3>
-<p><strong>Icons Configured</strong>:
-- Windows: <code>resources/Test Equipment.ico</code></p>
-<p><strong>Build Command</strong>:
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>pyinstaller<span class="w"> </span>report-generator-windows.spec
-</span></code></pre></div></p>
-<p><strong>Output</strong>:
-- <code>dist/SiglentReportGenerator/SiglentReportGenerator.exe</code> with embedded icon</p>
-<p><strong>Icon Locations in the spec</strong>:
-- Main executable's <code>icon=</code> argument (COLLECT-based build)
-- A commented-out one-file executable variant also sets <code>icon=</code></p>
-<hr />
-<h3 id="3-report-generator-linux-report-generator-linuxspec">3. Report Generator - Linux (<code>report-generator-linux.spec</code>)<a class="headerlink" href="#3-report-generator-linux-report-generator-linuxspec" title="Permanent link">&para;</a></h3>
-<p><strong>Icons Configured</strong>:
-- PNG icon bundled in resources for AppImage/desktop integration
-- Icon copied into the AppDir for Linux desktop entries</p>
-<p><strong>Build Command</strong>:
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>pyinstaller<span class="w"> </span>report-generator-linux.spec
-</span></code></pre></div></p>
-<p><strong>Output</strong>:
-- <code>dist/SiglentReportGenerator/SiglentReportGenerator</code> (no embedded icon)
-- Icon bundled at <code>resources/Test Equipment.png</code> for desktop integration</p>
-<p><strong>AppImage Integration</strong>:
-The AppDir-building section of the spec:
-- Copies the icon to the AppDir root: <code>shutil.copy('resources/Test Equipment.png', appdir / 'siglent-report-generator.png')</code>
-- Writes a desktop entry with <code>Icon=siglent-report-generator</code></p>
-<hr />
-<h2 id="icon-file-requirements">Icon File Requirements<a class="headerlink" href="#icon-file-requirements" title="Permanent link">&para;</a></h2>
-<h3 id="windows-ico">Windows (.ico)<a class="headerlink" href="#windows-ico" title="Permanent link">&para;</a></h3>
-<ul>
-<li><strong>Format</strong>: ICO (Windows Icon)</li>
-<li><strong>Sizes</strong>: Multiple resolutions (16x16, 32x32, 48x48, 256x256 recommended)</li>
-<li><strong>Used By</strong>: PyInstaller EXE on Windows</li>
-</ul>
-<h3 id="macos-icns">macOS (.icns)<a class="headerlink" href="#macos-icns" title="Permanent link">&para;</a></h3>
-<ul>
-<li><strong>Format</strong>: ICNS (Apple Icon Image)</li>
-<li><strong>Sizes</strong>: Multiple resolutions up to 1024x1024</li>
-<li><strong>Used By</strong>: PyInstaller .app bundle on macOS</li>
-<li><strong>Requirements</strong>: Must contain at least 512x512@2x for Retina displays</li>
-</ul>
-<h3 id="linux-png">Linux (.png)<a class="headerlink" href="#linux-png" title="Permanent link">&para;</a></h3>
-<ul>
-<li><strong>Format</strong>: PNG</li>
-<li><strong>Recommended Size</strong>: 256x256 or 512x512</li>
-<li><strong>Used By</strong>: Desktop files, AppImage, window managers</li>
-</ul>
-<hr />
-<h2 id="testing-the-icons">Testing the Icons<a class="headerlink" href="#testing-the-icons" title="Permanent link">&para;</a></h2>
-<h3 id="windows">Windows<a class="headerlink" href="#windows" title="Permanent link">&para;</a></h3>
-<ol>
-<li>Build the executable:
-   <div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>pyinstaller<span class="w"> </span>siglent-gui.spec
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="c1"># or</span>
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>pyinstaller<span class="w"> </span>report-generator-windows.spec
-</span></code></pre></div></li>
-<li>Check the icon:</li>
-<li>View <code>dist/</code> in File Explorer — the .exe should show the "Test Equipment" icon</li>
-<li>Right-click → Properties → check icon in dialog</li>
-<li>Run the .exe and check the taskbar icon</li>
-</ol>
-<h3 id="macos">macOS<a class="headerlink" href="#macos" title="Permanent link">&para;</a></h3>
-<ol>
-<li>Build the application: <code>pyinstaller siglent-gui.spec</code></li>
-<li>Check the icon:</li>
-<li>Open <code>dist/</code> in Finder — the .app bundle should show the "Test Equipment" icon</li>
-<li>Right-click → Get Info → check icon preview</li>
-<li>Run the app and check the Dock icon</li>
-</ol>
-<h3 id="linux">Linux<a class="headerlink" href="#linux" title="Permanent link">&para;</a></h3>
-<ol>
-<li>Build the executable:
-   <div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>pyinstaller<span class="w"> </span>siglent-gui.spec
-</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="c1"># or</span>
-</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>pyinstaller<span class="w"> </span>report-generator-linux.spec
-</span></code></pre></div></li>
-<li>For desktop integration:</li>
-<li>Create a <code>.desktop</code> file in <code>~/.local/share/applications/</code></li>
-<li>Set <code>Icon=/path/to/resources/Test Equipment.png</code></li>
-<li>The application will use this icon in launchers and menus</li>
-</ol>
-<hr />
-<h2 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">&para;</a></h2>
-<h3 id="icon-not-appearing-on-windows">Icon Not Appearing on Windows<a class="headerlink" href="#icon-not-appearing-on-windows" title="Permanent link">&para;</a></h3>
-<p><strong>Problem</strong>: .exe shows the default Python icon instead of the custom icon</p>
-<p><strong>Solutions</strong>:
-1. Verify the icon file exists: <code>ls resources/Test\ Equipment.ico</code>
-2. Rebuild with verbose output: <code>pyinstaller --clean siglent-gui.spec</code>
-3. Check the spec file has the correct icon path
-4. Ensure the icon file is a valid ICO (not just a renamed PNG)</p>
-<h3 id="icon-not-appearing-on-macos">Icon Not Appearing on macOS<a class="headerlink" href="#icon-not-appearing-on-macos" title="Permanent link">&para;</a></h3>
-<p><strong>Problem</strong>: .app bundle shows a generic document icon</p>
-<p><strong>Solutions</strong>:
-1. Verify the ICNS file exists: <code>ls resources/Test\ Equipment.icns</code>
-2. Rebuild with: <code>pyinstaller --clean siglent-gui.spec</code>
-3. Clear the icon cache: <code>sudo rm -rf /Library/Caches/com.apple.iconservices.store</code>
-4. Restart Finder: <code>killall Finder</code>
-5. Ensure the ICNS has the required resolutions (512x512@2x minimum)</p>
-<h3 id="appimage-icon-not-appearing-on-linux">AppImage Icon Not Appearing on Linux<a class="headerlink" href="#appimage-icon-not-appearing-on-linux" title="Permanent link">&para;</a></h3>
-<p><strong>Problem</strong>: AppImage doesn't show an icon in the launcher</p>
-<p><strong>Solutions</strong>:
-1. Verify the PNG is copied to the AppDir root
-2. Check the desktop file has the correct <code>Icon=</code> entry
-3. Ensure the icon filename matches (no spaces or special characters)
-4. Update the desktop database: <code>update-desktop-database ~/.local/share/applications/</code></p>
-<hr />
-<h2 id="icon-in-application-code-pyqt6">Icon in Application Code (PyQt6)<a class="headerlink" href="#icon-in-application-code-pyqt6" title="Permanent link">&para;</a></h2>
-<p>To use the icon within the running application (window title bar, about dialogs, etc.):</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">PyQt6.QtGui</span><span class="w"> </span><span class="kn">import</span> <span class="n">QIcon</span>
-</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">PyQt6.QtWidgets</span><span class="w"> </span><span class="kn">import</span> <span class="n">QApplication</span>
-</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="kn">import</span><span class="w"> </span><span class="nn">sys</span>
-</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
-</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>
-</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="n">app</span> <span class="o">=</span> <span class="n">QApplication</span><span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">argv</span><span class="p">)</span>
-</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>
-</span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="c1"># Get icon path (works in both dev and bundled executable)</span>
-</span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a><span class="k">if</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">sys</span><span class="p">,</span> <span class="s1">&#39;frozen&#39;</span><span class="p">,</span> <span class="kc">False</span><span class="p">):</span>
-</span><span id="__span-5-10"><a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a>    <span class="c1"># Running as a PyInstaller bundle</span>
-</span><span id="__span-5-11"><a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a>    <span class="n">base_path</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">_MEIPASS</span><span class="p">)</span>
-</span><span id="__span-5-12"><a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a><span class="k">else</span><span class="p">:</span>
-</span><span id="__span-5-13"><a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a>    <span class="c1"># Running in development</span>
-</span><span id="__span-5-14"><a id="__codelineno-5-14" name="__codelineno-5-14" href="#__codelineno-5-14"></a>    <span class="n">base_path</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="vm">__file__</span><span class="p">)</span><span class="o">.</span><span class="n">parent</span><span class="o">.</span><span class="n">parent</span>
-</span><span id="__span-5-15"><a id="__codelineno-5-15" name="__codelineno-5-15" href="#__codelineno-5-15"></a>
-</span><span id="__span-5-16"><a id="__codelineno-5-16" name="__codelineno-5-16" href="#__codelineno-5-16"></a><span class="c1"># Set application icon</span>
-</span><span id="__span-5-17"><a id="__codelineno-5-17" name="__codelineno-5-17" href="#__codelineno-5-17"></a><span class="n">icon_path</span> <span class="o">=</span> <span class="n">base_path</span> <span class="o">/</span> <span class="s1">&#39;resources&#39;</span> <span class="o">/</span> <span class="s1">&#39;Test Equipment.ico&#39;</span>
-</span><span id="__span-5-18"><a id="__codelineno-5-18" name="__codelineno-5-18" href="#__codelineno-5-18"></a><span class="k">if</span> <span class="n">icon_path</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
-</span><span id="__span-5-19"><a id="__codelineno-5-19" name="__codelineno-5-19" href="#__codelineno-5-19"></a>    <span class="n">app</span><span class="o">.</span><span class="n">setWindowIcon</span><span class="p">(</span><span class="n">QIcon</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">icon_path</span><span class="p">)))</span>
-</span><span id="__span-5-20"><a id="__codelineno-5-20" name="__codelineno-5-20" href="#__codelineno-5-20"></a>
-</span><span id="__span-5-21"><a id="__codelineno-5-21" name="__codelineno-5-21" href="#__codelineno-5-21"></a><span class="c1"># Or set on a specific window</span>
-</span><span id="__span-5-22"><a id="__codelineno-5-22" name="__codelineno-5-22" href="#__codelineno-5-22"></a><span class="kn">from</span><span class="w"> </span><span class="nn">PyQt6.QtWidgets</span><span class="w"> </span><span class="kn">import</span> <span class="n">QMainWindow</span>
-</span><span id="__span-5-23"><a id="__codelineno-5-23" name="__codelineno-5-23" href="#__codelineno-5-23"></a><span class="n">window</span> <span class="o">=</span> <span class="n">QMainWindow</span><span class="p">()</span>
-</span><span id="__span-5-24"><a id="__codelineno-5-24" name="__codelineno-5-24" href="#__codelineno-5-24"></a><span class="n">window</span><span class="o">.</span><span class="n">setWindowIcon</span><span class="p">(</span><span class="n">QIcon</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">icon_path</span><span class="p">)))</span>
+<h1 id="admin-panel">Admin panel<a class="headerlink" href="#admin-panel" title="Permanent link">&para;</a></h1>
+<p>Managing who can use the gateway used to mean remembering CLI subcommands. It
+does not any more. The gateway serves a small <strong>admin panel</strong> on the machine it
+runs on, at:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>http://127.0.0.1:8766/
 </span></code></pre></div>
-<p><strong>Note</strong>: for bundled executables, the icon must also be included in <code>datas</code> in the spec file:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="n">datas</span><span class="o">=</span><span class="p">[</span>
-</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>    <span class="p">(</span><span class="s1">&#39;resources/Test Equipment.ico&#39;</span><span class="p">,</span> <span class="s1">&#39;resources&#39;</span><span class="p">),</span>
-</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>    <span class="p">(</span><span class="s1">&#39;resources/Test Equipment.png&#39;</span><span class="p">,</span> <span class="s1">&#39;resources&#39;</span><span class="p">),</span>
-</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="p">],</span>
+<p>Open that in a browser <strong>on the gateway machine</strong> and you get one screen showing
+everyone who has access, with buttons to invite someone or cut them off. The
+<code>scpi-web invite</code> and <code>scpi-web token</code> commands still work exactly as before —
+the panel is a second way in, not a replacement.</p>
+<blockquote>
+<p><strong>This page is for whoever administers the gateway.</strong> If you are a user
+wanting to sign in, you need a link or a six-digit code from that person;
+see the <a href="../browser-ui/">Browser UI tour</a>.</p>
+</blockquote>
+<h2 id="why-there-is-no-sign-in">Why there is no sign-in<a class="headerlink" href="#why-there-is-no-sign-in" title="Permanent link">&para;</a></h2>
+<p>The panel asks for no password and no token. That is deliberate, and it rests on
+<strong>three independent defences</strong> — which is worth spelling out, because each one
+looks redundant until you see the attacker the others miss. Removing any of them
+opens the panel up.</p>
+<p><strong>1. The listener binds <code>127.0.0.1</code>.</strong> The operating system refuses every
+non-local connection before any gateway code runs. A colleague on the LAN
+pointing a browser at <code>http://gateway-pc:8766/</code> does not get a login screen —
+they get a refused connection. <strong>Physical access to the gateway machine is the
+credential</strong>, the same standard as being able to sit down and type
+<code>scpi-web token revoke bob</code>.</p>
+<p><strong>2. Requests must carry a <code>Host</code> of <code>127.0.0.1</code> or <code>localhost</code>.</strong> The bind stops
+a non-local <em>socket</em>. It does not stop a <em>browser</em>. A page the admin visits in
+the ordinary course of a day can point its own hostname at <code>127.0.0.1</code> — DNS
+rebinding — and become same-origin with the panel. The connection then really
+does arrive on loopback, so the bind is satisfied and waves it through; without
+this check that page could quietly issue an invitation and read the redeemable
+link straight back out of the response. A <code>Host</code> allowlist breaks it, because
+the request still carries the attacker's hostname — which rebinding, by
+construction, cannot launder.</p>
+<p><strong>3. Requests must carry no <code>Origin</code>, or the panel's own.</strong> Rebinding is the
+elaborate attack. The plain one needs none of it: a page on any site the admin
+happens to visit does
+<code>fetch("http://127.0.0.1:8766/api/invitations", {method: "POST", …})</code>. The
+socket really is local, so the bind is satisfied; the <code>Host</code> really is
+<code>127.0.0.1:8766</code>, so the allowlist is too. <strong>Neither of the defences above
+applies at all.</strong> What gives it away is the <code>Origin</code> header, which a browser
+attaches to every cross-origin request and a page cannot forge. The panel
+refuses anything whose <code>Origin</code> is not <code>http://127.0.0.1:8766</code> or
+<code>http://localhost:8766</code> (following <code>--admin-port</code> if you moved it). Requests
+with no <code>Origin</code> — <code>curl</code>, scripts, the panel's own same-origin fetches — are
+unaffected, because an <code>Origin</code> is precisely what a <em>cross</em>-origin request is
+obliged to carry. This also catches the rebinding variant, whose <code>Origin</code> would
+name the attacker's host.</p>
+<p>So: <strong>the bind stops the lab; the <code>Host</code> check stops rebinding; the <code>Origin</code>
+check stops the ordinary web page.</strong> None covers the others' attacker.</p>
+<p>There is a fourth thing helping, and it is worth naming so nobody mistakes it
+for the plan: the browser's CORS preflight, plus the fact that these endpoints
+read only JSON bodies. A cross-origin page cannot send <code>application/json</code>
+without a preflight the panel never answers, and a body it <em>can</em> send without
+one — <code>text/plain</code>, a form post — is rejected as malformed. That is genuine, and
+it is what stood between the panel and the attack above before the <code>Origin</code>
+check existed. But it is a property of the request parsers rather than a
+decision, so it would quietly evaporate the day an endpoint learns to read a
+form body or a <code>GET</code> learns to change something. Treat it as a backstop, not a
+defence you are relying on.</p>
+<p>If you are hacking on the panel with <code>npm run dev:admin</code>, the Vite proxy
+rewrites <code>Origin</code> alongside <code>Host</code> so the dev server keeps working. Do not
+instead reach for <code>CORSMiddleware</code> — adding one is precisely how this boundary
+would be lost.</p>
+<p>What this model does <em>not</em> survive is someone who can already run a browser on
+the gateway machine as you. If that is in your threat model, do not run the
+panel — see <a href="#turning-it-off">Turning it off</a>.</p>
+<h2 id="where-it-is-and-moving-it">Where it is, and moving it<a class="headerlink" href="#where-it-is-and-moving-it" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--admin-port</code></td>
+<td><code>8766</code></td>
+<td>Port for the admin panel</td>
+</tr>
+<tr>
+<td><code>--no-admin</code></td>
+<td><em>(off)</em></td>
+<td>Do not start the admin listener at all</td>
+</tr>
+</tbody>
+</table>
+<p><code>--port</code> and <code>--admin-port</code> must differ; the gateway says so and exits rather
+than failing later inside the socket bind.</p>
+<p><strong>There is deliberately no <code>--admin-host</code>.</strong> Every argument above depends on the
+listener being on loopback, so making the address configurable would turn a
+guarantee into a footgun — one flag, probably copied from a forum post, and an
+unauthenticated access-management UI is on the LAN. The address is a constant in
+the source, and the gateway asserts it is a loopback address before binding.</p>
+<p>If you need the panel from another machine, forward the port over SSH rather
+than rebinding it. The tunnel terminates on the gateway's own loopback, so the
+bind is satisfied honestly, and your browser sends a <code>Host</code> of <code>localhost</code>, so
+the allowlist is too:</p>
+<div class="language-console highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="gp">$ </span>ssh<span class="w"> </span>-L<span class="w"> </span><span class="m">8766</span>:127.0.0.1:8766<span class="w"> </span>you@gateway-pc
 </span></code></pre></div>
-<hr />
-<h2 id="build-automation">Build Automation<a class="headerlink" href="#build-automation" title="Permanent link">&para;</a></h2>
-<p>For the GUI, <code>make build-exe</code> wraps <code>pyinstaller --clean siglent-gui.spec</code> and picks the icon automatically via the spec's platform check. The report-generator specs don't have Make targets yet — invoke <code>pyinstaller</code> on the relevant <code>.spec</code> file directly, as shown above.</p>
-<hr />
-<h2 id="related-files">Related Files<a class="headerlink" href="#related-files" title="Permanent link">&para;</a></h2>
+<p>Then open <code>http://localhost:8766/</code> on your own machine. <strong>Forward it to the same
+port number</strong>, as above: your browser's <code>Origin</code> carries the local port, so
+<code>-L 9999:127.0.0.1:8766</code> would present as <code>http://localhost:9999</code> and be refused
+by the <code>Origin</code> check.</p>
+<p>This does move the
+boundary — anyone who can SSH to the gateway as you can now administer it — but
+that is a boundary you already chose, authenticated by SSH keys rather than by
+an unauthenticated port on the LAN.</p>
+<h2 id="the-people-screen">The People screen<a class="headerlink" href="#the-people-screen" title="Permanent link">&para;</a></h2>
+<p>There is one screen, because the person administering a gateway sits down to do
+a job, not to navigate.</p>
+<p><strong>Who has access</strong> lists each identity with the number of devices signed in
+under it and when one of them was last seen. This is <code>scpi-web token list</code> with
+a <strong>Revoke</strong> button. Revoking asks first, and the confirmation names the
+consequence — <em>"Revoke bob? This signs out all 2 of their devices"</em> — because
+the device count is exactly what the CLI cannot easily tell you before you act.
+Revocation takes effect on the next request; there is no restart.</p>
+<p><strong>Invitations</strong> takes a name and creates a ten-minute invitation, showing:</p>
 <ul>
-<li><code>siglent-gui.spec</code> - GUI application build configuration</li>
-<li><code>report-generator-windows.spec</code> - Windows report generator build</li>
-<li><code>report-generator-linux.spec</code> - Linux report generator build</li>
-<li><code>resources/Test Equipment.ico</code> - Windows icon</li>
-<li><code>resources/Test Equipment.icns</code> - macOS icon</li>
-<li><code>resources/Test Equipment.png</code> - Linux/web icon</li>
-<li><code>MANIFEST.in</code> - Ensures icons are included in source distributions</li>
+<li>the <strong>link</strong> to send, which signs a browser in with no typing at all;</li>
+<li>the <strong>six-digit code</strong> to read down a phone, grouped as <code>417 902</code>;</li>
+<li>a <strong>countdown</strong> to expiry, so you can see whether it is still worth sending.</li>
+</ul>
+<p>Both are one invitation with two ways in; whichever is used first consumes it.</p>
+<p><strong>Cancelling a pending invitation is new here.</strong> From the CLI, an invitation
+sent to the wrong person or with a typo in the name could only be waited out —
+ten minutes with a live credential in someone's chat window. The panel lists
+everything still pending and cancels it outright.</p>
+<h3 id="a-code-can-be-shown-again-a-link-cannot">A code can be shown again; a link cannot<a class="headerlink" href="#a-code-can-be-shown-again-a-link-cannot" title="Permanent link">&para;</a></h3>
+<p>Reopen the panel five minutes later and a pending invitation still shows its
+code, so an admin who closed the window can read it out without cancelling and
+starting over.</p>
+<p>The link is not shown again, and this is not an oversight. Only a <strong>hash</strong> of
+the link's nonce is stored, so the link genuinely exists once, at the moment of
+creation — there is nothing on disk to rebuild it from. If a link is lost,
+cancel the invitation and make a new one.</p>
+<p>The code, by contrast, is stored <strong>in the clear</strong>, and that deserves an
+explanation rather than a raised eyebrow. Hashing a secret drawn from a space of
+1,000,000 would be theatre: anyone holding the file could enumerate all
+1,000,000 hashes in well under a second. The code's real defences are that it
+expires in ten minutes and that failed redemptions are rate-limited (see
+<a href="../security/#guessing-a-join-code">Guessing a join code</a>). Storing it hashed
+would only make it <em>look</em> safer than it is.</p>
+<p>Storing it in clear is safe <strong>here and nowhere else</strong>: <code>invitations.json</code> is
+written <code>0600</code> where the platform supports it, and the only thing that ever
+reads a code back out is the host-only panel. It is never served to the LAN app.</p>
+<h2 id="first-run">First run<a class="headerlink" href="#first-run" title="Permanent link">&para;</a></h2>
+<p>Starting a gateway with an empty token store no longer mints anything. There is
+no auto-created <code>default</code> identity and no <code>?token=…</code> bootstrap URL — the first
+person to use a gateway should be a named human, not a placeholder that then
+owns every session it touches.</p>
+<p>Instead the gateway prints where it is and opens the panel on the host:</p>
+<div class="language-console highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="gp">$ </span>scpi-web
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="go">Gateway ready at http://127.0.0.1:8765/</span>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="go">No one has access yet — finish setup at http://127.0.0.1:8766/</span>
+</span></code></pre></div>
+<p>The panel shows <em>"No one has access yet. Invite someone below to get started."</em>
+Type your own name, press <strong>Invite</strong>, and open the link it gives you. That
+mints an identity for <strong>you</strong>, and from then on the sessions you create are
+owned by your name.</p>
+<p>If no browser can be opened — a headless box, an SSH session, a machine with no
+associated browser — the gateway carries on regardless and the printed URL is
+still there to open by hand. A browser problem can never stop a gateway
+starting.</p>
+<p>Once anyone has access, every later start prints the ordinary banner:</p>
+<div class="language-console highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="gp">$ </span>scpi-web
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="go">Gateway ready at http://127.0.0.1:8765/</span>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="go">Admin panel (this machine only) at http://127.0.0.1:8766/</span>
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="go">Hand out access with: scpi-web invite &lt;name&gt;</span>
+</span></code></pre></div>
+<h2 id="turning-it-off">Turning it off<a class="headerlink" href="#turning-it-off" title="Permanent link">&para;</a></h2>
+<p><code>--no-admin</code> starts the gateway with no admin listener at all. Nothing else
+changes; the CLI still does everything the panel does, apart from cancelling a
+pending invitation.</p>
+<p>On a gateway that <strong>already</strong> has users, that is all you need to know. On a
+<strong>fresh</strong> one it would otherwise be a trap — no panel and no auto-minted token
+means no way in — so the gateway says what to do instead:</p>
+<div class="language-console highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="gp">$ </span>scpi-web<span class="w"> </span>--no-admin
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="go">Gateway ready at http://127.0.0.1:8765/</span>
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="go">No one has access yet, and the admin panel is disabled (--no-admin).</span>
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="go">Create the first identity with: scpi-web invite &lt;name&gt;</span>
+</span></code></pre></div>
+<p>That is the path a headless or containerised deployment takes: run
+<code>scpi-web invite &lt;name&gt;</code> once, from the same <code>--config-dir</code>, and send yourself
+the link.</p>
+<h2 id="for-maintainers-the-panel-is-a-separate-bundle">For maintainers: the panel is a separate bundle<a class="headerlink" href="#for-maintainers-the-panel-is-a-separate-bundle" title="Permanent link">&para;</a></h2>
+<p>The admin UI is built and shipped separately from the LAN app, and the two must
+never meet:</p>
+<ul>
+<li><code>npm run build:admin</code> emits to <code>webapp/app/dist-admin/</code>, which
+  <code>make webapp-build</code> copies to <code>scpi_control/server/admin/static/</code>.</li>
+<li>The LAN app builds to <code>dist/</code> and is served from
+  <code>scpi_control/server/static/</code>.</li>
+</ul>
+<p>They are kept apart because the main app's SPA catch-all serves any real file it
+finds in <em>its</em> static directory — so a shared directory would hand the
+access-management UI to every browser in the lab. For the same reason the admin
+app is never mounted under the main app and never shares its router.</p>
+<p>CI enforces this by <strong>content, not filename</strong>: it greps the built LAN bundle for
+an admin-only route string and fails if one appears. A check that only looked
+for a file called <code>admin.*</code> would miss the case actually worth catching — an
+<code>import</code> from <code>src/admin/*</code> into the main app's module graph pulls admin code
+into <code>dist/</code> while leaving every filename untouched.</p>
+<h2 id="where-to-next">Where to next<a class="headerlink" href="#where-to-next" title="Permanent link">&para;</a></h2>
+<ul>
+<li><a href="../security/">Gateway security</a> — invitations, tokens, session ownership,
+  the SSRF gate, and deployment guidance</li>
+<li><a href="../browser-ui/">Browser UI tour</a> — what the people you invite will see</li>
 </ul>
 
 

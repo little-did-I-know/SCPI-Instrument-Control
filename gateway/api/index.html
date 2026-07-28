@@ -1052,6 +1052,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../admin-panel/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Admin Panel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../browser-ui/" class="md-nav__link">
         
   
@@ -3712,6 +3740,10 @@ is the same whether or not an invitation is live). See the
 <a href="../security/">Gateway security guide</a> for how to
 invite someone or mint a token, how ownership gates writes, and the WebSocket
 authentication handshake.</p>
+<p>The <a href="../admin-panel/">admin panel</a> has routes of its own — identities and
+invitations — but they belong to a <strong>separate application on a separate,
+loopback-bound port</strong> (<code>8766</code> by default) and are not part of this reference.
+They are not reachable from the LAN, and nothing on this page serves them.</p>
 <h2 id="sessions-discovery">Sessions &amp; discovery<a class="headerlink" href="#sessions-discovery" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
