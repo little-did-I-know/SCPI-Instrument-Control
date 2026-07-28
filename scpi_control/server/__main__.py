@@ -8,12 +8,21 @@ import uvicorn
 
 from scpi_control.server.app import create_app
 from scpi_control.server.auth import DEFAULT_CONFIG_DIR, TokenStore
+from scpi_control.server.gateway_url import read_base_url, write_base_url
+from scpi_control.server.invitations import InvitationStore, format_code
 from scpi_control.server.netpolicy import DEFAULT_ALLOWED_PORTS
 
 
+def _config_dir(args) -> Path:
+    return Path(args.config_dir) if args.config_dir else DEFAULT_CONFIG_DIR
+
+
+def _invitations(args) -> InvitationStore:
+    return InvitationStore(str(_config_dir(args) / "invitations.json"))
+
+
 def _store(args) -> TokenStore:
-    config_dir = Path(args.config_dir) if args.config_dir else DEFAULT_CONFIG_DIR
-    return TokenStore(str(config_dir / "tokens.json"))
+    return TokenStore(str(_config_dir(args) / "tokens.json"))
 
 
 def _add_config_dir(parser, default=None) -> None:
@@ -60,6 +69,11 @@ def main(argv=None) -> None:
     revoke.add_argument("name")
     _add_config_dir(revoke, default=argparse.SUPPRESS)
 
+    invite = sub.add_parser("invite", help="create a join link and code for someone")
+    invite.add_argument("name")
+    invite.add_argument("--url", default=None, help="base URL to print (default: the URL the gateway last recorded)")
+    _add_config_dir(invite, default=argparse.SUPPRESS)
+
     references = sub.add_parser("references", help="reference file maintenance").add_subparsers(dest="references_command", required=True)
     migrate = references.add_parser("migrate", help="convert pre-5.0 pickled reference files")
     migrate.add_argument("--dir", default=None, help="reference storage directory (default: ~/.siglent/references)")
@@ -72,6 +86,23 @@ def main(argv=None) -> None:
         target = args.dir if args.dir else str(DEFAULT_CONFIG_DIR / "references")
         result = migrate_references(target)
         print("converted {converted}, skipped {skipped}, failed {failed} in {0}".format(target, **result))
+        return
+
+    if args.command == "invite":
+        base = args.url or read_base_url(_config_dir(args))
+        fallback = base is None
+        if fallback:
+            base = "http://{0}:{1}/".format(args.host, args.port)
+        try:
+            link, code = _invitations(args).create(args.name)
+        except ValueError as exc:
+            sys.exit(str(exc))
+        print("\nInvitation for {0!r} — expires in 10 minutes.\n".format(args.name))
+        print("  Send this link:          {0}?invite={1}".format(base, link))
+        print("  Or read out this code:   {0}\n".format(format_code(code)))
+        if fallback:
+            print("(No gateway has started from this config directory yet, so that link assumes")
+            print(" {0}. If the gateway runs elsewhere, pass --url.)\n".format(base))
         return
 
     if args.command == "token":
@@ -107,11 +138,18 @@ def main(argv=None) -> None:
         parser.error("--max-sessions must be at least 1 (got {0})".format(args.max_sessions))
 
     store = _store(args)
+    url = write_base_url(_config_dir(args), args.host, args.port)
     if store.is_empty():
         raw = store.mint("default")
-        print("\nGateway ready. Open:\n\n    http://{0}:{1}/?token={2}\n".format(args.host, args.port, raw))
+        print("\nGateway ready. Open:\n\n    {0}?token={1}\n".format(url, raw))
+    else:
+        print("\nGateway ready at {0}\nHand out access with: scpi-web invite <name>\n".format(url))
     allowed_ports = frozenset(args.allow_port) | DEFAULT_ALLOWED_PORTS if args.allow_port else None
-    uvicorn.run(create_app(token_store=store, abandon_after=args.abandon_after, allowed_ports=allowed_ports, max_sessions=args.max_sessions), host=args.host, port=args.port)
+    uvicorn.run(
+        create_app(token_store=store, invitation_store=_invitations(args), abandon_after=args.abandon_after, allowed_ports=allowed_ports, max_sessions=args.max_sessions),
+        host=args.host,
+        port=args.port,
+    )
 
 
 if __name__ == "__main__":
