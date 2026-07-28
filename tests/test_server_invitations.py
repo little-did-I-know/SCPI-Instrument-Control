@@ -148,3 +148,74 @@ def test_redeem_without_a_credential_returns_none(tmp_path):
     store = InvitationStore(str(tmp_path / "invitations.json"))
     store.create("bob")
     assert store.redeem() is None
+
+
+def test_pending_list_reports_live_invitations(tmp_path):
+    store = InvitationStore(str(tmp_path / "invitations.json"))
+    _link, code = store.create("bob")
+    rows = store.pending_list()
+    assert len(rows) == 1
+    assert rows[0]["name"] == "bob"
+    assert rows[0]["code"] == code
+    assert rows[0]["id"]
+    assert rows[0]["expires"] > 0
+
+
+def test_pending_list_omits_expired_invitations(tmp_path):
+    store = InvitationStore(str(tmp_path / "invitations.json"))
+    store.create("stale", ttl=-1.0)
+    store.create("bob")
+    assert [row["name"] for row in store.pending_list()] == ["bob"]
+
+
+def test_pending_list_is_ordered_by_expiry(tmp_path):
+    store = InvitationStore(str(tmp_path / "invitations.json"))
+    store.create("later", ttl=600.0)
+    store.create("sooner", ttl=60.0)
+    assert [row["name"] for row in store.pending_list()] == ["sooner", "later"]
+
+
+def test_cancel_removes_the_invitation(tmp_path):
+    store = InvitationStore(str(tmp_path / "invitations.json"))
+    _link, code = store.create("bob")
+    invitation_id = store.pending_list()[0]["id"]
+    assert store.cancel(invitation_id) is True
+    assert store.pending_list() == []
+    assert store.redeem(code=code) is None
+
+
+def test_cancel_is_idempotent_and_reports_unknown_ids(tmp_path):
+    store = InvitationStore(str(tmp_path / "invitations.json"))
+    store.create("bob")
+    invitation_id = store.pending_list()[0]["id"]
+    assert store.cancel(invitation_id) is True
+    assert store.cancel(invitation_id) is False
+    assert store.cancel("deadbeef") is False
+
+
+def test_cancel_only_removes_the_named_invitation(tmp_path):
+    store = InvitationStore(str(tmp_path / "invitations.json"))
+    store.create("bob")
+    store.create("bob")  # one person, two pending invitations -- id must discriminate
+    first = store.pending_list()[0]["id"]
+    store.cancel(first)
+    remaining = store.pending_list()
+    assert len(remaining) == 1
+    assert remaining[0]["id"] != first
+
+
+def test_an_id_is_not_the_code(tmp_path):
+    # The id exists so cancellation can address an invitation without putting a
+    # live credential in a URL path -- and therefore in the host's access log.
+    # If the id ever becomes the code, that protection silently evaporates.
+    store = InvitationStore(str(tmp_path / "invitations.json"))
+    _link, code = store.create("bob")
+    assert store.pending_list()[0]["id"] != code
+
+
+def test_a_cancelled_invitation_is_gone_for_another_process(tmp_path):
+    path = str(tmp_path / "invitations.json")
+    store = InvitationStore(path)
+    _link, code = store.create("bob")
+    store.cancel(store.pending_list()[0]["id"])
+    assert InvitationStore(path).redeem(code=code) is None
