@@ -167,6 +167,13 @@ def test_the_two_apps_never_share_a_static_directory(tmp_path):
 
     assert app_module.STATIC_DIR != admin_app_module.ADMIN_STATIC_DIR
     assert admin_app_module.ADMIN_STATIC_DIR not in app_module.STATIC_DIR.parents
+    # Both directions, and this is the one that bites: if ADMIN_STATIC_DIR ever
+    # moved *under* STATIC_DIR (server/static/admin, say), the two paths would
+    # still differ and neither of the assertions above would notice -- while the
+    # main app's catch-all happily served the admin bundle to the whole LAN.
+    # The reverse nesting is the harmless direction; it would only expose the
+    # LAN bundle to the loopback panel.
+    assert app_module.STATIC_DIR not in admin_app_module.ADMIN_STATIC_DIR.parents
 
 
 def test_a_foreign_origin_is_rejected_on_a_read(admin):
