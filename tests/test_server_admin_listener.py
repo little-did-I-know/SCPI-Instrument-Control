@@ -215,3 +215,52 @@ def test_uvicorn_run_still_delegates_to_self_serve(monkeypatch):
     server.run()
 
     assert calls == [None]
+
+
+def test_the_event_loop_guard_is_in_force(request):
+    """Proves the autouse `_no_leaked_event_loop` guard in conftest.py actually
+    works, the same role test_no_argument_defaults_never_touch_the_real_home
+    (tests/test_server_auth_store.py) plays for `_no_real_home` and
+    test_the_no_real_browser_guard_is_in_force (tests/test_server_first_run.py)
+    plays for `_no_real_browser`.
+
+    This file is where that guard earns its keep: the two tests above both end
+    up inside `asyncio.run()`, which clears the thread's current event loop on
+    the way out. Without the guard that lands on whatever runs next in the
+    worker -- on CI it was three tests in tests/test_server_stream_ws.py, on
+    Python 3.9 only, in a file neither test has anything to do with.
+
+    Two things are asserted, because either alone would pass vacuously: that
+    the guard is wired up as autouse (this test never requests it), and that
+    its restore logic really restores. The middle assertion pins the damage
+    itself, so if a future Python stops leaking here, this says so rather than
+    quietly passing.
+    """
+    from tests.conftest import preserved_event_loop_state
+
+    assert "_no_leaked_event_loop" in request.fixturenames
+
+    # Start from an explicitly set loop rather than whatever ambient state this
+    # worker is in. A pristine main thread behaves differently across the
+    # supported range -- get_event_loop() creates a loop on 3.9-3.13 and raises
+    # on 3.14 -- whereas a loop that has been set is returned by every version,
+    # which keeps the assertions below meaningful on all of them.
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        assert asyncio.get_event_loop() is loop
+
+        with preserved_event_loop_state():
+            asyncio.run(asyncio.sleep(0))
+            # The leak, reproduced in one line: asyncio.run() does not put back
+            # what it found.
+            with pytest.raises(RuntimeError):
+                asyncio.get_event_loop()
+
+        # ...and the guard does. Identity, not merely "a loop exists": an
+        # implementation that installed a fresh loop instead of restoring the
+        # old one would satisfy the weaker check.
+        assert asyncio.get_event_loop() is loop
+    finally:
+        asyncio.set_event_loop(None)
+        loop.close()
