@@ -37,7 +37,10 @@ def test_revoking_unknown_name_exits_nonzero(tmp_path):
 
 def test_serve_bootstraps_a_token_and_prints_url(tmp_path, capsys, monkeypatch):
     started = {}
-    monkeypatch.setattr("uvicorn.run", lambda app, host, port: started.update(host=host, port=port))
+    monkeypatch.setattr(
+        "scpi_control.server.__main__._run_servers",
+        lambda main_app, host, port, admin_app, admin_port: started.update(host=host, port=port),
+    )
     main(["--config-dir", str(tmp_path), "--port", "9999"])
     printed = capsys.readouterr().out
     assert "?token=scpi_" in printed
@@ -46,7 +49,7 @@ def test_serve_bootstraps_a_token_and_prints_url(tmp_path, capsys, monkeypatch):
 
 
 def test_serve_does_not_remint_when_tokens_exist(tmp_path, capsys, monkeypatch):
-    monkeypatch.setattr("uvicorn.run", lambda app, host, port: None)
+    monkeypatch.setattr("scpi_control.server.__main__._run_servers", lambda main_app, host, port, admin_app, admin_port: None)
     main(["token", "add", "robin", "--config-dir", str(tmp_path)])
     capsys.readouterr()
     main(["--config-dir", str(tmp_path)])
@@ -124,7 +127,7 @@ def test_config_dir_before_bare_serve_bootstraps_into_given_directory(tmp_path, 
     position to appear in -- but it must still land in tmp_path, not the
     real ~/.siglent, and this asserts that directly rather than trusting a
     zero exit code."""
-    monkeypatch.setattr("uvicorn.run", lambda app, host, port: None)
+    monkeypatch.setattr("scpi_control.server.__main__._run_servers", lambda main_app, host, port, admin_app, admin_port: None)
     main(["--config-dir", str(tmp_path), "--port", "9999"])
     assert (tmp_path / "tokens.json").exists()
     assert TokenStore(str(tmp_path / "tokens.json")).names() == ["default"]

@@ -31,7 +31,7 @@ def test_the_printed_code_actually_redeems(tmp_path, capsys):
 
 
 def test_invite_uses_the_url_the_gateway_recorded(tmp_path, capsys, monkeypatch):
-    monkeypatch.setattr("uvicorn.run", lambda app, host, port: None)
+    monkeypatch.setattr("scpi_control.server.__main__._run_servers", lambda main_app, host, port, admin_app, admin_port: None)
     main(["--config-dir", str(tmp_path), "--host", "192.168.1.50", "--port", "9000"])
     capsys.readouterr()
     main(["invite", "bob", "--config-dir", str(tmp_path)])
@@ -72,7 +72,10 @@ def test_a_corrupt_invitation_file_stops_serve_before_a_token_is_minted(tmp_path
     # started AND left a live token behind -- and because the token store was
     # no longer empty, no later start would ever print that URL again. Exiting
     # is not enough to assert: the token is the damage.
-    monkeypatch.setattr("uvicorn.run", lambda app, host, port: pytest.fail("uvicorn should not have started"))
+    monkeypatch.setattr(
+        "scpi_control.server.__main__._run_servers",
+        lambda main_app, host, port, admin_app, admin_port: pytest.fail("uvicorn should not have started"),
+    )
     (tmp_path / "invitations.json").write_text("{ not json")
     with pytest.raises(SystemExit) as excinfo:
         main(["--config-dir", str(tmp_path)])
@@ -82,7 +85,7 @@ def test_a_corrupt_invitation_file_stops_serve_before_a_token_is_minted(tmp_path
 
 
 def test_serve_prints_the_url_every_time_not_just_the_first(tmp_path, capsys, monkeypatch):
-    monkeypatch.setattr("uvicorn.run", lambda app, host, port: None)
+    monkeypatch.setattr("scpi_control.server.__main__._run_servers", lambda main_app, host, port, admin_app, admin_port: None)
     main(["--config-dir", str(tmp_path), "--port", "9999"])
     capsys.readouterr()
     main(["--config-dir", str(tmp_path), "--port", "9999"])

@@ -1,16 +1,71 @@
 """Lab gateway entry point: python -m scpi_control.server / scpi-web."""
 
 import argparse
+import asyncio
+import contextlib
+import ipaddress
 import sys
 from pathlib import Path
 
 import uvicorn
 
+from scpi_control.server.admin.app import create_admin_app
 from scpi_control.server.app import create_app
 from scpi_control.server.auth import DEFAULT_CONFIG_DIR, TokenStore
 from scpi_control.server.gateway_url import read_base_url, write_base_url
 from scpi_control.server.invitations import InvitationStore, format_code
 from scpi_control.server.netpolicy import DEFAULT_ALLOWED_PORTS
+
+# The host-only boundary. Not a flag, and deliberately so: the admin app has no
+# authentication because the OS refuses non-local connections before it runs.
+# A configurable host would turn that guarantee into a footgun.
+ADMIN_HOST = "127.0.0.1"
+DEFAULT_ADMIN_PORT = 8766
+
+
+class _QuietServer(uvicorn.Server):
+    """A server that leaves signal handling to the main one.
+
+    Two uvicorn servers on one loop would otherwise both capture SIGINT, and
+    the second registration wins -- so Ctrl+C would stop one server while the
+    other kept the process alive. uvicorn 0.34.3 captures signals through this
+    context manager rather than install_signal_handlers().
+    """
+
+    @contextlib.contextmanager
+    def capture_signals(self):
+        yield
+
+
+def _run_servers(main_app, host: str, port: int, admin_app, admin_port: int) -> None:
+    """Serve the gateway, and the admin app when there is one.
+
+    Both run on one event loop in one process so they can share the token
+    store, the invitation store and the session manager as live objects.
+
+    Only the main server installs signal handlers -- it uses a plain
+    uvicorn.Server, while the admin server uses _QuietServer so its
+    capture_signals() is a no-op. The main server's shutdown sets should_exit
+    on the admin server too, so Ctrl+C stops both.
+    """
+    main_server = uvicorn.Server(uvicorn.Config(main_app, host=host, port=port))
+    if admin_app is None:
+        main_server.run()
+        return
+
+    assert ipaddress.ip_address(ADMIN_HOST).is_loopback, "the admin listener must bind a loopback address"
+    admin_config = uvicorn.Config(admin_app, host=ADMIN_HOST, port=admin_port)
+    admin_server = _QuietServer(admin_config)
+
+    async def _serve_both() -> None:
+        admin_task = asyncio.ensure_future(admin_server.serve())
+        try:
+            await main_server.serve()
+        finally:
+            admin_server.should_exit = True
+            await admin_task
+
+    asyncio.run(_serve_both())
 
 
 def _config_dir(args) -> Path:
@@ -44,6 +99,8 @@ def main(argv=None) -> None:
     parser = argparse.ArgumentParser(prog="scpi-web", description="SCPI Instrument Control web gateway")
     parser.add_argument("--host", default="127.0.0.1", help="bind address (use 0.0.0.0 to expose on the LAN)")
     parser.add_argument("--port", type=int, default=8765)
+    parser.add_argument("--admin-port", type=int, default=DEFAULT_ADMIN_PORT, help="port for the host-only admin panel (default: 8766)")
+    parser.add_argument("--no-admin", action="store_true", help="do not start the admin panel listener")
     parser.add_argument("--abandon-after", type=float, default=300.0, help="seconds of owner inactivity before another user may claim a session")
     # Registered ONLY on the top-level parser -- see _add_config_dir's docstring
     # for why the same option on a subparser (default=None) would clobber a
@@ -155,11 +212,9 @@ def main(argv=None) -> None:
     else:
         print("\nGateway ready at {0}\nHand out access with: scpi-web invite <name>\n".format(url))
     allowed_ports = frozenset(args.allow_port) | DEFAULT_ALLOWED_PORTS if args.allow_port else None
-    uvicorn.run(
-        create_app(token_store=store, invitation_store=invitations, abandon_after=args.abandon_after, allowed_ports=allowed_ports, max_sessions=args.max_sessions),
-        host=args.host,
-        port=args.port,
-    )
+    main_app = create_app(token_store=store, invitation_store=invitations, abandon_after=args.abandon_after, allowed_ports=allowed_ports, max_sessions=args.max_sessions)
+    admin_app = None if args.no_admin else create_admin_app(token_store=store, invitation_store=invitations, base_url=url)
+    _run_servers(main_app, args.host, args.port, admin_app, args.admin_port)
 
 
 if __name__ == "__main__":
