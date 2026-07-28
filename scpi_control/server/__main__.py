@@ -59,22 +59,33 @@ def _run_servers(main_app, host: str, port: int, admin_app, admin_port: int) -> 
     admin_config = uvicorn.Config(admin_app, host=ADMIN_HOST, port=admin_port)
     admin_server = _QuietServer(admin_config)
 
-    async def _serve_both() -> None:
+    main_serve = main_server.serve
+
+    async def _serve_both(sockets=None) -> None:
         admin_task = asyncio.ensure_future(admin_server.serve())
         try:
-            await main_server.serve()
+            await main_serve(sockets=sockets)
         finally:
             admin_server.should_exit = True
             await admin_task
 
-    # Server.run() calls this for the single-server (--no-admin) path above;
-    # asyncio.run() alone skips it, so without this line the default path
-    # (both servers) would silently run on a different event loop
-    # implementation than --no-admin -- uvloop is the installed default on
-    # Linux/macOS with uvicorn[standard], so --no-admin would get uvloop while
-    # the normal path got the stdlib loop.
-    main_server.config.setup_event_loop()
-    asyncio.run(_serve_both())
+    # Both listeners are driven by the main server's own run(), rather than by
+    # an asyncio.run() call here, because run() is what picks the event loop
+    # implementation -- and it has done that through two incompatible private
+    # Config APIs: setup_event_loop() up to uvicorn 0.35, a loop_factory handed
+    # to asyncio.run from 0.36, where the old name became a method that raises
+    # AttributeError on sight. Naming either one here would pin this module to
+    # a slice of the uvicorn range pyproject.toml declares. Letting run() do it
+    # means the two-server path gets exactly the loop the --no-admin path above
+    # gets (uvloop by default on Linux/macOS with uvicorn[standard]) on every
+    # version, with no version sniffing at all.
+    #
+    # Swapping serve() on the instance is how the pair reaches run(): run()
+    # awaits self.serve(sockets=sockets), so _serve_both stands in for it and
+    # calls the real one via main_serve, captured above. capture_signals() still
+    # wraps only the main server, inside main_serve, exactly as before.
+    main_server.serve = _serve_both
+    main_server.run()
 
 
 def _open_browser(url: str) -> bool:

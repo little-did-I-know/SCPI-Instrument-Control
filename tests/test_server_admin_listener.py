@@ -88,15 +88,25 @@ def test_main_server_returning_stops_the_admin_server_too(monkeypatch):
     created = []
 
     class FakeServer:
-        """Stands in for uvicorn.Server: no sockets, just should_exit/serve."""
+        """Stands in for uvicorn.Server: no sockets, just should_exit/serve/run."""
 
         def __init__(self, config):
             self.config = config
             self.should_exit = False
             self.exited = False
+            self.ran = False
             created.append(self)
 
-        async def serve(self):
+        def run(self, sockets=None):
+            # Real uvicorn.Server.run() is asyncio.run(self.serve(...)) plus the
+            # event-loop selection this fake has no use for. Keeping the
+            # self.serve() indirection is the point: _run_servers substitutes
+            # its own serve() on the instance, so driving the pair through
+            # run() is what proves the substitution actually reaches it.
+            self.ran = True
+            return asyncio.run(self.serve(sockets=sockets))
+
+        async def serve(self, sockets=None):
             if self is created[0]:
                 # The main server: simulate Ctrl+C by returning right away,
                 # the way uvicorn's serve() returns once it has handled
@@ -133,6 +143,13 @@ def test_main_server_returning_stops_the_admin_server_too(monkeypatch):
 
     assert len(created) == 2
     main_server, admin_server = created
+    # The pair must be driven by the main server's own run(): that is the only
+    # thing in either uvicorn generation that selects the event loop
+    # implementation, and the --no-admin path gets it for free. A revert to a
+    # bare asyncio.run() here would still pass every assertion below while
+    # silently putting the default path on a different loop than --no-admin.
+    assert main_server.ran is True
+    assert admin_server.ran is False
     assert admin_server.should_exit is True
     assert admin_server.exited is True
     # The line that decides the security boundary: uvicorn.Config(admin_app,
