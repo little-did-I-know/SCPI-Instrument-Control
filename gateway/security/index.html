@@ -1095,10 +1095,21 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#first-run" class="md-nav__link">
+  <a href="#starting-the-gateway" class="md-nav__link">
     <span class="md-ellipsis">
       
-        First run
+        Starting the gateway
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#inviting-someone" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Inviting someone
       
     </span>
   </a>
@@ -1151,10 +1162,21 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#health-check" class="md-nav__link">
+  <a href="#the-two-routes-that-need-no-token" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Health check
+        The two routes that need no token
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#guessing-a-join-code" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Guessing a join code
       
     </span>
   </a>
@@ -3618,10 +3640,21 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#first-run" class="md-nav__link">
+  <a href="#starting-the-gateway" class="md-nav__link">
     <span class="md-ellipsis">
       
-        First run
+        Starting the gateway
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#inviting-someone" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Inviting someone
       
     </span>
   </a>
@@ -3674,10 +3707,21 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#health-check" class="md-nav__link">
+  <a href="#the-two-routes-that-need-no-token" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Health check
+        The two routes that need no token
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#guessing-a-join-code" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Guessing a join code
       
     </span>
   </a>
@@ -3843,97 +3887,203 @@ gateway</strong>. It is <em>not</em> hardened for the public internet, and it do
 terminate TLS. The boundary stops an authenticated peer from doing things they
 should not — driving someone else's scope, scanning the internal network, or
 running code on the gateway host — and stops an unauthenticated peer from doing
-anything at all. It does <strong>not</strong> encrypt traffic; for that, put the gateway
+anything at all beyond an uptime probe and redeeming an invitation they were
+given (see <a href="#inviting-someone">Inviting someone</a>). It does <strong>not</strong> encrypt
+traffic; for that, put the gateway
 behind a reverse proxy or keep it on a network you trust. See
 <a href="#deployment">Deployment</a> for the specifics.</p>
-<h2 id="first-run">First run<a class="headerlink" href="#first-run" title="Permanent link">&para;</a></h2>
-<p>Start the gateway and it mints a token for you and prints a ready-to-open URL:</p>
+<h2 id="starting-the-gateway">Starting the gateway<a class="headerlink" href="#starting-the-gateway" title="Permanent link">&para;</a></h2>
+<p>Every start prints where the gateway can be reached:</p>
 <div class="language-console highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="gp">$ </span>scpi-web
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="go">Gateway ready. Open:</span>
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="go">    http://127.0.0.1:8765/?token=scpi_Qy8…f3A</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="go">Gateway ready at http://127.0.0.1:8765/</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="go">Hand out access with: scpi-web invite &lt;name&gt;</span>
+</span></code></pre></div>
+<p>The URL is the address you bound to, with one adjustment: a wildcard bind
+(<code>--host 0.0.0.0</code>) prints this machine's LAN address, because <code>0.0.0.0</code> is not
+something a colleague can open. A concrete <code>--host</code> is used verbatim, and
+loopback stays loopback. The gateway also records this URL in <code>gateway.json</code>
+under its config directory, which is how <code>invite</code> (below) knows what link to
+print.</p>
+<p>The <strong>very first</strong> start is different: with no tokens on disk there is nobody
+to invite you, so the gateway mints a token named <code>default</code> and prints a URL
+carrying it:</p>
+<div class="language-console highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="gp">$ </span>scpi-web
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="go">Gateway ready. Open:</span>
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="go">    http://127.0.0.1:8765/?token=scpi_Qy8…f3A</span>
 </span></code></pre></div>
 <p>Open that URL. The web UI lifts the token out of the address bar, stores it in
 the browser, and immediately strips it from the URL — so it does not linger in
 your history or leak through the <code>Referer</code> header of any link you click. From
 then on the UI sends the token automatically.</p>
-<p>The token named <code>default</code> is created only when no tokens exist yet. Restarting
-the gateway does <strong>not</strong> mint a new one or reprint the URL — your existing token
-keeps working. To get the URL again, mint another token (below) or read the
-token file.</p>
+<p>That <code>?token=</code> bootstrap happens only while the token store is empty. Once it
+holds anything, every start prints the plain banner above instead.</p>
+<h2 id="inviting-someone">Inviting someone<a class="headerlink" href="#inviting-someone" title="Permanent link">&para;</a></h2>
+<p>Nobody in the lab should ever have to handle a <code>scpi_…</code> string. To give a
+colleague access, run one command on the gateway host:</p>
+<div class="language-console highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="gp">$ </span>scpi-web<span class="w"> </span>invite<span class="w"> </span>bob
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="go">Invitation for &#39;bob&#39; — expires in 10 minutes.</span>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="go">  Send this link:          http://127.0.0.1:8765/?invite=Vb2…9tQ</span>
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="go">  Or read out this code:   417 902</span>
+</span></code></pre></div>
+<p>Send the link, or read the six digits down the phone — the two are <strong>one</strong>
+invitation with two ways in, and whichever is used first consumes it. Opening
+the link signs that browser in with no typing at all; the code goes in the
+<strong>Join code</strong> box on the gateway's sign-in screen. Either way the gateway
+mints a token named <code>bob</code>, and that name is the identity that owns Bob's
+sessions from then on.</p>
+<ul>
+<li>The invitation lives <strong>ten minutes</strong>. That is deliberate: a link pasted into
+  a chat channel is worthless long before anyone scrolls back to it.</li>
+<li>It is good for <strong>one</strong> person. Two colleagues, two <code>invite</code> commands.</li>
+<li>Someone locked out — new laptop, cleared browser, no idea where the token
+  went — is the same command again: <code>scpi-web invite bob</code>. Their existing
+  tokens keep working alongside the new one. If they should not, run
+  <code>scpi-web token revoke bob</code> <strong>first</strong>, then invite: revoking a name cuts off
+  every token it holds, including one you just issued.</li>
+</ul>
+<p>The link's host and port come from the URL the gateway recorded when it last
+started, so what <code>invite</code> prints is openable as-is. If no gateway has ever
+started from this config directory, <code>invite</code> prints a note saying so, falls
+back to the default <code>http://127.0.0.1:8765/</code>, and points you at <code>--url</code> — pass
+<code>--url http://host:port/</code> to set the base yourself.</p>
 <h2 id="tokens">Tokens<a class="headerlink" href="#tokens" title="Permanent link">&para;</a></h2>
-<p>Tokens are the gateway's credentials. They are long random strings prefixed
-<code>scpi_</code>, stored <strong>hashed</strong> (SHA-256) in <code>~/.siglent/tokens.json</code> — the raw token
-is shown once, at creation, and never written to disk or logged. Manage them
-with the <code>token</code> subcommands:</p>
-<div class="language-console highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="gp">$ </span>scpi-web<span class="w"> </span>token<span class="w"> </span>add<span class="w"> </span>alice
-</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="go">token &#39;alice&#39; created. Copy it now, it is not stored:</span>
-</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>
-</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="go">    scpi_7dK…2mР</span>
-</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>
-</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="gp">$ </span>scpi-web<span class="w"> </span>token<span class="w"> </span>list
-</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="go">alice</span>
-</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="go">default</span>
-</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>
-</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="gp">$ </span>scpi-web<span class="w"> </span>token<span class="w"> </span>revoke<span class="w"> </span>default
-</span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="go">revoked &#39;default&#39;</span>
+<p>A token is the gateway's actual credential: a long random string prefixed
+<code>scpi_</code>, stored <strong>hashed</strong> (SHA-256) in <code>~/.siglent/tokens.json</code> — the raw
+token is shown once, at creation, and never written to disk or logged. An
+invitation redeems into one of these.</p>
+<p>You mint one by hand for <strong>scripts, notebooks, and CI</strong> — the case where a
+long-lived secret that can be copied into a config or a secret store is
+exactly the right answer, and where nobody is sitting at a browser to type a
+join code.</p>
+<div class="language-console highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="gp">$ </span>scpi-web<span class="w"> </span>token<span class="w"> </span>add<span class="w"> </span>ci-nightly
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="go">token &#39;ci-nightly&#39; created. Copy it now, it is not stored:</span>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="go">    scpi_7dK…2mР</span>
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>
+</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="gp">$ </span>scpi-web<span class="w"> </span>token<span class="w"> </span>list
+</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="go">alice                2 devices   last used 2026-07-28T09:14:02+00:00</span>
+</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="go">ci-nightly           1 device    last used never</span>
+</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>
+</span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="gp">$ </span>scpi-web<span class="w"> </span>token<span class="w"> </span>revoke<span class="w"> </span>alice
+</span><span id="__span-3-11"><a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a><span class="go">revoked &#39;alice&#39;</span>
 </span></code></pre></div>
 <ul>
 <li><strong><code>token add &lt;name&gt;</code></strong> mints a token and prints it <strong>once</strong>. Copy it then; it
-  cannot be recovered. The <em>name</em> is the identity — it is what appears as a
-  session's owner and in any attribution.</li>
-<li><strong><code>token list</code></strong> shows names only, never secrets.</li>
-<li><strong><code>token revoke &lt;name&gt;</code></strong> removes a token from <code>tokens.json</code>. Use it when a
-  token is shared too widely or a laptop walks off.</li>
+  cannot be recovered. Hand it to automation through an environment variable or
+  a secret store rather than pasting it into a script — see
+  <a href="#sending-the-token">Sending the token</a> for a worked example.</li>
+<li>A <strong>name is an identity, not a credential.</strong> One name can hold several
+  tokens — a laptop, a bench tablet, a reinstalled browser — and every one of
+  them reports the same owner. Running <code>token add bob</code> twice succeeds and
+  leaves you with two working tokens for Bob; so does inviting him twice.</li>
+<li><strong><code>token list</code></strong> shows names, how many device tokens each holds, and when one
+  of them was last seen — never secrets. <code>last used</code> is best-effort bookkeeping
+  kept in memory by the running gateway; it resets when the store reloads and
+  is not an audit record.</li>
+<li><strong><code>token revoke &lt;name&gt;</code></strong> removes <strong>every</strong> token under that name, so "Bob
+  has left" is a single command whatever he signed in from.</li>
 </ul>
+<p><strong>Revocation takes effect immediately.</strong> The gateway watches <code>tokens.json</code> and
+reloads it when it changes on disk, so a token revoked from another terminal
+stops working on the very next request — no restart needed.</p>
 <blockquote>
-<p><strong>A running gateway loads its tokens once, at startup.</strong> <code>token revoke</code> (and
-<code>token add</code>) edit the file from a separate process, so <strong>restart <code>scpi-web</code>
-for a revocation to take effect.</strong> Until it restarts, a revoked token keeps
-working. If you have revoked a token because it leaked, restart the gateway.</p>
+<p><strong>One exception: a live-stream WebSocket already open.</strong> A stream
+authenticates once, at the handshake, and nothing re-checks it afterwards, so
+revoking the token does not tear the connection down — it keeps receiving
+waveform data until it closes. Worse, a watching stream marks its session as
+owner-watching, and that <em>refuses</em> a claim outright however long the owner has
+been idle, so the revoked tab also keeps you from taking over the session it
+is holding. If you need a leaked credential cut off mid-capture, close that
+stream (or restart the gateway); revoking the token alone is not enough.</p>
 </blockquote>
 <p>Every token is equal: there are no roles or scopes. Anyone with a valid token can
 create sessions and read any session; ownership (below) governs who may <em>write</em>.</p>
 <p>The token store lives under <code>~/.siglent</code> by default; relocate it with
-<code>--config-dir &lt;path&gt;</code> (which applies to <code>token add|list|revoke</code> and to serving).</p>
+<code>--config-dir &lt;path&gt;</code> (which applies to <code>token add|list|revoke</code>, to <code>invite</code>,
+and to serving).</p>
 <blockquote>
 <p><strong>A malformed <code>tokens.json</code> is a hard error, by design.</strong> If the file is
 corrupt, the gateway refuses to start rather than falling back to "no tokens" —
 because "no tokens" would be indistinguishable from a fresh install and could
-silently open the gateway. Fix or remove the file.</p>
+silently open the gateway. Fix or remove the file. Pending invitations live
+beside it in <code>invitations.json</code> and follow the same rule; that file holds no
+tokens, so deleting it costs you nothing but the invitations you have not yet
+handed out.</p>
 </blockquote>
 <h2 id="sending-the-token">Sending the token<a class="headerlink" href="#sending-the-token" title="Permanent link">&para;</a></h2>
 <p>The token travels differently over HTTP and WebSocket, because browsers cannot
 set an <code>Authorization</code> header on a WebSocket handshake.</p>
 <h3 id="http-authorization-bearer">HTTP — <code>Authorization: Bearer</code><a class="headerlink" href="#http-authorization-bearer" title="Permanent link">&para;</a></h3>
-<div class="language-console highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="gp">$ </span>curl<span class="w"> </span>-H<span class="w"> </span><span class="s2">&quot;Authorization: Bearer scpi_7dK…2mР&quot;</span><span class="w"> </span>http://127.0.0.1:8765/api/sessions
+<div class="language-console highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="gp">$ </span>curl<span class="w"> </span>-H<span class="w"> </span><span class="s2">&quot;Authorization: Bearer scpi_7dK…2mР&quot;</span><span class="w"> </span>http://127.0.0.1:8765/api/sessions
 </span></code></pre></div>
 <p>A query-parameter token (<code>?token=…</code>) is accepted <strong>only</strong> on the initial page
 load of the web UI, and is <strong>rejected</strong> on every <code>/api/*</code> route. Putting a
 credential in an API URL would leak it into logs and history, so there is exactly
 one way in for the API: the header.</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">requests</span>
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="n">TOKEN</span> <span class="o">=</span> <span class="s2">&quot;scpi_7dK…2mР&quot;</span>
-</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="n">s</span> <span class="o">=</span> <span class="n">requests</span><span class="o">.</span><span class="n">Session</span><span class="p">()</span>
-</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="n">s</span><span class="o">.</span><span class="n">headers</span><span class="p">[</span><span class="s2">&quot;Authorization&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;Bearer </span><span class="si">{</span><span class="n">TOKEN</span><span class="si">}</span><span class="s2">&quot;</span>
-</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>
-</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="n">s</span><span class="o">.</span><span class="n">post</span><span class="p">(</span><span class="s2">&quot;http://127.0.0.1:8765/api/sessions&quot;</span><span class="p">,</span> <span class="n">json</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;label&quot;</span><span class="p">:</span> <span class="s2">&quot;bench&quot;</span><span class="p">,</span> <span class="s2">&quot;mock&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">})</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="kn">import</span><span class="w"> </span><span class="nn">requests</span>
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>
+</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="c1"># Mint it once with `scpi-web token add my-script`, then export it:</span>
+</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="c1">#     export SCPI_WEB_TOKEN=scpi_...</span>
+</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="n">s</span> <span class="o">=</span> <span class="n">requests</span><span class="o">.</span><span class="n">Session</span><span class="p">()</span>
+</span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="n">s</span><span class="o">.</span><span class="n">headers</span><span class="p">[</span><span class="s2">&quot;Authorization&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;Bearer </span><span class="si">{</span><span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s1">&#39;SCPI_WEB_TOKEN&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span>
+</span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a>
+</span><span id="__span-5-10"><a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a><span class="n">s</span><span class="o">.</span><span class="n">post</span><span class="p">(</span><span class="s2">&quot;http://127.0.0.1:8765/api/sessions&quot;</span><span class="p">,</span> <span class="n">json</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;label&quot;</span><span class="p">:</span> <span class="s2">&quot;bench&quot;</span><span class="p">,</span> <span class="s2">&quot;mock&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">})</span>
 </span></code></pre></div>
 <h3 id="websocket-the-scpi-token-subprotocol">WebSocket — the <code>scpi-token</code> subprotocol<a class="headerlink" href="#websocket-the-scpi-token-subprotocol" title="Permanent link">&para;</a></h3>
 <p>The live-waveform stream authenticates through the WebSocket subprotocol list.
 Offer <strong>two</strong> entries — the token-bearing one and the plain <code>scpi</code> fallback:</p>
-<div class="language-javascript highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="ow">new</span><span class="w"> </span><span class="nx">WebSocket</span><span class="p">(</span><span class="nx">url</span><span class="p">,</span><span class="w"> </span><span class="p">[</span><span class="sb">`scpi-token.</span><span class="si">${</span><span class="nx">token</span><span class="si">}</span><span class="sb">`</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;scpi&quot;</span><span class="p">]);</span>
+<div class="language-javascript highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="ow">new</span><span class="w"> </span><span class="nx">WebSocket</span><span class="p">(</span><span class="nx">url</span><span class="p">,</span><span class="w"> </span><span class="p">[</span><span class="sb">`scpi-token.</span><span class="si">${</span><span class="nx">token</span><span class="si">}</span><span class="sb">`</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;scpi&quot;</span><span class="p">]);</span>
 </span></code></pre></div>
 <p>The server reads the token from the <code>scpi-token.</code> entry and, on success, accepts
 the socket selecting the non-secret <code>scpi</code> subprotocol — it never echoes your
 token back in a response header. An unauthenticated handshake is closed with code
 <strong>1008</strong> (policy violation). If you only ever offer <code>scpi-token.&lt;token&gt;</code> with no
 <code>scpi</code> fallback, a real browser will fail the handshake, so always send both.</p>
-<h3 id="health-check">Health check<a class="headerlink" href="#health-check" title="Permanent link">&para;</a></h3>
-<p><code>GET /api/health</code> is the one route that needs no token — it exists so a load
-balancer or a "is it up?" probe does not require a credential. It returns only
-<code>{"status": "ok"}</code> and touches no instrument.</p>
+<h3 id="the-two-routes-that-need-no-token">The two routes that need no token<a class="headerlink" href="#the-two-routes-that-need-no-token" title="Permanent link">&para;</a></h3>
+<p>Everything under <code>/api/</code> is authenticated except these:</p>
+<ul>
+<li><strong><code>GET /api/health</code></strong> exists so a load balancer or an "is it up?" probe does
+  not need a credential. It returns only <code>{"status": "ok"}</code> and touches no
+  instrument.</li>
+<li><strong><code>POST /api/join</code></strong> redeems an invitation — it cannot require a token,
+  because it is how you get one. Unlike the health probe it is a <strong>write</strong>: a
+  successful call mints a token and consumes the invitation. It takes
+  <code>{"code": "417902"}</code> or <code>{"invite": "&lt;the link's nonce&gt;"}</code> and returns
+  <code>{"token": …, "identity": …}</code>.</li>
+</ul>
+<p><code>/api/join</code> is the most exposed surface the gateway has, so it is built to give
+nothing away. <strong>Every</strong> failure — wrong code, expired, already redeemed —
+returns the same <strong>401</strong> with byte-identical wording, so it cannot be used to
+probe for which invitations exist. Only a rate limit answers differently, with
+<strong>429</strong>.</p>
+<h3 id="guessing-a-join-code">Guessing a join code<a class="headerlink" href="#guessing-a-join-code" title="Permanent link">&para;</a></h3>
+<p>A six-digit code is 1,000,000 possibilities, which is only enough because of
+what surrounds it:</p>
+<ul>
+<li>An invitation <strong>expires in ten minutes</strong>, so a guesser gets ten minutes, not
+  forever.</li>
+<li><strong>Failed</strong> <code>/api/join</code> attempts are limited to <strong>ten per minute across all
+  clients</strong> — not per IP. A per-IP budget means very little against someone on
+  the same lab network who can pick their own source addresses. Successes are
+  not counted, because a success consumes its invitation and so cannot be
+  repeated, and counting them would let a lab arriving together at 9am lock
+  each other out.</li>
+</ul>
+<p>That caps a determined guesser at roughly 100 attempts over an invitation's
+life: about a 1-in-10,000 chance per invitation.</p>
+<p>There is deliberately <strong>no per-invitation attempt cap.</strong> A wrong code cannot be
+attributed to any particular invitation, so the only way to charge one would be
+to charge all of them — which would hand any passer-by a way to invalidate
+everyone's pending access by typing garbage. The global failure limit is the
+trade: a burst of wrong guesses delays honest joiners by a minute rather than
+cancelling them.</p>
 <h3 id="api-schema">API schema<a class="headerlink" href="#api-schema" title="Permanent link">&para;</a></h3>
 <p>The OpenAPI schema is served at <code>/api/openapi.json</code> and requires a token like any
 other API route. The interactive <code>/docs</code> and <code>/redoc</code> UIs are <strong>disabled</strong> —
@@ -3957,8 +4107,8 @@ owner; your view stays live, only the controls are gated.</p>
 <p>If an owner walks away, their session should not stay locked forever. Any
 authenticated user can take it over once the owner has been inactive past a
 threshold:</p>
-<div class="language-console highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="gp">$ </span>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>-H<span class="w"> </span><span class="s2">&quot;Authorization: Bearer </span><span class="nv">$TOKEN</span><span class="s2">&quot;</span><span class="w"> </span><span class="se">\</span>
-</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">    </span>http://127.0.0.1:8765/api/sessions/&lt;id&gt;/claim
+<div class="language-console highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="gp">$ </span>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>-H<span class="w"> </span><span class="s2">&quot;Authorization: Bearer </span><span class="nv">$TOKEN</span><span class="s2">&quot;</span><span class="w"> </span><span class="se">\</span>
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">    </span>http://127.0.0.1:8765/api/sessions/&lt;id&gt;/claim
 </span></code></pre></div>
 <ul>
 <li>The threshold is <strong><code>--abandon-after</code> seconds</strong> (default <strong>300</strong>). Before it
@@ -3972,9 +4122,9 @@ threshold:</p>
 </ul>
 <h3 id="handing-off-explicitly">Handing off explicitly<a class="headerlink" href="#handing-off-explicitly" title="Permanent link">&para;</a></h3>
 <p>The current owner can pass a session to a named user:</p>
-<div class="language-console highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="gp">$ </span>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>-H<span class="w"> </span><span class="s2">&quot;Authorization: Bearer </span><span class="nv">$OWNER_TOKEN</span><span class="s2">&quot;</span><span class="w"> </span><span class="se">\</span>
-</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">    </span>-H<span class="w"> </span><span class="s2">&quot;Content-Type: application/json&quot;</span><span class="w"> </span>-d<span class="w"> </span><span class="s1">&#39;{&quot;name&quot;: &quot;bob&quot;}&#39;</span><span class="w"> </span><span class="se">\</span>
-</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="w">    </span>http://127.0.0.1:8765/api/sessions/&lt;id&gt;/owner
+<div class="language-console highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="gp">$ </span>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>-H<span class="w"> </span><span class="s2">&quot;Authorization: Bearer </span><span class="nv">$OWNER_TOKEN</span><span class="s2">&quot;</span><span class="w"> </span><span class="se">\</span>
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="w">    </span>-H<span class="w"> </span><span class="s2">&quot;Content-Type: application/json&quot;</span><span class="w"> </span>-d<span class="w"> </span><span class="s1">&#39;{&quot;name&quot;: &quot;bob&quot;}&#39;</span><span class="w"> </span><span class="se">\</span>
+</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="w">    </span>http://127.0.0.1:8765/api/sessions/&lt;id&gt;/owner
 </span></code></pre></div>
 <p>The <code>name</code> must be an existing token name; an unknown name is rejected with
 <strong>400</strong> and ownership does not change. Passing <code>""</code> <strong>releases</strong> the session
@@ -4016,8 +4166,8 @@ the gate entirely — use them for hardware-free work.</p>
 stored as JSON and files load without unpickling — closing that path.</p>
 <p><strong>Files saved by 4.x are in the old format and will not load</strong> until converted.
 The gateway tells you so, naming the file. Convert them once:</p>
-<div class="language-console highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="gp">$ </span>scpi-web<span class="w"> </span>references<span class="w"> </span>migrate
-</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="go">converted 3, skipped 0, failed 0 in /home/you/.siglent/references</span>
+<div class="language-console highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="gp">$ </span>scpi-web<span class="w"> </span>references<span class="w"> </span>migrate
+</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="go">converted 3, skipped 0, failed 0 in /home/you/.siglent/references</span>
 </span></code></pre></div>
 <ul>
 <li>Conversion is <strong>atomic</strong> — a file that fails to convert is left exactly as it
@@ -4068,7 +4218,8 @@ directory, when you run the command explicitly.</p>
 <li><strong>TLS.</strong> See the table above.</li>
 <li><strong>Per-user reference storage.</strong> References are a shared store; ownership
   applies to live instrument sessions only.</li>
-<li><strong>Rate limiting</strong> beyond the session cap.</li>
+<li><strong>General rate limiting.</strong> The only limiter is on failed <code>/api/join</code>
+  attempts (above); authenticated routes are bounded by the session cap alone.</li>
 </ul>
 <h2 id="quick-reference">Quick reference<a class="headerlink" href="#quick-reference" title="Permanent link">&para;</a></h2>
 <table>
@@ -4093,7 +4244,7 @@ directory, when you run the command explicitly.</p>
 <tr>
 <td><code>--config-dir</code></td>
 <td><code>~/.siglent</code></td>
-<td>Where <code>tokens.json</code> lives</td>
+<td>Where <code>tokens.json</code>, <code>gateway.json</code> and <code>invitations.json</code> live</td>
 </tr>
 <tr>
 <td><code>--allow-port &lt;n&gt;</code></td>
@@ -4121,16 +4272,20 @@ directory, when you run the command explicitly.</p>
 </thead>
 <tbody>
 <tr>
+<td><code>scpi-web invite &lt;name&gt;</code></td>
+<td>Give a person access: a 10-minute link and code (<code>--url</code> overrides the base URL)</td>
+</tr>
+<tr>
 <td><code>scpi-web token add &lt;name&gt;</code></td>
-<td>Mint a token (printed once)</td>
+<td>Mint a long-lived token for a script or CI job (printed once)</td>
 </tr>
 <tr>
 <td><code>scpi-web token list</code></td>
-<td>List token names</td>
+<td>List identities with device counts and last use</td>
 </tr>
 <tr>
 <td><code>scpi-web token revoke &lt;name&gt;</code></td>
-<td>Revoke a token (restart the gateway to apply)</td>
+<td>Revoke every token under a name (effective immediately)</td>
 </tr>
 <tr>
 <td><code>scpi-web references migrate</code></td>
@@ -4148,7 +4303,11 @@ directory, when you run the command explicitly.</p>
 <tbody>
 <tr>
 <td><strong>401</strong></td>
-<td>Missing or invalid token</td>
+<td>Missing or invalid token — or, on <code>join</code>, an invitation that is wrong, expired, or already used (one message for all three)</td>
+</tr>
+<tr>
+<td><strong>429</strong> on <code>join</code></td>
+<td>Too many failed join attempts across all clients; wait a minute</td>
 </tr>
 <tr>
 <td><strong>409</strong> on a write</td>

@@ -4042,7 +4042,16 @@
 <h3 id="web-gateway">Web gateway<a class="headerlink" href="#web-gateway" title="Permanent link">&para;</a></h3>
 <ul>
 <li>The optional web gateway (<code>scpi-web</code>) authenticates every <code>/api/*</code> request
-  with a bearer token, except the unauthenticated <code>GET /api/health</code> probe</li>
+  with a bearer token, except the unauthenticated <code>GET /api/health</code> probe and
+  <code>POST /api/join</code>, which exchanges a short-lived invitation for a token</li>
+<li>Invitations (<code>scpi-web invite &lt;name&gt;</code>) expire after ten minutes and are
+  consumed on first use; failed join attempts are rate limited globally, and
+  every rejected invitation — wrong code, expired, already redeemed — returns
+  the same 401 with byte-identical wording, so the route cannot be used to
+  probe for which invitations exist</li>
+<li>Revoking a name (<code>scpi-web token revoke &lt;name&gt;</code>) removes every token it
+  holds and takes effect immediately — the gateway reloads its token store
+  when the file changes</li>
 <li>Instrument sessions are owned by the token that created them — only the
   owner may issue writes; other tokens may read and watch</li>
 <li>Outbound connection targets are validated (an SSRF gate) before the gateway

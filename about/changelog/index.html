@@ -3322,6 +3322,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#breaking-changes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ⚠️ Breaking Changes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#added" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3657,7 +3668,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#breaking-changes" class="md-nav__link">
+  <a href="#breaking-changes_1" class="md-nav__link">
     <span class="md-ellipsis">
       
         ⚠️ Breaking Changes
@@ -3785,7 +3796,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#breaking-changes_1" class="md-nav__link">
+  <a href="#breaking-changes_2" class="md-nav__link">
     <span class="md-ellipsis">
       
         ⚠️ Breaking Changes
@@ -3991,7 +4002,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#breaking-changes_2" class="md-nav__link">
+  <a href="#breaking-changes_3" class="md-nav__link">
     <span class="md-ellipsis">
       
         ⚠️ Breaking Changes
@@ -4041,7 +4052,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#breaking-changes_3" class="md-nav__link">
+  <a href="#breaking-changes_4" class="md-nav__link">
     <span class="md-ellipsis">
       
         ⚠️ Breaking Changes
@@ -4152,7 +4163,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#breaking-changes_4" class="md-nav__link">
+  <a href="#breaking-changes_5" class="md-nav__link">
     <span class="md-ellipsis">
       
         Breaking Changes
@@ -4507,7 +4518,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#breaking-changes_5" class="md-nav__link">
+  <a href="#breaking-changes_6" class="md-nav__link">
     <span class="md-ellipsis">
       
         ⚠️ BREAKING CHANGES
@@ -5055,6 +5066,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#breaking-changes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ⚠️ Breaking Changes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#added" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5390,7 +5412,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#breaking-changes" class="md-nav__link">
+  <a href="#breaking-changes_1" class="md-nav__link">
     <span class="md-ellipsis">
       
         ⚠️ Breaking Changes
@@ -5518,7 +5540,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#breaking-changes_1" class="md-nav__link">
+  <a href="#breaking-changes_2" class="md-nav__link">
     <span class="md-ellipsis">
       
         ⚠️ Breaking Changes
@@ -5724,7 +5746,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#breaking-changes_2" class="md-nav__link">
+  <a href="#breaking-changes_3" class="md-nav__link">
     <span class="md-ellipsis">
       
         ⚠️ Breaking Changes
@@ -5774,7 +5796,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#breaking-changes_3" class="md-nav__link">
+  <a href="#breaking-changes_4" class="md-nav__link">
     <span class="md-ellipsis">
       
         ⚠️ Breaking Changes
@@ -5885,7 +5907,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#breaking-changes_4" class="md-nav__link">
+  <a href="#breaking-changes_5" class="md-nav__link">
     <span class="md-ellipsis">
       
         Breaking Changes
@@ -6240,7 +6262,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#breaking-changes_5" class="md-nav__link">
+  <a href="#breaking-changes_6" class="md-nav__link">
     <span class="md-ellipsis">
       
         ⚠️ BREAKING CHANGES
@@ -6702,8 +6724,28 @@
 <p>The format is based on <a href="https://keepachangelog.com/en/1.0.0/">Keep a Changelog</a>,
 and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semantic Versioning</a>.</p>
 <h2 id="unreleased">[Unreleased]<a class="headerlink" href="#unreleased" title="Permanent link">&para;</a></h2>
+<h3 id="breaking-changes">⚠️ Breaking Changes<a class="headerlink" href="#breaking-changes" title="Permanent link">&para;</a></h3>
+<ul>
+<li>A token name is now an identity rather than a unique credential. <code>scpi-web token add &lt;name&gt;</code>
+  no longer fails when that name already exists — it mints an additional token, so one person can
+  hold several devices, and <code>scpi-web token revoke &lt;name&gt;</code> cuts off every one of them at once.
+  Anything that relied on the duplicate-name error to detect an existing name should call
+  <code>TokenStore.names()</code> instead.</li>
+<li><code>DuplicateTokenName</code> has been removed from <code>scpi_control.server.auth</code>. It can no longer be
+  raised, so any <code>except DuplicateTokenName</code> clause is now an <code>ImportError</code> waiting to happen.</li>
+<li><code>TokenStore.names()</code> now returns distinct names, sorted. It previously returned one entry per
+  token, which is one entry per device under the new model.</li>
+</ul>
 <h3 id="added">Added<a class="headerlink" href="#added" title="Permanent link">&para;</a></h3>
 <ul>
+<li>Handing out gateway access no longer means sending someone a permanent secret. <code>scpi-web invite
+  &lt;name&gt;</code> prints a link and a six-digit code for the same ten-minute invitation: send the link, or
+  read the code down the phone. Either one is exchanged in the browser for a real token, so a
+  scientist never sees an <code>scpi_…</code> string and a leaked chat message stops working in minutes. The
+  same command is how you get someone back in after they clear their browser or switch laptops.
+  The sign-in screen now asks for a join code first, with the raw-token field kept for scripts and
+  CI.</li>
+<li><code>scpi-web token list</code> now shows how many devices each identity holds and when it was last used.</li>
 <li>The SCPI terminal now works for any connected instrument, not just oscilloscopes. It moved out
   of the oscilloscope's control rail (eight tabs down to seven) into a drawer across the bottom of
   the window, opened from a Terminal button in the header and closed with Escape, so a power
@@ -6745,6 +6787,12 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 </ul>
 <h3 id="fixed">Fixed<a class="headerlink" href="#fixed" title="Permanent link">&para;</a></h3>
 <ul>
+<li>Revoking a token now takes effect immediately. The gateway reloads its token store when the file
+  changes, so <code>scpi-web token revoke</code> no longer requires restarting the server to lock someone out
+  — which meant the documented remedy for a leaked credential silently did nothing until someone
+  remembered to restart.</li>
+<li>The token store is now written atomically, so a crash or a concurrent read during a write can no
+  longer leave a <code>tokens.json</code> that the gateway refuses to start from.</li>
 <li>An AWG channel whose waveform the instrument will not report now shows the same <code>--.--</code> marker
   every other unreadable field uses, instead of a blank dropdown.</li>
 <li>The home screen's no-instruments-found message no longer singles out "start a Mock scope" — it
@@ -7010,7 +7058,7 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   <code>from scpi_control.gui.widgets import ChannelControl</code> is unchanged.</li>
 </ul>
 <h2 id="500-2026-07-24">[5.0.0] - 2026-07-24<a class="headerlink" href="#500-2026-07-24" title="Permanent link">&para;</a></h2>
-<h3 id="breaking-changes">⚠️ Breaking Changes<a class="headerlink" href="#breaking-changes" title="Permanent link">&para;</a></h3>
+<h3 id="breaking-changes_1">⚠️ Breaking Changes<a class="headerlink" href="#breaking-changes_1" title="Permanent link">&para;</a></h3>
 <ul>
 <li>Web gateway: every <code>/api/*</code> request now requires a bearer token, and the live-stream
   WebSocket requires one too. On first run <code>scpi-web</code> mints a token and prints a
@@ -7137,7 +7185,7 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   modern guide documents no such command, and the mock handler is removed in v5.0.0.</li>
 </ul>
 <h2 id="400-2026-07-22">[4.0.0] - 2026-07-22<a class="headerlink" href="#400-2026-07-22" title="Permanent link">&para;</a></h2>
-<h3 id="breaking-changes_1">⚠️ Breaking Changes<a class="headerlink" href="#breaking-changes_1" title="Permanent link">&para;</a></h3>
+<h3 id="breaking-changes_2">⚠️ Breaking Changes<a class="headerlink" href="#breaking-changes_2" title="Permanent link">&para;</a></h3>
 <ul>
 <li>Power supply and function-generator readback (<code>measure_voltage</code>/<code>measure_current</code>/<code>measure_power</code>,
   setpoint/OVP/OCP getters, and AWG <code>frequency</code>/<code>amplitude</code>/<code>offset</code>/<code>phase</code>) now raise
@@ -7227,7 +7275,7 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 <li>Report generator PDF: characters outside the built-in font's range (⚠, ✓/✗, σ, Ω, …) no longer render as blank boxes — they are normalized to readable text, with a catch-all so any unexpected glyph can never box out.</li>
 </ul>
 <h2 id="300-2026-07-17">[3.0.0] - 2026-07-17<a class="headerlink" href="#300-2026-07-17" title="Permanent link">&para;</a></h2>
-<h3 id="breaking-changes_2">⚠️ Breaking Changes<a class="headerlink" href="#breaking-changes_2" title="Permanent link">&para;</a></h3>
+<h3 id="breaking-changes_3">⚠️ Breaking Changes<a class="headerlink" href="#breaking-changes_3" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>The report generator's <code>WaveformData</code> fields are renamed, and <code>channel</code>
   moved from the first constructor argument to the third.</strong> <code>channel_name</code>,
@@ -7315,7 +7363,7 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   MAT/HDF5 boundary.</li>
 </ul>
 <h2 id="200-2026-07-15">[2.0.0] - 2026-07-15<a class="headerlink" href="#200-2026-07-15" title="Permanent link">&para;</a></h2>
-<h3 id="breaking-changes_3">⚠️ Breaking Changes<a class="headerlink" href="#breaking-changes_3" title="Permanent link">&para;</a></h3>
+<h3 id="breaking-changes_4">⚠️ Breaking Changes<a class="headerlink" href="#breaking-changes_4" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>Removed the <code>siglent</code> compatibility shim.</strong> <code>import siglent</code> now raises
   <code>ModuleNotFoundError</code>; use <code>import scpi_control</code> (identical API). The shim
@@ -7380,7 +7428,7 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 <h2 id="100-2026-01-06">[1.0.0] - 2026-01-06<a class="headerlink" href="#100-2026-01-06" title="Permanent link">&para;</a></h2>
 <h3 id="major-release-package-renamed">⚠️ MAJOR RELEASE - Package Renamed<a class="headerlink" href="#major-release-package-renamed" title="Permanent link">&para;</a></h3>
 <p><strong>This is a major release with a package rename.</strong> The project has been renamed from <code>Siglent-Oscilloscope</code> to <code>SCPI-Instrument-Control</code> to better reflect its expanded capabilities beyond just Siglent oscilloscopes.</p>
-<h3 id="breaking-changes_4">Breaking Changes<a class="headerlink" href="#breaking-changes_4" title="Permanent link">&para;</a></h3>
+<h3 id="breaking-changes_5">Breaking Changes<a class="headerlink" href="#breaking-changes_5" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>PyPI Package Name</strong>: <code>siglent</code> → <code>SCPI-Instrument-Control</code></li>
 <li><strong>Python Import Name</strong>: <code>import siglent</code> → <code>import scpi_control</code> (recommended)</li>
@@ -7995,7 +8043,7 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 <li>Resolved workflow exit code 1 error during archive creation</li>
 </ul>
 <h2 id="030-unreleased">[0.3.0] - Unreleased<a class="headerlink" href="#030-unreleased" title="Permanent link">&para;</a></h2>
-<h3 id="breaking-changes_5">⚠️ BREAKING CHANGES<a class="headerlink" href="#breaking-changes_5" title="Permanent link">&para;</a></h3>
+<h3 id="breaking-changes_6">⚠️ BREAKING CHANGES<a class="headerlink" href="#breaking-changes_6" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>Exception Class Renaming</strong> (Issue #3 from Code Review)</li>
 <li><code>ConnectionError</code> renamed to <code>SiglentConnectionError</code> to avoid shadowing Python's built-in <code>ConnectionError</code></li>

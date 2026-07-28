@@ -3700,9 +3700,18 @@ UI itself calls, with one noted exception: the older <code>/scope/command</code>
 works, but the shipping frontend calls the kind-agnostic
 <a href="#command-console">command console</a> route instead.</p>
 <p>Every route below requires <code>Authorization: Bearer &lt;token&gt;</code> <strong>except</strong>
-<code>GET /api/health</code>. See the <a href="../security/">Gateway security guide</a> for how to
-mint a token, how ownership gates writes, and the WebSocket authentication
-handshake.</p>
+<code>GET /api/health</code> and <code>POST /api/join</code>. The latter exchanges an invitation for
+a token — <code>{"code": "417902"}</code> or <code>{"invite": "&lt;nonce from an invite link&gt;"}</code>
+in, <code>{"token", "identity"}</code> back — so it cannot require the credential it
+issues. Every rejected invitation — wrong code, expired, already redeemed —
+returns the same <strong>401</strong> with byte-identical wording, so the route cannot be
+used to probe for which invitations exist; too many failures return <strong>429</strong>,
+and a body that is not valid JSON of the shape above is rejected <strong>422</strong> by
+request validation before the handler runs (which reveals nothing: the answer
+is the same whether or not an invitation is live). See the
+<a href="../security/">Gateway security guide</a> for how to
+invite someone or mint a token, how ownership gates writes, and the WebSocket
+authentication handshake.</p>
 <h2 id="sessions-discovery">Sessions &amp; discovery<a class="headerlink" href="#sessions-discovery" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -4236,8 +4245,8 @@ session's WebSocket subscribers as a <code>state</code> message with <code>"kind
 </tbody>
 </table>
 <h2 id="curl-quickstart">Curl quickstart<a class="headerlink" href="#curl-quickstart" title="Permanent link">&para;</a></h2>
-<p>Create a mock session, configure a channel, and fetch its waveform as JSON — no hardware required. Start the gateway first (<code>scpi-web</code> prints a token on first run; mint another with <code>scpi-web token add &lt;name&gt;</code>) and export it:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nb">export</span><span class="w"> </span><span class="nv">TOKEN</span><span class="o">=</span>scpi_...<span class="w">   </span><span class="c1"># from the gateway&#39;s startup output</span>
+<p>Create a mock session, configure a channel, and fetch its waveform as JSON — no hardware required. Start the gateway first, then mint a token for this script with <code>scpi-web token add curl-demo</code> (that is what <code>token add</code> is for: scripts and CI, where a long-lived secret is the right answer) and export it:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nb">export</span><span class="w"> </span><span class="nv">TOKEN</span><span class="o">=</span>scpi_...<span class="w">   </span><span class="c1"># printed once by `scpi-web token add curl-demo`</span>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
 </span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="c1"># 1. Create a mock scope session</span>
 </span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>curl<span class="w"> </span>-s<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>http://127.0.0.1:8765/api/sessions<span class="w"> </span><span class="se">\</span>
