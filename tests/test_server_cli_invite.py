@@ -65,6 +65,22 @@ def test_config_dir_before_subcommand_is_used_for_invite(tmp_path, capsys):
     assert (tmp_path / "invitations.json").exists()
 
 
+def test_a_corrupt_invitation_file_stops_serve_before_a_token_is_minted(tmp_path, capsys, monkeypatch):
+    # The invitation store used to be built inside the create_app(...) call,
+    # after the bootstrap mint and after "Gateway ready. Open: ...?token=...".
+    # So a corrupt invitations.json printed a URL for a server that never
+    # started AND left a live token behind -- and because the token store was
+    # no longer empty, no later start would ever print that URL again. Exiting
+    # is not enough to assert: the token is the damage.
+    monkeypatch.setattr("uvicorn.run", lambda app, host, port: pytest.fail("uvicorn should not have started"))
+    (tmp_path / "invitations.json").write_text("{ not json")
+    with pytest.raises(SystemExit) as excinfo:
+        main(["--config-dir", str(tmp_path)])
+    assert excinfo.value.code != 0
+    assert TokenStore(str(tmp_path / "tokens.json")).names() == []
+    assert "?token=" not in capsys.readouterr().out
+
+
 def test_serve_prints_the_url_every_time_not_just_the_first(tmp_path, capsys, monkeypatch):
     monkeypatch.setattr("uvicorn.run", lambda app, host, port: None)
     main(["--config-dir", str(tmp_path), "--port", "9999"])

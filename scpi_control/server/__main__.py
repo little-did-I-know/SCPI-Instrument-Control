@@ -138,6 +138,16 @@ def main(argv=None) -> None:
         parser.error("--max-sessions must be at least 1 (got {0})".format(args.max_sessions))
 
     store = _store(args)
+    # Built here, not inline in the create_app(...) call below, for the same
+    # reason --max-sessions is checked above: InvitationStore.__init__ raises
+    # ValueError on a corrupt invitations.json, and constructing it after the
+    # mint meant the admin saw "Gateway ready. Open: ...?token=..." for a
+    # server that then died -- leaving a live token in tokens.json that, since
+    # the store is no longer empty, no later start would ever print again.
+    try:
+        invitations = _invitations(args)
+    except ValueError as exc:
+        sys.exit(str(exc))
     url = write_base_url(_config_dir(args), args.host, args.port)
     if store.is_empty():
         raw = store.mint("default")
@@ -146,7 +156,7 @@ def main(argv=None) -> None:
         print("\nGateway ready at {0}\nHand out access with: scpi-web invite <name>\n".format(url))
     allowed_ports = frozenset(args.allow_port) | DEFAULT_ALLOWED_PORTS if args.allow_port else None
     uvicorn.run(
-        create_app(token_store=store, invitation_store=_invitations(args), abandon_after=args.abandon_after, allowed_ports=allowed_ports, max_sessions=args.max_sessions),
+        create_app(token_store=store, invitation_store=invitations, abandon_after=args.abandon_after, allowed_ports=allowed_ports, max_sessions=args.max_sessions),
         host=args.host,
         port=args.port,
     )
