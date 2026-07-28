@@ -22,6 +22,11 @@ is the same whether or not an invitation is live). See the
 invite someone or mint a token, how ownership gates writes, and the WebSocket
 authentication handshake.
 
+The [admin panel](admin-panel.md) has routes of its own — identities and
+invitations — but they belong to a **separate application on a separate,
+loopback-bound port** (`8766` by default) and are not part of this reference.
+They are not reachable from the LAN, and nothing on this page serves them.
+
 ## Sessions & discovery
 
 | Method | Path | Body / params | Response | Errors |

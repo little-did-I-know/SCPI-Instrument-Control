@@ -28,13 +28,18 @@ python -m scpi_control.server
 ```
 
 By default the gateway listens on `http://127.0.0.1:8765`, and prints that URL
-every time it starts. On the very first run — when no tokens exist yet — it
-also mints one and prints it in the URL (`http://127.0.0.1:8765/?token=…`);
-open that to reach the browser UI.
+every time it starts. Alongside it, on the gateway machine only, it serves an
+[admin panel](admin-panel.md) at `http://127.0.0.1:8766` for managing who has
+access.
 
-To give someone else access, run `scpi-web invite <name>` on the gateway host.
-It prints a link and a six-digit code, both good for ten minutes and for one
-sign-in; send either. Nobody but you needs to handle a raw token.
+On the **very first** run — when nobody has access yet — the gateway opens that
+panel for you. Invite yourself, open the link it gives you, and you are in under
+your own name. Nothing is minted automatically.
+
+To give someone else access, invite them from the panel, or run
+`scpi-web invite <name>` on the gateway host. Either way they get a link and a
+six-digit code, both good for ten minutes and for one sign-in; send either.
+Nobody but you needs to handle a raw token.
 
 ## Security posture
 
@@ -47,6 +52,11 @@ in. Exposing it to the LAN is an explicit choice:
 ```bash
 scpi-web --host 0.0.0.0
 ```
+
+The admin panel is the exception, and a deliberate one: it has no sign-in, and
+it binds `127.0.0.1` unconditionally so that only someone at the gateway machine
+can reach it. See [Admin panel](admin-panel.md) for why that is the boundary and
+how to turn it off.
 
 See the **[Gateway security guide](security.md)** for the full model: tokens,
 session ownership, the SSRF gate that validates outbound connection targets,
@@ -85,6 +95,8 @@ ever plugging in an instrument.
 
 - [Gateway security](security.md) — invitations, tokens, session ownership,
   the SSRF gate, and deployment guidance
+- [Admin panel](admin-panel.md) — the host-only screen for managing who has
+  access, and first-run setup
 - [Browser UI Tour](browser-ui.md) — a walkthrough of the home screen, canvas
   modes, and rail tabs
 - [REST & WebSocket API](api.md) — the complete wire reference, with a curl

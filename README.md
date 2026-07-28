@@ -632,14 +632,18 @@ scpi-web                                   # prints its URL on every start
 scpi-web invite bob                        # a 10-minute link + code for someone else
 ```
 
-The gateway prints its URL every time it starts; the very first run also mints
-a token and prints it in the URL (`http://127.0.0.1:8765/?token=…`). **Every
-request needs a token**, but nobody except the admin has to handle one:
-`scpi-web invite <name>` prints a link and a six-digit code, either of which
-signs a colleague in, both expiring in ten minutes. For scripts and CI, mint a
-long-lived token with `scpi-web token add <name>`. A name is an identity that
-can hold several devices' tokens, and `scpi-web token revoke <name>` cuts off
-all of them, immediately.
+The gateway prints its URL every time it starts, and serves an **admin panel**
+on the gateway machine only (`http://127.0.0.1:8766/`) for managing who has
+access — invite, revoke, cancel a pending invitation. It has no sign-in because
+it binds loopback: physical access to the machine is the credential. On the very
+first run, when nobody has access yet, the gateway opens that panel so you can
+name yourself; nothing is minted automatically. **Every request to the gateway
+itself needs a token**, but nobody except the admin has to handle one: the
+panel — or `scpi-web invite <name>` — produces a link and a six-digit code,
+either of which signs a colleague in, both expiring in ten minutes. For scripts
+and CI, mint a long-lived token with `scpi-web token add <name>`. A name is an
+identity that can hold several devices' tokens, and
+`scpi-web token revoke <name>` cuts off all of them, immediately.
 
 Sessions can target real scopes by IP or a built-in mock (`mock: true`) for
 hardware-free use. The OpenAPI schema is served at `/api/openapi.json` (token
@@ -652,7 +656,9 @@ instrument session an owner (owner writes, everyone else watches), validates
 outbound connection targets, and caps concurrent sessions. It does **not**
 terminate TLS — put it behind a reverse proxy or keep it on a trusted network.
 See the **[Gateway security guide](docs/gateway/security.md)** for invitations,
-tokens, ownership, claiming, the SSRF gate, and deployment.
+tokens, ownership, claiming, the SSRF gate, and deployment, and the
+**[Admin panel guide](docs/gateway/admin-panel.md)** for the host-only
+management screen and first-run setup.
 
 > **Upgrading from 4.x:** the gateway now requires a token, and reference files
 > saved by 4.x must be converted once with `scpi-web references migrate`. Both
@@ -677,12 +683,13 @@ Full documentation: [Web Gateway guide](https://little-did-I-know.github.io/SCPI
 
 ```bash
 make webapp-install       # once
-make webapp-build         # build the UI into the server
+make webapp-build         # build both bundles (LAN UI + admin panel) into the server
 scpi-web --host 0.0.0.0   # serve API + UI on one port
 ```
 
-Open the URL the gateway prints on startup — tokened on the first run, or use
-a code from `scpi-web invite`. For UI development, run `scpi-web` in one
+Open the URL the gateway prints on startup and sign in with a code or link —
+from the admin panel on the first run, or from `scpi-web invite` after that.
+For UI development, run `scpi-web` in one
 terminal and `cd webapp/app && npm run dev` in another — Vite proxies `/api`
 (HTTP and WebSocket) to the gateway with hot reload; open the dev server with
 an `?invite=…` from `scpi-web invite dev` (or a `?token=…`) so the UI picks up
