@@ -18,6 +18,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   raised, so any `except DuplicateTokenName` clause is now an `ImportError` waiting to happen.
 - `TokenStore.names()` now returns distinct names, sorted. It previously returned one entry per
   token, which is one entry per device under the new model.
+- A fresh gateway no longer mints an identity called `default`, and no longer prints a
+  `?token=…` bootstrap URL on first start. Instead it opens a host-only admin panel and asks
+  what to call you, so the first identity is a real person rather than an anonymous credential
+  that ends up owning every session it creates. Existing installations are unaffected — this
+  changes only what happens when the token store is empty.
 
 ### Added
 
@@ -67,6 +72,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the page.
 - A non-owner is now told, in session, that it's read-only and who owns it, with the same Claim
   action the home screen offers. Previously they found out by having a write rejected.
+- The gateway now serves an admin panel on the machine it runs on, at `http://127.0.0.1:8766/`.
+  It lists who has access with device counts and last-seen, issues an invitation showing the
+  link and code together with a countdown, cancels one sent to the wrong person, and revokes
+  someone with a confirmation that names how many devices it signs out. There is no sign-in:
+  the listener binds loopback, so the operating system refuses every non-local connection.
+  `--admin-port` moves it; `--no-admin` switches it off. There is deliberately no flag to bind
+  it to another address.
+- Cancelling a pending invitation is new — previously the only remedy for one sent to the wrong
+  person was waiting ten minutes for it to expire.
 
 ### Fixed
 
