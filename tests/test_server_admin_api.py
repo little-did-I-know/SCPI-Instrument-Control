@@ -138,6 +138,37 @@ def test_localhost_and_loopback_hosts_still_work(admin):
     assert client.get("/api/identities", headers={"Host": "localhost"}).status_code == 200
 
 
+def test_the_main_app_serves_no_admin_routes(tmp_path):
+    # The mirror image of test_the_admin_app_has_no_auth_middleware, and the
+    # more important half: that one checks the admin app for auth, which is not
+    # where the mistake gets made. The mistake gets made in create_app, as one
+    # stray `app.include_router(admin_api.router, prefix="/api")` -- and it
+    # passes the entire suite and the CI bundle gate, while handing every LAN
+    # token-holder the power to mint invitations for arbitrary names and revoke
+    # arbitrary identities. That is a straight escalation from "every token is
+    # equal" to admin, so it is asserted in the language it would be written in.
+    from scpi_control.server.app import create_app
+
+    tokens = TokenStore(str(tmp_path / "tokens.json"))
+    invitations = InvitationStore(str(tmp_path / "invitations.json"))
+    app = create_app(token_store=tokens, invitation_store=invitations)
+    paths = {route.path for route in app.routes}
+    leaked = sorted(path for path in paths if path.startswith("/api/identities") or path.startswith("/api/invitations"))
+    assert not leaked, "create_app serves admin routes: {0}".format(leaked)
+
+
+def test_the_two_apps_never_share_a_static_directory(tmp_path):
+    # The second rule in admin/app.py's docstring. The main app's SPA catch-all
+    # serves any real file it finds in its own static dir, so pointing the two
+    # at one directory would hand the access-management UI to every LAN browser
+    # without changing a single route.
+    import scpi_control.server.admin.app as admin_app_module
+    import scpi_control.server.app as app_module
+
+    assert app_module.STATIC_DIR != admin_app_module.ADMIN_STATIC_DIR
+    assert admin_app_module.ADMIN_STATIC_DIR not in app_module.STATIC_DIR.parents
+
+
 def test_a_foreign_origin_is_rejected_on_a_read(admin):
     # The attack neither the bind nor the Host allowlist touches: a page on any
     # site the admin visits does fetch("http://127.0.0.1:8766/api/identities").
