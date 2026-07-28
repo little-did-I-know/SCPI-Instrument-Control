@@ -90,9 +90,8 @@ against the same `--config-dir`.
 ## Inviting someone
 
 Nobody in the lab should ever have to handle a `scpi_…` string. The
-[admin panel](admin-panel.md) does this from a screen — and is the only way to
-*cancel* an invitation you should not have sent. From a terminal, it is one
-command on the gateway host:
+[admin panel](admin-panel.md) does this from a screen; from a terminal, it is
+one command on the gateway host:
 
 ```console
 $ scpi-web invite bob
