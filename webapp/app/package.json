@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && tsc --noEmit -p tsconfig.node.json && vite build",
+    "build:admin": "vite build --config vite.admin.config.ts",
+    "dev:admin": "vite --config vite.admin.config.ts",
     "preview": "vite preview",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"

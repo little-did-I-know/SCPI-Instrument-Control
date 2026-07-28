@@ -24,48 +24,74 @@ traffic; for that, put the gateway
 behind a reverse proxy or keep it on a network you trust. See
 [Deployment](#deployment) for the specifics.
 
+Everything on this page describes the **gateway** listener, the one your
+colleagues reach. The [admin panel](admin-panel.md) is a second listener with a
+different model: it is unauthenticated, and it is bound to `127.0.0.1` so that
+only someone sitting at the gateway machine can reach it at all. Physical access
+is its credential.
+
 ## Starting the gateway
 
-Every start prints where the gateway can be reached:
+Every start prints where the gateway can be reached, and where to administer it:
 
 ```console
 $ scpi-web
 
 Gateway ready at http://127.0.0.1:8765/
+Admin panel (this machine only) at http://127.0.0.1:8766/
 Hand out access with: scpi-web invite <name>
 ```
 
-The URL is the address you bound to, with one adjustment: a wildcard bind
+The first URL is the address you bound to, with one adjustment: a wildcard bind
 (`--host 0.0.0.0`) prints this machine's LAN address, because `0.0.0.0` is not
 something a colleague can open. A concrete `--host` is used verbatim, and
 loopback stays loopback. The gateway also records this URL in `gateway.json`
 under its config directory, which is how `invite` (below) knows what link to
 print.
 
-The **very first** start is different: with no tokens on disk there is nobody
-to invite you, so the gateway mints a token named `default` and prints a URL
-carrying it:
+The second is the [admin panel](admin-panel.md) — a screen for managing who has
+access, served on a **loopback-bound** listener so it is reachable only from the
+gateway machine itself. Start with `--no-admin` to leave it off entirely.
+
+### The very first start
+
+With no tokens on disk there is nobody to invite you, so the gateway sends you
+to the panel to name yourself:
 
 ```console
 $ scpi-web
 
-Gateway ready. Open:
-
-    http://127.0.0.1:8765/?token=scpi_Qy8…f3A
+Gateway ready at http://127.0.0.1:8765/
+No one has access yet — finish setup at http://127.0.0.1:8766/
 ```
 
-Open that URL. The web UI lifts the token out of the address bar, stores it in
-the browser, and immediately strips it from the URL — so it does not linger in
-your history or leak through the `Referer` header of any link you click. From
-then on the UI sends the token automatically.
+It also tries to open that address in the host's browser. Invite yourself, open
+the link the panel gives you, and you have an identity under your own name.
 
-That `?token=` bootstrap happens only while the token store is empty. Once it
-holds anything, every start prints the plain banner above instead.
+Nothing is minted for you. **There is no auto-created `default` identity and no
+`?token=…` bootstrap URL** — a placeholder identity would end up owning real
+instrument sessions, which makes "who is driving this scope?" unanswerable at
+exactly the moment it matters.
+
+If you started with `--no-admin` there is no panel to send you to, so the
+gateway tells you the other way in instead:
+
+```console
+$ scpi-web --no-admin
+
+Gateway ready at http://127.0.0.1:8765/
+No one has access yet, and the admin panel is disabled (--no-admin).
+Create the first identity with: scpi-web invite <name>
+```
+
+That is the headless and containerised path: run `scpi-web invite <name>` once
+against the same `--config-dir`.
 
 ## Inviting someone
 
-Nobody in the lab should ever have to handle a `scpi_…` string. To give a
-colleague access, run one command on the gateway host:
+Nobody in the lab should ever have to handle a `scpi_…` string. The
+[admin panel](admin-panel.md) does this from a screen; from a terminal, it is
+one command on the gateway host:
 
 ```console
 $ scpi-web invite bob
@@ -86,6 +112,9 @@ sessions from then on.
 - The invitation lives **ten minutes**. That is deliberate: a link pasted into
   a chat channel is worthless long before anyone scrolls back to it.
 - It is good for **one** person. Two colleagues, two `invite` commands.
+- Sent to the wrong person, or with a typo in the name? **Cancel it** in the
+  [admin panel](admin-panel.md). The CLI has no cancel, so from a terminal the
+  only remedy is waiting the ten minutes out.
 - Someone locked out — new laptop, cleared browser, no idea where the token
   went — is the same command again: `scpi-web invite bob`. Their existing
   tokens keep working alongside the new one. If they should not, run
@@ -373,6 +402,7 @@ directory, when you run the command explicitly.
 | Concern | Guidance |
 |---|---|
 | **Bind address** | Defaults to `127.0.0.1` (local only). Use `--host 0.0.0.0` to reach it from the LAN — and only then does the token boundary matter. |
+| **Admin panel** | Always on `127.0.0.1`, whatever `--host` says, and there is deliberately no `--admin-host`. It is unauthenticated, so a non-loopback bind would put access management on the LAN. Reach it from elsewhere with an SSH port-forward, or disable it with `--no-admin`. |
 | **TLS / encryption** | Out of scope for the gateway. Traffic (including the bearer token) is unencrypted. Put the gateway behind a TLS-terminating reverse proxy, or keep it on a trusted network. |
 | **Tokens in transit** | Because traffic is unencrypted, a token on an untrusted network can be captured. This is the main reason TLS-via-proxy is recommended for any non-loopback exposure. |
 | **Token storage** | `~/.siglent/tokens.json`, hashed, written `0600` where the platform supports it. Anyone who can read the *raw* tokens (e.g. from your shell history) can act as you — treat them like passwords. |
@@ -395,6 +425,8 @@ directory, when you run the command explicitly.
 |---|---|---|
 | `--host` | `127.0.0.1` | Bind address; `0.0.0.0` exposes on the LAN |
 | `--port` | `8765` | Listen port |
+| `--admin-port` | `8766` | Port for the host-only [admin panel](admin-panel.md) (must differ from `--port`) |
+| `--no-admin` | *(off)* | Do not start the admin panel listener |
 | `--config-dir` | `~/.siglent` | Where `tokens.json`, `gateway.json` and `invitations.json` live |
 | `--allow-port <n>` | `{5025}` | Extra instrument port(s) the gateway may connect to (repeatable) |
 | `--max-sessions` | `8` | Concurrent instrument-session cap |

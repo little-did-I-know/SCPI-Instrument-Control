@@ -127,6 +127,7 @@ nav:
   - Web Gateway:
       - Overview: gateway/index.md
       - Security: gateway/security.md
+      - Admin Panel: gateway/admin-panel.md
       - Browser UI Tour: gateway/browser-ui.md
       - REST & WebSocket API: gateway/api.md
   - GUI Application:

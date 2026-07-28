@@ -53,7 +53,7 @@ def _normalize_code(value: str) -> str:
 
 
 class InvitationStore:
-    """Pending invitations persisted as {name, link_hash, code, expires}."""
+    """Pending invitations persisted as {id, name, link_hash, code, expires}."""
 
     def __init__(self, path: Optional[str] = None) -> None:
         self.path = Path(path) if path is not None else DEFAULT_CONFIG_DIR / "invitations.json"
@@ -79,7 +79,19 @@ class InvitationStore:
             # would be less dangerous than silently discarding tokens, but
             # the surprise -- "I sent Bob a link and it just did not work" --
             # is exactly the failure this whole feature exists to remove.
-            raise ValueError("invitation store {0} is unreadable: {1}".format(self.path, exc))
+            #
+            # Unlike a genuinely corrupt file, an unreadable-but-parseable
+            # file (e.g. one written before the "id" field existed) has an
+            # easy way out, and the operator should not have to guess it:
+            # nothing in here outlives ten minutes, so the file can simply be
+            # deleted and the gateway restarted -- any invitation that was
+            # still pending just needs reissuing.
+            raise ValueError(
+                "invitation store {0} is unreadable: {1}. If this file predates "
+                "an upgrade, it is safe to delete: invitations expire in minutes, "
+                "so nothing in it outlives a restart -- reissue any that were still "
+                "pending.".format(self.path, exc)
+            )
         self._invitations = invitations
         self._stat = stat
 
@@ -97,6 +109,8 @@ class InvitationStore:
                 raise ValueError('each invitation must have string "name", "link_hash" and "code" keys')
             if not isinstance(entry.get("expires"), (int, float)):
                 raise ValueError('each invitation must have a numeric "expires" key')
+            if not isinstance(entry.get("id"), str):
+                raise ValueError('each invitation must have a string "id" key')
         return entries
 
     def _reload_if_changed(self) -> None:
@@ -125,7 +139,7 @@ class InvitationStore:
         link = secrets.token_urlsafe(32)
         code = "{0:0{1}d}".format(secrets.randbelow(10**CODE_DIGITS), CODE_DIGITS)
         self._prune()
-        self._invitations.append({"name": name, "link_hash": _hash(link), "code": code, "expires": time.time() + ttl})
+        self._invitations.append({"id": secrets.token_hex(4), "name": name, "link_hash": _hash(link), "code": code, "expires": time.time() + ttl})
         self._save()
         return link, code
 
@@ -156,3 +170,35 @@ class InvitationStore:
         self._reload_if_changed()
         self._prune()
         return len(self._invitations)
+
+    def pending_list(self) -> List[Dict[str, Any]]:
+        """Live invitations, soonest to expire first.
+
+        Includes the code. That is safe here and nowhere else: the code is
+        stored in clear (see the module docstring), the file is 0600, and the
+        only consumer is the host-only admin panel. It is what lets the panel
+        re-show an invitation you closed the window on -- the CLI prints once
+        and forgets, so today the only remedy for a lost code is waiting ten
+        minutes.
+        """
+        self._reload_if_changed()
+        self._prune()
+        rows = [{"id": str(entry["id"]), "name": str(entry["name"]), "code": str(entry["code"]), "expires": float(entry["expires"])} for entry in self._invitations]
+        return sorted(rows, key=lambda row: row["expires"])
+
+    def cancel(self, invitation_id: str) -> bool:
+        """Withdraw a pending invitation. True if one was removed.
+
+        Addressed by id rather than by code so a cancellation never puts a live
+        credential in a URL path, and therefore never puts one in the gateway's
+        access log. Name would not work either: one person can hold several
+        pending invitations.
+        """
+        self._reload_if_changed()
+        self._prune()
+        remaining = [entry for entry in self._invitations if entry["id"] != invitation_id]
+        if len(remaining) == len(self._invitations):
+            return False
+        self._invitations = remaining
+        self._save()
+        return True

@@ -11,8 +11,13 @@ include docs/SDS800XHD_Series_ProgrammingGuide_EN11G.pdf
 # Include resources (logos, icons)
 recursive-include resources *.png *.ico *.icns
 
-# Include web gateway frontend build output (when present)
+# Include web gateway frontend build output (when present). Both bundles must
+# be listed: include-package-data sources package data from this manifest, so a
+# static directory missing here is silently absent from the wheel and the sdist
+# even when make webapp-build produced it. tests/test_packaging_manifest.py
+# fails if a new scpi_control/server/**/static directory appears without a rule.
 recursive-include scpi_control/server/static *
+recursive-include scpi_control/server/admin/static *
 
 # Include examples
 recursive-include examples *.py

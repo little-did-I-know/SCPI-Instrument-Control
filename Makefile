@@ -200,12 +200,17 @@ web-server:  ## Run the web gateway (dev, mock-friendly)
 webapp-install:  ## Install webapp dependencies
 	cd webapp/app && npm install
 
-webapp-build:  ## Build the webapp into the server's static dir
+webapp-build:  ## Build both webapp bundles into the server's static dirs
 	cd webapp/app && npm run build
 	rm -rf scpi_control/server/static
 	mkdir -p scpi_control/server/static
 	cp -r webapp/app/dist/* scpi_control/server/static/
-	@echo "✓ Webapp built into scpi_control/server/static/"
+	cd webapp/app && npm run build:admin
+	rm -rf scpi_control/server/admin/static
+	mkdir -p scpi_control/server/admin/static
+	cp -r webapp/app/dist-admin/* scpi_control/server/admin/static/
+	mv scpi_control/server/admin/static/admin.html scpi_control/server/admin/static/index.html
+	@echo "✓ Webapp built into scpi_control/server/static/ and admin/static/"
 
 version:  ## Show package version
 	@python -c "import scpi_control; print(f'SCPI-Instrument-Control v{scpi_control.__version__}')"

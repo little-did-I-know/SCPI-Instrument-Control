@@ -325,3 +325,41 @@ def test_summary_counts_devices_without_revealing_secrets(tmp_path):
     assert rows["robin"]["devices"] == 1
     assert rows["bob"]["last_used"] is not None
     assert "hash" not in rows["bob"]
+
+
+def test_summary_sees_a_token_minted_by_another_process(tmp_path):
+    # summary() used to read self._tokens directly, with no reload -- fine
+    # while only the CLI called it, but the admin app's GET /api/identities
+    # is the first caller living inside the same running server process that
+    # a second process (the CLI minting/revoking) writes past. Without a
+    # reload here, the admin panel would render a roster missing tokens
+    # minted after this process started.
+    path = str(tmp_path / "tokens.json")
+    gateway = TokenStore(path)
+    gateway.mint("robin")
+
+    TokenStore(path).mint("bob")
+
+    names = {row["name"] for row in gateway.summary()}
+    assert names == {"robin", "bob"}
+
+
+def test_revoke_does_not_resurrect_a_token_minted_by_another_process(tmp_path):
+    # revoke() used to read and rewrite self._tokens with no reload first.
+    # Instance A revoking "robin" while stale would _save() its own outdated
+    # in-memory list -- silently erasing the token instance B minted for
+    # "bob" in between, even though this revoke has nothing to do with bob.
+    path = str(tmp_path / "tokens.json")
+    instance_a = TokenStore(path)
+    raw_robin = instance_a.mint("robin")
+
+    instance_b = TokenStore(path)
+    raw_bob = instance_b.mint("bob")
+
+    assert instance_a.revoke("robin") is True
+
+    # bob's token, minted by instance_b after instance_a's snapshot, must
+    # still verify -- instance_a's revoke() must not have overwritten it.
+    fresh = TokenStore(path)
+    assert fresh.verify(raw_bob) == "bob"
+    assert fresh.verify(raw_robin) is None

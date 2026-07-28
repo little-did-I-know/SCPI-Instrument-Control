@@ -89,6 +89,8 @@ site/
 
 # Web gateway frontend build output
 scpi_control/server/static/
+scpi_control/server/admin/static/
+webapp/app/dist-admin/
 
 # pytest-testmon impact-selection database (local dev only)
 .testmondata*

@@ -1,16 +1,106 @@
 """Lab gateway entry point: python -m scpi_control.server / scpi-web."""
 
 import argparse
+import asyncio
+import contextlib
+import ipaddress
 import sys
 from pathlib import Path
 
 import uvicorn
 
+from scpi_control.server.admin.app import DEFAULT_ADMIN_PORT, create_admin_app
 from scpi_control.server.app import create_app
 from scpi_control.server.auth import DEFAULT_CONFIG_DIR, TokenStore
 from scpi_control.server.gateway_url import read_base_url, write_base_url
 from scpi_control.server.invitations import InvitationStore, format_code
 from scpi_control.server.netpolicy import DEFAULT_ALLOWED_PORTS
+
+# The host-only boundary. Not a flag, and deliberately so: the admin app has no
+# authentication because the OS refuses non-local connections before it runs.
+# A configurable host would turn that guarantee into a footgun.
+# DEFAULT_ADMIN_PORT lives in admin/app.py, not here: the app itself needs it
+# to build the Origin allowlist, and two copies could drift apart into a panel
+# that refuses its own requests.
+ADMIN_HOST = "127.0.0.1"
+
+
+class _QuietServer(uvicorn.Server):
+    """A server that leaves signal handling to the main one.
+
+    Two uvicorn servers on one loop would otherwise both capture SIGINT, and
+    the second registration wins -- so Ctrl+C would stop one server while the
+    other kept the process alive. uvicorn 0.34.3 captures signals through this
+    context manager rather than install_signal_handlers().
+    """
+
+    @contextlib.contextmanager
+    def capture_signals(self):
+        yield
+
+
+def _run_servers(main_app, host: str, port: int, admin_app, admin_port: int) -> None:
+    """Serve the gateway, and the admin app when there is one.
+
+    Both run on one event loop in one process so they can share the token
+    store, the invitation store and the session manager as live objects.
+
+    Only the main server installs signal handlers -- it uses a plain
+    uvicorn.Server, while the admin server uses _QuietServer so its
+    capture_signals() is a no-op. The main server's shutdown sets should_exit
+    on the admin server too, so Ctrl+C stops both.
+    """
+    main_server = uvicorn.Server(uvicorn.Config(main_app, host=host, port=port))
+    if admin_app is None:
+        main_server.run()
+        return
+
+    assert ipaddress.ip_address(ADMIN_HOST).is_loopback, "the admin listener must bind a loopback address"
+    admin_config = uvicorn.Config(admin_app, host=ADMIN_HOST, port=admin_port)
+    admin_server = _QuietServer(admin_config)
+
+    main_serve = main_server.serve
+
+    async def _serve_both(sockets=None) -> None:
+        admin_task = asyncio.ensure_future(admin_server.serve())
+        try:
+            await main_serve(sockets=sockets)
+        finally:
+            admin_server.should_exit = True
+            await admin_task
+
+    # Both listeners are driven by the main server's own run(), rather than by
+    # an asyncio.run() call here, because run() is what picks the event loop
+    # implementation -- and it has done that through two incompatible private
+    # Config APIs: setup_event_loop() up to uvicorn 0.35, a loop_factory handed
+    # to asyncio.run from 0.36, where the old name became a method that raises
+    # AttributeError on sight. Naming either one here would pin this module to
+    # a slice of the uvicorn range pyproject.toml declares. Letting run() do it
+    # means the two-server path gets exactly the loop the --no-admin path above
+    # gets (uvloop by default on Linux/macOS with uvicorn[standard]) on every
+    # version, with no version sniffing at all.
+    #
+    # Swapping serve() on the instance is how the pair reaches run(): run()
+    # awaits self.serve(sockets=sockets), so _serve_both stands in for it and
+    # calls the real one via main_serve, captured above. capture_signals() still
+    # wraps only the main server, inside main_serve, exactly as before.
+    main_server.serve = _serve_both
+    main_server.run()
+
+
+def _open_browser(url: str) -> bool:
+    """Open ``url`` in the host's browser. False if that was not possible.
+
+    Never raises: a headless box, an SSH session or a machine with no
+    associated browser must still start a gateway. The caller prints the URL
+    either way.
+    """
+    import webbrowser
+
+    try:
+        return bool(webbrowser.open(url))
+    except Exception:
+        return False
 
 
 def _config_dir(args) -> Path:
@@ -44,6 +134,8 @@ def main(argv=None) -> None:
     parser = argparse.ArgumentParser(prog="scpi-web", description="SCPI Instrument Control web gateway")
     parser.add_argument("--host", default="127.0.0.1", help="bind address (use 0.0.0.0 to expose on the LAN)")
     parser.add_argument("--port", type=int, default=8765)
+    parser.add_argument("--admin-port", type=int, default=DEFAULT_ADMIN_PORT, help="port for the host-only admin panel (default: 8766)")
+    parser.add_argument("--no-admin", action="store_true", help="do not start the admin panel listener")
     parser.add_argument("--abandon-after", type=float, default=300.0, help="seconds of owner inactivity before another user may claim a session")
     # Registered ONLY on the top-level parser -- see _add_config_dir's docstring
     # for why the same option on a subparser (default=None) would clobber a
@@ -137,6 +229,12 @@ def main(argv=None) -> None:
     if args.max_sessions < 1:
         parser.error("--max-sessions must be at least 1 (got {0})".format(args.max_sessions))
 
+    # Same reasoning as --max-sessions above: without this check, --port and
+    # --admin-port colliding fails deep inside uvicorn's socket bind with a
+    # bare traceback instead of a sentence explaining the mistake.
+    if not args.no_admin and args.port == args.admin_port:
+        parser.error("--port and --admin-port must differ (both are {0})".format(args.port))
+
     store = _store(args)
     # Built here, not inline in the create_app(...) call below, for the same
     # reason --max-sessions is checked above: InvitationStore.__init__ raises
@@ -149,17 +247,27 @@ def main(argv=None) -> None:
     except ValueError as exc:
         sys.exit(str(exc))
     url = write_base_url(_config_dir(args), args.host, args.port)
+    admin_url = "http://{0}:{1}/".format(ADMIN_HOST, args.admin_port)
     if store.is_empty():
-        raw = store.mint("default")
-        print("\nGateway ready. Open:\n\n    {0}?token={1}\n".format(url, raw))
-    else:
+        if args.no_admin:
+            print("\nGateway ready at {0}\nNo one has access yet, and the admin panel is disabled (--no-admin).\nCreate the first identity with: scpi-web invite <name>\n".format(url))
+        else:
+            print("\nGateway ready at {0}\nNo one has access yet — finish setup at {1}\n".format(url, admin_url))
+            try:
+                _open_browser(admin_url)
+            except Exception:
+                # _open_browser already swallows what it can; this is the
+                # belt-and-braces guard that a browser problem can never stop a
+                # gateway starting.
+                pass
+    elif args.no_admin:
         print("\nGateway ready at {0}\nHand out access with: scpi-web invite <name>\n".format(url))
+    else:
+        print("\nGateway ready at {0}\nAdmin panel (this machine only) at {1}\nHand out access with: scpi-web invite <name>\n".format(url, admin_url))
     allowed_ports = frozenset(args.allow_port) | DEFAULT_ALLOWED_PORTS if args.allow_port else None
-    uvicorn.run(
-        create_app(token_store=store, invitation_store=invitations, abandon_after=args.abandon_after, allowed_ports=allowed_ports, max_sessions=args.max_sessions),
-        host=args.host,
-        port=args.port,
-    )
+    main_app = create_app(token_store=store, invitation_store=invitations, abandon_after=args.abandon_after, allowed_ports=allowed_ports, max_sessions=args.max_sessions)
+    admin_app = None if args.no_admin else create_admin_app(token_store=store, invitation_store=invitations, base_url=url, admin_port=args.admin_port)
+    _run_servers(main_app, args.host, args.port, admin_app, args.admin_port)
 
 
 if __name__ == "__main__":

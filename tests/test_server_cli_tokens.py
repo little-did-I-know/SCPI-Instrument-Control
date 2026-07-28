@@ -35,23 +35,15 @@ def test_revoking_unknown_name_exits_nonzero(tmp_path):
     assert excinfo.value.code != 0
 
 
-def test_serve_bootstraps_a_token_and_prints_url(tmp_path, capsys, monkeypatch):
-    started = {}
-    monkeypatch.setattr("uvicorn.run", lambda app, host, port: started.update(host=host, port=port))
-    main(["--config-dir", str(tmp_path), "--port", "9999"])
-    printed = capsys.readouterr().out
-    assert "?token=scpi_" in printed
-    assert started["port"] == 9999
-    assert TokenStore(str(tmp_path / "tokens.json")).names() == ["default"]
-
-
-def test_serve_does_not_remint_when_tokens_exist(tmp_path, capsys, monkeypatch):
-    monkeypatch.setattr("uvicorn.run", lambda app, host, port: None)
-    main(["token", "add", "robin", "--config-dir", str(tmp_path)])
-    capsys.readouterr()
+def test_serve_never_mints_a_token(tmp_path, capsys, monkeypatch):
+    # The old behaviour bootstrapped an identity literally called "default"
+    # on an empty store; an empty store now mints nothing at all -- see
+    # tests/test_server_first_run.py for what actually happens instead.
+    # (conftest.py's autouse _no_real_browser fixture keeps the empty-store
+    # path here from popping a real browser window.)
+    monkeypatch.setattr("scpi_control.server.__main__._run_servers", lambda main_app, host, port, admin_app, admin_port: None)
     main(["--config-dir", str(tmp_path)])
-    assert TokenStore(str(tmp_path / "tokens.json")).names() == ["robin"]
-    assert "?token=" not in capsys.readouterr().out
+    assert TokenStore(str(tmp_path / "tokens.json")).names() == []
 
 
 # --- --config-dir ordering regressions -------------------------------------
@@ -117,17 +109,6 @@ def test_config_dir_after_subcommand_is_used_for_token_revoke(tmp_path):
     main(["token", "add", "robin", "--config-dir", str(tmp_path)])
     main(["token", "revoke", "robin", "--config-dir", str(tmp_path)])
     assert TokenStore(str(tmp_path / "tokens.json")).names() == []
-
-
-def test_config_dir_before_bare_serve_bootstraps_into_given_directory(tmp_path, capsys, monkeypatch):
-    """The bare serve path has no subcommand, so --config-dir only has one
-    position to appear in -- but it must still land in tmp_path, not the
-    real ~/.siglent, and this asserts that directly rather than trusting a
-    zero exit code."""
-    monkeypatch.setattr("uvicorn.run", lambda app, host, port: None)
-    main(["--config-dir", str(tmp_path), "--port", "9999"])
-    assert (tmp_path / "tokens.json").exists()
-    assert TokenStore(str(tmp_path / "tokens.json")).names() == ["default"]
 
 
 def test_token_add_twice_adds_a_device_instead_of_failing(tmp_path, capsys):

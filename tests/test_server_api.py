@@ -351,13 +351,21 @@ def test_cli_parses_defaults(tmp_path, monkeypatch):
         create_app_calls.append(kwargs)
         return object()
 
-    def fake_run(app, host, port, **kwargs):
+    def fake_run_servers(main_app, host, port, admin_app, admin_port):
         captured.update(host=host, port=port)
 
     # --config-dir points at tmp_path so this never touches the developer's real
     # ~/.siglent/tokens.json; create_app is stubbed so no real ASGI app is built.
+    #
+    # _run_servers is the seam, NOT uvicorn.run: since the admin listener landed,
+    # serving goes through uvicorn.Server(uvicorn.Config(...)).run() and
+    # asyncio.run(), and uvicorn.run() is never called. Stubbing uvicorn.run here
+    # therefore intercepted nothing -- cli.main() bound real sockets on 8765 and
+    # 8766 and served forever, so this test did not fail, it HUNG, taking the
+    # whole run with it. Every other CLI test in the suite patches _run_servers;
+    # this one was missed.
     monkeypatch.setattr(cli, "create_app", fake_create_app)
-    monkeypatch.setattr(cli.uvicorn, "run", fake_run)
+    monkeypatch.setattr(cli, "_run_servers", fake_run_servers)
     cli.main(["--config-dir", str(tmp_path)])
     assert captured == {"host": "127.0.0.1", "port": 8765}
     assert isinstance(create_app_calls[0]["token_store"], TokenStore)

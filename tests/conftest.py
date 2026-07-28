@@ -1,5 +1,6 @@
 """Fixtures shared across the test suite."""
 
+import asyncio
 from contextlib import contextmanager
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -8,6 +9,88 @@ import numpy as np
 import pytest
 
 from scpi_control.report_generator.models.report_data import WaveformData
+
+
+def _event_loop_state():
+    """(holder, loop, set_called) for this thread's current-event-loop state.
+
+    ``asyncio`` exposes no way to *read* the current loop without creating one:
+    ``asyncio.get_event_loop()`` is the only getter, and on a pristine main
+    thread it installs a brand new loop as a side effect. Snapshotting through
+    it would therefore mean creating a loop for every one of the ~2100 tests in
+    this suite, and would destroy the very pristine-ness we want to restore.
+
+    So this reads the policy's thread-local holder directly. Both attributes
+    have lived on ``asyncio.BaseDefaultEventLoopPolicy._Local`` since 3.4 and
+    are still there on 3.14; uvloop's policy subclasses it and has them too.
+    They are private, which is why ``test_the_event_loop_guard_is_in_force``
+    (tests/test_server_admin_listener.py) exists -- if a future Python moves
+    them, that test fails loudly instead of the guard silently doing nothing.
+
+    Returns ``(None, None, False)`` for an exotic policy without the holder, so
+    the guard degrades to a no-op rather than damaging state it cannot read.
+    """
+    holder = getattr(asyncio.get_event_loop_policy(), "_local", None)
+    if holder is None:
+        return None, None, False
+    return holder, getattr(holder, "_loop", None), getattr(holder, "_set_called", False)
+
+
+@contextmanager
+def preserved_event_loop_state():
+    """Restore the current-event-loop state that ``asyncio.run()`` destroys.
+
+    ``asyncio.run()`` ends with ``events.set_event_loop(None)``, which leaves
+    the policy holding ``_set_called = True`` and ``_loop = None``. In that
+    state ``asyncio.get_event_loop()`` no longer creates a loop on demand -- it
+    raises ``RuntimeError: There is no current event loop in thread
+    'MainThread'``. That is process-global, so a test calling ``asyncio.run()``
+    breaks whatever runs *next* in the same worker, not itself.
+
+    This is not hypothetical: it took down three tests in
+    tests/test_server_stream_ws.py on CI, a file nobody had touched, on Python
+    3.9 only. 3.9 caps at fastapi 0.128.8, and that older starlette stack calls
+    ``get_event_loop()`` where newer releases do not, so 3.10-3.14 stayed green
+    while the oldest supported Python failed.
+
+    Snapshot-and-restore rather than "install a fresh loop": for the vast
+    majority of tests nothing changed and the teardown is two comparisons and
+    no allocation. Nothing here creates a loop, and nothing closes one -- a
+    loop a test opened is that test's to close.
+    """
+    holder, loop, set_called = _event_loop_state()
+    try:
+        yield
+    finally:
+        if holder is not None:
+            _, now_loop, now_set_called = _event_loop_state()
+            if now_loop is not loop or now_set_called != set_called:
+                holder._loop = loop
+                holder._set_called = set_called
+
+
+@pytest.fixture(autouse=True)
+def _no_leaked_event_loop():
+    """Never let one test's ``asyncio.run()`` break the next test in the worker.
+
+    The third guard of its kind here, and for the third time because per-test
+    discipline had already failed: ``_no_real_home`` after a test minted a live
+    token into the developer's real ~/.siglent, ``_no_real_browser`` after
+    tests started opening real browser windows, and now this. Two tests on this
+    branch call ``asyncio.run()`` -- one directly, one via a real
+    ``uvicorn.Server.run()``, which *is* ``asyncio.run()`` -- and the damage
+    they do lands somewhere else entirely, on one Python version, in whichever
+    file the worker happens to pick up next. Asking the next person who writes
+    an ``asyncio.run()`` in a test to remember this is exactly the discipline
+    that has already failed twice.
+
+    Async tests are unaffected: both pytest-asyncio and anyio create and hold
+    their own loop for the test rather than adopting the ambient one, and
+    anyio's blocking portal (what starlette's TestClient uses) runs its loop in
+    a worker thread whose state this fixture never reads or writes.
+    """
+    with preserved_event_loop_state():
+        yield
 
 
 @pytest.fixture(autouse=True)
@@ -41,6 +124,35 @@ def _no_real_home(monkeypatch, tmp_path):
     monkeypatch.setattr("scpi_control.server.auth.DEFAULT_CONFIG_DIR", fake_home / ".siglent")
     monkeypatch.setattr("scpi_control.server.__main__.DEFAULT_CONFIG_DIR", fake_home / ".siglent")
     yield fake_home
+
+
+@pytest.fixture(autouse=True)
+def _no_real_browser(monkeypatch):
+    """Never let a test pop a real browser window (or whatever a headless CI
+    runner does when asked to open one).
+
+    Per-test discipline is not enough here, the same lesson as _no_real_home
+    above: scpi_control.server.__main__._open_browser is reachable from any
+    test that calls main() against a fresh (empty) config dir -- a first-run
+    gateway opens the setup screen unless told not to. Two tests already hit
+    this by accident once that path started doing real browser I/O, each
+    stubbing it individually. This is the backstop so a third one cannot slip
+    through the same way ~/.siglent did.
+
+    Patches ``webbrowser.open`` itself, not our own ``_open_browser``
+    wrapper. ``webbrowser.open`` is the actual OS boundary -- patching it
+    also covers any future code path that reaches the stdlib directly,
+    something patching our wrapper could never do -- and it leaves
+    ``_open_browser``'s own try/except doing real work against a stubbed
+    call instead of being bypassed entirely.
+
+    This does not stop a test from asserting its own behaviour: a test can
+    still monkeypatch ``_open_browser`` directly, to capture the URL it was
+    given or to force it to raise. Fixtures run before the test body, so a
+    test's own monkeypatch.setattr on the same or a different target simply
+    layers on top of (or replaces) this one -- it is never overridden by it.
+    """
+    monkeypatch.setattr("webbrowser.open", lambda url, *args, **kwargs: True)
 
 
 @contextmanager
