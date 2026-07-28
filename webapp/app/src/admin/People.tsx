@@ -215,9 +215,22 @@ export function People() {
                 style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "var(--text-sm)" }}
               >
                 <span>{invite.name}</span>
+                {/*
+                  The code is shown again here, not just on the invitation you
+                  happen to have just created. GET /api/invitations returns it
+                  for exactly this reason: an admin who closed the window, or
+                  who is back at the bench an hour later, would otherwise have
+                  no way to recover it and would have to cancel and re-invite.
+                  The link is deliberately absent -- only the nonce's hash is
+                  stored, so it cannot be reconstructed after creation.
+                */}
+                <code style={{ fontFamily: "var(--font-mono)", letterSpacing: "0.1em" }}>{groupCode(invite.code)}</code>
                 <span>
                   <Countdown expires={invite.expires} />
                 </span>
+                <Button size="sm" onClick={() => void copyToClipboard(invite.code)}>
+                  Copy code
+                </Button>
                 <Button size="sm" onClick={() => void cancelInvite(invite.id)}>
                   Cancel invitation
                 </Button>

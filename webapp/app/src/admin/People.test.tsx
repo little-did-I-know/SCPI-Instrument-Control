@@ -126,6 +126,35 @@ describe("People", () => {
     await waitFor(() => expect(screen.queryByRole("button", { name: /cancel invitation/i })).not.toBeInTheDocument());
   });
 
+  it("re-shows a pending invitation's code without re-creating it", async () => {
+    // The code is what the admin reads down a phone, and the panel is the only
+    // way to get it back: the CLI prints once and forgets, and the link cannot
+    // be reconstructed because only its hash is stored. GET /api/invitations
+    // returns the code for exactly this reason, so a listing that renders the
+    // name and countdown but drops the code makes that response pointless and
+    // leaves "cancel and re-invite" as the only remedy for a mislaid code.
+    // This asserts a *pending* invitation loaded on mount -- not one this
+    // browser session just created, which is a different code path.
+    vi.spyOn(adminApi, "identities").mockResolvedValue([]);
+    vi.spyOn(adminApi, "invitations").mockResolvedValue([invitation("a1b2c3d4", "bob")]);
+    const create = vi.spyOn(adminApi, "createInvitation");
+    render(<People />);
+    expect(await screen.findByText(/417 902/)).toBeInTheDocument();
+    expect(create).not.toHaveBeenCalled();
+  });
+
+  it("does not offer a link for a pending invitation, only a code", async () => {
+    // Only the nonce's hash is stored, so the link genuinely exists once, at
+    // creation. Rendering a link here would mean somebody had reconstructed
+    // one -- which could only be a wrong one.
+    vi.spyOn(adminApi, "identities").mockResolvedValue([]);
+    vi.spyOn(adminApi, "invitations").mockResolvedValue([invitation("a1b2c3d4", "bob")]);
+    render(<People />);
+    await screen.findByText(/417 902/);
+    expect(screen.queryByText(/\?invite=/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /copy link/i })).not.toBeInTheDocument();
+  });
+
   it("reports a failure instead of silently doing nothing", async () => {
     vi.spyOn(adminApi, "identities").mockResolvedValue([]);
     vi.spyOn(adminApi, "invitations").mockResolvedValue([]);
