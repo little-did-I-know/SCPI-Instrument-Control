@@ -141,4 +141,47 @@ describe("Sessions", () => {
     await userEvent.click(within(dialog).getByRole("button", { name: /close/i }));
     expect(await screen.findByRole("alert")).toHaveTextContent(/session already closing/i);
   });
+
+  it("leaves other rows usable while one row is releasing", async () => {
+    // The old code disabled every button on every row whenever any action was in
+    // flight, so acting on one bench greyed out the whole panel.
+    vi.spyOn(adminApi, "sessions").mockResolvedValue([
+      session({ id: "aaa", label: "bench-a" }),
+      session({ id: "bbb", label: "bench-b" }),
+    ]);
+    let resolveRelease: () => void = () => {};
+    vi.spyOn(adminApi, "releaseSession").mockReturnValue(
+      new Promise<void>((resolve) => {
+        resolveRelease = resolve;
+      }),
+    );
+    render(<Sessions />);
+
+    const rows = await screen.findAllByRole("row");
+    const rowA = within(rows[1]);
+    const rowB = within(rows[2]);
+    await userEvent.click(rowA.getByRole("button", { name: "Release" }));
+
+    expect(rowA.getByRole("button", { name: "Release" })).toBeDisabled();
+    expect(rowB.getByRole("button", { name: "Release" })).toBeEnabled();
+    expect(rowB.getByRole("button", { name: "Close" })).toBeEnabled();
+
+    resolveRelease();
+  });
+
+  it("puts the close confirmation in a modal that traps focus", async () => {
+    vi.spyOn(adminApi, "sessions").mockResolvedValue([session({ id: "aaa", label: "bench-a" })]);
+    const close = vi.spyOn(adminApi, "closeSession").mockResolvedValue(undefined);
+    render(<Sessions />);
+    await userEvent.click(await screen.findByRole("button", { name: "Close" }));
+
+    const dialog = screen.getByRole("alertdialog");
+    expect(dialog).toHaveAttribute("aria-modal", "true");
+    expect(screen.getByRole("button", { name: "Cancel" })).toHaveFocus();
+    expect(close).not.toHaveBeenCalled();
+
+    await userEvent.keyboard("{Escape}");
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    expect(close).not.toHaveBeenCalled();
+  });
 });

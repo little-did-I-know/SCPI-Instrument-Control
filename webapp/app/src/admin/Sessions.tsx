@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Button } from "../ds/Button";
+import { ConfirmDialog } from "../ds/ConfirmDialog";
 import { DataTable } from "../ds/DataTable";
 import { GroupBox } from "../ds/GroupBox";
 import { adminApi, type Session } from "./api";
@@ -25,8 +26,6 @@ export function Sessions() {
   const [closing, setClosing] = useState(false);
   const [releasingId, setReleasingId] = useState<string | null>(null);
 
-  const dialogRef = useRef<HTMLDivElement>(null);
-
   const loadSessions = useCallback(async () => {
     try {
       setError("");
@@ -39,12 +38,6 @@ export function Sessions() {
   useEffect(() => {
     void loadSessions();
   }, [loadSessions]);
-
-  // Move focus into the confirmation so keyboard and screen-reader users land
-  // on it rather than having to hunt for a dialog that appeared elsewhere.
-  useEffect(() => {
-    if (closeTarget) dialogRef.current?.focus();
-  }, [closeTarget]);
 
   const release = async (session: Session) => {
     setError("");
@@ -96,19 +89,10 @@ export function Sessions() {
               session.viewers,
               formatIdle(session.idle_seconds),
               <div style={{ display: "flex", gap: "var(--space-2)" }}>
-                <Button
-                  size="sm"
-                  disabled={closeTarget !== null || releasingId !== null}
-                  onClick={() => void release(session)}
-                >
+                <Button size="sm" disabled={releasingId === session.id} onClick={() => void release(session)}>
                   Release
                 </Button>
-                <Button
-                  size="sm"
-                  variant="danger"
-                  disabled={closeTarget !== null || releasingId !== null}
-                  onClick={() => setCloseTarget(session)}
-                >
+                <Button size="sm" variant="danger" disabled={releasingId === session.id} onClick={() => setCloseTarget(session)}>
                   Close
                 </Button>
               </div>,
@@ -118,38 +102,19 @@ export function Sessions() {
       </GroupBox>
 
       {closeTarget ? (
-        <div
-          role="alertdialog"
-          aria-label={`Close ${closeTarget.label}?`}
-          aria-modal="true"
-          tabIndex={-1}
-          ref={dialogRef}
-          style={{
-            border: "1px solid var(--lc-border-strong)",
-            borderRadius: "var(--lc-radius)",
-            background: "var(--lc-panel)",
-            boxShadow: "var(--lc-elev-1)",
-            padding: "var(--space-3)",
-            display: "flex",
-            flexDirection: "column",
-            gap: "var(--space-2)",
-            maxWidth: "360px",
-          }}
-        >
-          <p>
-            Close {closeTarget.label}? This ends the session immediately, and anyone viewing it
-            loses their view right now.
-            {closeTarget.recording ? " This session is recording -- closing it stops that capture." : null}
-          </p>
-          <div style={{ display: "flex", gap: "var(--space-2)", justifyContent: "flex-end" }}>
-            <Button disabled={closing} onClick={() => setCloseTarget(null)}>
-              Cancel
-            </Button>
-            <Button variant="danger" disabled={closing} onClick={() => void confirmClose()}>
-              Close
-            </Button>
-          </div>
-        </div>
+        <ConfirmDialog
+          title={`Close ${closeTarget.label}?`}
+          confirmLabel="Close"
+          busy={closing}
+          onCancel={() => setCloseTarget(null)}
+          onConfirm={() => void confirmClose()}
+          body={
+            <>
+              This ends the session immediately, and anyone viewing it loses their view right now.
+              {closeTarget.recording ? " This session is recording — closing it stops that capture." : null}
+            </>
+          }
+        />
       ) : null}
     </div>
   );
