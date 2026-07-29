@@ -207,6 +207,33 @@ describe("People", () => {
     expect(await screen.findByText(/no one has access yet/i)).toBeInTheDocument();
   });
 
+  it("leaves other rows usable while one identity's revoke is in flight", async () => {
+    // Mirrors Sessions' equivalent test: the old code disabled every row's
+    // Revoke button whenever any revoke was targeted, so acting on one
+    // identity greyed out the whole roster.
+    vi.spyOn(adminApi, "identities").mockResolvedValue([identity("bob", 2), identity("alice", 1)]);
+    vi.spyOn(adminApi, "invitations").mockResolvedValue([]);
+    let resolveRevoke: (result: { devices: number; streams: number; sessions: number }) => void = () => {};
+    vi.spyOn(adminApi, "revokeIdentity").mockReturnValue(
+      new Promise((resolve) => {
+        resolveRevoke = resolve;
+      }),
+    );
+    render(<People />);
+
+    const rows = await screen.findAllByRole("row");
+    const rowBob = within(rows[1]);
+    const rowAlice = within(rows[2]);
+    await userEvent.click(rowBob.getByRole("button", { name: /revoke/i }));
+    const dialog = screen.getByRole("alertdialog");
+    await userEvent.click(within(dialog).getByRole("button", { name: /revoke/i }));
+
+    expect(rowBob.getByRole("button", { name: /revoke/i })).toBeDisabled();
+    expect(rowAlice.getByRole("button", { name: /revoke/i })).toBeEnabled();
+
+    resolveRevoke({ devices: 2, streams: 0, sessions: 0 });
+  });
+
   it("confirms a revoke in a modal that traps focus", async () => {
     // Same dialog as Sessions: the promise of aria-modal has to be true here too.
     vi.spyOn(adminApi, "identities").mockResolvedValue([identity("bob", 2)]);

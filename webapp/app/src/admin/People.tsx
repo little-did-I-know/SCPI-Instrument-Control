@@ -155,7 +155,7 @@ export function People() {
               <Button
                 size="sm"
                 variant="danger"
-                disabled={revokeTarget !== null}
+                disabled={revokeTarget?.name === identity.name}
                 onClick={() => setRevokeTarget(identity)}
               >
                 Revoke
