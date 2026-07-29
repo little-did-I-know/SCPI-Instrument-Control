@@ -1162,6 +1162,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#the-sessions-screen" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Sessions screen
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#first-run" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3580,6 +3591,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#the-sessions-screen" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Sessions screen
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#first-run" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3650,9 +3672,10 @@ runs on, at:</p>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>http://127.0.0.1:8766/
 </span></code></pre></div>
 <p>Open that in a browser <strong>on the gateway machine</strong> and you get one screen showing
-everyone who has access, with buttons to invite someone or cut them off. The
-<code>scpi-web invite</code> and <code>scpi-web token</code> commands still work exactly as before —
-the panel is a second way in, not a replacement.</p>
+everyone who has access and every session currently open, with buttons to
+invite someone, cut them off, or free up or end a session. The <code>scpi-web
+invite</code> and <code>scpi-web token</code> commands still work exactly as before — the panel
+is a second way in, not a replacement.</p>
 <blockquote>
 <p><strong>This page is for whoever administers the gateway.</strong> If you are a user
 wanting to sign in, you need a link or a six-digit code from that person;
@@ -3759,10 +3782,17 @@ an unauthenticated port on the LAN.</p>
 a job, not to navigate.</p>
 <p><strong>Who has access</strong> lists each identity with the number of devices signed in
 under it and when one of them was last seen. This is <code>scpi-web token list</code> with
-a <strong>Revoke</strong> button. Revoking asks first, and the confirmation names the
-consequence — <em>"Revoke bob? This signs out all 2 of their devices"</em> — because
-the device count is exactly what the CLI cannot easily tell you before you act.
-Revocation takes effect on the next request; there is no restart.</p>
+a <strong>Revoke</strong> button. Revoking is one action that does three things at once —
+signs out every device under that name, cuts any live stream it is watching
+right now, and frees any session it owns for anyone else to claim immediately —
+and the confirmation names all three before you commit: <em>"Revoke bob? This
+signs out all 2 of their devices, cuts any live stream they're watching right
+now, and frees any session they own for anyone to claim immediately — if
+they're mid-capture, they lose their view the moment you confirm."</em> Once you
+confirm, the panel reports back what actually happened — how many devices,
+streams, and sessions — rather than a bare "done", because the CLI cannot
+easily tell you any of that before you act. Revocation takes effect on the next
+request; there is no restart.</p>
 <p><strong>Invitations</strong> takes a name and creates a ten-minute invitation, showing:</p>
 <ul>
 <li>the <strong>link</strong> to send, which signs a browser in with no typing at all;</li>
@@ -3792,6 +3822,27 @@ would only make it <em>look</em> safer than it is.</p>
 <p>Storing it in clear is safe <strong>here and nowhere else</strong>: <code>invitations.json</code> is
 written <code>0600</code> where the platform supports it, and the only thing that ever
 reads a code back out is the host-only panel. It is never served to the LAN app.</p>
+<h2 id="the-sessions-screen">The Sessions screen<a class="headerlink" href="#the-sessions-screen" title="Permanent link">&para;</a></h2>
+<p><strong>Live sessions</strong> lists every open instrument session — the instrument (its
+label, and address or <code>(Mock)</code>), who owns it, how many viewers are watching,
+and how long the owner has been idle. Each row has two buttons:</p>
+<ul>
+<li><strong>Release</strong> clears the session's owner right away, with no confirmation. It
+  is not destructive — the instrument keeps running and every viewer keeps
+  watching — it just makes the session unowned, so the next person to claim it
+  gets it immediately instead of waiting out <code>--abandon-after</code>. This is the
+  same release an owner can already do on themselves (see
+  <a href="../security/#handing-off-explicitly">Handing off explicitly</a>); the panel just
+  lets an admin do it to someone else's session.</li>
+<li><strong>Close</strong> ends the session outright, so it asks first. The confirmation
+  names the consequence — <em>"Close *label</em>? This ends the session immediately,
+  and anyone viewing it loses their view right now."* — and adds a second
+  warning when the session is currently recording, because closing it stops
+  that capture too.</li>
+</ul>
+<p>Revoking an identity on the People screen above reaches this same list: every
+session the revoked name owned is released the same way Release does here, so
+you never have to open Sessions afterward to clean up what Revoke left behind.</p>
 <h2 id="first-run">First run<a class="headerlink" href="#first-run" title="Permanent link">&para;</a></h2>
 <p>Starting a gateway with an empty token store no longer mints anything. There is
 no auto-created <code>default</code> identity and no <code>?token=…</code> bootstrap URL — the first

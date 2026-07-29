@@ -4243,7 +4243,7 @@ session's WebSocket subscribers as a <code>state</code> message with <code>"kind
 </tr>
 </tbody>
 </table>
-<p>The connection closes with code <strong>4404</strong> if the session ID does not exist, and <strong>4410</strong> when the session itself closes (after which the socket receives a final <code>closed</code> message). The server-side outbox is bounded (256 frames); under sustained backpressure it drops the oldest queued <code>waveform</code> frame to make room rather than growing unbounded — <code>state</code>/<code>error</code>/<code>closed</code> control frames are never dropped.</p>
+<p>The connection closes with code <strong>4404</strong> if the session ID does not exist, <strong>4410</strong> when the session itself closes (after which the socket receives a final <code>closed</code> message), and <strong>4403</strong> if the identity that opened the socket is revoked while it is still connected — distinct from 4410 because the session is untouched; only the viewer's credential is gone (see <a href="../security/#tokens">Gateway security</a>). The server-side outbox is bounded (256 frames); under sustained backpressure it drops the oldest queued <code>waveform</code> frame to make room rather than growing unbounded — <code>state</code>/<code>error</code>/<code>closed</code> control frames are never dropped.</p>
 <h2 id="errors">Errors<a class="headerlink" href="#errors" title="Permanent link">&para;</a></h2>
 <p>Every error response is JSON: <code>{"error": "&lt;ExceptionClassName&gt;", "detail": "&lt;message&gt;"}</code>.</p>
 <table>
