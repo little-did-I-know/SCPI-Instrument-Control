@@ -206,4 +206,21 @@ describe("People", () => {
     render(<People />);
     expect(await screen.findByText(/no one has access yet/i)).toBeInTheDocument();
   });
+
+  it("confirms a revoke in a modal that traps focus", async () => {
+    // Same dialog as Sessions: the promise of aria-modal has to be true here too.
+    vi.spyOn(adminApi, "identities").mockResolvedValue([identity("bob", 2)]);
+    vi.spyOn(adminApi, "invitations").mockResolvedValue([]);
+    const revoke = vi.spyOn(adminApi, "revokeIdentity");
+    render(<People />);
+    await userEvent.click(await screen.findByRole("button", { name: /revoke/i }));
+
+    const dialog = screen.getByRole("alertdialog");
+    expect(dialog).toHaveAttribute("aria-modal", "true");
+    expect(screen.getByRole("button", { name: "Cancel" })).toHaveFocus();
+
+    await userEvent.keyboard("{Escape}");
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    expect(revoke).not.toHaveBeenCalled();
+  });
 });
