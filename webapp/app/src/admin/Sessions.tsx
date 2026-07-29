@@ -93,12 +93,14 @@ export function Sessions() {
 
       <GroupBox title="Live sessions">
         {sessions === null ? (
-          <p>Loading…</p>
+          <p style={{ color: "var(--text-muted)" }}>Loading…</p>
         ) : sessions.length === 0 ? (
-          <p>No live sessions.</p>
+          <p style={{ color: "var(--text-muted)" }}>
+            No live sessions. Sessions appear here when someone opens an instrument.
+          </p>
         ) : (
           <DataTable
-            columns={["Instrument", "Owner", "Viewers", "Idle", ""]}
+            columns={["Instrument", "Owner", { label: "Viewers", width: "5.5rem", align: "right", mono: true }, { label: "Idle", width: "7rem", align: "right", mono: true }, ""]}
             rows={sessions.map((session) => [
               formatInstrument(session),
               session.owner || "—",

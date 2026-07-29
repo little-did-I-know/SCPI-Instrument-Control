@@ -36,6 +36,29 @@ describe("Sessions", () => {
     expect(screen.getByText(/5\.5/)).toBeInTheDocument();
   });
 
+  it("right-aligns the numeric columns in a mono face", async () => {
+    // Viewer counts and idle times are scanned down a column, not read as prose.
+    vi.spyOn(adminApi, "sessions").mockResolvedValue([session({ idle_seconds: 5.5 })]);
+    render(<Sessions />);
+    const cell = await screen.findByText("5.5s idle");
+    expect(cell.closest("td")).toHaveStyle({ textAlign: "right" });
+  });
+
+  it("keeps the destructive action visually secondary", async () => {
+    vi.spyOn(adminApi, "sessions").mockResolvedValue([session()]);
+    render(<Sessions />);
+    const close = await screen.findByRole("button", { name: "Close" });
+    const release = screen.getByRole("button", { name: "Release" });
+    expect(close).toHaveAttribute("data-variant", "danger");
+    expect(release).not.toHaveAttribute("data-variant", "danger");
+  });
+
+  it("explains an empty list rather than just stating it", async () => {
+    vi.spyOn(adminApi, "sessions").mockResolvedValue([]);
+    render(<Sessions />);
+    expect(await screen.findByText(/Sessions appear here when someone opens an instrument/)).toBeInTheDocument();
+  });
+
   it("renders an address instead of Mock for a real instrument", async () => {
     vi.spyOn(adminApi, "sessions").mockResolvedValue([
       session({ id: "s1", mock: false, address: "192.168.1.20:5025" }),

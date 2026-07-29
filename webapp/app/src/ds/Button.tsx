@@ -125,6 +125,7 @@ export function Button({
       onMouseDown={() => setState("active")}
       onMouseUp={() => setState("hover")}
       style={{ ...base, ...variants[variant], ...dyn, ...style }}
+      data-variant={variant}
       {...rest}
     >
       {icon && <span style={{ display: "inline-flex", fontSize: "1.05em" }}>{icon}</span>}
