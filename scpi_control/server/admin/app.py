@@ -93,10 +93,15 @@ class _SameOriginOnlyMiddleware:
         await self.app(scope, receive, send)
 
 
-def create_admin_app(token_store, invitation_store, base_url: Optional[str] = None, admin_port: int = DEFAULT_ADMIN_PORT) -> FastAPI:
+def create_admin_app(token_store, invitation_store, manager=None, stream_registry=None, base_url: Optional[str] = None, admin_port: int = DEFAULT_ADMIN_PORT) -> FastAPI:
     app = FastAPI(title="SCPI Gateway Admin", docs_url=None, redoc_url=None, openapi_url=None)
     app.state.tokens = token_store
     app.state.invitations = invitation_store
+    # The gateway's own instances, not private copies -- see __main__.py:269
+    # (main_app.state.manager / .stream_registry). A second SessionManager here
+    # would give the panel an empty, disconnected view of the world.
+    app.state.manager = manager
+    app.state.stream_registry = stream_registry
     app.state.base_url = base_url
 
     from scpi_control.server.admin import api as admin_api

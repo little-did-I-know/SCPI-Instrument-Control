@@ -1,9 +1,12 @@
 """Admin routes. Unauthenticated by design -- see admin/app.py."""
 
+import time
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
+
+from scpi_control.server.schemas import session_out
 
 router = APIRouter()
 
@@ -62,4 +65,33 @@ async def create_invitation(body: InvitationCreate, request: Request):
 async def cancel_invitation(invitation_id: str, request: Request):
     if not request.app.state.invitations.cancel(invitation_id):
         raise HTTPException(status_code=404, detail="no invitation with that id")
+    return None
+
+
+@router.get("/sessions")
+async def list_sessions(request: Request):
+    """Every open session. Reuses the gateway's own serializer plus idle time.
+
+    NOTE: this is a *different* /api/sessions from the gateway's authenticated
+    one -- same path, different app, different port. Do not "share" the router:
+    tests/test_server_admin_api.py::test_the_main_app_serves_no_admin_routes
+    exists because doing so would hand every LAN token-holder admin powers.
+    """
+    now = time.monotonic()
+    return [dict(session_out(session), idle_seconds=round(now - session.owner_last_active, 1)) for session in request.app.state.manager.list()]
+
+
+@router.post("/sessions/{session_id}/release", status_code=204)
+async def release_session(session_id: str, request: Request):
+    session = request.app.state.manager.get(session_id)
+    if session is None:
+        raise HTTPException(status_code=404, detail="no session with that id")
+    session.owner = ""
+    return None
+
+
+@router.delete("/sessions/{session_id}", status_code=204)
+async def close_session(session_id: str, request: Request):
+    if not request.app.state.manager.delete(session_id):
+        raise HTTPException(status_code=404, detail="no session with that id")
     return None
