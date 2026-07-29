@@ -495,7 +495,12 @@ class ModernTransfer:
             raise exceptions.InvalidParameterError(f"Invalid format: {format}")
         if stride is not None and stride < 1:
             raise exceptions.InvalidParameterError(f"stride must be a positive integer (got {stride})")
-        effective_stride = stride or 1
+        # int(...), not just `stride or 1`: a float stride (e.g. a caller's
+        # ceil-division producing 2.5 -- or 2.0, benign here but not
+        # guaranteed elsewhere) must not be written to the wire as-is, since
+        # :WAVeform:INTerval is a real SCPI command argument, not a Python
+        # value.
+        effective_stride = int(stride) if stride else 1
         scope = self._scope
 
         # Source (and width) must be selected before PREamble?/DATA? read

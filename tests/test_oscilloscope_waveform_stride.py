@@ -117,6 +117,35 @@ def test_a_strided_read_returns_the_decimated_point_count_and_scaled_dt():
     assert dt == pytest.approx(7 / 20_000.0)
 
 
+def test_a_float_stride_is_coerced_to_an_integer_before_being_sent():
+    # `effective_stride = stride or 1` alone puts a float straight onto the
+    # wire (":WAVeform:INTerval 2.5") -- Task 3's minor asked to reject
+    # stride < 1, not to stop coercing to int. Restore the coercion.
+    scope, sent = _recording_scope(idn=MODERN_IDN)
+    scope.get_waveform(1, provenance=False, stride=2.5)
+    assert ":WAVeform:INTerval 2" in sent
+    assert not any("2.5" in cmd for cmd in sent)
+
+
+def test_a_stride_left_over_from_a_prior_read_does_not_leak_into_the_next_one():
+    """The behavioural version of test_the_default_read_resets_the_stride_to_one
+    above: that test only pins the command string. Now that the mock honours
+    :WAVeform:INTerval, the actual leak this class's docstring warns about is
+    expressible -- a strided read followed by a plain read on the SAME
+    connection must return the full record, not the previous stride's
+    decimated count.
+    """
+    conn = MockConnection(idn=MODERN_IDN, sample_rate=20_000.0, timebase=1e-3)
+    conn.record_length = 1000
+    scope = Oscilloscope("mock", connection=conn)
+    scope.connect()
+
+    scope.get_waveform(1, provenance=False, stride=7)
+    full = scope.get_waveform(1, provenance=False)
+
+    assert len(full.voltage) == 1000
+
+
 def test_a_stride_needing_more_than_one_window_raises():
     """A strided record that would not fit in a single :WAVeform:DATA?
     transfer must raise rather than mis-assemble: the general chunking loop's
