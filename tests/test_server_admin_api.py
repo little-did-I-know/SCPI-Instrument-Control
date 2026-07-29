@@ -19,6 +19,29 @@ def admin_stores(tmp_path):
 
 
 @pytest.fixture
+def admin_static_client(tmp_path, monkeypatch, admin_stores):
+    # The `admin` fixture above never points ADMIN_STATIC_DIR at a real
+    # directory (no bundle has been built), so it cannot exercise the SPA
+    # route's cache headers. Build a throwaway static dir and monkeypatch it
+    # in, mirroring test_server_spa.py's static_client fixture, rather than
+    # weakening `admin` for the many tests that don't need a static bundle.
+    import scpi_control.server.admin.app as admin_app_module
+
+    static_dir = tmp_path / "static"
+    static_dir.mkdir()
+    (static_dir / "index.html").write_text("<!doctype html><title>admin</title>", encoding="utf-8")
+    (static_dir / "app.js").write_text("console.log('x')", encoding="utf-8")
+    monkeypatch.setattr(admin_app_module, "ADMIN_STATIC_DIR", static_dir)
+
+    tokens, invitations = admin_stores
+    manager = SessionManager()
+    app = admin_app_module.create_admin_app(token_store=tokens, invitation_store=invitations, manager=manager, stream_registry=StreamRegistry(), base_url="http://192.168.1.50:8765/")
+    with TestClient(app, base_url="http://127.0.0.1") as client:
+        yield client
+    manager.close_all()
+
+
+@pytest.fixture
 def admin(admin_stores):
     # One fixture for the whole file: create_admin_app now *requires* a manager
     # and a stream registry, so there is no longer a "plain" admin app that
@@ -374,6 +397,28 @@ def test_a_safelisted_content_type_cannot_create_an_invitation(admin):
         response = client.post("/api/invitations", content=b'{"name": "bob"}', headers={"Content-Type": content_type})
         assert response.status_code != 200, content_type
     assert invitations.pending() == 0
+
+
+def test_the_admin_index_is_never_cached(admin_static_client):
+    # index.html names the content-hashed asset files, so it is the one file a
+    # rebuild cannot invalidate. Cached, it keeps asking for a bundle that no
+    # longer exists and the page appears frozen at the previous build.
+    response = admin_static_client.get("/")
+    assert response.headers["cache-control"] == "no-store"
+
+
+def test_the_admin_spa_fallback_is_never_cached(admin_static_client):
+    # An unknown path falls back to index.html; that response needs the same
+    # treatment or a deep-linked client route caches a stale document.
+    response = admin_static_client.get("/sessions/abc123")
+    assert response.headers["cache-control"] == "no-store"
+
+
+def test_admin_hashed_assets_stay_cacheable(admin_static_client):
+    # Their names change when their contents do, so making them uncacheable
+    # would trade the staleness bug for a slower panel.
+    response = admin_static_client.get("/app.js")
+    assert response.headers.get("cache-control") != "no-store"
 
 
 def test_admin_spa_traversal_is_contained(tmp_path):

@@ -6,7 +6,7 @@ from typing import Optional
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.concurrency import run_in_threadpool
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from scpi_control.exceptions import InvalidParameterError, SiglentError, SiglentTimeoutError
@@ -15,7 +15,7 @@ from scpi_control.server.auth import AuthMiddleware, TokenStore
 from scpi_control.server.invitations import InvitationStore
 from scpi_control.server.revocation import StreamRegistry
 from scpi_control.server.sessions import SessionError, SessionManager
-from scpi_control.server.spa import resolve_spa_path
+from scpi_control.server.spa import spa_response
 
 STATIC_DIR = Path(__file__).parent / "static"
 
@@ -145,7 +145,7 @@ def create_app(
         async def spa(full_path: str):
             if full_path.startswith("api/"):
                 raise HTTPException(status_code=404, detail="unknown path /{0}".format(full_path))
-            return FileResponse(str(resolve_spa_path(STATIC_DIR, full_path)))
+            return spa_response(STATIC_DIR, full_path)
 
     # Added last so it wraps everything above, including the SPA catch-all: pure
     # ASGI middleware (not BaseHTTPMiddleware) so it also guards WebSocket scopes.
