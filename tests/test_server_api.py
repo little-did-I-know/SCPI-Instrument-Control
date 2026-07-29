@@ -341,6 +341,8 @@ class TestViewers:
 
 
 def test_cli_parses_defaults(tmp_path, monkeypatch):
+    import types
+
     import scpi_control.server.__main__ as cli
     from scpi_control.server.auth import TokenStore
 
@@ -349,7 +351,10 @@ def test_cli_parses_defaults(tmp_path, monkeypatch):
 
     def fake_create_app(**kwargs):
         create_app_calls.append(kwargs)
-        return object()
+        # main() now reads main_app.state.manager/.stream_registry to wire the
+        # admin app (see __main__.py's create_admin_app call) -- a bare
+        # object() no longer has anywhere to read those from.
+        return types.SimpleNamespace(state=types.SimpleNamespace(manager=object(), stream_registry=object()))
 
     def fake_run_servers(main_app, host, port, admin_app, admin_port):
         captured.update(host=host, port=port)

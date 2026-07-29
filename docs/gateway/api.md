@@ -181,7 +181,7 @@ All paths under `/api/sessions/{id}/scope/`.
 | `error` | `{"type": "error", "detail": "connection lost"}` |
 | `closed` | `{"type": "closed"}` |
 
-The connection closes with code **4404** if the session ID does not exist, and **4410** when the session itself closes (after which the socket receives a final `closed` message). The server-side outbox is bounded (256 frames); under sustained backpressure it drops the oldest queued `waveform` frame to make room rather than growing unbounded — `state`/`error`/`closed` control frames are never dropped.
+The connection closes with code **4404** if the session ID does not exist, **4410** when the session itself closes (after which the socket receives a final `closed` message), and **4403** if the identity that opened the socket is revoked while it is still connected — distinct from 4410 because the session is untouched; only the viewer's credential is gone (see [Gateway security](security.md#tokens)). The server-side outbox is bounded (256 frames); under sustained backpressure it drops the oldest queued `waveform` frame to make room rather than growing unbounded — `state`/`error`/`closed` control frames are never dropped.
 
 ## Errors
 

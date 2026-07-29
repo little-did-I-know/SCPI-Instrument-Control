@@ -9,9 +9,10 @@ http://127.0.0.1:8766/
 ```
 
 Open that in a browser **on the gateway machine** and you get one screen showing
-everyone who has access, with buttons to invite someone or cut them off. The
-`scpi-web invite` and `scpi-web token` commands still work exactly as before —
-the panel is a second way in, not a replacement.
+everyone who has access and every session currently open, with buttons to
+invite someone, cut them off, or free up or end a session. The `scpi-web
+invite` and `scpi-web token` commands still work exactly as before — the panel
+is a second way in, not a replacement.
 
 > **This page is for whoever administers the gateway.** If you are a user
 > wanting to sign in, you need a link or a six-digit code from that person;
@@ -121,10 +122,17 @@ a job, not to navigate.
 
 **Who has access** lists each identity with the number of devices signed in
 under it and when one of them was last seen. This is `scpi-web token list` with
-a **Revoke** button. Revoking asks first, and the confirmation names the
-consequence — *"Revoke bob? This signs out all 2 of their devices"* — because
-the device count is exactly what the CLI cannot easily tell you before you act.
-Revocation takes effect on the next request; there is no restart.
+a **Revoke** button. Revoking is one action that does three things at once —
+signs out every device under that name, cuts any live stream it is watching
+right now, and frees any session it owns for anyone else to claim immediately —
+and the confirmation names all three before you commit: *"Revoke bob? This
+signs out all 2 of their devices, cuts any live stream they're watching right
+now, and frees any session they own for anyone to claim immediately — if
+they're mid-capture, they lose their view the moment you confirm."* Once you
+confirm, the panel reports back what actually happened — how many devices,
+streams, and sessions — rather than a bare "done", because the CLI cannot
+easily tell you any of that before you act. Revocation takes effect on the next
+request; there is no restart.
 
 **Invitations** takes a name and creates a ten-minute invitation, showing:
 
@@ -161,6 +169,29 @@ would only make it *look* safer than it is.
 Storing it in clear is safe **here and nowhere else**: `invitations.json` is
 written `0600` where the platform supports it, and the only thing that ever
 reads a code back out is the host-only panel. It is never served to the LAN app.
+
+## The Sessions screen
+
+**Live sessions** lists every open instrument session — the instrument (its
+label, and address or `(Mock)`), who owns it, how many viewers are watching,
+and how long the owner has been idle. Each row has two buttons:
+
+- **Release** clears the session's owner right away, with no confirmation. It
+  is not destructive — the instrument keeps running and every viewer keeps
+  watching — it just makes the session unowned, so the next person to claim it
+  gets it immediately instead of waiting out `--abandon-after`. This is the
+  same release an owner can already do on themselves (see
+  [Handing off explicitly](security.md#handing-off-explicitly)); the panel just
+  lets an admin do it to someone else's session.
+- **Close** ends the session outright, so it asks first. The confirmation
+  names the consequence — *"Close *label*? This ends the session immediately,
+  and anyone viewing it loses their view right now."* — and adds a second
+  warning when the session is currently recording, because closing it stops
+  that capture too.
+
+Revoking an identity on the People screen above reaches this same list: every
+session the revoked name owned is released the same way Release does here, so
+you never have to open Sessions afterward to clean up what Revoke left behind.
 
 ## First run
 

@@ -170,16 +170,24 @@ revoked 'alice'
 
 **Revocation takes effect immediately.** The gateway watches `tokens.json` and
 reloads it when it changes on disk, so a token revoked from another terminal
-stops working on the very next request — no restart needed.
+stops working on the very next request — no restart needed. Revoking a name
+is also more than a lock on new requests: it cuts any live stream that name is
+watching right now, and releases any session it owns so someone else can claim
+it immediately — see [Ownership](#ownership-owner-writes-everyone-watches) for
+what that release means.
 
-> **One exception: a live-stream WebSocket already open.** A stream
-> authenticates once, at the handshake, and nothing re-checks it afterwards, so
-> revoking the token does not tear the connection down — it keeps receiving
-> waveform data until it closes. Worse, a watching stream marks its session as
-> owner-watching, and that *refuses* a claim outright however long the owner has
-> been idle, so the revoked tab also keeps you from taking over the session it
-> is holding. If you need a leaked credential cut off mid-capture, close that
-> stream (or restart the gateway); revoking the token alone is not enough.
+> **A live-stream WebSocket already open is torn down too.** A stream
+> authenticates once, at the handshake, but revocation still reaches it: the
+> socket closes with code **4403** (`CLOSE_IDENTITY_REVOKED`), distinct from
+> **4410** (the session ended) — here the *session* is untouched, the viewer
+> just lost their credential. Two independent triggers make this land even
+> when the revocation happens outside the serving process — `scpi-web token
+> revoke` is a separate command invocation and has no way to signal a running
+> gateway directly: the admin panel signals the stream the moment you click
+> Revoke, and every stream also checks its own identity on its own, every few
+> seconds (5 by default), as a backstop that catches a revocation made any
+> other way. Either path clears out within a handful of seconds; neither
+> requires closing the tab yourself or restarting the gateway.
 
 Every token is equal: there are no roles or scopes. Anyone with a valid token can
 create sessions and read any session; ownership (below) governs who may *write*.
