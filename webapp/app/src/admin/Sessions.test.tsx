@@ -187,66 +187,129 @@ describe("Sessions", () => {
 
   it("refreshes on a timer so the idle column cannot go stale", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
-    vi.spyOn(adminApi, "sessions")
-      .mockResolvedValueOnce([session({ idle_seconds: 4 })])
-      .mockResolvedValueOnce([session({ idle_seconds: 14 })]);
-    render(<Sessions />);
-    expect(await screen.findByText("4s idle")).toBeInTheDocument();
+    try {
+      vi.spyOn(adminApi, "sessions")
+        .mockResolvedValueOnce([session({ idle_seconds: 4 })])
+        .mockResolvedValueOnce([session({ idle_seconds: 14 })]);
+      render(<Sessions />);
+      expect(await screen.findByText("4s idle")).toBeInTheDocument();
 
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(10_000);
-    });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(10_000);
+      });
 
-    expect(await screen.findByText("14s idle")).toBeInTheDocument();
-    vi.useRealTimers();
+      expect(await screen.findByText("14s idle")).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("does not refresh while a confirmation is open", async () => {
     // The list must not reshuffle under a confirmation the operator is reading.
     vi.useFakeTimers({ shouldAdvanceTime: true });
-    const list = vi.spyOn(adminApi, "sessions").mockResolvedValue([session({ id: "aaa", label: "bench-a" })]);
-    render(<Sessions />);
-    await userEvent.click(await screen.findByRole("button", { name: "Close" }));
-    const callsWhenOpened = list.mock.calls.length;
+    try {
+      const list = vi.spyOn(adminApi, "sessions").mockResolvedValue([session({ id: "aaa", label: "bench-a" })]);
+      render(<Sessions />);
+      await userEvent.click(await screen.findByRole("button", { name: "Close" }));
+      const callsWhenOpened = list.mock.calls.length;
 
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(60_000);
-    });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(60_000);
+      });
 
-    expect(list.mock.calls.length).toBe(callsWhenOpened);
-    vi.useRealTimers();
+      expect(list.mock.calls.length).toBe(callsWhenOpened);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("keeps the last good rows when a refresh fails", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
-    vi.spyOn(adminApi, "sessions")
-      .mockResolvedValueOnce([session({ label: "bench-a" })])
-      .mockRejectedValueOnce(new Error("gateway unreachable"));
-    render(<Sessions />);
-    expect(await screen.findByText(/bench-a/)).toBeInTheDocument();
+    try {
+      vi.spyOn(adminApi, "sessions")
+        .mockResolvedValueOnce([session({ label: "bench-a" })])
+        .mockRejectedValueOnce(new Error("gateway unreachable"));
+      render(<Sessions />);
+      expect(await screen.findByText(/bench-a/)).toBeInTheDocument();
 
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(10_000);
-    });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(10_000);
+      });
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("gateway unreachable");
-    expect(screen.getByText(/bench-a/)).toBeInTheDocument();
-    vi.useRealTimers();
+      expect(await screen.findByRole("alert")).toHaveTextContent("gateway unreachable");
+      expect(screen.getByText(/bench-a/)).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("stops polling once unmounted", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
-    const list = vi.spyOn(adminApi, "sessions").mockResolvedValue([session()]);
-    const { unmount } = render(<Sessions />);
-    await screen.findByRole("table");
-    unmount();
-    const callsAtUnmount = list.mock.calls.length;
+    try {
+      const list = vi.spyOn(adminApi, "sessions").mockResolvedValue([session()]);
+      const { unmount } = render(<Sessions />);
+      await screen.findByRole("table");
+      unmount();
+      const callsAtUnmount = list.mock.calls.length;
 
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(60_000);
-    });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(60_000);
+      });
 
-    expect(list.mock.calls.length).toBe(callsAtUnmount);
-    vi.useRealTimers();
+      expect(list.mock.calls.length).toBe(callsAtUnmount);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("does not let a stale poll response overwrite a newer release reload", async () => {
+    // A release fires its own reload; if an in-flight poll tick's older
+    // response resolves after it, the released session must not reappear.
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      let resolvePoll: (rows: SessionRow[]) => void = () => {};
+      let resolveReleaseReload: (rows: SessionRow[]) => void = () => {};
+      const list = vi
+        .spyOn(adminApi, "sessions")
+        .mockResolvedValueOnce([session({ id: "aaa", label: "bench-a", owner: "bob" })])
+        // The poll tick's request, kicked off while the release is in flight.
+        .mockImplementationOnce(
+          () => new Promise<SessionRow[]>((resolve) => (resolvePoll = resolve)),
+        )
+        // The release's own reload, requested after the poll tick above.
+        .mockImplementationOnce(
+          () => new Promise<SessionRow[]>((resolve) => (resolveReleaseReload = resolve)),
+        );
+      vi.spyOn(adminApi, "releaseSession").mockResolvedValue(undefined);
+      render(<Sessions />);
+      await screen.findByText(/bob/);
+
+      // Trigger the poll tick: its request goes in flight but does not resolve yet.
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(10_000);
+      });
+      expect(list.mock.calls.length).toBe(2);
+
+      // Now release, which fires its own (third) reload request.
+      await user.click(screen.getByRole("button", { name: "Release" }));
+      await vi.waitFor(() => expect(list.mock.calls.length).toBe(3));
+
+      // The release's reload resolves first, clearing the owner...
+      await act(async () => {
+        resolveReleaseReload([session({ id: "aaa", label: "bench-a", owner: "" })]);
+      });
+      expect(await screen.findByText("—")).toBeInTheDocument();
+
+      // ...then the stale poll response resolves late, with the old owner.
+      // It must be discarded rather than winning because it landed last.
+      await act(async () => {
+        resolvePoll([session({ id: "aaa", label: "bench-a", owner: "bob" })]);
+      });
+      expect(screen.getByText("—")).toBeInTheDocument();
+      expect(screen.queryByText(/bob/)).not.toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "../ds/Button";
 import { ConfirmDialog } from "../ds/ConfirmDialog";
 import { DataTable } from "../ds/DataTable";
@@ -30,10 +30,14 @@ export function Sessions() {
   const [closing, setClosing] = useState(false);
   const [releasingId, setReleasingId] = useState<string | null>(null);
 
+  const requestId = useRef(0);
+
   const loadSessions = useCallback(async () => {
+    const id = ++requestId.current;
     try {
       setError("");
-      setSessions(await adminApi.sessions());
+      const rows = await adminApi.sessions();
+      if (id === requestId.current) setSessions(rows);
     } catch (err) {
       setError(errorMessage(err));
     }
