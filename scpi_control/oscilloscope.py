@@ -11,6 +11,7 @@ from scpi_control import exceptions
 from scpi_control.analysis import FFTAnalyzer
 from scpi_control.channel import Channel
 from scpi_control.connection import BaseConnection, SocketConnection
+from scpi_control.exceptions import SiglentError
 from scpi_control.math_channel import MathChannel
 from scpi_control.measurement import Measurement
 from scpi_control.models import ModelCapability, detect_model_from_idn
@@ -351,6 +352,27 @@ class Oscilloscope:
                 return "TRIGD"
             return "AUTO" if mode.endswith("AUTO") else "READY"
         return normalize_status(self.query(self._get_command("get_acq_status")))
+
+    def new_acquisition_ready(self) -> Optional[bool]:
+        """True if a new acquisition has completed since the last check.
+
+        Returns None when the active dialect has no way to tell us, which callers
+        must treat as "no gate available" rather than as False -- a False would
+        stall the live view forever on those dialects.
+
+        The underlying INR? register is READ-AND-CLEAR: reading it consumes the
+        event. This method is therefore the single permitted consumer. Do not read
+        get_new_data anywhere else, and do not call this method twice per tick
+        expecting the same answer.
+        """
+        if not self._has_command("get_new_data"):
+            return None
+        try:
+            response = self.query(self._get_command("get_new_data"))
+            return bool(int(response.strip()) & 0x01)
+        except (SiglentError, ValueError):
+            # A gate we cannot read is a gate we do not have, for this tick only.
+            return None
 
     @property
     def timebase(self) -> float:
