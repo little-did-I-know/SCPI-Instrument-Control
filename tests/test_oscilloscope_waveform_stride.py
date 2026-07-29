@@ -13,7 +13,10 @@ decimated file they believe is complete. So every read sets the interval
 explicitly -- including the default path, which resets it to 1.
 """
 
-from scpi_control import Oscilloscope
+import numpy as np
+import pytest
+
+from scpi_control import Oscilloscope, exceptions
 from scpi_control.connection.mock import MockConnection
 
 LEGACY_IDN = "Siglent Technologies,SDS1104X-E,MOCK0001,1.0.0.0"
@@ -63,3 +66,69 @@ def test_stride_is_not_sent_on_a_dialect_without_the_command():
 def test_record_length_query_is_mapped_on_modern():
     scope = _connected_scope(idn=MODERN_IDN, custom_responses={":ACQuire:POINts?": "1400000"})
     assert scope.record_length() == 1400000
+
+
+def test_the_interval_write_precedes_the_preamble_read():
+    # The placement is load-bearing (see waveform_transfer.ModernTransfer.acquire):
+    # the preamble must be read back under the interval THIS call asked for, not
+    # whatever a previous caller (e.g. the live view) left set on the instrument --
+    # otherwise that stride leaks into whatever reads the preamble next. Pinned in
+    # the index-comparison style already used by
+    # test_modern_waveform_transfer.py::test_preamble_is_read_before_data, so a
+    # future reorder fails loudly instead of silently reintroducing the leak.
+    scope, sent = _recording_scope(idn=MODERN_IDN)
+    scope.get_waveform(1, provenance=False, stride=7)
+    sent_upper = [c.upper() for c in sent]
+    interval_idx = sent_upper.index(":WAVEFORM:INTERVAL 7")
+    preamble_idx = sent_upper.index(":WAVEFORM:PREAMBLE?")
+    assert interval_idx < preamble_idx
+
+
+def test_zero_stride_is_rejected():
+    scope = _connected_scope(idn=MODERN_IDN)
+    with pytest.raises(exceptions.InvalidParameterError):
+        scope.get_waveform(1, provenance=False, stride=0)
+
+
+def test_negative_stride_is_rejected():
+    # int(stride or 1) alone would collapse a negative stride to itself
+    # (not to 1) and write it straight onto the wire -- ":WAVeform:INTerval -3"
+    # -- unless it is rejected first.
+    scope = _connected_scope(idn=MODERN_IDN)
+    with pytest.raises(exceptions.InvalidParameterError):
+        scope.get_waveform(1, provenance=False, stride=-3)
+
+
+def test_a_strided_read_returns_the_decimated_point_count_and_scaled_dt():
+    """The test that would have caught the mock doing nothing: before the mock
+    honored :WAVeform:INTerval, a stride changed no bytes on the wire -- same
+    point count back, same dt. This pins both halves of striding actually
+    working: fewer points, and a time axis scaled to match.
+    """
+    conn = MockConnection(idn=MODERN_IDN, sample_rate=20_000.0, timebase=1e-3)
+    conn.record_length = 1000
+    scope = Oscilloscope("mock", connection=conn)
+    scope.connect()
+
+    wf = scope.get_waveform(1, provenance=False, stride=7)
+
+    assert len(wf.voltage) == 143  # ceil(1000 / 7)
+    dt = float(np.mean(np.diff(wf.time)))
+    assert dt == pytest.approx(7 / 20_000.0)
+
+
+def test_a_stride_needing_more_than_one_window_raises():
+    """A strided record that would not fit in a single :WAVeform:DATA?
+    transfer must raise rather than mis-assemble: the general chunking loop's
+    `start` bookkeeping is only valid in the same (strided) space as
+    :WAVeform:STARt when nothing is being decimated (stride == 1) -- see
+    ModernTransfer.acquire's else-branch comment.
+    """
+    conn = MockConnection(idn=MODERN_IDN, sample_rate=20_000.0, timebase=1e-3)
+    conn.record_length = 1000
+    conn.max_points = 100  # strided count at stride=2 (500) exceeds this
+    scope = Oscilloscope("mock", connection=conn)
+    scope.connect()
+
+    with pytest.raises(exceptions.FeatureNotSupportedError):
+        scope.get_waveform(1, provenance=False, stride=2)

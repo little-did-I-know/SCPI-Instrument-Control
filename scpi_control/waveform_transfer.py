@@ -389,6 +389,7 @@ class LeCroyTransfer:
 # dialects must stay independently editable (Task 15 vs Task 18).
 _MODERN_COMM_TYPE = 32  # short: 0=byte, 1=word
 _MODERN_WAVE_ARRAY_COUNT = 116  # long: number of data points
+_MODERN_DATA_INTERVAL = 136  # long: = :WAVeform:INTerval, echoed back (p.755)
 _MODERN_VERTICAL_GAIN = 156  # float: V/div, no probe attenuation
 _MODERN_VERTICAL_OFFSET = 160  # float
 _MODERN_CODE_PER_DIV = 164  # float
@@ -414,6 +415,10 @@ def parse_modern_wavedesc(payload: bytes, *, error_context: str = "") -> dict:
     return {
         "comm_type": struct.unpack_from("<h", payload, _MODERN_COMM_TYPE)[0],
         "wave_array_count": struct.unpack_from("<i", payload, _MODERN_WAVE_ARRAY_COUNT)[0],
+        # Echoed back purely so acquire() can cross-check it against the
+        # stride it actually requested -- see the DATA_INTERVAL mismatch
+        # warning below. Not otherwise used to scale anything.
+        "data_interval": struct.unpack_from("<i", payload, _MODERN_DATA_INTERVAL)[0],
         "vertical_gain": struct.unpack_from("<f", payload, _MODERN_VERTICAL_GAIN)[0],
         "vertical_offset": struct.unpack_from("<f", payload, _MODERN_VERTICAL_OFFSET)[0],
         "code_per_div": struct.unpack_from("<f", payload, _MODERN_CODE_PER_DIV)[0],
@@ -435,6 +440,17 @@ class ModernTransfer:
     is capped at :WAVeform:MAXPoint points; acquire() below reads the
     PREamble's wave_array_count (the FULL record length) and loops
     :WAVeform:STARt in MAXPoint-sized windows until the whole record is read.
+
+    Task 3 stride follow-up: that STARt-driven loop is only correct when
+    stride is 1 (`start` is advanced by the count of points already
+    delivered, which is the same space as :WAVeform:STARt only when nothing
+    is being decimated). A stride > 1 therefore takes a DIFFERENT, narrower
+    path below: a single, unlooped window sized to the (already strided)
+    record length, since the live view's <= MAX_FRAME_POINTS request is far
+    below any real :WAVeform:MAXPoint. If a strided record ever needed more
+    than one window, acquire() raises rather than mis-assemble it -- the
+    general chunking loop is deliberately NOT made stride-aware, so the
+    proven stride=1/export path is untouched.
     """
 
     def __init__(self, scope: "Oscilloscope"):
@@ -467,12 +483,19 @@ class ModernTransfer:
             entire record_length, not just the first window.
 
         Raises:
-            InvalidParameterError: If a non-BYTE/WORD format is requested.
+            InvalidParameterError: If a non-BYTE/WORD format is requested, or
+                stride is not a positive integer.
             CommandError: If either binary block is malformed.
+            FeatureNotSupportedError: If a stride > 1 would need more than one
+                :WAVeform:DATA? window (see the class docstring) -- this is a
+                loud refusal rather than a silently mis-assembled read.
         """
         format = format.upper()
         if format not in ("BYTE", "WORD"):
             raise exceptions.InvalidParameterError(f"Invalid format: {format}")
+        if stride is not None and stride < 1:
+            raise exceptions.InvalidParameterError(f"stride must be a positive integer (got {stride})")
+        effective_stride = stride or 1
         scope = self._scope
 
         # Source (and width) must be selected before PREamble?/DATA? read
@@ -486,8 +509,12 @@ class ModernTransfer:
             # above on interval being instrument state rather than a
             # per-request argument. Guarded so a future dialect without the
             # command (were one ever routed through ModernTransfer) is
-            # unaffected rather than raising KeyError.
-            scope.write(scope._get_command("set_waveform_interval", value=int(stride or 1)))
+            # unaffected rather than raising KeyError. Written BEFORE the
+            # PREamble? read below -- load-bearing, not incidental: the
+            # preamble must be read back under the interval this call asked
+            # for, not whatever a previous caller (e.g. the live view) left
+            # set, or that stride would leak into this read.
+            scope.write(scope._get_command("set_waveform_interval", value=effective_stride))
 
         with scope._connection.lock:
             scope.write(scope._get_command("get_waveform_preamble"))
@@ -499,10 +526,28 @@ class ModernTransfer:
         if meta["code_per_div"] == 0:
             raise exceptions.CommandError(f"Modern WAVEDESC code_per_div is 0 ({preamble_context})")
 
+        # The one thing code cannot settle: whether a real instrument's
+        # DATA_INTERVAL echo (and therefore its HORIZ_INTERVAL scaling, used
+        # below for the time axis) actually reflects the stride we requested.
+        # A mismatch must not be invisible -- log it, but don't raise; a
+        # disagreement here is a scaling risk, not a malformed read.
+        if meta["data_interval"] != effective_stride:
+            logger.warning(
+                "Requested :WAVeform:INTerval %d but PREamble reported DATA_INTERVAL %d (host %s:%s) -- the returned record length/time axis may not be scaled the way this driver assumes.",
+                effective_stride,
+                meta["data_interval"],
+                scope.host,
+                scope.port,
+            )
+
         dtype = np.int16 if meta["comm_type"] == 1 else np.int8
         # wave_array_count (WAVEDESC address 116-119, p.756) is "Number of
-        # data points in the data array" -- the FULL record, even when a
-        # single :WAVeform:DATA? transfer cannot carry all of it at once.
+        # data points in the data array". ASSUMPTION (Task 3 stride
+        # follow-up, not yet confirmed against real hardware): when stride >
+        # 1, this is the STRIDED count, not the full record's -- see the
+        # mock's build_waveform_preamble docstring for why. It is still the
+        # FULL record when stride == 1, even when a single :WAVeform:DATA?
+        # transfer cannot carry all of it at once.
         record_length = meta["wave_array_count"]
 
         # :WAVeform:MAXPoint? (p.753) is Query-only: the scope reports its own
@@ -516,29 +561,56 @@ class ModernTransfer:
             max_points = max(record_length, 1)
 
         data_context = f"host {scope.host}:{scope.port}, command ':WAVeform:DATA?'"
-        chunks = []
-        start = 0
-        while start < record_length:
-            # STARt and DATA? are coupled (DATA? answers "using the source
-            # specified by :WAVeform:SOURce" AND the current STARt window),
-            # so both live under one lock acquisition -- same reasoning as
-            # the preamble read above, extended to cover the write that picks
-            # which window DATA? answers with.
+
+        if effective_stride == 1:
+            # The proven export path: completely unchanged from before
+            # stride existed.
+            chunks = []
+            start = 0
+            while start < record_length:
+                # STARt and DATA? are coupled (DATA? answers "using the source
+                # specified by :WAVeform:SOURce" AND the current STARt window),
+                # so both live under one lock acquisition -- same reasoning as
+                # the preamble read above, extended to cover the write that picks
+                # which window DATA? answers with.
+                with scope._connection.lock:
+                    scope.write(scope._get_command("set_waveform_start", value=start))
+                    scope.write(scope._get_command("get_waveform_data"))
+                    data_raw = scope.read_raw()
+                chunk = parse_ieee_block(data_raw, dtype, error_context=data_context)
+                if chunk.size == 0:
+                    # A well-behaved instrument only returns an empty window at
+                    # end-of-record, which the `while` condition above already
+                    # excludes -- this guards against a non-conformant one
+                    # instead of looping forever.
+                    break
+                chunks.append(chunk)
+                start += chunk.size
+
+            codes = np.concatenate(chunks) if chunks else np.array([], dtype=dtype)
+        else:
+            # Deliberately NOT the general chunking loop, and deliberately not
+            # made stride-aware: `start` there is advanced by chunk.size (points
+            # already delivered, in the STRIDED/transmitted space) but written
+            # to :WAVeform:STARt and compared against record_length -- the same
+            # space as chunk.size only when stride is 1. Beyond one window, a
+            # second iteration would re-request source points the first window
+            # already delivered, silently duplicating a stretch of the record
+            # (and building `time` over the wrong `n`). The live view's request
+            # is always <= MAX_FRAME_POINTS, far below any real MAXPoint, so a
+            # single window covers every case it actually needs; a strided read
+            # that would not fit raises instead of mis-assembling.
+            if record_length > max_points:
+                raise exceptions.FeatureNotSupportedError(
+                    f"Strided read of {record_length} points (stride={effective_stride}) exceeds "
+                    f"this instrument's per-transfer cap of {max_points} points (:WAVeform:MAXPoint?); "
+                    f"multi-window strided reads are not supported ({data_context})"
+                )
             with scope._connection.lock:
-                scope.write(scope._get_command("set_waveform_start", value=start))
+                scope.write(scope._get_command("set_waveform_start", value=0))
                 scope.write(scope._get_command("get_waveform_data"))
                 data_raw = scope.read_raw()
-            chunk = parse_ieee_block(data_raw, dtype, error_context=data_context)
-            if chunk.size == 0:
-                # A well-behaved instrument only returns an empty window at
-                # end-of-record, which the `while` condition above already
-                # excludes -- this guards against a non-conformant one
-                # instead of looping forever.
-                break
-            chunks.append(chunk)
-            start += chunk.size
-
-        codes = np.concatenate(chunks) if chunks else np.array([], dtype=dtype)
+            codes = parse_ieee_block(data_raw, dtype, error_context=data_context)
 
         # SDS Series Programming Guide EN11G p.758 ("Read Waveform Data",
         # analog example, Step 3): "voltage value (V) = code value
