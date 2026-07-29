@@ -2,7 +2,10 @@ export type Identity = { name: string; devices: number; last_used: string | null
 export type Invitation = { id: string; name: string; code: string; expires: number; link?: string };
 export type RevocationResult = { devices: number; streams: number; sessions: number };
 
-/** The gateway's own session_out() payload, plus idle_seconds (see admin/api.py::list_sessions). */
+/** The gateway's own session_out() payload, plus idle_seconds and recording
+ * (see admin/api.py::list_sessions and its _is_recording helper). `recording`
+ * is `false` for any session whose kind has no recorder (PSU, AWG) -- it
+ * means "not known to be recording", not "definitely not". */
 export type Session = {
   id: string;
   label: string;
@@ -17,6 +20,7 @@ export type Session = {
   viewers: number;
   owner: string;
   idle_seconds: number;
+  recording: boolean;
 };
 
 /**

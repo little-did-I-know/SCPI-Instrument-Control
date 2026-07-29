@@ -13,6 +13,25 @@ from scpi_control.server.schemas import session_out
 router = APIRouter()
 
 
+def _is_recording(session) -> bool:
+    """True only for a scope session whose TrendRecorder is currently recording.
+
+    Matches the exact comparison already used by api/scope.py and adapters.py
+    (``recorder.state == "recording"``) rather than inventing a new notion.
+
+    PSU and AWG sessions have no recorder at all -- InstrumentSession.recorder
+    is a thin property delegating to ``self.adapter.recorder``, and only
+    ScopeAdapter sets that attribute (sessions.py's own docstring: "touching
+    one of these on a non-scope session raises AttributeError from its
+    adapter, which is the honest answer"). getattr's default here treats
+    "we can't tell" as "not recording" -- an unconditional warning for every
+    kind is exactly what adding this field is meant to replace -- rather than
+    letting one row's AttributeError take down the whole listing.
+    """
+    recorder = getattr(session, "recorder", None)
+    return recorder is not None and recorder.state == "recording"
+
+
 class InvitationCreate(BaseModel):
     name: str
 
@@ -83,7 +102,8 @@ async def cancel_invitation(invitation_id: str, request: Request):
 
 @router.get("/sessions")
 async def list_sessions(request: Request):
-    """Every open session. Reuses the gateway's own serializer plus idle time.
+    """Every open session. Reuses the gateway's own serializer plus idle time
+    and whether it's currently recording (see _is_recording).
 
     NOTE: this is a *different* /api/sessions from the gateway's authenticated
     one -- same path, different app, different port. Do not "share" the router:
@@ -91,7 +111,7 @@ async def list_sessions(request: Request):
     exists because doing so would hand every LAN token-holder admin powers.
     """
     now = time.monotonic()
-    return [dict(session_out(session), idle_seconds=round(now - session.owner_last_active, 1)) for session in request.app.state.manager.list()]
+    return [dict(session_out(session), idle_seconds=round(now - session.owner_last_active, 1), recording=_is_recording(session)) for session in request.app.state.manager.list()]
 
 
 @router.post("/sessions/{session_id}/release", status_code=204)

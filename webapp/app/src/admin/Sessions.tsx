@@ -137,8 +137,9 @@ export function Sessions() {
           }}
         >
           <p>
-            Close {closeTarget.label}? This ends the session immediately. Anyone viewing it loses
-            their view right now, and any capture in progress stops.
+            Close {closeTarget.label}? This ends the session immediately, and anyone viewing it
+            loses their view right now.
+            {closeTarget.recording ? " This session is recording -- closing it stops that capture." : null}
           </p>
           <div style={{ display: "flex", gap: "var(--space-2)", justifyContent: "flex-end" }}>
             <Button disabled={closing} onClick={() => setCloseTarget(null)}>

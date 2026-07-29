@@ -18,6 +18,7 @@ const session = (overrides: Partial<SessionRow> = {}): SessionRow => ({
   viewers: 0,
   owner: "",
   idle_seconds: 12.3,
+  recording: false,
   ...overrides,
 });
 
@@ -80,22 +81,36 @@ describe("Sessions", () => {
   });
 
   it("shows a confirmation naming the instrument before closing, and sends nothing until confirmed", async () => {
-    vi.spyOn(adminApi, "sessions").mockResolvedValue([session({ id: "s1", label: "bench-1" })]);
+    vi.spyOn(adminApi, "sessions").mockResolvedValue([session({ id: "s1", label: "bench-1", recording: false })]);
     const close = vi.spyOn(adminApi, "closeSession").mockResolvedValue(undefined);
     render(<Sessions />);
     await userEvent.click(await screen.findByRole("button", { name: /close/i }));
 
     const dialog = screen.getByRole("alertdialog");
     expect(dialog).toHaveTextContent(/bench-1/);
-    // The listing has no field for "is this session recording" (session_out's
-    // `state` is only ever connecting/connected/closed/error), so the warning
-    // can't be conditioned on that -- it applies to every close, honestly.
-    expect(dialog).toHaveTextContent(/capture in progress/i);
     expect(close).not.toHaveBeenCalled();
 
     await userEvent.click(within(dialog).getByRole("button", { name: /cancel/i }));
     expect(close).not.toHaveBeenCalled();
     expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+  });
+
+  it("warns that the session is recording when it is", async () => {
+    // Backed by /api/sessions' `recording` field (admin/api.py::_is_recording),
+    // which mirrors the same recorder.state == "recording" comparison used by
+    // api/scope.py and adapters.py -- not a new notion of recording.
+    vi.spyOn(adminApi, "sessions").mockResolvedValue([session({ id: "s1", label: "bench-1", recording: true })]);
+    render(<Sessions />);
+    await userEvent.click(await screen.findByRole("button", { name: /close/i }));
+    expect(screen.getByRole("alertdialog")).toHaveTextContent(/recording/i);
+  });
+
+  it("does not warn about recording when the session is not recording", async () => {
+    // Asserting only the positive branch would let a hardcoded warning pass.
+    vi.spyOn(adminApi, "sessions").mockResolvedValue([session({ id: "s1", label: "bench-1", recording: false })]);
+    render(<Sessions />);
+    await userEvent.click(await screen.findByRole("button", { name: /close/i }));
+    expect(screen.getByRole("alertdialog")).not.toHaveTextContent(/recording/i);
   });
 
   it("closes a session only after the confirmation is accepted, and reloads the listing", async () => {

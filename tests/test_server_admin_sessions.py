@@ -4,6 +4,8 @@ Unauthenticated by design -- see admin/app.py -- so the listing test asserts
 reachability with no credential explicitly rather than leaving it implied.
 """
 
+import time
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -36,6 +38,38 @@ def test_the_listing_reports_owner_viewers_and_idle_seconds(admin_sessions):
     assert row["owner"] == "bob"
     assert row["viewers"] == 0
     assert isinstance(row["idle_seconds"], (int, float))
+
+
+def test_the_listing_reports_recording_true_for_a_recording_session(admin_sessions):
+    client, manager = admin_sessions
+    session = manager.create("bench-1", mock=True, owner="bob")
+    # The real TrendRecorder, started directly rather than through the
+    # start_recording route: that route also requires a non-empty measurement
+    # selection and runs on the session's worker thread via a Future, which
+    # would make this test slow and would exercise ScopeAdapter.start_recording
+    # rather than the admin listing this test is actually about. Calling
+    # recorder.start() directly is the same object api/scope.py's route calls,
+    # just without that surrounding machinery.
+    session.recorder.start([(1, "RMS")], time.time())
+    rows = client.get("/api/sessions").json()
+    assert rows[0]["recording"] is True
+
+
+def test_the_listing_reports_recording_false_for_an_idle_session(admin_sessions):
+    client, manager = admin_sessions
+    manager.create("bench-1", mock=True, owner="bob")
+    rows = client.get("/api/sessions").json()
+    assert rows[0]["recording"] is False
+
+
+def test_the_listing_reports_recording_false_for_a_kind_with_no_recorder(admin_sessions):
+    # PSU and AWG sessions have no recorder at all (only ScopeAdapter sets
+    # one) -- InstrumentSession.recorder raises AttributeError there by
+    # design. This must degrade to False, not take the whole listing down.
+    client, manager = admin_sessions
+    manager.create("supply-1", kind="psu", mock=True, owner="bob")
+    rows = client.get("/api/sessions").json()
+    assert rows[0]["recording"] is False
 
 
 def test_the_listing_is_reachable_with_no_credential(admin_sessions):
