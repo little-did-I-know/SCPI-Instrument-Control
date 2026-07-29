@@ -3,7 +3,7 @@ import { Button } from "../ds/Button";
 import { DataTable } from "../ds/DataTable";
 import { GroupBox } from "../ds/GroupBox";
 import { Countdown } from "./Countdown";
-import { adminApi, type Identity, type Invitation } from "./api";
+import { adminApi, type Identity, type Invitation, type RevocationResult } from "./api";
 
 function formatDevices(count: number): string {
   return `${count} device${count === 1 ? "" : "s"}`;
@@ -44,6 +44,21 @@ function errorMessage(err: unknown): string {
   return err instanceof Error ? err.message : "Something went wrong.";
 }
 
+function formatStreams(count: number): string {
+  return `${count} live stream${count === 1 ? "" : "s"}`;
+}
+
+function formatSessions(count: number): string {
+  return `${count} session${count === 1 ? "" : "s"}`;
+}
+
+/** What DELETE /api/identities/{name} actually tore down -- reported so the
+ * admin learns whether a live viewer or an owned session was affected,
+ * instead of a generic "done". */
+function formatRevocationResult(name: string, result: RevocationResult): string {
+  return `Revoked ${name}: signed out ${formatDevices(result.devices)}, closed ${formatStreams(result.streams)}, and freed ${formatSessions(result.sessions)}.`;
+}
+
 export function People() {
   const [identities, setIdentities] = useState<Identity[] | null>(null);
   const [invitations, setInvitations] = useState<Invitation[] | null>(null);
@@ -51,6 +66,7 @@ export function People() {
 
   const [revokeTarget, setRevokeTarget] = useState<Identity | null>(null);
   const [revoking, setRevoking] = useState(false);
+  const [revoked, setRevoked] = useState("");
 
   const [inviteName, setInviteName] = useState("");
   const [inviting, setInviting] = useState(false);
@@ -81,8 +97,10 @@ export function People() {
     setError("");
     setRevoking(true);
     try {
-      await adminApi.revokeIdentity(revokeTarget.name);
+      const name = revokeTarget.name;
+      const result = await adminApi.revokeIdentity(name);
       setRevokeTarget(null);
+      setRevoked(formatRevocationResult(name, result));
       await loadIdentities();
     } catch (err) {
       setError(errorMessage(err));
@@ -129,6 +147,7 @@ export function People() {
       ) : null}
 
       <GroupBox title="Who has access">
+        {revoked ? <p style={{ fontSize: "var(--text-sm)" }}>{revoked}</p> : null}
         {identities === null ? (
           <p>Loading…</p>
         ) : identities.length === 0 ? (
@@ -261,7 +280,10 @@ export function People() {
           }}
         >
           <p>
-            Revoke {revokeTarget.name}? This signs out all {revokeTarget.devices} of their devices.
+            Revoke {revokeTarget.name}? This signs out all {revokeTarget.devices} of their devices,
+            cuts any live stream they're watching right now, and frees any session they own for
+            anyone to claim immediately -- if they're mid-capture, they lose their view the moment
+            you confirm.
           </p>
           <div style={{ display: "flex", gap: "var(--space-2)", justifyContent: "flex-end" }}>
             <Button disabled={revoking} onClick={() => setRevokeTarget(null)}>

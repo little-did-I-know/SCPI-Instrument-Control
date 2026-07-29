@@ -23,6 +23,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   what to call you, so the first identity is a real person rather than an anonymous credential
   that ends up owning every session it creates. Existing installations are unaffected — this
   changes only what happens when the token store is empty.
+- Revoking an identity now also closes that identity's live streams and releases the sessions
+  they owned. A revoked colleague mid-capture loses their view, and their session becomes
+  immediately claimable. The revoke route's response code has changed from 204 to 200 with a
+  body carrying `{"devices", "streams", "sessions"}` counts — a wire-visible change for anyone
+  scripting against it.
 
 ### Added
 
@@ -85,6 +90,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   it to another address.
 - Cancelling a pending invitation is new — previously the only remedy for one sent to the wrong
   person was waiting ten minutes for it to expire.
+- A Sessions screen in the admin panel lists every open session with its owner, viewer count and
+  idle time. Release clears the owner, making the session immediately claimable by anyone, with
+  no confirmation. Close ends the session after confirming, and warns when that session is
+  recording so an active capture is not lost accidentally.
 
 ### Fixed
 
@@ -99,6 +108,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The home screen's no-instruments-found message no longer singles out "start a Mock scope" — it
   points at the mock button for whichever instrument kind, since a mock power supply and mock
   function generator are just as available.
+- A revoked credential no longer keeps streaming to a client with an active token, and no longer
+  blocks a new user from claiming the session. A periodic liveness check in each stream catches
+  a revocation in a different process (default every 5 seconds), and closes the client's WebSocket
+  with code 4403 to signal that the credential was revoked rather than the session ending (4410).
 
 ## [5.8.0] - 2026-07-27
 

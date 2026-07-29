@@ -363,3 +363,22 @@ def test_revoke_does_not_resurrect_a_token_minted_by_another_process(tmp_path):
     fresh = TokenStore(path)
     assert fresh.verify(raw_bob) == "bob"
     assert fresh.verify(raw_robin) is None
+
+
+def test_names_sees_an_identity_minted_by_another_process(tmp_path):
+    # names() was the one public reader that never reloaded. That was harmless
+    # while its only caller ran after verify() had already reloaded in the same
+    # request -- identity_is_live() is the first caller for which it is not.
+    path = str(tmp_path / "tokens.json")
+    gateway = TokenStore(path)
+    gateway.mint("robin")
+    TokenStore(path).mint("bob")
+    assert gateway.names() == ["bob", "robin"]
+
+
+def test_names_stops_seeing_an_identity_revoked_by_another_process(tmp_path):
+    path = str(tmp_path / "tokens.json")
+    gateway = TokenStore(path)
+    gateway.mint("bob")
+    TokenStore(path).revoke("bob")
+    assert gateway.names() == []

@@ -119,7 +119,9 @@ sessions from then on.
   went — is the same command again: `scpi-web invite bob`. Their existing
   tokens keep working alongside the new one. If they should not, run
   `scpi-web token revoke bob` **first**, then invite: revoking a name cuts off
-  every token it holds, including one you just issued.
+  every token it holds, including one you just issued. One corner case if Bob
+  has a **live stream** open at that moment — see the note on the liveness
+  check below.
 
 The link's host and port come from the URL the gateway recorded when it last
 started, so what `invite` prints is openable as-is. If no gateway has ever
@@ -170,16 +172,36 @@ revoked 'alice'
 
 **Revocation takes effect immediately.** The gateway watches `tokens.json` and
 reloads it when it changes on disk, so a token revoked from another terminal
-stops working on the very next request — no restart needed.
+stops working on the very next request — no restart needed. Revoking a name
+is also more than a lock on new requests: it cuts any live stream that name is
+watching right now, and releases any session it owns so someone else can claim
+it immediately — see [Ownership](#ownership-owner-writes-everyone-watches) for
+what that release means.
 
-> **One exception: a live-stream WebSocket already open.** A stream
-> authenticates once, at the handshake, and nothing re-checks it afterwards, so
-> revoking the token does not tear the connection down — it keeps receiving
-> waveform data until it closes. Worse, a watching stream marks its session as
-> owner-watching, and that *refuses* a claim outright however long the owner has
-> been idle, so the revoked tab also keeps you from taking over the session it
-> is holding. If you need a leaked credential cut off mid-capture, close that
-> stream (or restart the gateway); revoking the token alone is not enough.
+> **A live-stream WebSocket already open is torn down too.** A stream
+> authenticates once, at the handshake, but revocation still reaches it: the
+> socket closes with code **4403** (`CLOSE_IDENTITY_REVOKED`), distinct from
+> **4410** (the session ended) — here the *session* is untouched, the viewer
+> just lost their credential. Two independent triggers make this land even
+> when the revocation happens outside the serving process — `scpi-web token
+> revoke` is a separate command invocation and has no way to signal a running
+> gateway directly: the admin panel signals the stream the moment you click
+> Revoke, and every stream also checks its own identity on its own, every few
+> seconds (5 by default), as a backstop that catches a revocation made any
+> other way. Either path clears out within a handful of seconds; neither
+> requires closing the tab yourself or restarting the gateway.
+>
+> **One limitation, worth knowing before you lean on it.** The backstop asks
+> whether the *name* still exists, not whether the particular token that
+> opened the socket does. So if the name comes back before that stream's next
+> check — `scpi-web token add bob` a second after `token revoke bob`, or Bob
+> redeeming a fresh invitation that quickly — the check sees a live "bob"
+> again and concludes nothing happened, and the stream opened on the revoked
+> credential keeps running until it closes for some other reason. New requests
+> from it are still refused; it is the already-open socket that lingers. If
+> you are re-issuing to someone who is watching a live capture, give the
+> gateway a few seconds in between, or revoke from the admin panel instead: it
+> signals every open stream the moment you click Revoke and is not affected.
 
 Every token is equal: there are no roles or scopes. Anyone with a valid token can
 create sessions and read any session; ownership (below) governs who may *write*.
@@ -449,3 +471,4 @@ directory, when you run the command explicitly.
 | **409** on create | Session cap reached |
 | **400** on session create | Target address/port refused by the SSRF gate |
 | **WS close 1008** | WebSocket handshake was not authenticated |
+| **WS close 4403** | The identity that opened the stream was revoked while it was open (the session itself is untouched) |

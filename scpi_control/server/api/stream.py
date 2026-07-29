@@ -5,6 +5,7 @@ import contextlib
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from scpi_control.server.auth import WS_ACCEPT_SUBPROTOCOL
+from scpi_control.server.revocation import identity_is_live
 
 router = APIRouter(tags=["stream"])
 
@@ -15,6 +16,11 @@ OUTBOX_MAXSIZE = 256
 # Distinct from 4404 (unknown session) and 4410 (session ended): the socket was
 # accepted but this session's adapter could not produce its opening frame.
 CLOSE_INITIAL_FRAME_FAILED = 4500
+
+# The identity that opened this socket was revoked. Distinct from 4410 (the
+# session ended) because nothing happened to the session -- the viewer lost
+# their credential.
+CLOSE_IDENTITY_REVOKED = 4403
 
 
 def _enqueue(outbox: "asyncio.Queue", message) -> None:
@@ -68,6 +74,28 @@ async def _send_from_outbox(websocket: WebSocket, outbox: "asyncio.Queue") -> No
         return
 
 
+async def _watch_for_revocation(token_store, identity: str, revoked: "asyncio.Event", interval: float) -> None:
+    """Set ``revoked`` once ``identity`` stops existing.
+
+    The backstop for a revocation made in another process -- `scpi-web token
+    revoke` -- where nothing in this process receives an event. Sets the same
+    event the registry does, so there is one teardown path rather than two that
+    have to agree. A store read can raise (TokenStore._load() surfaces a
+    corrupt file or a transient OSError as ValueError) -- that costs this tick,
+    not the whole backstop, so we retry on the next one instead of letting the
+    task die silently and leaving a revoked identity streaming forever.
+    """
+    while True:
+        await asyncio.sleep(interval)
+        try:
+            live = identity_is_live(token_store, identity)
+        except Exception:
+            continue  # an unreadable store is transient; re-check next tick
+        if not live:
+            revoked.set()
+            return
+
+
 @router.websocket("/sessions/{session_id}/stream")
 async def stream(websocket: WebSocket, session_id: str):
     session = websocket.app.state.manager.get(session_id)
@@ -95,9 +123,25 @@ async def stream(websocket: WebSocket, session_id: str):
     # abnormal disconnect releases it just like a clean close does.
     identity = getattr(websocket.state, "identity", "")
     unmark_owner_watching = session.mark_owner_watching(identity)
+    revoked = asyncio.Event()
+    unregister_stream = None
+    watcher = None
     receiver = None
     sender = None
+    revocation = None
     try:
+        # Inside the try, not above it. mark_owner_watching() has already run,
+        # so anything that raises between there and the finally leaves the
+        # owner marked as watching forever and the session permanently
+        # unclaimable -- the exact bug this whole sub-project exists to kill,
+        # arriving through a different door. Only create_app mounts this
+        # router, so today both lookups are guaranteed to be there; an app
+        # assembled some other way (an embedder, a future second mount) would
+        # raise AttributeError here, and that must cost the connection, not the
+        # bench. The names are bound to None above so the finally can tell
+        # "never registered" from "registered", and skip what was never set up.
+        unregister_stream = websocket.app.state.stream_registry.add(identity, revoked)
+        watcher = asyncio.ensure_future(_watch_for_revocation(websocket.app.state.tokens, identity, revoked, websocket.app.state.stream_revocation_interval))
         # The initial frame must match whatever shape this session's adapter
         # publishes on every subsequent tick, so the adapter -- not a `kind`
         # branch here -- decides it. A kind that forgets the hook raises
@@ -120,7 +164,14 @@ async def stream(websocket: WebSocket, session_id: str):
         # finishes first tears the connection down.
         receiver = asyncio.ensure_future(_receive_until_disconnect(websocket))
         sender = asyncio.ensure_future(_send_from_outbox(websocket, outbox))
-        await asyncio.wait({receiver, sender}, return_when=asyncio.FIRST_COMPLETED)
+        revocation = asyncio.ensure_future(revoked.wait())
+        await asyncio.wait({receiver, sender, revocation}, return_when=asyncio.FIRST_COMPLETED)
+        if revoked.is_set():
+            # Say why. A client that just sees the socket vanish cannot tell a
+            # revocation from a network blip, and this one should send the user
+            # back to the sign-in screen rather than retrying forever.
+            with contextlib.suppress(Exception):
+                await websocket.close(code=CLOSE_IDENTITY_REVOKED)
     except WebSocketDisconnect:
         pass
     except Exception:
@@ -129,7 +180,9 @@ async def stream(websocket: WebSocket, session_id: str):
     finally:
         unmark_owner_watching()
         unsubscribe()
-        for task in (receiver, sender):
+        if unregister_stream is not None:
+            unregister_stream()
+        for task in (receiver, sender, watcher, revocation):
             if task is not None:
                 task.cancel()
                 with contextlib.suppress(Exception, asyncio.CancelledError):

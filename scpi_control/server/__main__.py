@@ -266,7 +266,18 @@ def main(argv=None) -> None:
         print("\nGateway ready at {0}\nAdmin panel (this machine only) at {1}\nHand out access with: scpi-web invite <name>\n".format(url, admin_url))
     allowed_ports = frozenset(args.allow_port) | DEFAULT_ALLOWED_PORTS if args.allow_port else None
     main_app = create_app(token_store=store, invitation_store=invitations, abandon_after=args.abandon_after, allowed_ports=allowed_ports, max_sessions=args.max_sessions)
-    admin_app = None if args.no_admin else create_admin_app(token_store=store, invitation_store=invitations, base_url=url, admin_port=args.admin_port)
+    admin_app = (
+        None
+        if args.no_admin
+        else create_admin_app(
+            token_store=store,
+            invitation_store=invitations,
+            manager=main_app.state.manager,
+            stream_registry=main_app.state.stream_registry,
+            base_url=url,
+            admin_port=args.admin_port,
+        )
+    )
     _run_servers(main_app, args.host, args.port, admin_app, args.admin_port)
 
 

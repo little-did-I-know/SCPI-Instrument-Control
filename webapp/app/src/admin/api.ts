@@ -1,5 +1,27 @@
 export type Identity = { name: string; devices: number; last_used: string | null };
 export type Invitation = { id: string; name: string; code: string; expires: number; link?: string };
+export type RevocationResult = { devices: number; streams: number; sessions: number };
+
+/** The gateway's own session_out() payload, plus idle_seconds and recording
+ * (see admin/api.py::list_sessions and its _is_recording helper). `recording`
+ * is `false` for any session whose kind has no recorder (PSU, AWG) -- it
+ * means "not known to be recording", not "definitely not". */
+export type Session = {
+  id: string;
+  label: string;
+  kind: string;
+  mock: boolean;
+  address: string | null;
+  state: string;
+  idn: string;
+  model: string;
+  dialect: string;
+  num_channels: number;
+  viewers: number;
+  owner: string;
+  idle_seconds: number;
+  recording: boolean;
+};
 
 /**
  * Admin API client. Deliberately does NOT attach a bearer token: this app is
@@ -31,5 +53,10 @@ export const adminApi = {
   invitations: () => request<Invitation[]>("/api/invitations"),
   createInvitation: (name: string) => request<Invitation>("/api/invitations", json("POST", { name })),
   cancelInvitation: (id: string) => request<void>(`/api/invitations/${id}`, { method: "DELETE" }),
-  revokeIdentity: (name: string) => request<void>(`/api/identities/${encodeURIComponent(name)}`, { method: "DELETE" }),
+  // 200 with the torn-down counts, not 204 -- so the panel can report what
+  // revoking actually did instead of a generic "done".
+  revokeIdentity: (name: string) => request<RevocationResult>(`/api/identities/${encodeURIComponent(name)}`, { method: "DELETE" }),
+  sessions: () => request<Session[]>("/api/sessions"),
+  releaseSession: (id: string) => request<void>(`/api/sessions/${id}/release`, { method: "POST" }),
+  closeSession: (id: string) => request<void>(`/api/sessions/${id}`, { method: "DELETE" }),
 };

@@ -28,10 +28,26 @@ describe("People", () => {
     expect(screen.getByRole("alertdialog")).toHaveTextContent(/all 2 of their devices/i);
   });
 
+  it("names all three consequences of revoking before it happens", async () => {
+    // Devices, live streams, and owned sessions are the three things
+    // revoke_identity() actually tears down (scpi_control/server/revocation.py).
+    // A colleague mid-capture loses their view and their session becomes
+    // immediately claimable by anyone -- the confirmation must not undersell
+    // that by mentioning only the device count.
+    vi.spyOn(adminApi, "identities").mockResolvedValue([identity("bob", 2)]);
+    vi.spyOn(adminApi, "invitations").mockResolvedValue([]);
+    render(<People />);
+    await userEvent.click(await screen.findByRole("button", { name: /revoke/i }));
+    const dialog = screen.getByRole("alertdialog");
+    expect(dialog).toHaveTextContent(/device/i);
+    expect(dialog).toHaveTextContent(/live stream/i);
+    expect(dialog).toHaveTextContent(/session/i);
+  });
+
   it("does not revoke until the confirmation is accepted", async () => {
     vi.spyOn(adminApi, "identities").mockResolvedValue([identity("bob", 2)]);
     vi.spyOn(adminApi, "invitations").mockResolvedValue([]);
-    const revoke = vi.spyOn(adminApi, "revokeIdentity").mockResolvedValue(undefined);
+    const revoke = vi.spyOn(adminApi, "revokeIdentity").mockResolvedValue({ devices: 2, streams: 1, sessions: 1 });
     render(<People />);
     await userEvent.click(await screen.findByRole("button", { name: /revoke/i }));
     await userEvent.click(screen.getByRole("button", { name: /cancel/i }));
@@ -49,7 +65,7 @@ describe("People", () => {
       .mockResolvedValueOnce([identity("bob", 2)])
       .mockResolvedValueOnce([]);
     vi.spyOn(adminApi, "invitations").mockResolvedValue([]);
-    const revoke = vi.spyOn(adminApi, "revokeIdentity").mockResolvedValue(undefined);
+    const revoke = vi.spyOn(adminApi, "revokeIdentity").mockResolvedValue({ devices: 2, streams: 1, sessions: 1 });
     render(<People />);
     await screen.findByText(/bob/);
     const callsAfterMount = identities.mock.calls.length;
@@ -61,6 +77,25 @@ describe("People", () => {
     expect(revoke).toHaveBeenCalledWith("bob");
     await waitFor(() => expect(identities.mock.calls.length).toBeGreaterThan(callsAfterMount));
     expect(await screen.findByText(/no one has access yet/i)).toBeInTheDocument();
+  });
+
+  it("surfaces the counts the revoke route returns", async () => {
+    // revoke_identity() reports what it actually tore down -- the panel must
+    // show that, not a generic "done" message, since the counts are the only
+    // way an admin learns whether a live viewer or session was affected.
+    vi.spyOn(adminApi, "identities")
+      .mockResolvedValueOnce([identity("bob", 2)])
+      .mockResolvedValueOnce([]);
+    vi.spyOn(adminApi, "invitations").mockResolvedValue([]);
+    vi.spyOn(adminApi, "revokeIdentity").mockResolvedValue({ devices: 2, streams: 1, sessions: 1 });
+    render(<People />);
+    await userEvent.click(await screen.findByRole("button", { name: /revoke/i }));
+    const dialog = screen.getByRole("alertdialog");
+    await userEvent.click(within(dialog).getByRole("button", { name: /revoke/i }));
+
+    const notice = await screen.findByText(/2 devices/i);
+    expect(notice).toHaveTextContent(/1 live stream/i);
+    expect(notice).toHaveTextContent(/1 session/i);
   });
 
   it("shows the link and the code after inviting", async () => {

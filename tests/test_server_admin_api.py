@@ -1,11 +1,15 @@
 """The host-only admin app: routes, and the absence of auth."""
 
+import asyncio
+
 import pytest
 from fastapi.testclient import TestClient
 
 from scpi_control.server.admin.app import create_admin_app
 from scpi_control.server.auth import TokenStore
 from scpi_control.server.invitations import InvitationStore
+from scpi_control.server.revocation import StreamRegistry
+from scpi_control.server.sessions import SessionManager
 from tests.route_introspection import iter_http_routes
 
 
@@ -16,13 +20,23 @@ def admin_stores(tmp_path):
 
 @pytest.fixture
 def admin(admin_stores):
+    # One fixture for the whole file: create_admin_app now *requires* a manager
+    # and a stream registry, so there is no longer a "plain" admin app that
+    # revocation cannot be tested against. The separate `admin_revocation`
+    # fixture existed only to work around those arguments defaulting to None,
+    # which is the defect this app is built without. Tests that need the
+    # manager or the registry read them back off app.state (below), which also
+    # pins that create_admin_app really did store what it was handed.
     tokens, invitations = admin_stores
-    app = create_admin_app(token_store=tokens, invitation_store=invitations, base_url="http://192.168.1.50:8765/")
+    app = create_admin_app(token_store=tokens, invitation_store=invitations, manager=SessionManager(), stream_registry=StreamRegistry(), base_url="http://192.168.1.50:8765/")
     # base_url is 127.0.0.1, not the httpx default "testserver": TrustedHostMiddleware
     # only allows 127.0.0.1/localhost, and the Host header httpx sends is derived
     # from base_url unless a test overrides it.
     with TestClient(app, base_url="http://127.0.0.1") as client:
         yield client, tokens, invitations
+    # Sessions created through the manager start a worker thread each; close
+    # them rather than leaving one per test running for the rest of the session.
+    app.state.manager.close_all()
 
 
 def test_identities_are_listed_with_device_counts(admin):
@@ -90,18 +104,71 @@ def test_cancelling_an_unknown_invitation_is_404(admin):
     assert client.delete("/api/invitations/deadbeef").status_code == 404
 
 
+def test_the_admin_app_refuses_to_build_without_a_manager_and_registry(admin_stores):
+    # The pre-6.0.0 call site. While those two arguments defaulted to None it
+    # built an app that looked healthy and then half-completed every
+    # revocation: DELETE /api/identities/{name} destroys the tokens on disk
+    # first and only then walks the registry, so the credential was gone, the
+    # live streams and owned sessions were not, and the panel saw a 500 -- "it
+    # failed", about an action that had already partly happened. Refusing at
+    # construction is the only moment that is still catchable.
+    tokens, invitations = admin_stores
+    with pytest.raises(TypeError):
+        create_admin_app(token_store=tokens, invitation_store=invitations, base_url="http://192.168.1.50:8765/")
+    with pytest.raises(TypeError):
+        create_admin_app(token_store=tokens, invitation_store=invitations, manager=SessionManager())
+    with pytest.raises(TypeError):
+        create_admin_app(token_store=tokens, invitation_store=invitations, stream_registry=StreamRegistry())
+
+
 def test_revoking_an_identity_removes_every_device(admin):
+    # The status changes deliberately from 204 to 200: a panel that cannot say
+    # what it did would have to guess. See revoke_identity in revocation.py.
     client, tokens, _invitations = admin
     laptop = tokens.mint("bob")
     tablet = tokens.mint("bob")
-    assert client.delete("/api/identities/bob").status_code == 204
+    response = client.delete("/api/identities/bob")
+    assert response.status_code == 200
+    assert response.json() == {"devices": 2, "streams": 0, "sessions": 0}
     assert tokens.verify(laptop) is None
     assert tokens.verify(tablet) is None
 
 
+def test_revoking_an_identity_reports_streams_and_sessions_too(admin):
+    client, tokens, _invitations = admin
+    manager, registry = client.app.state.manager, client.app.state.stream_registry
+    tokens.mint("bob")
+    manager.create("bench-1", mock=True, owner="bob")
+    registry.add("bob", asyncio.Event())
+    response = client.delete("/api/identities/bob")
+    assert response.status_code == 200
+    assert response.json() == {"devices": 1, "streams": 1, "sessions": 1}
+
+
+def test_revoking_an_identity_releases_only_that_identitys_sessions(admin):
+    client, tokens, _invitations = admin
+    manager = client.app.state.manager
+    tokens.mint("bob")
+    tokens.mint("robin")
+    mine = manager.create("bench-1", mock=True, owner="bob")
+    theirs = manager.create("bench-2", mock=True, owner="robin")
+    response = client.delete("/api/identities/bob")
+    assert response.status_code == 200
+    assert response.json()["sessions"] == 1
+    assert manager.get(mine.id).owner == ""
+    assert manager.get(theirs.id).owner == "robin"
+
+
 def test_revoking_an_unknown_identity_is_404(admin):
-    client, _tokens, _invitations = admin
+    client, tokens, _invitations = admin
+    manager = client.app.state.manager
+    tokens.mint("robin")
+    session = manager.create("bench-1", mock=True, owner="robin")
     assert client.delete("/api/identities/ghost").status_code == 404
+    # Changes nothing: the surviving identity's token still verifies and its
+    # session is still owned.
+    assert tokens.names() == ["robin"]
+    assert manager.get(session.id).owner == "robin"
 
 
 def test_the_admin_app_has_no_auth_middleware(admin):
@@ -164,7 +231,17 @@ def test_the_main_app_serves_no_admin_routes(gateway_auth, tmp_path):
     # precisely the one-line mistake it exists to catch, and pass on the three
     # routes create_app declares inline. iter_http_routes reads the generated
     # schema instead, which reports full paths whatever the nesting.
-    leaked = sorted({path for _method, path in iter_http_routes(app) if path.startswith("/api/identities") or path.startswith("/api/invitations")})
+    #
+    # The filter has to name every admin path that is *distinguishable* from a
+    # gateway one. Two of the three session routes the panel gained collide by
+    # path with legitimate gateway routes -- GET /api/sessions and DELETE
+    # /api/sessions/{session_id} exist on both apps, deliberately (see
+    # admin/api.py:list_sessions) -- so neither can be looked for here without
+    # failing on the honest gateway. /api/sessions/{session_id}/release is the
+    # admin router's one unambiguous fingerprint, and so the only one of the
+    # three that could betray a stray include_router of it.
+    admin_only = ("/api/identities", "/api/invitations", "/api/sessions/{session_id}/release")
+    leaked = sorted({path for _method, path in iter_http_routes(app) if path.startswith(admin_only)})
     assert not leaked, "create_app serves admin routes: {0}".format(leaked)
 
     # The same question put to the running app, which no route-object or schema
@@ -178,6 +255,18 @@ def test_the_main_app_serves_no_admin_routes(gateway_auth, tmp_path):
         client.headers.update(headers)
         assert client.get("/api/identities").status_code == 404
         assert client.get("/api/invitations").status_code == 404
+        # Same reasoning as the filter above: of the three session routes, only
+        # release can be asked for by path without the gateway's own
+        # /api/sessions answering. It is asked against a *real* session, not a
+        # ghost id, because the admin route 404s on a ghost exactly as an
+        # unrouted path does -- the leak would be invisible. On a real one it
+        # answers 204 and unowns it, which the second assertion catches. The
+        # status is 405 when a built SPA bundle's GET catch-all claims the path
+        # and 404 when there is no bundle to claim it; both mean "no POST
+        # handler here".
+        session_id = client.post("/api/sessions", json={"label": "bench", "mock": True}).json()["id"]
+        assert client.post("/api/sessions/{0}/release".format(session_id)).status_code in (404, 405)
+        assert client.get("/api/sessions/{0}".format(session_id)).json()["owner"] == "tester"
 
 
 def test_the_two_apps_never_share_a_static_directory(tmp_path):
@@ -219,6 +308,24 @@ def test_a_foreign_origin_is_rejected_on_a_write(admin):
     assert invitations.pending() == 0
 
 
+def test_a_foreign_origin_is_rejected_on_a_bodyless_mutating_route(admin):
+    # The module docstring names "the day someone accepts a form body" as the
+    # day FastAPI's insistence on application/json stops backing the Origin
+    # check up. POST /api/sessions/{id}/release is that day, arriving from the
+    # other direction: it takes no body and no content type at all, so a page
+    # on any site the admin visits can send it with no preflight, and the
+    # Origin check is the only thing standing between that page and every
+    # session on the bench being unowned. The other Origin tests are a GET and
+    # a JSON POST; neither covers this shape.
+    client, _tokens, _invitations = admin
+    manager = client.app.state.manager
+    session = manager.create("bench-1", mock=True, owner="bob")
+    response = client.post("/api/sessions/{0}/release".format(session.id), headers={"Origin": "http://evil.example"})
+    assert response.status_code == 403
+    # Refused before the handler, not merely hidden from the caller.
+    assert manager.get(session.id).owner == "bob"
+
+
 def test_a_rebound_origin_on_the_panels_own_port_is_rejected(admin):
     # The rebinding variant: the attacker's page reaches the panel on the right
     # port, so its Origin carries the panel's port but the attacker's hostname.
@@ -250,7 +357,7 @@ def test_the_origin_allowlist_follows_the_configured_admin_port(admin_stores):
     # The port is not hardcoded: run the panel on --admin-port 9001 and 9001 is
     # what its own Origin must be, while the default 8766 becomes foreign.
     tokens, invitations = admin_stores
-    app = create_admin_app(token_store=tokens, invitation_store=invitations, admin_port=9001)
+    app = create_admin_app(token_store=tokens, invitation_store=invitations, manager=SessionManager(), stream_registry=StreamRegistry(), admin_port=9001)
     with TestClient(app, base_url="http://127.0.0.1") as client:
         assert client.get("/api/identities", headers={"Origin": "http://127.0.0.1:9001"}).status_code == 200
         assert client.get("/api/identities", headers={"Origin": "http://127.0.0.1:8766"}).status_code == 403
@@ -289,7 +396,7 @@ def test_admin_spa_traversal_is_contained(tmp_path):
     try:
         tokens = TokenStore(str(tmp_path / "tokens.json"))
         invitations = InvitationStore(str(tmp_path / "invitations.json"))
-        app = admin_app_module.create_admin_app(token_store=tokens, invitation_store=invitations)
+        app = admin_app_module.create_admin_app(token_store=tokens, invitation_store=invitations, manager=SessionManager(), stream_registry=StreamRegistry())
         with TestClient(app, base_url="http://127.0.0.1") as client:
             for payload in ("/%2e%2e/outside/secret.txt", "/../outside/secret.txt", "/%2e%2e%2foutside/secret.txt"):
                 response = client.get(payload)
