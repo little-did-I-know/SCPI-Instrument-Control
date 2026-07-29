@@ -24,8 +24,9 @@ def resolve_spa_path(static_dir: Path, full_path: str) -> Path:
 
     Returns the resolved candidate if it exists as a file and stays inside
     ``static_dir``; otherwise returns ``static_dir / "index.html"``. The
-    caller is responsible for rejecting ``/api/*`` before calling this, and
-    for wrapping the result in a FileResponse.
+    caller is responsible for rejecting ``/api/*`` before calling this.
+    Wrapping the result in a response is `spa_response`'s job below -- it is
+    the only caller of this function.
     """
     static_root = static_dir.resolve()
     candidate = (static_dir / full_path).resolve()
