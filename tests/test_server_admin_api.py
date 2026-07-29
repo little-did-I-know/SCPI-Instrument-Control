@@ -231,7 +231,17 @@ def test_the_main_app_serves_no_admin_routes(gateway_auth, tmp_path):
     # precisely the one-line mistake it exists to catch, and pass on the three
     # routes create_app declares inline. iter_http_routes reads the generated
     # schema instead, which reports full paths whatever the nesting.
-    leaked = sorted({path for _method, path in iter_http_routes(app) if path.startswith("/api/identities") or path.startswith("/api/invitations")})
+    #
+    # The filter has to name every admin path that is *distinguishable* from a
+    # gateway one. Two of the three session routes the panel gained collide by
+    # path with legitimate gateway routes -- GET /api/sessions and DELETE
+    # /api/sessions/{session_id} exist on both apps, deliberately (see
+    # admin/api.py:list_sessions) -- so neither can be looked for here without
+    # failing on the honest gateway. /api/sessions/{session_id}/release is the
+    # admin router's one unambiguous fingerprint, and so the only one of the
+    # three that could betray a stray include_router of it.
+    admin_only = ("/api/identities", "/api/invitations", "/api/sessions/{session_id}/release")
+    leaked = sorted({path for _method, path in iter_http_routes(app) if path.startswith(admin_only)})
     assert not leaked, "create_app serves admin routes: {0}".format(leaked)
 
     # The same question put to the running app, which no route-object or schema
@@ -245,6 +255,18 @@ def test_the_main_app_serves_no_admin_routes(gateway_auth, tmp_path):
         client.headers.update(headers)
         assert client.get("/api/identities").status_code == 404
         assert client.get("/api/invitations").status_code == 404
+        # Same reasoning as the filter above: of the three session routes, only
+        # release can be asked for by path without the gateway's own
+        # /api/sessions answering. It is asked against a *real* session, not a
+        # ghost id, because the admin route 404s on a ghost exactly as an
+        # unrouted path does -- the leak would be invisible. On a real one it
+        # answers 204 and unowns it, which the second assertion catches. The
+        # status is 405 when a built SPA bundle's GET catch-all claims the path
+        # and 404 when there is no bundle to claim it; both mean "no POST
+        # handler here".
+        session_id = client.post("/api/sessions", json={"label": "bench", "mock": True}).json()["id"]
+        assert client.post("/api/sessions/{0}/release".format(session_id)).status_code in (404, 405)
+        assert client.get("/api/sessions/{0}".format(session_id)).json()["owner"] == "tester"
 
 
 def test_the_two_apps_never_share_a_static_directory(tmp_path):
@@ -284,6 +306,24 @@ def test_a_foreign_origin_is_rejected_on_a_write(admin):
     assert response.status_code == 403
     # The refusal must happen before the handler, not merely hide its output.
     assert invitations.pending() == 0
+
+
+def test_a_foreign_origin_is_rejected_on_a_bodyless_mutating_route(admin):
+    # The module docstring names "the day someone accepts a form body" as the
+    # day FastAPI's insistence on application/json stops backing the Origin
+    # check up. POST /api/sessions/{id}/release is that day, arriving from the
+    # other direction: it takes no body and no content type at all, so a page
+    # on any site the admin visits can send it with no preflight, and the
+    # Origin check is the only thing standing between that page and every
+    # session on the bench being unowned. The other Origin tests are a GET and
+    # a JSON POST; neither covers this shape.
+    client, _tokens, _invitations = admin
+    manager = client.app.state.manager
+    session = manager.create("bench-1", mock=True, owner="bob")
+    response = client.post("/api/sessions/{0}/release".format(session.id), headers={"Origin": "http://evil.example"})
+    assert response.status_code == 403
+    # Refused before the handler, not merely hidden from the caller.
+    assert manager.get(session.id).owner == "bob"
 
 
 def test_a_rebound_origin_on_the_panels_own_port_is_rejected(admin):
