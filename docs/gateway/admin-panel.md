@@ -203,7 +203,7 @@ dialog: a modal that sits over the page rather than a block of text under the
 table, so it is never scrolled out of view on a long list. It opens with focus
 already on Cancel, keeps Tab from leaving the dialog, and closes on **Escape**
 or a click on the backdrop behind it — all three read as "never mind" and put
-focus back on the button you opened it from. While either confirmation is
+focus back on the button you opened it from. While the Close confirmation is
 open, the ten-second refresh pauses, so the row you are reading about cannot
 reshuffle or disappear out from under the question you are being asked.
 
