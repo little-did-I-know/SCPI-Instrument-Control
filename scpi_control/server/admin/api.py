@@ -4,6 +4,7 @@ import time
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Request
+from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel
 
 from scpi_control.server.schemas import session_out
@@ -92,6 +93,14 @@ async def release_session(session_id: str, request: Request):
 
 @router.delete("/sessions/{session_id}", status_code=204)
 async def close_session(session_id: str, request: Request):
-    if not request.app.state.manager.delete(session_id):
+    # SessionManager.delete() calls session.close(), which joins the session's
+    # worker thread (up to a 10s timeout) -- a blocking call that must not run
+    # on the event loop this app shares with the main gateway (__main__.py's
+    # "Both run on one event loop in one process"). Offloaded to the threadpool
+    # the same way scpi_control/server/api/sessions.py's own delete route does;
+    # the handler itself stays async def per the thread-safety constraint on
+    # asyncio.Event (see revocation.py) even though this route doesn't touch
+    # the registry directly.
+    if not await run_in_threadpool(request.app.state.manager.delete, session_id):
         raise HTTPException(status_code=404, detail="no session with that id")
     return None
