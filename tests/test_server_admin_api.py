@@ -20,27 +20,23 @@ def admin_stores(tmp_path):
 
 @pytest.fixture
 def admin(admin_stores):
+    # One fixture for the whole file: create_admin_app now *requires* a manager
+    # and a stream registry, so there is no longer a "plain" admin app that
+    # revocation cannot be tested against. The separate `admin_revocation`
+    # fixture existed only to work around those arguments defaulting to None,
+    # which is the defect this app is built without. Tests that need the
+    # manager or the registry read them back off app.state (below), which also
+    # pins that create_admin_app really did store what it was handed.
     tokens, invitations = admin_stores
-    app = create_admin_app(token_store=tokens, invitation_store=invitations, base_url="http://192.168.1.50:8765/")
+    app = create_admin_app(token_store=tokens, invitation_store=invitations, manager=SessionManager(), stream_registry=StreamRegistry(), base_url="http://192.168.1.50:8765/")
     # base_url is 127.0.0.1, not the httpx default "testserver": TrustedHostMiddleware
     # only allows 127.0.0.1/localhost, and the Host header httpx sends is derived
     # from base_url unless a test overrides it.
     with TestClient(app, base_url="http://127.0.0.1") as client:
         yield client, tokens, invitations
-
-
-@pytest.fixture
-def admin_revocation(tmp_path):
-    # Separate from `admin`: revoke_identity's path touches app.state.manager
-    # and .stream_registry, which the plain `admin` fixture leaves as None
-    # (mirrors tests/test_server_admin_sessions.py's admin_sessions fixture).
-    tokens = TokenStore(str(tmp_path / "tokens.json"))
-    invitations = InvitationStore(str(tmp_path / "invitations.json"))
-    manager = SessionManager()
-    registry = StreamRegistry()
-    app = create_admin_app(token_store=tokens, invitation_store=invitations, manager=manager, stream_registry=registry)
-    with TestClient(app, base_url="http://127.0.0.1") as client:
-        yield client, tokens, manager, registry
+    # Sessions created through the manager start a worker thread each; close
+    # them rather than leaving one per test running for the rest of the session.
+    app.state.manager.close_all()
 
 
 def test_identities_are_listed_with_device_counts(admin):
@@ -108,10 +104,27 @@ def test_cancelling_an_unknown_invitation_is_404(admin):
     assert client.delete("/api/invitations/deadbeef").status_code == 404
 
 
-def test_revoking_an_identity_removes_every_device(admin_revocation):
+def test_the_admin_app_refuses_to_build_without_a_manager_and_registry(admin_stores):
+    # The pre-6.0.0 call site. While those two arguments defaulted to None it
+    # built an app that looked healthy and then half-completed every
+    # revocation: DELETE /api/identities/{name} destroys the tokens on disk
+    # first and only then walks the registry, so the credential was gone, the
+    # live streams and owned sessions were not, and the panel saw a 500 -- "it
+    # failed", about an action that had already partly happened. Refusing at
+    # construction is the only moment that is still catchable.
+    tokens, invitations = admin_stores
+    with pytest.raises(TypeError):
+        create_admin_app(token_store=tokens, invitation_store=invitations, base_url="http://192.168.1.50:8765/")
+    with pytest.raises(TypeError):
+        create_admin_app(token_store=tokens, invitation_store=invitations, manager=SessionManager())
+    with pytest.raises(TypeError):
+        create_admin_app(token_store=tokens, invitation_store=invitations, stream_registry=StreamRegistry())
+
+
+def test_revoking_an_identity_removes_every_device(admin):
     # The status changes deliberately from 204 to 200: a panel that cannot say
     # what it did would have to guess. See revoke_identity in revocation.py.
-    client, tokens, _manager, _registry = admin_revocation
+    client, tokens, _invitations = admin
     laptop = tokens.mint("bob")
     tablet = tokens.mint("bob")
     response = client.delete("/api/identities/bob")
@@ -121,8 +134,9 @@ def test_revoking_an_identity_removes_every_device(admin_revocation):
     assert tokens.verify(tablet) is None
 
 
-def test_revoking_an_identity_reports_streams_and_sessions_too(admin_revocation):
-    client, tokens, manager, registry = admin_revocation
+def test_revoking_an_identity_reports_streams_and_sessions_too(admin):
+    client, tokens, _invitations = admin
+    manager, registry = client.app.state.manager, client.app.state.stream_registry
     tokens.mint("bob")
     manager.create("bench-1", mock=True, owner="bob")
     registry.add("bob", asyncio.Event())
@@ -131,8 +145,9 @@ def test_revoking_an_identity_reports_streams_and_sessions_too(admin_revocation)
     assert response.json() == {"devices": 1, "streams": 1, "sessions": 1}
 
 
-def test_revoking_an_identity_releases_only_that_identitys_sessions(admin_revocation):
-    client, tokens, manager, _registry = admin_revocation
+def test_revoking_an_identity_releases_only_that_identitys_sessions(admin):
+    client, tokens, _invitations = admin
+    manager = client.app.state.manager
     tokens.mint("bob")
     tokens.mint("robin")
     mine = manager.create("bench-1", mock=True, owner="bob")
@@ -144,8 +159,9 @@ def test_revoking_an_identity_releases_only_that_identitys_sessions(admin_revoca
     assert manager.get(theirs.id).owner == "robin"
 
 
-def test_revoking_an_unknown_identity_is_404(admin_revocation):
-    client, tokens, manager, _registry = admin_revocation
+def test_revoking_an_unknown_identity_is_404(admin):
+    client, tokens, _invitations = admin
+    manager = client.app.state.manager
     tokens.mint("robin")
     session = manager.create("bench-1", mock=True, owner="robin")
     assert client.delete("/api/identities/ghost").status_code == 404
@@ -301,7 +317,7 @@ def test_the_origin_allowlist_follows_the_configured_admin_port(admin_stores):
     # The port is not hardcoded: run the panel on --admin-port 9001 and 9001 is
     # what its own Origin must be, while the default 8766 becomes foreign.
     tokens, invitations = admin_stores
-    app = create_admin_app(token_store=tokens, invitation_store=invitations, admin_port=9001)
+    app = create_admin_app(token_store=tokens, invitation_store=invitations, manager=SessionManager(), stream_registry=StreamRegistry(), admin_port=9001)
     with TestClient(app, base_url="http://127.0.0.1") as client:
         assert client.get("/api/identities", headers={"Origin": "http://127.0.0.1:9001"}).status_code == 200
         assert client.get("/api/identities", headers={"Origin": "http://127.0.0.1:8766"}).status_code == 403
@@ -340,7 +356,7 @@ def test_admin_spa_traversal_is_contained(tmp_path):
     try:
         tokens = TokenStore(str(tmp_path / "tokens.json"))
         invitations = InvitationStore(str(tmp_path / "invitations.json"))
-        app = admin_app_module.create_admin_app(token_store=tokens, invitation_store=invitations)
+        app = admin_app_module.create_admin_app(token_store=tokens, invitation_store=invitations, manager=SessionManager(), stream_registry=StreamRegistry())
         with TestClient(app, base_url="http://127.0.0.1") as client:
             for payload in ("/%2e%2e/outside/secret.txt", "/../outside/secret.txt", "/%2e%2e%2foutside/secret.txt"):
                 response = client.get(payload)

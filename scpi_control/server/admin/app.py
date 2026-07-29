@@ -47,6 +47,8 @@ from fastapi.responses import FileResponse, JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
+from scpi_control.server.revocation import StreamRegistry
+from scpi_control.server.sessions import SessionManager
 from scpi_control.server.spa import resolve_spa_path
 
 ADMIN_STATIC_DIR = Path(__file__).parent / "static"
@@ -93,7 +95,19 @@ class _SameOriginOnlyMiddleware:
         await self.app(scope, receive, send)
 
 
-def create_admin_app(token_store, invitation_store, manager=None, stream_registry=None, base_url: Optional[str] = None, admin_port: int = DEFAULT_ADMIN_PORT) -> FastAPI:
+def create_admin_app(token_store, invitation_store, *, manager: SessionManager, stream_registry: StreamRegistry, base_url: Optional[str] = None, admin_port: int = DEFAULT_ADMIN_PORT) -> FastAPI:
+    """Build the panel. ``manager`` and ``stream_registry`` are required.
+
+    They are keyword-only and have no defaults on purpose. They used to default
+    to None, which let a caller written against the pre-6.0.0 signature build an
+    app that looked fine and then half-completed a revocation: DELETE
+    /api/identities/{name} destroys the tokens *first* (on disk, irreversibly)
+    and only then walks the registry, so a None registry meant the credential
+    was gone while the streams it authenticated stayed open and the sessions it
+    owned stayed unclaimable -- and the panel reported a 500, i.e. "nothing
+    happened". A TypeError at construction is the only place that mistake can
+    still be caught before it costs somebody their revocation.
+    """
     app = FastAPI(title="SCPI Gateway Admin", docs_url=None, redoc_url=None, openapi_url=None)
     app.state.tokens = token_store
     app.state.invitations = invitation_store
