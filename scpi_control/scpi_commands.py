@@ -221,6 +221,10 @@ class SCPICommandSet:
         # to learn how many :WAVeform:STARt-driven DATA? windows a full
         # record needs.
         "get_waveform_maxpoint": ":WAVeform:MAXPoint?",  # p.753
+        # The record length, i.e. how many points the acquisition holds. NOT
+        # :WAVeform:MAXPoint? (p.753), which is the maximum per transfer -- using
+        # that to size a stride would under-decimate a deep record.
+        "get_acq_points": ":ACQuire:POINts?",  # p.36, p.43
         # Measurements — the :MEASure:SIMPle subsystem (p.335 index). The legacy
         # PAVA? command is deliberately ABSENT: it appears zero times in this
         # guide (exhaustive full-text search), so offering it here made measure()

@@ -12,7 +12,7 @@ definite-length block framing is shared by all of them.
 import logging
 import re
 import struct
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 import numpy as np
 
@@ -108,12 +108,16 @@ class SiglentTransfer:
     def __init__(self, scope: "Oscilloscope"):
         self._scope = scope
 
-    def acquire(self, channel: int, format: str = "BYTE") -> WaveformData:
+    def acquire(self, channel: int, format: str = "BYTE", stride: Optional[int] = None) -> WaveformData:
         """Acquire waveform data from a channel via WF? DAT2.
 
         Args:
             channel: Channel number (1-4)
             format: Data format - 'BYTE' or 'WORD' (default: 'BYTE')
+            stride: Unused on this dialect -- legacy Siglent has no documented
+                :WAVeform:INTerval-equivalent command, so nothing is written.
+                Accepted only so callers can pass it uniformly regardless of
+                which transfer make_transfer() selected.
 
         Returns:
             WaveformData object with time and voltage arrays
@@ -227,13 +231,17 @@ class TektronixTransfer:
     def __init__(self, scope: "Oscilloscope"):
         self._scope = scope
 
-    def acquire(self, channel: int, format: str = "BYTE") -> WaveformData:
+    def acquire(self, channel: int, format: str = "BYTE", stride: Optional[int] = None) -> WaveformData:
         """Acquire waveform data from a channel via the CURVe protocol.
 
         Args:
             channel: Channel number (1-4)
             format: Data format - only 'BYTE' (8-bit, DATa:WIDth 1) is
                 supported today; 'WORD' (16-bit) is a follow-up.
+            stride: Unused on this dialect -- no documented Tektronix
+                equivalent to :WAVeform:INTerval. Accepted only so callers
+                can pass it uniformly regardless of which transfer
+                make_transfer() selected.
 
         Returns:
             WaveformData scaled by the WFMOutpre preamble (ymult/yoff/yzero for
@@ -335,7 +343,17 @@ class LeCroyTransfer:
     def __init__(self, scope: "Oscilloscope"):
         self._scope = scope
 
-    def acquire(self, channel: int, format: str = "BYTE") -> WaveformData:
+    def acquire(self, channel: int, format: str = "BYTE", stride: Optional[int] = None) -> WaveformData:
+        """Acquire waveform data from a channel via WF? ALL.
+
+        Args:
+            channel: Channel number (1-4)
+            format: Data format - 'BYTE' or 'WORD'
+            stride: Unused on this dialect -- no documented LeCroy equivalent
+                to :WAVeform:INTerval. Accepted only so callers can pass it
+                uniformly regardless of which transfer make_transfer()
+                selected.
+        """
         scope = self._scope
         fmt = "WORD" if format.upper() == "WORD" else "BYTE"
         scope.write(scope._get_command("set_comm_format", fmt=fmt))
@@ -422,7 +440,7 @@ class ModernTransfer:
     def __init__(self, scope: "Oscilloscope"):
         self._scope = scope
 
-    def acquire(self, channel: int, format: str = "BYTE") -> WaveformData:
+    def acquire(self, channel: int, format: str = "BYTE", stride: Optional[int] = None) -> WaveformData:
         """Acquire waveform data from a channel via :WAVeform:SOURce/PREamble/DATA.
 
         Args:
@@ -430,6 +448,15 @@ class ModernTransfer:
             format: Data format - 'BYTE' or 'WORD' (default: 'BYTE'); sets
                 :WAVeform:WIDTh before the transfer so COMM_TYPE in the
                 preamble matches what DATA? actually sends.
+            stride: Sets :WAVeform:INTerval before the transfer so the
+                instrument returns every Nth point instead of the driver
+                pulling the full record and striding it down after the wire
+                transfer. :WAVeform:INTerval is instrument state, not a
+                per-request argument -- a value left over from a previous
+                caller (e.g. the live view) would silently decimate the next
+                export on this session. So this is ALWAYS written explicitly,
+                including when stride is None, which writes 1 (no
+                decimation) rather than leaving whatever was last set.
 
         Returns:
             WaveformData scaled by the PREamble's vertical_gain/
@@ -453,6 +480,14 @@ class ModernTransfer:
         # :WAVeform:SOURce" (guide p.748/p.754).
         scope.write(scope._get_command("set_waveform_source", ch=channel))
         scope.write(scope._get_command("set_waveform_width", value=format))
+
+        if scope._has_command("set_waveform_interval"):
+            # Always explicit, never inherited: see the stride docstring note
+            # above on interval being instrument state rather than a
+            # per-request argument. Guarded so a future dialect without the
+            # command (were one ever routed through ModernTransfer) is
+            # unaffected rather than raising KeyError.
+            scope.write(scope._get_command("set_waveform_interval", value=int(stride or 1)))
 
         with scope._connection.lock:
             scope.write(scope._get_command("get_waveform_preamble"))

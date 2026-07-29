@@ -374,6 +374,18 @@ class Oscilloscope:
             # A gate we cannot read is a gate we do not have, for this tick only.
             return None
 
+    def record_length(self) -> Optional[int]:
+        """The full acquisition length in points, or None if the dialect can't say.
+
+        This is :ACQuire:POINts?, NOT :WAVeform:MAXPoint? -- the latter is the
+        maximum points a single transfer can carry, not how many the record
+        actually holds. A caller sizing a stride from the wrong one would
+        under-decimate a deep record.
+        """
+        if not self._has_command("get_acq_points"):
+            return None
+        return int(float(self.query(self._get_command("get_acq_points"))))
+
     @property
     def timebase(self) -> float:
         """Get timebase setting in seconds/division."""
@@ -392,7 +404,7 @@ class Oscilloscope:
         """Perform automatic setup."""
         self.write(self._get_command("auto_setup"))
 
-    def get_waveform(self, channel: int, provenance: bool = True) -> WaveformData:
+    def get_waveform(self, channel: int, provenance: bool = True, stride: Optional[int] = None) -> WaveformData:
         """Acquire waveform data from a channel.
 
         Convenience method that calls waveform.acquire().
@@ -401,11 +413,19 @@ class Oscilloscope:
             channel: Channel number (1-4)
             provenance: Snapshot instrument settings alongside the data
                 (default True; pass False on high-rate paths)
+            stride: Ask the instrument to return every Nth point via
+                :WAVeform:INTerval, bounding the transfer instead of pulling
+                the full record and striding it down afterward. This is
+                instrument state, not a per-request argument: every read sets
+                it explicitly, so None means "set it to 1", never "leave it
+                alone" -- otherwise a stride left over from the live view
+                would silently decimate the next export on this session.
+                Ignored on dialects that don't document the command.
 
         Returns:
             WaveformData object with time and voltage arrays
         """
-        return self.waveform.acquire(channel, provenance=provenance)
+        return self.waveform.acquire(channel, provenance=provenance, stride=stride)
 
     @property
     def device_info(self) -> Optional[Dict[str, str]]:
