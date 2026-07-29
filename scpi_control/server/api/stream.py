@@ -80,11 +80,18 @@ async def _watch_for_revocation(token_store, identity: str, revoked: "asyncio.Ev
     The backstop for a revocation made in another process -- `scpi-web token
     revoke` -- where nothing in this process receives an event. Sets the same
     event the registry does, so there is one teardown path rather than two that
-    have to agree.
+    have to agree. A store read can raise (TokenStore._load() surfaces a
+    corrupt file or a transient OSError as ValueError) -- that costs this tick,
+    not the whole backstop, so we retry on the next one instead of letting the
+    task die silently and leaving a revoked identity streaming forever.
     """
     while True:
         await asyncio.sleep(interval)
-        if not identity_is_live(token_store, identity):
+        try:
+            live = identity_is_live(token_store, identity)
+        except Exception:
+            continue  # an unreadable store is transient; re-check next tick
+        if not live:
             revoked.set()
             return
 

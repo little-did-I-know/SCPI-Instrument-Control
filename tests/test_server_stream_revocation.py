@@ -2,6 +2,7 @@
 
 import pytest
 from fastapi.testclient import TestClient
+from starlette.websockets import WebSocketDisconnect
 
 from scpi_control.server.app import create_app
 from scpi_control.server.auth import TokenStore
@@ -28,9 +29,10 @@ def test_the_panel_path_closes_a_live_stream(tmp_path):
         with client.websocket_connect("/api/sessions/{0}/stream".format(session_id), subprotocols=["scpi-token.{0}".format(raw), "scpi"]) as ws:
             ws.receive_json()  # initial frame proves the stream is live
             revoke_identity(tokens, app.state.manager, app.state.stream_registry, "bob")
-            with pytest.raises(Exception):
+            with pytest.raises(WebSocketDisconnect) as excinfo:
                 for _ in range(50):
                     ws.receive_json()
+            assert excinfo.value.code == CLOSE_IDENTITY_REVOKED
 
 
 def test_the_backstop_closes_a_stream_revoked_by_another_process(tmp_path):
@@ -43,9 +45,10 @@ def test_the_backstop_closes_a_stream_revoked_by_another_process(tmp_path):
         with client.websocket_connect("/api/sessions/{0}/stream".format(session_id), subprotocols=["scpi-token.{0}".format(raw), "scpi"]) as ws:
             ws.receive_json()
             TokenStore(str(tmp_path / "tokens.json")).revoke("bob")
-            with pytest.raises(Exception):
+            with pytest.raises(WebSocketDisconnect) as excinfo:
                 for _ in range(50):
                     ws.receive_json()
+            assert excinfo.value.code == CLOSE_IDENTITY_REVOKED
 
 
 def test_a_revoked_stream_stops_blocking_the_claim(tmp_path):
@@ -62,9 +65,10 @@ def test_a_revoked_stream_stops_blocking_the_claim(tmp_path):
             session = app.state.manager.list()[0]
             assert session.owner_watching() is True
             TokenStore(str(tmp_path / "tokens.json")).revoke("bob")
-            with pytest.raises(Exception):
+            with pytest.raises(WebSocketDisconnect) as excinfo:
                 for _ in range(50):
                     ws.receive_json()
+            assert excinfo.value.code == CLOSE_IDENTITY_REVOKED
         assert session.owner_watching() is False
 
 
