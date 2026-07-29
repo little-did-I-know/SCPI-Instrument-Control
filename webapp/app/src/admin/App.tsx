@@ -1,5 +1,6 @@
 import { GroupBox } from "../ds/GroupBox";
 import { People } from "./People";
+import { Sessions } from "./Sessions";
 
 /**
  * Admin app shell. There is exactly one screen -- the person who administers
@@ -10,6 +11,9 @@ export function App() {
     <div style={{ padding: "var(--space-4)", fontFamily: "var(--font-ui)", maxWidth: "960px", margin: "0 auto" }}>
       <GroupBox title="SCPI Gateway Admin">
         <People />
+        <div style={{ marginTop: "var(--space-4)" }}>
+          <Sessions />
+        </div>
       </GroupBox>
     </div>
   );
