@@ -124,12 +124,24 @@ async def stream(websocket: WebSocket, session_id: str):
     identity = getattr(websocket.state, "identity", "")
     unmark_owner_watching = session.mark_owner_watching(identity)
     revoked = asyncio.Event()
-    unregister_stream = websocket.app.state.stream_registry.add(identity, revoked)
-    watcher = asyncio.ensure_future(_watch_for_revocation(websocket.app.state.tokens, identity, revoked, websocket.app.state.stream_revocation_interval))
+    unregister_stream = None
+    watcher = None
     receiver = None
     sender = None
     revocation = None
     try:
+        # Inside the try, not above it. mark_owner_watching() has already run,
+        # so anything that raises between there and the finally leaves the
+        # owner marked as watching forever and the session permanently
+        # unclaimable -- the exact bug this whole sub-project exists to kill,
+        # arriving through a different door. Only create_app mounts this
+        # router, so today both lookups are guaranteed to be there; an app
+        # assembled some other way (an embedder, a future second mount) would
+        # raise AttributeError here, and that must cost the connection, not the
+        # bench. The names are bound to None above so the finally can tell
+        # "never registered" from "registered", and skip what was never set up.
+        unregister_stream = websocket.app.state.stream_registry.add(identity, revoked)
+        watcher = asyncio.ensure_future(_watch_for_revocation(websocket.app.state.tokens, identity, revoked, websocket.app.state.stream_revocation_interval))
         # The initial frame must match whatever shape this session's adapter
         # publishes on every subsequent tick, so the adapter -- not a `kind`
         # branch here -- decides it. A kind that forgets the hook raises
@@ -168,7 +180,8 @@ async def stream(websocket: WebSocket, session_id: str):
     finally:
         unmark_owner_watching()
         unsubscribe()
-        unregister_stream()
+        if unregister_stream is not None:
+            unregister_stream()
         for task in (receiver, sender, watcher, revocation):
             if task is not None:
                 task.cancel()

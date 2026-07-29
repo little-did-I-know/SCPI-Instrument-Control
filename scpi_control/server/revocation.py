@@ -12,7 +12,7 @@ The liveness check notices because TokenStore reloads when the file changes.
 """
 
 import asyncio
-from typing import Any, Callable, Dict, List, Optional, Set
+from typing import Any, Callable, Dict, Optional, Set
 
 
 class StreamRegistry:

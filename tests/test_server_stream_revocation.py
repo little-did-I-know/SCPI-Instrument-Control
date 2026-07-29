@@ -193,6 +193,39 @@ def test_a_revoked_stream_stops_blocking_the_claim(tmp_path):
         assert session.owner_watching() is False
 
 
+def test_a_stream_that_cannot_reach_the_registry_still_frees_the_session(tmp_path):
+    # The same bug through a different door. api/stream.py reads
+    # app.state.stream_registry and .stream_revocation_interval *after*
+    # mark_owner_watching() has already run, so those two lookups raising would
+    # skip unmark_owner_watching() and leave the session unclaimable until the
+    # idle threshold -- permanently, while the owner is watching nothing.
+    # Unreachable through create_app, which always sets both; reachable by an
+    # app assembled any other way, which is what deleting the attribute stands
+    # in for. The connection is allowed to die; the bench is not.
+    app, tokens = _client(tmp_path, interval=3600.0)
+    # Claimable-if-idle immediately, so the claim below turns on the one thing
+    # this test is about: claim() refuses while the owner is *watching*,
+    # whatever the idle threshold says (server/ownership.py).
+    app.state.abandon_after = 0.0
+    raw = tokens.mint("bob")
+    robin = tokens.mint("robin")
+    with TestClient(app) as client:
+        headers = {"Authorization": "Bearer {0}".format(raw)}
+        session_id = client.post("/api/sessions", json={"label": "bench", "mock": True}, headers=headers).json()["id"]
+        del app.state.stream_registry
+        # The handshake is accepted before those lookups run, so the socket
+        # really opens and the handler then falls straight through to its
+        # finally. Nothing is received: the handler returns without closing, so
+        # TestClient has nothing to hand back and a receive here would block
+        # forever. Leaving the context is what waits for the handler.
+        with client.websocket_connect("/api/sessions/{0}/stream".format(session_id), subprotocols=["scpi-token.{0}".format(raw), "scpi"]):
+            pass
+        session = app.state.manager.get(session_id)
+        assert session.owner_watching() is False
+        # And claimable for real, not merely clean in the bookkeeping.
+        assert client.post("/api/sessions/{0}/claim".format(session_id), headers={"Authorization": "Bearer {0}".format(robin)}).status_code == 200
+
+
 def test_an_unrelated_identity_keeps_streaming(tmp_path):
     # Over-broad teardown would be worse than none: revoking one person must
     # not drop everyone watching. The mock's frames are deliberately left
