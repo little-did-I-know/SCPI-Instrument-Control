@@ -2,10 +2,12 @@
 
 import asyncio
 
+import httpx
 import pytest
 from fastapi.testclient import TestClient
 from starlette.websockets import WebSocketDisconnect
 
+from scpi_control.server.admin.app import create_admin_app
 from scpi_control.server.app import create_app
 from scpi_control.server.auth import TokenStore
 from scpi_control.server.invitations import InvitationStore
@@ -66,6 +68,76 @@ def _revoke_on_the_serving_loop(client, tokens, app, name):
         return revoke_identity(tokens, app.state.manager, app.state.stream_registry, name)
 
     return portal.call(_revoke)
+
+
+def _delete_identity_on_the_panel(client, admin_app, name):
+    """DELETE /api/identities/{name} on the admin app, on the gateway's loop.
+
+    A second ``TestClient`` would be the obvious way to reach the panel, and it
+    would quietly invalidate the test: each TestClient starts its own portal, so
+    the admin route would run on a *second* event loop and set the gateway
+    loop's events from a foreign thread -- the harness reintroducing the very
+    defect ``_revoke_on_the_serving_loop`` exists to keep out of this file, and
+    the opposite of what ships. ``__main__.py`` runs both apps on one loop in
+    one process (``_run_servers``); that shared loop is what makes the panel's
+    ``Event.set()`` safe on a live socket, so a test of that seam has to
+    reproduce it.
+
+    Driving httpx's ASGI transport from inside the gateway client's portal does:
+    one loop, the panel's real middleware stack (TrustedHost, same-Origin) and
+    the real route, arriving at the same registry the open socket registered
+    with. The Host must be 127.0.0.1 because TrustedHostMiddleware allows
+    nothing else, and no Origin is sent -- which is what a same-origin fetch
+    from the panel's own page looks like.
+    """
+    async def _request():
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=admin_app), base_url="http://127.0.0.1") as http:
+            return await http.delete("/api/identities/{0}".format(name))
+
+    return client.portal.call(_request)
+
+
+def test_the_admin_route_closes_a_live_stream_and_frees_the_session(tmp_path):
+    # The seam. Everything either side of it was already covered and the seam
+    # itself was not: the route was tested against a synthetic asyncio.Event
+    # (tests/test_server_admin_api.py) and the teardown was tested by calling
+    # revoke_identity directly (above), so the wiring that joins them -- the
+    # panel and the gateway sharing one manager and one registry, as
+    # __main__.py arranges -- was exercised only by a CLI test, against stubs.
+    # This is the shipped path end to end: click Revoke, socket dies, bench
+    # frees up.
+    tokens = TokenStore(str(tmp_path / "tokens.json"))
+    invitations = InvitationStore(str(tmp_path / "invitations.json"))
+    # 3600s, as in the panel-path test above: the backstop cannot be what tore
+    # this stream down, so only the route can have.
+    gateway = create_app(token_store=tokens, invitation_store=invitations, stream_revocation_interval=3600.0)
+    # Precisely __main__.py's wiring: the panel is handed the gateway's own
+    # manager and registry. Private copies would give it an empty world and
+    # this test would pass while revoking nothing.
+    admin_app = create_admin_app(token_store=tokens, invitation_store=invitations, manager=gateway.state.manager, stream_registry=gateway.state.stream_registry)
+    raw = tokens.mint("bob")
+    with TestClient(gateway) as client:
+        headers = {"Authorization": "Bearer {0}".format(raw)}
+        session_id = client.post("/api/sessions", json={"label": "bench", "mock": True}, headers=headers).json()["id"]
+        with client.websocket_connect("/api/sessions/{0}/stream".format(session_id), subprotocols=["scpi-token.{0}".format(raw), "scpi"]) as ws:
+            ws.receive_json()  # initial frame: the socket is real and live
+            session = gateway.state.manager.get(session_id)
+            assert session.owner_watching() is True
+            response = _delete_identity_on_the_panel(client, admin_app, "bob")
+            assert response.status_code == 200
+            # What the panel tells the operator, from the app that owns the
+            # real state rather than a synthetic one: one device, one stream,
+            # one session.
+            assert response.json() == {"devices": 1, "streams": 1, "sessions": 1}
+            with pytest.raises(WebSocketDisconnect) as excinfo:
+                for _ in range(50):
+                    ws.receive_json()
+            assert excinfo.value.code == CLOSE_IDENTITY_REVOKED
+        # The point of the whole sub-project: not that the socket closed, but
+        # that the bench is usable again. Both halves of "claimable" -- no
+        # owner, and nobody watching on that owner's behalf.
+        assert session.owner == ""
+        assert session.owner_watching() is False
 
 
 def test_the_panel_path_closes_a_live_stream(tmp_path):
