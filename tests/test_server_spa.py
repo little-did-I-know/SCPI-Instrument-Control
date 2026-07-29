@@ -74,3 +74,25 @@ def test_encoded_traversal_is_contained(tmp_path, monkeypatch, gateway_auth):
             assert response.status_code in (200, 404), payload
             assert "TOP SECRET" not in response.text, payload
     manager.close_all()
+
+
+def test_index_is_never_cached(static_client):
+    # index.html names the content-hashed asset files, so it is the one file a
+    # rebuild cannot invalidate. Cached, it keeps asking for a bundle that no
+    # longer exists and the page appears frozen at the previous build.
+    response = static_client.get("/")
+    assert response.headers["cache-control"] == "no-store"
+
+
+def test_the_spa_fallback_is_never_cached(static_client):
+    # An unknown path falls back to index.html; that response needs the same
+    # treatment or a deep-linked client route caches a stale document.
+    response = static_client.get("/sessions/abc123")
+    assert response.headers["cache-control"] == "no-store"
+
+
+def test_hashed_assets_stay_cacheable(static_client):
+    # Their names change when their contents do, so making them uncacheable
+    # would trade the staleness bug for a slower panel.
+    response = static_client.get("/app.js")
+    assert response.headers.get("cache-control") != "no-store"

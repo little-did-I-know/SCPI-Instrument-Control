@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Button } from "../ds/Button";
+import { ConfirmDialog } from "../ds/ConfirmDialog";
 import { DataTable } from "../ds/DataTable";
 import { GroupBox } from "../ds/GroupBox";
 import { Countdown } from "./Countdown";
@@ -72,8 +73,6 @@ export function People() {
   const [inviting, setInviting] = useState(false);
   const [created, setCreated] = useState<Invitation | null>(null);
 
-  const dialogRef = useRef<HTMLDivElement>(null);
-
   const loadIdentities = useCallback(async () => {
     setIdentities(await adminApi.identities());
   }, []);
@@ -85,12 +84,6 @@ export function People() {
     void loadIdentities();
     void loadInvitations();
   }, [loadIdentities, loadInvitations]);
-
-  // Move focus into the confirmation so keyboard and screen-reader users land
-  // on it rather than having to hunt for a dialog that appeared elsewhere.
-  useEffect(() => {
-    if (revokeTarget) dialogRef.current?.focus();
-  }, [revokeTarget]);
 
   const confirmRevoke = async () => {
     if (!revokeTarget) return;
@@ -162,7 +155,7 @@ export function People() {
               <Button
                 size="sm"
                 variant="danger"
-                disabled={revokeTarget !== null}
+                disabled={revokeTarget?.name === identity.name}
                 onClick={() => setRevokeTarget(identity)}
               >
                 Revoke
@@ -261,39 +254,20 @@ export function People() {
       </GroupBox>
 
       {revokeTarget ? (
-        <div
-          role="alertdialog"
-          aria-label={`Revoke ${revokeTarget.name}?`}
-          aria-modal="true"
-          tabIndex={-1}
-          ref={dialogRef}
-          style={{
-            border: "1px solid var(--lc-border-strong)",
-            borderRadius: "var(--lc-radius)",
-            background: "var(--lc-panel)",
-            boxShadow: "var(--lc-elev-1)",
-            padding: "var(--space-3)",
-            display: "flex",
-            flexDirection: "column",
-            gap: "var(--space-2)",
-            maxWidth: "360px",
-          }}
-        >
-          <p>
-            Revoke {revokeTarget.name}? This signs out all {revokeTarget.devices} of their devices,
-            cuts any live stream they're watching right now, and frees any session they own for
-            anyone to claim immediately -- if they're mid-capture, they lose their view the moment
-            you confirm.
-          </p>
-          <div style={{ display: "flex", gap: "var(--space-2)", justifyContent: "flex-end" }}>
-            <Button disabled={revoking} onClick={() => setRevokeTarget(null)}>
-              Cancel
-            </Button>
-            <Button variant="danger" disabled={revoking} onClick={() => void confirmRevoke()}>
-              Revoke
-            </Button>
-          </div>
-        </div>
+        <ConfirmDialog
+          title={`Revoke ${revokeTarget.name}?`}
+          confirmLabel="Revoke"
+          busy={revoking}
+          onCancel={() => setRevokeTarget(null)}
+          onConfirm={() => void confirmRevoke()}
+          body={
+            <>
+              This signs out all {revokeTarget.devices} of their devices, cuts any live stream
+              they're watching right now, and frees any session they own for anyone to claim
+              immediately — if they're mid-capture, they lose their view the moment you confirm.
+            </>
+          }
+        />
       ) : null}
     </div>
   );

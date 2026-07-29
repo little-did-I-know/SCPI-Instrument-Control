@@ -43,13 +43,13 @@ from pathlib import Path
 from typing import Iterable, List, Optional
 
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from scpi_control.server.revocation import StreamRegistry
 from scpi_control.server.sessions import SessionManager
-from scpi_control.server.spa import resolve_spa_path
+from scpi_control.server.spa import spa_response
 
 ADMIN_STATIC_DIR = Path(__file__).parent / "static"
 DEFAULT_ADMIN_PORT = 8766
@@ -132,7 +132,7 @@ def create_admin_app(token_store, invitation_store, *, manager: SessionManager, 
         async def spa(full_path: str):
             if full_path.startswith("api/"):
                 raise HTTPException(status_code=404, detail="unknown path /{0}".format(full_path))
-            return FileResponse(str(resolve_spa_path(ADMIN_STATIC_DIR, full_path)))
+            return spa_response(ADMIN_STATIC_DIR, full_path)
 
     # The second and third independent defences described in the module
     # docstring -- see there for why the loopback bind alone is not enough.

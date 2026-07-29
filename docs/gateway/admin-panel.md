@@ -174,7 +174,16 @@ reads a code back out is the host-only panel. It is never served to the LAN app.
 
 **Live sessions** lists every open instrument session — the instrument (its
 label, and address or `(Mock)`), who owns it, how many viewers are watching,
-and how long the owner has been idle. Each row has two buttons:
+and how long the owner has been idle. The list refreshes itself every ten
+seconds, so **Idle** keeps counting up instead of freezing at whatever it read
+when the page opened — leave the screen open across a coffee break and it
+still tells the truth. A refresh that fails leaves the rows on screen as they
+were rather than blanking the table, and one row's Release or Close can never
+be stepped on by a slower refresh landing after it: the action always wins.
+Each row's buttons act on that row alone — clearing one session never touches
+the buttons on any other.
+
+Each row has two buttons:
 
 - **Release** clears the session's owner right away, with no confirmation. It
   is not destructive — the instrument keeps running and every viewer keeps
@@ -188,6 +197,15 @@ and how long the owner has been idle. Each row has two buttons:
   and anyone viewing it loses their view right now."* — and adds a second
   warning when the session is currently recording, because closing it stops
   that capture too.
+
+Close's confirmation, and Revoke's on the People screen above, are the same
+dialog: a modal that sits over the page rather than a block of text under the
+table, so it is never scrolled out of view on a long list. It opens with focus
+already on Cancel, keeps Tab from leaving the dialog, and closes on **Escape**
+or a click on the backdrop behind it — all three read as "never mind" and put
+focus back on the button you opened it from. While the Close confirmation is
+open, the ten-second refresh pauses, so the row you are reading about cannot
+reshuffle or disappear out from under the question you are being asked.
 
 Revoking an identity on the People screen above reaches this same list: every
 session the revoked name owned is released the same way Release does here, so

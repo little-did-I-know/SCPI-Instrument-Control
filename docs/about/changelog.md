@@ -94,6 +94,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   idle time. Release clears the owner, making the session immediately claimable by anyone, with
   no confirmation. Close ends the session after confirming, and warns when that session is
   recording so an active capture is not lost accidentally.
+- The admin panel gained a page header.
+- The live-session list in the Sessions screen now displays readable right-aligned numeric columns
+  for Viewers and Idle time.
 
 ### Fixed
 
@@ -112,6 +115,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   blocks a new user from claiming the session. A periodic liveness check in each stream catches
   a revocation in a different process (default every 5 seconds), and closes the client's WebSocket
   with code 4403 to signal that the credential was revoked rather than the session ending (4410).
+- The admin panel's Close and Revoke confirmations are now genuinely modal: a backdrop over the
+  page, focus trapped inside, dismissible by Escape or a backdrop click, and focus returned to the
+  triggering button when closed. Previously they appeared as inline panels below the table, so on a
+  long list they could render below the fold and appear not to work.
+- Acting on one session (releasing or revoking) no longer disables the action buttons on every
+  other row — each row's actions are now independent.
+- The live-session list refreshes every 10 seconds, so the Idle column stays current instead of
+  being a snapshot from page load. Refreshes pause while a Close confirmation is open, so the list
+  cannot reshuffle under a question you are reading, and a failed refresh leaves the previous rows
+  visible rather than blanking the table.
+- The gateway serves `index.html` with `Cache-Control: no-store` on both the gateway and admin
+  panel, so a rebuilt webapp appears on an ordinary reload instead of requiring a hard refresh and
+  cache clear.
 
 ## [5.8.0] - 2026-07-27
 

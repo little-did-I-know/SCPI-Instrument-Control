@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "../ds/Button";
+import { ConfirmDialog } from "../ds/ConfirmDialog";
 import { DataTable } from "../ds/DataTable";
 import { GroupBox } from "../ds/GroupBox";
 import { adminApi, type Session } from "./api";
@@ -17,22 +18,31 @@ function errorMessage(err: unknown): string {
   return err instanceof Error ? err.message : "Something went wrong.";
 }
 
+// Idle time is the one value whose entire purpose is freshness, so it is
+// refetched rather than left at whatever it was when the page loaded.
+const POLL_INTERVAL_MS = 10_000;
+
 export function Sessions() {
   const [sessions, setSessions] = useState<Session[] | null>(null);
   const [error, setError] = useState("");
 
   const [closeTarget, setCloseTarget] = useState<Session | null>(null);
   const [closing, setClosing] = useState(false);
+  const [closeError, setCloseError] = useState("");
   const [releasingId, setReleasingId] = useState<string | null>(null);
 
-  const dialogRef = useRef<HTMLDivElement>(null);
+  const requestId = useRef(0);
 
   const loadSessions = useCallback(async () => {
+    const id = ++requestId.current;
     try {
-      setError("");
-      setSessions(await adminApi.sessions());
+      const rows = await adminApi.sessions();
+      if (id === requestId.current) {
+        setSessions(rows);
+        setError("");
+      }
     } catch (err) {
-      setError(errorMessage(err));
+      if (id === requestId.current) setError(errorMessage(err));
     }
   }, []);
 
@@ -40,11 +50,13 @@ export function Sessions() {
     void loadSessions();
   }, [loadSessions]);
 
-  // Move focus into the confirmation so keyboard and screen-reader users land
-  // on it rather than having to hunt for a dialog that appeared elsewhere.
+  // Paused while a confirmation is open: re-sorting the list under someone who
+  // is reading "Close bench-a?" is how the wrong session gets closed.
   useEffect(() => {
-    if (closeTarget) dialogRef.current?.focus();
-  }, [closeTarget]);
+    if (closeTarget) return;
+    const timer = setInterval(() => void loadSessions(), POLL_INTERVAL_MS);
+    return () => clearInterval(timer);
+  }, [closeTarget, loadSessions]);
 
   const release = async (session: Session) => {
     setError("");
@@ -61,14 +73,17 @@ export function Sessions() {
 
   const confirmClose = async () => {
     if (!closeTarget) return;
-    setError("");
+    setCloseError("");
     setClosing(true);
     try {
       await adminApi.closeSession(closeTarget.id);
       setCloseTarget(null);
       await loadSessions();
     } catch (err) {
-      setError(errorMessage(err));
+      // Reported through the dialog's own error slot, not the page-level
+      // banner: the dialog stays open for a retry, and the banner would be
+      // hidden behind its backdrop anyway.
+      setCloseError(errorMessage(err));
     } finally {
       setClosing(false);
     }
@@ -84,30 +99,31 @@ export function Sessions() {
 
       <GroupBox title="Live sessions">
         {sessions === null ? (
-          <p>Loading…</p>
+          <p style={{ color: "var(--text-muted)" }}>Loading…</p>
         ) : sessions.length === 0 ? (
-          <p>No live sessions.</p>
+          <p style={{ color: "var(--text-muted)" }}>
+            No live sessions. Sessions appear here when someone opens an instrument.
+          </p>
         ) : (
           <DataTable
-            columns={["Instrument", "Owner", "Viewers", "Idle", ""]}
+            columns={["Instrument", "Owner", { label: "Viewers", width: "5.5rem", align: "right", mono: true }, { label: "Idle", width: "7rem", align: "right", mono: true }, ""]}
             rows={sessions.map((session) => [
               formatInstrument(session),
               session.owner || "—",
               session.viewers,
               formatIdle(session.idle_seconds),
               <div style={{ display: "flex", gap: "var(--space-2)" }}>
-                <Button
-                  size="sm"
-                  disabled={closeTarget !== null || releasingId !== null}
-                  onClick={() => void release(session)}
-                >
+                <Button size="sm" disabled={releasingId === session.id} onClick={() => void release(session)}>
                   Release
                 </Button>
                 <Button
                   size="sm"
                   variant="danger"
-                  disabled={closeTarget !== null || releasingId !== null}
-                  onClick={() => setCloseTarget(session)}
+                  disabled={releasingId === session.id}
+                  onClick={() => {
+                    setCloseTarget(session);
+                    setCloseError("");
+                  }}
                 >
                   Close
                 </Button>
@@ -118,38 +134,23 @@ export function Sessions() {
       </GroupBox>
 
       {closeTarget ? (
-        <div
-          role="alertdialog"
-          aria-label={`Close ${closeTarget.label}?`}
-          aria-modal="true"
-          tabIndex={-1}
-          ref={dialogRef}
-          style={{
-            border: "1px solid var(--lc-border-strong)",
-            borderRadius: "var(--lc-radius)",
-            background: "var(--lc-panel)",
-            boxShadow: "var(--lc-elev-1)",
-            padding: "var(--space-3)",
-            display: "flex",
-            flexDirection: "column",
-            gap: "var(--space-2)",
-            maxWidth: "360px",
+        <ConfirmDialog
+          title={`Close ${closeTarget.label}?`}
+          confirmLabel="Close"
+          busy={closing}
+          error={closeError}
+          onCancel={() => {
+            setCloseTarget(null);
+            setCloseError("");
           }}
-        >
-          <p>
-            Close {closeTarget.label}? This ends the session immediately, and anyone viewing it
-            loses their view right now.
-            {closeTarget.recording ? " This session is recording -- closing it stops that capture." : null}
-          </p>
-          <div style={{ display: "flex", gap: "var(--space-2)", justifyContent: "flex-end" }}>
-            <Button disabled={closing} onClick={() => setCloseTarget(null)}>
-              Cancel
-            </Button>
-            <Button variant="danger" disabled={closing} onClick={() => void confirmClose()}>
-              Close
-            </Button>
-          </div>
-        </div>
+          onConfirm={() => void confirmClose()}
+          body={
+            <>
+              This ends the session immediately, and anyone viewing it loses their view right now.
+              {closeTarget.recording ? " This session is recording — closing it stops that capture." : null}
+            </>
+          }
+        />
       ) : null}
     </div>
   );

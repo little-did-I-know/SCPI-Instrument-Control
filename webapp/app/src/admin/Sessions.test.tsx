@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Sessions } from "./Sessions";
@@ -34,6 +34,29 @@ describe("Sessions", () => {
     expect(screen.getByText(/bob/)).toBeInTheDocument();
     expect(screen.getByText(/2/)).toBeInTheDocument();
     expect(screen.getByText(/5\.5/)).toBeInTheDocument();
+  });
+
+  it("right-aligns the numeric columns in a mono face", async () => {
+    // Viewer counts and idle times are scanned down a column, not read as prose.
+    vi.spyOn(adminApi, "sessions").mockResolvedValue([session({ idle_seconds: 5.5 })]);
+    render(<Sessions />);
+    const cell = await screen.findByText("5.5s idle");
+    expect(cell.closest("td")).toHaveStyle({ textAlign: "right" });
+  });
+
+  it("keeps the destructive action visually secondary", async () => {
+    vi.spyOn(adminApi, "sessions").mockResolvedValue([session()]);
+    render(<Sessions />);
+    const close = await screen.findByRole("button", { name: "Close" });
+    const release = screen.getByRole("button", { name: "Release" });
+    expect(close).toHaveAttribute("data-variant", "danger");
+    expect(release).not.toHaveAttribute("data-variant", "danger");
+  });
+
+  it("explains an empty list rather than just stating it", async () => {
+    vi.spyOn(adminApi, "sessions").mockResolvedValue([]);
+    render(<Sessions />);
+    expect(await screen.findByText(/Sessions appear here when someone opens an instrument/)).toBeInTheDocument();
   });
 
   it("renders an address instead of Mock for a real instrument", async () => {
@@ -140,5 +163,270 @@ describe("Sessions", () => {
     const dialog = screen.getByRole("alertdialog");
     await userEvent.click(within(dialog).getByRole("button", { name: /close/i }));
     expect(await screen.findByRole("alert")).toHaveTextContent(/session already closing/i);
+  });
+
+  it("keeps a failed close's error inside the modal, not hidden behind the backdrop", async () => {
+    // Before this fix, a failed close's message rendered in the page-level
+    // banner, which sits underneath the backdrop while the dialog stays
+    // open (confirmClose only clears closeTarget on success) -- so the
+    // only evidence of the failure was invisible to the operator reading
+    // the still-open dialog.
+    vi.spyOn(adminApi, "sessions").mockResolvedValue([session({ id: "s1", label: "bench-1" })]);
+    vi.spyOn(adminApi, "closeSession").mockRejectedValue(new Error("session already closing"));
+    render(<Sessions />);
+    await userEvent.click(await screen.findByRole("button", { name: /close/i }));
+    const dialog = screen.getByRole("alertdialog");
+    await userEvent.click(within(dialog).getByRole("button", { name: /close/i }));
+
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent(/session already closing/i);
+    expect(screen.getByRole("alertdialog")).toBeInTheDocument();
+  });
+
+  it("leaves other rows usable while one row is releasing", async () => {
+    // The old code disabled every button on every row whenever any action was in
+    // flight, so acting on one bench greyed out the whole panel.
+    vi.spyOn(adminApi, "sessions").mockResolvedValue([
+      session({ id: "aaa", label: "bench-a" }),
+      session({ id: "bbb", label: "bench-b" }),
+    ]);
+    let resolveRelease: () => void = () => {};
+    vi.spyOn(adminApi, "releaseSession").mockReturnValue(
+      new Promise<void>((resolve) => {
+        resolveRelease = resolve;
+      }),
+    );
+    render(<Sessions />);
+
+    const rows = await screen.findAllByRole("row");
+    const rowA = within(rows[1]);
+    const rowB = within(rows[2]);
+    await userEvent.click(rowA.getByRole("button", { name: "Release" }));
+
+    expect(rowA.getByRole("button", { name: "Release" })).toBeDisabled();
+    expect(rowB.getByRole("button", { name: "Release" })).toBeEnabled();
+    expect(rowB.getByRole("button", { name: "Close" })).toBeEnabled();
+
+    resolveRelease();
+  });
+
+  it("puts the close confirmation in a modal that traps focus", async () => {
+    vi.spyOn(adminApi, "sessions").mockResolvedValue([session({ id: "aaa", label: "bench-a" })]);
+    const close = vi.spyOn(adminApi, "closeSession").mockResolvedValue(undefined);
+    render(<Sessions />);
+    await userEvent.click(await screen.findByRole("button", { name: "Close" }));
+
+    const dialog = screen.getByRole("alertdialog");
+    expect(dialog).toHaveAttribute("aria-modal", "true");
+    expect(screen.getByRole("button", { name: "Cancel" })).toHaveFocus();
+    expect(close).not.toHaveBeenCalled();
+
+    await userEvent.keyboard("{Escape}");
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    expect(close).not.toHaveBeenCalled();
+  });
+
+  it("refreshes on a timer so the idle column cannot go stale", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      vi.spyOn(adminApi, "sessions")
+        .mockResolvedValueOnce([session({ idle_seconds: 4 })])
+        .mockResolvedValueOnce([session({ idle_seconds: 14 })]);
+      render(<Sessions />);
+      expect(await screen.findByText("4s idle")).toBeInTheDocument();
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(10_000);
+      });
+
+      expect(await screen.findByText("14s idle")).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("does not refresh while a confirmation is open", async () => {
+    // The list must not reshuffle under a confirmation the operator is reading.
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const list = vi.spyOn(adminApi, "sessions").mockResolvedValue([session({ id: "aaa", label: "bench-a" })]);
+      render(<Sessions />);
+      await userEvent.click(await screen.findByRole("button", { name: "Close" }));
+      const callsWhenOpened = list.mock.calls.length;
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(60_000);
+      });
+
+      expect(list.mock.calls.length).toBe(callsWhenOpened);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("keeps the last good rows when a refresh fails", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      vi.spyOn(adminApi, "sessions")
+        .mockResolvedValueOnce([session({ label: "bench-a" })])
+        .mockRejectedValueOnce(new Error("gateway unreachable"));
+      render(<Sessions />);
+      expect(await screen.findByText(/bench-a/)).toBeInTheDocument();
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(10_000);
+      });
+
+      expect(await screen.findByRole("alert")).toHaveTextContent("gateway unreachable");
+      expect(screen.getByText(/bench-a/)).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("stops polling once unmounted", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const list = vi.spyOn(adminApi, "sessions").mockResolvedValue([session()]);
+      const { unmount } = render(<Sessions />);
+      await screen.findByRole("table");
+      unmount();
+      const callsAtUnmount = list.mock.calls.length;
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(60_000);
+      });
+
+      expect(list.mock.calls.length).toBe(callsAtUnmount);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("does not let a stale poll response overwrite a newer release reload", async () => {
+    // A release fires its own reload; if an in-flight poll tick's older
+    // response resolves after it, the released session must not reappear.
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      let resolvePoll: (rows: SessionRow[]) => void = () => {};
+      let resolveReleaseReload: (rows: SessionRow[]) => void = () => {};
+      const list = vi
+        .spyOn(adminApi, "sessions")
+        .mockResolvedValueOnce([session({ id: "aaa", label: "bench-a", owner: "bob" })])
+        // The poll tick's request, kicked off while the release is in flight.
+        .mockImplementationOnce(
+          () => new Promise<SessionRow[]>((resolve) => (resolvePoll = resolve)),
+        )
+        // The release's own reload, requested after the poll tick above.
+        .mockImplementationOnce(
+          () => new Promise<SessionRow[]>((resolve) => (resolveReleaseReload = resolve)),
+        );
+      vi.spyOn(adminApi, "releaseSession").mockResolvedValue(undefined);
+      render(<Sessions />);
+      await screen.findByText(/bob/);
+
+      // Trigger the poll tick: its request goes in flight but does not resolve yet.
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(10_000);
+      });
+      expect(list.mock.calls.length).toBe(2);
+
+      // Now release, which fires its own (third) reload request.
+      await user.click(screen.getByRole("button", { name: "Release" }));
+      await vi.waitFor(() => expect(list.mock.calls.length).toBe(3));
+
+      // The release's reload resolves first, clearing the owner...
+      await act(async () => {
+        resolveReleaseReload([session({ id: "aaa", label: "bench-a", owner: "" })]);
+      });
+      expect(await screen.findByText("—")).toBeInTheDocument();
+
+      // ...then the stale poll response resolves late, with the old owner.
+      // It must be discarded rather than winning because it landed last.
+      await act(async () => {
+        resolvePoll([session({ id: "aaa", label: "bench-a", owner: "bob" })]);
+      });
+      expect(screen.getByText("—")).toBeInTheDocument();
+      expect(screen.queryByText(/bob/)).not.toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("does not clear an existing error banner before a poll's own response arrives", async () => {
+    // The old code called setError("") synchronously at the top of every
+    // loadSessions -- including a poll tick -- before the network call even
+    // resolved, so a banner from an earlier failure vanished the instant the
+    // next tick fired, regardless of what that tick's own request did.
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      let resolvePoll: (rows: SessionRow[]) => void = () => {};
+      vi.spyOn(adminApi, "sessions")
+        .mockRejectedValueOnce(new Error("gateway unreachable"))
+        .mockImplementationOnce(() => new Promise<SessionRow[]>((resolve) => (resolvePoll = resolve)));
+      render(<Sessions />);
+      expect(await screen.findByRole("alert")).toHaveTextContent(/gateway unreachable/i);
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(10_000);
+      });
+
+      // The tick's own request is in flight but unresolved: the earlier
+      // banner must still be visible, not cleared the instant the tick fired.
+      expect(screen.getByRole("alert")).toHaveTextContent(/gateway unreachable/i);
+
+      await act(async () => {
+        resolvePoll([session()]);
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("does not let a stale poll rejection raise an error banner over fresh rows", async () => {
+    // Mirrors the stale-response test above, but for the error path: the old
+    // catch block's setError() had no generation guard at all, so a
+    // superseded request's rejection could paint a banner over rows a newer,
+    // successful request had already delivered.
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      let rejectPoll: (err: Error) => void = () => {};
+      let resolveReleaseReload: (rows: SessionRow[]) => void = () => {};
+      const list = vi
+        .spyOn(adminApi, "sessions")
+        .mockResolvedValueOnce([session({ id: "aaa", label: "bench-a", owner: "bob" })])
+        // The poll tick's request, kicked off while the release is in flight.
+        .mockImplementationOnce(() => new Promise<SessionRow[]>((_resolve, reject) => (rejectPoll = reject)))
+        // The release's own reload, requested after the poll tick above.
+        .mockImplementationOnce(
+          () => new Promise<SessionRow[]>((resolve) => (resolveReleaseReload = resolve)),
+        );
+      vi.spyOn(adminApi, "releaseSession").mockResolvedValue(undefined);
+      render(<Sessions />);
+      await screen.findByText(/bob/);
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(10_000);
+      });
+      expect(list.mock.calls.length).toBe(2);
+
+      await user.click(screen.getByRole("button", { name: "Release" }));
+      await vi.waitFor(() => expect(list.mock.calls.length).toBe(3));
+
+      await act(async () => {
+        resolveReleaseReload([session({ id: "aaa", label: "bench-a", owner: "" })]);
+      });
+      expect(await screen.findByText("—")).toBeInTheDocument();
+
+      // The stale poll tick's rejection resolves late. It must be discarded,
+      // not painted over the fresh (successful) rows above.
+      await act(async () => {
+        rejectPoll(new Error("stale gateway blip"));
+      });
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
