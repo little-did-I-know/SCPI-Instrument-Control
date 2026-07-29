@@ -210,7 +210,16 @@ class TokenStore:
         return True
 
     def names(self) -> List[str]:
-        """Distinct identities, sorted. One entry per person, not per device."""
+        """Distinct identities, sorted. One entry per person, not per device.
+
+        Reloads first, like every other public reader. This used to be the one
+        exception, which was survivable only because its sole in-server caller
+        ran after AuthMiddleware had already reloaded in the same request.
+        identity_is_live() is called from a long-lived WebSocket that issues no
+        requests at all, so a stale answer there would keep a revoked stream
+        alive indefinitely -- the exact bug this module exists to fix.
+        """
+        self._reload_if_changed()
         return sorted({str(entry["name"]) for entry in self._tokens})
 
     def summary(self) -> List[Dict[str, Any]]:
