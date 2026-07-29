@@ -386,6 +386,25 @@ class Oscilloscope:
             return None
         return int(float(self.query(self._get_command("get_acq_points"))))
 
+    def waveform_max_points(self) -> Optional[int]:
+        """The instrument's per-:WAVeform:DATA?-transfer cap, or None if the dialect can't say.
+
+        This is :WAVeform:MAXPoint? -- the same cap ModernTransfer.acquire
+        (waveform_transfer.py) reads before deciding whether a strided record
+        fits in a single window, raising FeatureNotSupportedError when it
+        doesn't. A caller sizing a stride against a frame budget alone,
+        ignoring this number, can turn that guard into a total live-view
+        outage on a model that reports a cap below the frame budget -- size
+        against min(frame_budget, this value) instead.
+        """
+        if not self._has_command("get_waveform_maxpoint"):
+            return None
+        try:
+            value = int(float(self.query(self._get_command("get_waveform_maxpoint"))))
+        except (SiglentError, ValueError):
+            return None
+        return value if value > 0 else None
+
     @property
     def timebase(self) -> float:
         """Get timebase setting in seconds/division."""

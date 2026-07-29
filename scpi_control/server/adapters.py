@@ -30,7 +30,12 @@ DEFAULT_MOCK_AWG_IDN = "Siglent Technologies,SDG1032X,SDG1XXXXX,2.01.01.37R1"
 def _safe(fn, default=None):
     try:
         return fn()
-    except SiglentError:
+    except (SiglentError, ValueError):
+        # ValueError alongside SiglentError: a couple of the callers wrapped
+        # here (Oscilloscope.record_length()/waveform_max_points()) parse a
+        # numeric response with int(float(...)), which raises ValueError on a
+        # malformed reply rather than a SiglentError. Either way, the poll
+        # tick is the session heartbeat and must degrade to `default`, not die.
         return default
 
 
@@ -147,6 +152,12 @@ class ScopeAdapter(InstrumentAdapter):
         self.active_reference: Optional[Dict[str, Any]] = None  # {"name", "channel", "data": {"time","voltage",...}}
         self._shown: set = set()  # trace keys (M1/M2/F1/F2/SPEC) live on subscribers' canvases; worker-thread-only
         self.recorder = TrendRecorder()  # internally locked: worker appends, request threads control/read
+        # Whether a waveform frame has ever been published on this session.
+        # False lets the very first tick fetch unconditionally even when the
+        # gate below says "nothing new" -- a scope sitting in Stop mode never
+        # produces a new acquisition, and without this exemption it would show
+        # an empty canvas forever instead of its perfectly good last frame.
+        self._published_a_frame = False
 
     def build(self, address, port, mock, model, allowed_ports, connection):
         if mock:
@@ -170,13 +181,38 @@ class ScopeAdapter(InstrumentAdapter):
     def poll(self, instrument, publish, tick):
         scope = instrument
         shown = self._shown
+        # A read the scope cannot answer yet blocks this worker, and the worker
+        # is also the only thing servicing user commands -- so an unanswerable
+        # read freezes the whole UI for the length of the acquisition. Ask
+        # first, and ask at most once: the underlying register is
+        # read-and-clear, so a second read in this tick would consume a real
+        # event and get a meaningless answer. None (dialect has no gate) must
+        # never be treated as False, or the live view dies on every
+        # non-Siglent scope.
+        ready = _safe(lambda: scope.new_acquisition_ready(), default=None)
+        if ready is False and self._published_a_frame:
+            return
+        # Size the stride from the full record length, capped by whichever is
+        # smaller: our own per-frame budget, or the instrument's own
+        # per-transfer limit (:WAVeform:MAXPoint?, via waveform_max_points()).
+        # Sizing against MAX_FRAME_POINTS alone can still overflow a low cap
+        # and turn ModernTransfer's strided-read guard (FeatureNotSupportedError)
+        # into a total live-view outage -- capping here makes that guard
+        # unreachable by construction.
+        points = _safe(lambda: scope.record_length(), default=None)
+        stride = None
+        if points:
+            cap = _safe(lambda: scope.waveform_max_points(), default=None)
+            limit = min(MAX_FRAME_POINTS, cap) if cap else MAX_FRAME_POINTS
+            stride = max(1, -(-points // limit))
         acquired = {}
         for n in scope.supported_channels:
             ch = scope.get_channel(n)
             if ch is not None and _safe(lambda: ch.enabled, default=False):
-                data = scope.get_waveform(n, provenance=False)
+                data = scope.get_waveform(n, provenance=False, stride=stride)
                 acquired["C{0}".format(n)] = data
                 publish(_decimate_frame(n, data.time, data.voltage))
+                self._published_a_frame = True
         shown_now = set()
         for label, math in (("M1", scope.math1), ("M2", scope.math2)):
             result = None
