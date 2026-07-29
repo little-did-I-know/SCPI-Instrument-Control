@@ -13,6 +13,7 @@ from scpi_control.exceptions import InvalidParameterError, SiglentError, Siglent
 from scpi_control.server.api.join import FailureLimiter
 from scpi_control.server.auth import AuthMiddleware, TokenStore
 from scpi_control.server.invitations import InvitationStore
+from scpi_control.server.revocation import StreamRegistry
 from scpi_control.server.sessions import SessionError, SessionManager
 from scpi_control.server.spa import resolve_spa_path
 
@@ -28,6 +29,7 @@ def create_app(
     references_dir: Optional[str] = None,
     token_store: Optional[TokenStore] = None,
     invitation_store: Optional[InvitationStore] = None,
+    stream_revocation_interval: float = 5.0,
     abandon_after: float = 300.0,
     allowed_ports: Optional[frozenset] = None,
     max_sessions: Optional[int] = None,
@@ -73,6 +75,14 @@ def create_app(
     # (scpi_control.server.ownership.claim); mutable at runtime so tests can
     # drive it to 0 instead of sleeping for a real timeout.
     app.state.abandon_after = abandon_after
+    # Live streams grouped by identity, so revoking can signal them. Shared by
+    # the admin app, which is why both listeners run in one process.
+    app.state.stream_registry = StreamRegistry()
+    # How often a stream re-checks that its identity still exists. Injectable
+    # because a test that waits five real seconds is a test nobody runs, and
+    # because the registry test has to set it high enough to prove the backstop
+    # could not have been what tore the stream down.
+    app.state.stream_revocation_interval = stream_revocation_interval
 
     from scpi_control.server.api import awg as awg_api
     from scpi_control.server.api import commands as commands_api
