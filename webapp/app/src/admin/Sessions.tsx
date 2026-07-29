@@ -18,6 +18,10 @@ function errorMessage(err: unknown): string {
   return err instanceof Error ? err.message : "Something went wrong.";
 }
 
+// Idle time is the one value whose entire purpose is freshness, so it is
+// refetched rather than left at whatever it was when the page loaded.
+const POLL_INTERVAL_MS = 10_000;
+
 export function Sessions() {
   const [sessions, setSessions] = useState<Session[] | null>(null);
   const [error, setError] = useState("");
@@ -38,6 +42,14 @@ export function Sessions() {
   useEffect(() => {
     void loadSessions();
   }, [loadSessions]);
+
+  // Paused while a confirmation is open: re-sorting the list under someone who
+  // is reading "Close bench-a?" is how the wrong session gets closed.
+  useEffect(() => {
+    if (closeTarget) return;
+    const timer = setInterval(() => void loadSessions(), POLL_INTERVAL_MS);
+    return () => clearInterval(timer);
+  }, [closeTarget, loadSessions]);
 
   const release = async (session: Session) => {
     setError("");

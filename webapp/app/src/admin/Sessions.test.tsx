@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Sessions } from "./Sessions";
@@ -183,5 +183,70 @@ describe("Sessions", () => {
     await userEvent.keyboard("{Escape}");
     expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
     expect(close).not.toHaveBeenCalled();
+  });
+
+  it("refreshes on a timer so the idle column cannot go stale", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.spyOn(adminApi, "sessions")
+      .mockResolvedValueOnce([session({ idle_seconds: 4 })])
+      .mockResolvedValueOnce([session({ idle_seconds: 14 })]);
+    render(<Sessions />);
+    expect(await screen.findByText("4s idle")).toBeInTheDocument();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10_000);
+    });
+
+    expect(await screen.findByText("14s idle")).toBeInTheDocument();
+    vi.useRealTimers();
+  });
+
+  it("does not refresh while a confirmation is open", async () => {
+    // The list must not reshuffle under a confirmation the operator is reading.
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const list = vi.spyOn(adminApi, "sessions").mockResolvedValue([session({ id: "aaa", label: "bench-a" })]);
+    render(<Sessions />);
+    await userEvent.click(await screen.findByRole("button", { name: "Close" }));
+    const callsWhenOpened = list.mock.calls.length;
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(60_000);
+    });
+
+    expect(list.mock.calls.length).toBe(callsWhenOpened);
+    vi.useRealTimers();
+  });
+
+  it("keeps the last good rows when a refresh fails", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.spyOn(adminApi, "sessions")
+      .mockResolvedValueOnce([session({ label: "bench-a" })])
+      .mockRejectedValueOnce(new Error("gateway unreachable"));
+    render(<Sessions />);
+    expect(await screen.findByText(/bench-a/)).toBeInTheDocument();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10_000);
+    });
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("gateway unreachable");
+    expect(screen.getByText(/bench-a/)).toBeInTheDocument();
+    vi.useRealTimers();
+  });
+
+  it("stops polling once unmounted", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const list = vi.spyOn(adminApi, "sessions").mockResolvedValue([session()]);
+    const { unmount } = render(<Sessions />);
+    await screen.findByRole("table");
+    unmount();
+    const callsAtUnmount = list.mock.calls.length;
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(60_000);
+    });
+
+    expect(list.mock.calls.length).toBe(callsAtUnmount);
+    vi.useRealTimers();
   });
 });
