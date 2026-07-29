@@ -165,6 +165,23 @@ describe("Sessions", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(/session already closing/i);
   });
 
+  it("keeps a failed close's error inside the modal, not hidden behind the backdrop", async () => {
+    // Before this fix, a failed close's message rendered in the page-level
+    // banner, which sits underneath the backdrop while the dialog stays
+    // open (confirmClose only clears closeTarget on success) -- so the
+    // only evidence of the failure was invisible to the operator reading
+    // the still-open dialog.
+    vi.spyOn(adminApi, "sessions").mockResolvedValue([session({ id: "s1", label: "bench-1" })]);
+    vi.spyOn(adminApi, "closeSession").mockRejectedValue(new Error("session already closing"));
+    render(<Sessions />);
+    await userEvent.click(await screen.findByRole("button", { name: /close/i }));
+    const dialog = screen.getByRole("alertdialog");
+    await userEvent.click(within(dialog).getByRole("button", { name: /close/i }));
+
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent(/session already closing/i);
+    expect(screen.getByRole("alertdialog")).toBeInTheDocument();
+  });
+
   it("leaves other rows usable while one row is releasing", async () => {
     // The old code disabled every button on every row whenever any action was in
     // flight, so acting on one bench greyed out the whole panel.
@@ -331,6 +348,83 @@ describe("Sessions", () => {
       });
       expect(screen.getByText("—")).toBeInTheDocument();
       expect(screen.queryByText(/bob/)).not.toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("does not clear an existing error banner before a poll's own response arrives", async () => {
+    // The old code called setError("") synchronously at the top of every
+    // loadSessions -- including a poll tick -- before the network call even
+    // resolved, so a banner from an earlier failure vanished the instant the
+    // next tick fired, regardless of what that tick's own request did.
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      let resolvePoll: (rows: SessionRow[]) => void = () => {};
+      vi.spyOn(adminApi, "sessions")
+        .mockRejectedValueOnce(new Error("gateway unreachable"))
+        .mockImplementationOnce(() => new Promise<SessionRow[]>((resolve) => (resolvePoll = resolve)));
+      render(<Sessions />);
+      expect(await screen.findByRole("alert")).toHaveTextContent(/gateway unreachable/i);
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(10_000);
+      });
+
+      // The tick's own request is in flight but unresolved: the earlier
+      // banner must still be visible, not cleared the instant the tick fired.
+      expect(screen.getByRole("alert")).toHaveTextContent(/gateway unreachable/i);
+
+      await act(async () => {
+        resolvePoll([session()]);
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("does not let a stale poll rejection raise an error banner over fresh rows", async () => {
+    // Mirrors the stale-response test above, but for the error path: the old
+    // catch block's setError() had no generation guard at all, so a
+    // superseded request's rejection could paint a banner over rows a newer,
+    // successful request had already delivered.
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      let rejectPoll: (err: Error) => void = () => {};
+      let resolveReleaseReload: (rows: SessionRow[]) => void = () => {};
+      const list = vi
+        .spyOn(adminApi, "sessions")
+        .mockResolvedValueOnce([session({ id: "aaa", label: "bench-a", owner: "bob" })])
+        // The poll tick's request, kicked off while the release is in flight.
+        .mockImplementationOnce(() => new Promise<SessionRow[]>((_resolve, reject) => (rejectPoll = reject)))
+        // The release's own reload, requested after the poll tick above.
+        .mockImplementationOnce(
+          () => new Promise<SessionRow[]>((resolve) => (resolveReleaseReload = resolve)),
+        );
+      vi.spyOn(adminApi, "releaseSession").mockResolvedValue(undefined);
+      render(<Sessions />);
+      await screen.findByText(/bob/);
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(10_000);
+      });
+      expect(list.mock.calls.length).toBe(2);
+
+      await user.click(screen.getByRole("button", { name: "Release" }));
+      await vi.waitFor(() => expect(list.mock.calls.length).toBe(3));
+
+      await act(async () => {
+        resolveReleaseReload([session({ id: "aaa", label: "bench-a", owner: "" })]);
+      });
+      expect(await screen.findByText("—")).toBeInTheDocument();
+
+      // The stale poll tick's rejection resolves late. It must be discarded,
+      // not painted over the fresh (successful) rows above.
+      await act(async () => {
+        rejectPoll(new Error("stale gateway blip"));
+      });
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     } finally {
       vi.useRealTimers();
     }

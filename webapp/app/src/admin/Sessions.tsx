@@ -28,6 +28,7 @@ export function Sessions() {
 
   const [closeTarget, setCloseTarget] = useState<Session | null>(null);
   const [closing, setClosing] = useState(false);
+  const [closeError, setCloseError] = useState("");
   const [releasingId, setReleasingId] = useState<string | null>(null);
 
   const requestId = useRef(0);
@@ -35,11 +36,13 @@ export function Sessions() {
   const loadSessions = useCallback(async () => {
     const id = ++requestId.current;
     try {
-      setError("");
       const rows = await adminApi.sessions();
-      if (id === requestId.current) setSessions(rows);
+      if (id === requestId.current) {
+        setSessions(rows);
+        setError("");
+      }
     } catch (err) {
-      setError(errorMessage(err));
+      if (id === requestId.current) setError(errorMessage(err));
     }
   }, []);
 
@@ -70,14 +73,17 @@ export function Sessions() {
 
   const confirmClose = async () => {
     if (!closeTarget) return;
-    setError("");
+    setCloseError("");
     setClosing(true);
     try {
       await adminApi.closeSession(closeTarget.id);
       setCloseTarget(null);
       await loadSessions();
     } catch (err) {
-      setError(errorMessage(err));
+      // Reported through the dialog's own error slot, not the page-level
+      // banner: the dialog stays open for a retry, and the banner would be
+      // hidden behind its backdrop anyway.
+      setCloseError(errorMessage(err));
     } finally {
       setClosing(false);
     }
@@ -110,7 +116,15 @@ export function Sessions() {
                 <Button size="sm" disabled={releasingId === session.id} onClick={() => void release(session)}>
                   Release
                 </Button>
-                <Button size="sm" variant="danger" disabled={releasingId === session.id} onClick={() => setCloseTarget(session)}>
+                <Button
+                  size="sm"
+                  variant="danger"
+                  disabled={releasingId === session.id}
+                  onClick={() => {
+                    setCloseTarget(session);
+                    setCloseError("");
+                  }}
+                >
                   Close
                 </Button>
               </div>,
@@ -124,7 +138,11 @@ export function Sessions() {
           title={`Close ${closeTarget.label}?`}
           confirmLabel="Close"
           busy={closing}
-          onCancel={() => setCloseTarget(null)}
+          error={closeError}
+          onCancel={() => {
+            setCloseTarget(null);
+            setCloseError("");
+          }}
           onConfirm={() => void confirmClose()}
           body={
             <>
