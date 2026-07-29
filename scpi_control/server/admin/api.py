@@ -7,6 +7,7 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel
 
+from scpi_control.server import revocation
 from scpi_control.server.schemas import session_out
 
 router = APIRouter()
@@ -28,11 +29,22 @@ async def list_identities(request: Request):
     return request.app.state.tokens.summary()
 
 
-@router.delete("/identities/{name}", status_code=204)
+@router.delete("/identities/{name}")
 async def revoke_identity(name: str, request: Request):
-    if not request.app.state.tokens.revoke(name):
+    # Not offloaded to the threadpool, unlike close_session below: revoke_
+    # identity's own asyncio.Event.set() calls (via StreamRegistry.revoke)
+    # are not thread-safe and must run on this event loop (see revocation.py
+    # and the module note on Task 4). Splitting the token store's blocking
+    # file I/O out from that Event.set() would duplicate revocation logic
+    # into this route, which is the one thing Task 1 exists to prevent. The
+    # blocking window this leaves on the loop is a single small JSON file
+    # read/write on an unauthenticated, loopback-only, human-operated panel --
+    # nothing like close_session's up-to-10s thread join, which is why that
+    # one is offloaded and this one is not.
+    result = revocation.revoke_identity(request.app.state.tokens, request.app.state.manager, request.app.state.stream_registry, name)
+    if result is None:
         raise HTTPException(status_code=404, detail="no identity named {0!r}".format(name))
-    return None
+    return result
 
 
 @router.get("/invitations")

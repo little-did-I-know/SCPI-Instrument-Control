@@ -1,11 +1,15 @@
 """The host-only admin app: routes, and the absence of auth."""
 
+import asyncio
+
 import pytest
 from fastapi.testclient import TestClient
 
 from scpi_control.server.admin.app import create_admin_app
 from scpi_control.server.auth import TokenStore
 from scpi_control.server.invitations import InvitationStore
+from scpi_control.server.revocation import StreamRegistry
+from scpi_control.server.sessions import SessionManager
 from tests.route_introspection import iter_http_routes
 
 
@@ -23,6 +27,20 @@ def admin(admin_stores):
     # from base_url unless a test overrides it.
     with TestClient(app, base_url="http://127.0.0.1") as client:
         yield client, tokens, invitations
+
+
+@pytest.fixture
+def admin_revocation(tmp_path):
+    # Separate from `admin`: revoke_identity's path touches app.state.manager
+    # and .stream_registry, which the plain `admin` fixture leaves as None
+    # (mirrors tests/test_server_admin_sessions.py's admin_sessions fixture).
+    tokens = TokenStore(str(tmp_path / "tokens.json"))
+    invitations = InvitationStore(str(tmp_path / "invitations.json"))
+    manager = SessionManager()
+    registry = StreamRegistry()
+    app = create_admin_app(token_store=tokens, invitation_store=invitations, manager=manager, stream_registry=registry)
+    with TestClient(app, base_url="http://127.0.0.1") as client:
+        yield client, tokens, manager, registry
 
 
 def test_identities_are_listed_with_device_counts(admin):
@@ -90,18 +108,51 @@ def test_cancelling_an_unknown_invitation_is_404(admin):
     assert client.delete("/api/invitations/deadbeef").status_code == 404
 
 
-def test_revoking_an_identity_removes_every_device(admin):
-    client, tokens, _invitations = admin
+def test_revoking_an_identity_removes_every_device(admin_revocation):
+    # The status changes deliberately from 204 to 200: a panel that cannot say
+    # what it did would have to guess. See revoke_identity in revocation.py.
+    client, tokens, _manager, _registry = admin_revocation
     laptop = tokens.mint("bob")
     tablet = tokens.mint("bob")
-    assert client.delete("/api/identities/bob").status_code == 204
+    response = client.delete("/api/identities/bob")
+    assert response.status_code == 200
+    assert response.json() == {"devices": 2, "streams": 0, "sessions": 0}
     assert tokens.verify(laptop) is None
     assert tokens.verify(tablet) is None
 
 
-def test_revoking_an_unknown_identity_is_404(admin):
-    client, _tokens, _invitations = admin
+def test_revoking_an_identity_reports_streams_and_sessions_too(admin_revocation):
+    client, tokens, manager, registry = admin_revocation
+    tokens.mint("bob")
+    manager.create("bench-1", mock=True, owner="bob")
+    registry.add("bob", asyncio.Event())
+    response = client.delete("/api/identities/bob")
+    assert response.status_code == 200
+    assert response.json() == {"devices": 1, "streams": 1, "sessions": 1}
+
+
+def test_revoking_an_identity_releases_only_that_identitys_sessions(admin_revocation):
+    client, tokens, manager, _registry = admin_revocation
+    tokens.mint("bob")
+    tokens.mint("robin")
+    mine = manager.create("bench-1", mock=True, owner="bob")
+    theirs = manager.create("bench-2", mock=True, owner="robin")
+    response = client.delete("/api/identities/bob")
+    assert response.status_code == 200
+    assert response.json()["sessions"] == 1
+    assert manager.get(mine.id).owner == ""
+    assert manager.get(theirs.id).owner == "robin"
+
+
+def test_revoking_an_unknown_identity_is_404(admin_revocation):
+    client, tokens, manager, _registry = admin_revocation
+    tokens.mint("robin")
+    session = manager.create("bench-1", mock=True, owner="robin")
     assert client.delete("/api/identities/ghost").status_code == 404
+    # Changes nothing: the surviving identity's token still verifies and its
+    # session is still owned.
+    assert tokens.names() == ["robin"]
+    assert manager.get(session.id).owner == "robin"
 
 
 def test_the_admin_app_has_no_auth_middleware(admin):
