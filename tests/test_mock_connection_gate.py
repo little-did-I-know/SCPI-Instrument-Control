@@ -52,3 +52,34 @@ def test_no_gate_means_no_blocking():
     conn.connect()
     conn.write("C1:WF? DAT2")
     conn.read_raw()
+
+
+def test_the_waveform_gate_blocks_the_modern_dialect_too():
+    # The legacy path above and the modern :WAVeform:DATA? path
+    # (base.py's read_raw()) are two wire encodings of the identical logical
+    # query -- both share the one waveform_gate attribute and the one
+    # _wait_for_waveform_gate() call. This pins the modern branch so a future
+    # refactor of the modern preamble/data dispatch can't silently drop the
+    # wait without a test noticing. Same modern IDN Task 1's tests use for the
+    # SDS824X HD, so both files agree on what resolves to the modern dialect.
+    gate = threading.Event()
+    conn = MockConnection(idn="Siglent Technologies,SDS824X HD,SDS08A0X804831,3.8.12.1.1.3.6", waveform_gate=gate)
+    conn.connect()
+    done = threading.Event()
+
+    def read():
+        conn.write(":WAVeform:DATA?")
+        conn.read_raw()
+        done.set()
+
+    worker = threading.Thread(target=read, daemon=True)
+    worker.start()
+    try:
+        assert not done.wait(timeout=0.2), "the read returned without the gate being released"
+    finally:
+        # Always release the gate, even if the assertion above fails, so a
+        # broken gate cannot leave the worker thread blocked forever.
+        gate.set()
+    assert done.wait(timeout=2.0), "the read did not return after the gate was released"
+    worker.join(timeout=2.0)
+    assert not worker.is_alive(), "worker thread did not exit after the read returned"
