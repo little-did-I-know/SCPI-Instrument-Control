@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.0.0] - 2026-07-30
+
 ### ⚠️ Breaking Changes
 
 - A token name is now an identity rather than a unique credential. `scpi-web token add <name>`
