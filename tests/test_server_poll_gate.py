@@ -16,6 +16,20 @@ from scpi_control.server.adapters import MAX_FRAME_POINTS, ScopeAdapter
 
 class _FakeChannel:
     enabled = True
+    # The rest is only here so read_state() (which initial_frame calls) can
+    # read a channel without a real Oscilloscope.
+    voltage_scale = 1.0
+    voltage_offset = 0.0
+    coupling = "DC"
+    probe_ratio = 1.0
+
+
+class _FakeTrigger:
+    mode = "AUTO"
+    source = "C1"
+    level = 0.0
+    slope = "POS"
+    coupling = "DC"
 
 
 class _FakeWaveform:
@@ -37,6 +51,11 @@ class _FakeScope:
         self.math1 = None
         self.math2 = None
         self.last_stride = None
+        self.timebase = 1e-3
+        self.trigger = _FakeTrigger()
+
+    def acquisition_status(self):
+        return "STOP"
 
     def new_acquisition_ready(self):
         return next(self._ready)
@@ -94,6 +113,26 @@ def test_a_dialect_without_the_gate_keeps_fetching_every_tick():
     published.clear()
     adapter.poll(scope, published.append, 2)
     assert any(f["type"] == "waveform" for f in published)
+
+
+def test_a_new_viewer_gets_the_first_tick_exemption_again():
+    """Final-review fix (Important 2): the exemption was tracked per SESSION
+    but the canvas it protects belongs to a SUBSCRIBER. The frontend clears
+    every frame on unmount, and initial_frame publishes only a `state` frame --
+    so a viewer that reloads the page had an empty canvas and a flag saying "a
+    frame was already published", and on a scope sitting in Stop (INR? bit 0
+    never sets again) it stayed empty forever, with no error and no log line.
+    Seeding a new stream must re-arm the exemption.
+    """
+    adapter, scope, published = _adapter(ready=[False, False])
+    adapter.poll(scope, published.append, 1)  # first tick fetches under the exemption
+    assert any(f["type"] == "waveform" for f in published)
+
+    adapter.initial_frame(scope)  # a viewer (re)opens the stream: fresh, empty canvas
+
+    published.clear()
+    adapter.poll(scope, published.append, 2)
+    assert any(f["type"] == "waveform" for f in published), "a reloaded viewer with a cleared canvas must get a frame, not wait forever for an acquisition that never comes"
 
 
 def test_the_stride_is_sized_from_the_record_length():

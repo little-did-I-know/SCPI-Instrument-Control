@@ -196,11 +196,13 @@ class ScopeAdapter(InstrumentAdapter):
         self.active_reference: Optional[Dict[str, Any]] = None  # {"name", "channel", "data": {"time","voltage",...}}
         self._shown: set = set()  # trace keys (M1/M2/F1/F2/SPEC) live on subscribers' canvases; worker-thread-only
         self.recorder = TrendRecorder()  # internally locked: worker appends, request threads control/read
-        # Whether a waveform frame has ever been published on this session.
-        # False lets the very first tick fetch unconditionally even when the
-        # gate below says "nothing new" -- a scope sitting in Stop mode never
-        # produces a new acquisition, and without this exemption it would show
-        # an empty canvas forever instead of its perfectly good last frame.
+        # Whether a waveform frame has been published since the most recent
+        # stream was seeded. False lets the next tick fetch unconditionally
+        # even when the gate below says "nothing new" -- a scope sitting in
+        # Stop mode never produces a new acquisition, and without this
+        # exemption it would show an empty canvas forever instead of its
+        # perfectly good last frame. initial_frame() resets it, because the
+        # canvas this protects belongs to a subscriber, not to the session.
         self._published_a_frame = False
         # Last-known-good/bad status per poll-path query, keyed by an
         # operation label -- see _safe()'s docstring. Worker-thread-only, like
@@ -312,6 +314,19 @@ class ScopeAdapter(InstrumentAdapter):
                 publish(compute.reference_stats(reference, acquired))
 
     def initial_frame(self, instrument):
+        # Re-arm the first-tick exemption: a newly-opened stream is a canvas
+        # with nothing on it. The frontend clears every frame on unmount and
+        # this opening frame carries state only, so a viewer that reloads the
+        # page starts empty -- while the flag still said a frame had been
+        # published, which on a scope sitting in Stop (INR? bit 0 never sets
+        # again) left the canvas blank forever with no error and no log line.
+        # That is the exact failure the exemption exists to prevent; the unit
+        # it has to be counted in is a SUBSCRIBER, not a session.
+        #
+        # Race-free without a lock: initial_frame is submitted as a job and so
+        # runs on the same worker thread as poll(), which is the only other
+        # reader/writer of this flag.
+        self._published_a_frame = False
         return {"type": "state", "state": read_state(instrument)}
 
     def close(self, instrument):
