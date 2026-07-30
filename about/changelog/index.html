@@ -3346,7 +3346,18 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="[Unreleased]">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#600-2026-07-30" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [6.0.0] - 2026-07-30
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[6.0.0] - 2026-07-30">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -5101,7 +5112,18 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="[Unreleased]">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#600-2026-07-30" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [6.0.0] - 2026-07-30
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[6.0.0] - 2026-07-30">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -6774,6 +6796,7 @@
 <p>The format is based on <a href="https://keepachangelog.com/en/1.0.0/">Keep a Changelog</a>,
 and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semantic Versioning</a>.</p>
 <h2 id="unreleased">[Unreleased]<a class="headerlink" href="#unreleased" title="Permanent link">&para;</a></h2>
+<h2 id="600-2026-07-30">[6.0.0] - 2026-07-30<a class="headerlink" href="#600-2026-07-30" title="Permanent link">&para;</a></h2>
 <h3 id="breaking-changes">⚠️ Breaking Changes<a class="headerlink" href="#breaking-changes" title="Permanent link">&para;</a></h3>
 <ul>
 <li>A token name is now an identity rather than a unique credential. <code>scpi-web token add &lt;name&gt;</code>
@@ -6792,9 +6815,13 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   changes only what happens when the token store is empty.</li>
 <li>Revoking an identity now also closes that identity's live streams and releases the sessions
   they owned. A revoked colleague mid-capture loses their view, and their session becomes
-  immediately claimable. The revoke route's response code has changed from 204 to 200 with a
-  body carrying <code>{"devices", "streams", "sessions"}</code> counts — a wire-visible change for anyone
-  scripting against it.</li>
+  immediately claimable.</li>
+<li>Waveform values read from a high-resolution Siglent instrument in the default 8-bit transfer
+  mode change by a factor of 256 — they were that much too small, and are now correct. This is a
+  defect fix rather than an API change, but it is the change in this release most likely to
+  affect you, and it is listed here so it is not missed: <strong>waveform data captured from an HD
+  instrument before 6.0.0 should be treated as unusable rather than rescaled</strong>, because the
+  8-bit path also discarded the low byte. The full entry is under Fixed.</li>
 </ul>
 <h3 id="added">Added<a class="headerlink" href="#added" title="Permanent link">&para;</a></h3>
 <ul>
