@@ -105,6 +105,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- On modern Siglent instruments, the gateway now asks the instrument to thin the waveform record
+  to the points the display needs, rather than transferring everything and discarding most of it
+  client-side — no change to what you see on screen. Dialects without the interval command
+  continue to transfer the full record and thin on the server.
 - The CSV and JSON exports now stream instead of loading into memory; when a waveform is too large
   to export safely, the endpoints return an error naming the actual point count and showing how to
   proceed with `max_points`. On dialects that cannot report record length in advance, the export
@@ -117,12 +121,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   previously fetched a waveform on a timer without checking whether the instrument had finished
   acquiring — at slow sweep rates this meant requesting much faster than the scope could produce
   frames, blocking the read until the acquisition was complete, and freezing every control in the
-  web UI (since the session's only worker thread also services commands). The poll now checks
-  whether a new acquisition has landed before fetching, and requests only the display points
-  rather than transferring the entire record and then discarding most of it.
-- The live view updates once per completed acquisition. At slow sweep rates, a single update
-  every 14 seconds (at 1 s/div, for example) is expected behaviour — it matches the instrument's
-  own display rate — and is not a defect or regression.
+  web UI (since the session's only worker thread also services commands). On modern Siglent
+  instruments, the poll now checks whether a new acquisition has landed before fetching; other
+  dialects use adaptive timing-based backoff to prevent the freeze.
+- On modern Siglent instruments, the live view updates once per completed acquisition. At slow
+  sweep rates, a single update every 14 seconds (at 1 s/div, for example) is expected behaviour —
+  it matches the instrument's own display rate — and is not a defect or regression.
 - A channel whose display query failed is now logged instead of silently failing. Previously a
   poll-path failure made a channel appear 'off': no waveform, no error message, a gateway that
   appeared healthy and did nothing.
