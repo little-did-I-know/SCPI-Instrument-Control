@@ -21,7 +21,7 @@ permissions:
 jobs:
   build-windows:
     name: Build Windows Executable
-    if: ${ github.event_name != 'workflow_dispatch' || inputs.platforms == 'all' || contains(inputs.platforms, 'windows') }
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.platforms == 'all' || contains(inputs.platforms, 'windows') }}
     runs-on: windows-latest
 
     steps:
@@ -87,7 +87,7 @@ jobs:
 
   build-macos-arm64:
     name: Build macOS Application (Apple Silicon)
-    if: ${ github.event_name != 'workflow_dispatch' || inputs.platforms == 'all' || contains(inputs.platforms, 'macos-arm64') }
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.platforms == 'all' || contains(inputs.platforms, 'macos-arm64') }}
     runs-on: macos-15 # Apple Silicon. macos-14 is deprecated (actions/runner-images)
 
     steps:
@@ -155,7 +155,7 @@ jobs:
 
   build-macos-x64:
     name: Build macOS Application (Intel)
-    if: ${ github.event_name != 'workflow_dispatch' || inputs.platforms == 'all' || contains(inputs.platforms, 'macos-x64') }
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.platforms == 'all' || contains(inputs.platforms, 'macos-x64') }}
     runs-on: macos-15-intel # Intel x86_64. macos-13 was RETIRED 2025-12-04 and a job
     # requesting it never schedules -- it sits queued until GitHub's 24h limit and the run
     # is cancelled, which is why no release before 6.0.0 ever carried an Intel asset (and
@@ -228,7 +228,7 @@ jobs:
 
   build-linux:
     name: Build Linux Binary
-    if: ${ github.event_name != 'workflow_dispatch' || inputs.platforms == 'all' || contains(inputs.platforms, 'linux') }
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.platforms == 'all' || contains(inputs.platforms, 'linux') }}
     runs-on: ubuntu-latest
 
     steps:
