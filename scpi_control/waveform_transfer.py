@@ -576,6 +576,17 @@ class ModernTransfer:
             # preamble must be read back under the interval this call asked
             # for, not whatever a previous caller (e.g. the live view) left
             # set, or that stride would leak into this read.
+            #
+            # DO NOT "optimize" this to skip the write when the value hasn't
+            # changed, or when stride is None -- that reintroduces the exact
+            # leak this comment warns about, silently. The guard is
+            # tests/test_oscilloscope_waveform_stride.py::
+            # test_a_stride_left_over_from_a_prior_read_does_not_leak_into_the_next_one,
+            # which pins the observable failure (a strided read followed by a
+            # plain read on the same connection must return the FULL record).
+            # Confirmed by mutation test (Task 7): making this write
+            # conditional on `stride is not None` makes that test fail with
+            # 143 points back instead of 1000.
             scope.write(scope._get_command("set_waveform_interval", value=effective_stride))
 
         with scope._connection.lock:

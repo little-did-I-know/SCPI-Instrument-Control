@@ -51,14 +51,6 @@ def test_a_stride_is_sent_before_the_read():
     assert ":WAVeform:INTerval 7" in sent
 
 
-def test_the_default_read_resets_the_stride_to_one():
-    # Not "leaves it alone": the interval is instrument state, so a stride left
-    # over from the live view would silently decimate an export.
-    scope, sent = _recording_scope(idn=MODERN_IDN)
-    scope.get_waveform(1, provenance=False)
-    assert ":WAVeform:INTerval 1" in sent
-
-
 def test_stride_is_not_sent_on_a_dialect_without_the_command():
     scope, sent = _recording_scope(idn=LEGACY_IDN)
     scope.get_waveform(1, provenance=False, stride=7)
@@ -130,12 +122,26 @@ def test_a_float_stride_is_coerced_to_an_integer_before_being_sent():
 
 
 def test_a_stride_left_over_from_a_prior_read_does_not_leak_into_the_next_one():
-    """The behavioural version of test_the_default_read_resets_the_stride_to_one
-    above: that test only pins the command string. Now that the mock honours
-    :WAVeform:INTerval, the actual leak this class's docstring warns about is
-    expressible -- a strided read followed by a plain read on the SAME
-    connection must return the full record, not the previous stride's
-    decimated count.
+    """THE interval-leak guard (Task 7). Pins the actual observable failure
+    mode -- not just the wire command -- so it cannot rot: a strided read
+    followed by a plain read on the SAME connection must return the full
+    record, not the previous stride's decimated count.
+
+    An earlier version of this suite also had
+    test_the_default_read_resets_the_stride_to_one, asserting only that
+    ":WAVeform:INTerval 1" appeared in the sent commands. It was removed as
+    redundant once this test existed: mutation-testing acquire() (making the
+    :WAVeform:INTerval write conditional on `stride is not None`, Task 7)
+    fails BOTH tests identically, and the command-string assertion is
+    strictly weaker -- it would also break on an inconsequential wire-format
+    change (e.g. a future dialect spelling the command differently) that
+    changes no observable behaviour, which this test would not.
+
+    If you are about to make the interval write in ModernTransfer.acquire()
+    (scpi_control/waveform_transfer.py) conditional -- e.g. "only write if it
+    differs from the last value" -- this is the test that will fail. Do not
+    work around it; the write must stay unconditional (see the comment at
+    that write site).
     """
     conn = MockConnection(idn=MODERN_IDN, sample_rate=20_000.0, timebase=1e-3)
     conn.record_length = 1000
