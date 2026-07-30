@@ -112,6 +112,33 @@ describe("HorizontalPanel", () => {
     await userEvent.click(increment);
     expect(patchTimebase).not.toHaveBeenCalled();
   });
+
+  // 0.101 s/div is the literal value the original free-decimal SpinBox
+  // defect produced (1 ms + one 100 ms stepper click). Anyone who already
+  // hit that bug has a scope sitting at exactly this off-ladder value, so
+  // snapping it to the nearest rung before stepping is the realistic first
+  // interaction with the new control, not an edge case.
+  it("snaps an off-ladder starting value (0.101, the original defect's output) to the nearest rung before stepping up", async () => {
+    useSession.getState().applyState(stateWithTimebase(0.101));
+    const patchTimebase = vi.spyOn(api, "patchTimebase").mockResolvedValue(BASE_STATE);
+    render(<HorizontalPanel />);
+
+    expect(screen.getByText("100 ms")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByLabelText("Increase timebase"));
+    await waitFor(() => expect(patchTimebase).toHaveBeenCalledWith("abc", 0.2));
+  });
+
+  it("snaps the same off-ladder starting value (0.101) to the nearest rung before stepping down", async () => {
+    useSession.getState().applyState(stateWithTimebase(0.101));
+    const patchTimebase = vi.spyOn(api, "patchTimebase").mockResolvedValue(BASE_STATE);
+    render(<HorizontalPanel />);
+
+    expect(screen.getByText("100 ms")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByLabelText("Decrease timebase"));
+    await waitFor(() => expect(patchTimebase).toHaveBeenCalledWith("abc", 0.05));
+  });
 });
 
 describe("TriggerPanel no longer owns the timebase", () => {
