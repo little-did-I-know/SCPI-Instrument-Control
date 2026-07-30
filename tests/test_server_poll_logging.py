@@ -132,26 +132,35 @@ def test_a_query_that_degrades_inside_the_accessor_is_silent_by_design(caplog):
     _safe never sees an exception from them and its logging branch is
     unreachable. The labels promised log lines that could never be written.
 
-    A modern-dialect mock is exactly that situation for real: it has no
-    response for :ACQuire:POINts?, so record_length() genuinely fails and
-    genuinely degrades to None. The tick must still publish a frame and must
-    stay silent, since nothing was swallowed at this level.
+    This used to lean on the modern mock simply being unable to answer INR?
+    and :ACQuire:POINts?. It no longer can: the mock now answers BOTH the way
+    hardware does (header-prefixed "INR 8193", bare NR3 "1.00E+05"), because
+    each of those queries silently failing was itself a bug -- the first left
+    the new-acquisition gate inert on the instrument, the second meant stride
+    sizing was never exercised at all.
 
-    This test used to lean on INR? failing here too. It no longer does: the
-    modern mock now answers INR? the way hardware does (header-prefixed
-    "INR 8193"), because that query silently failing was itself the bug that
-    left the new-acquisition gate inert on the instrument. record_length()
-    still degrades, which is all this test needs.
+    So the degradation is forced explicitly now, which is what this test was
+    always really about: an accessor that swallows its own query failure gives
+    _safe nothing to log, and the tick must still publish a frame and stay
+    silent. Forcing it also means the test cannot quietly stop covering
+    anything the next time the mock grows a handler.
     """
     from scpi_control.connection.mock import MockConnection
     from scpi_control.oscilloscope import Oscilloscope
 
-    conn = MockConnection("mock", idn="Siglent Technologies,SDS824X HD,MOCK0001,1.0.0.0", channel_states={1: True, 2: False, 3: False, 4: False}, sample_rate=1_000_000.0, timebase=1e-3)
+    conn = MockConnection(
+        "mock",
+        idn="Siglent Technologies,SDS824X HD,MOCK0001,1.0.0.0",
+        channel_states={1: True, 2: False, 3: False, 4: False},
+        sample_rate=1_000_000.0,
+        timebase=1e-3,
+        custom_responses={":ACQuire:POINts?": "not-a-number"},
+    )
     scope = Oscilloscope("mock", connection=conn)
     scope.connect()
     assert scope.dialect == "modern"
     assert scope.new_acquisition_ready() is not None, "the modern mock must answer INR? now -- a silently failing gate was the bug"
-    assert scope.record_length() is None, "fixture broken: the modern mock is expected to fail :ACQuire:POINts?"
+    assert scope.record_length() is None, "fixture broken: record_length() must degrade to None on the forced bad reply"
 
     adapter = ScopeAdapter()
     published = []

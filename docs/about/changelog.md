@@ -160,6 +160,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   condition. It now raises the new `MeasurementUnavailableError` (a `CommandError` subclass, so
   existing handlers keep working) and the gateway reports the reading as unavailable without
   logging an alarm.
+- A mock oscilloscope now reports its own acquisition length, like a real one. `:ACQuire:POINts?`
+  had no mock answer, so the query failed and the driver concluded the record length was unknown
+  — which meant the live view's frame-thinning was never exercised against a mock at all, on any
+  dialect. A mock session's live view now thins its frames the same way a real instrument's does.
 - The timebase control's stepper no longer moves in 0.1 s jumps or hides sub-microsecond sweeps
   under a six-decimal display. It previously lived in the Trigger panel with 100 ms increments —
   one click from 1 ms/div landed on 0.101 s/div — and made sub-microsecond sweeps effectively

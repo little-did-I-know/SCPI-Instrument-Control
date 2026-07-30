@@ -274,6 +274,21 @@ def handle_query(conn, command: str) -> Optional[str]:
     upper = command.upper()
 
     if conn.scope_dialect == "modern":
+        if upper == ":ACQUIRE:POINTS?":
+            # Bare NR3, as measured on a real SDS824X HD: "1.00E+05".
+            #
+            # There was no handler here, so the query raised, record_length()
+            # caught it and degraded to None ("the dialect can't say"), and the
+            # live view's stride sizing -- driven entirely by record_length() --
+            # was never exercised against the modern mock. Same shape as the
+            # INR? gap above: a query the instrument answers happily, that the
+            # mock could only fail.
+            #
+            # Deliberately the SAME _effective_record_length() the preamble
+            # uses, so the point count and wave_array_count always describe one
+            # record. Sourcing them separately is how a stride gets sized
+            # against a length the transfer does not actually have.
+            return _format_nr3(float(_effective_record_length(conn, _modern_source_channel(conn))))
         if upper == "INR?":
             # The modern personality had NO handler here, so INR? raised and
             # Oscilloscope.new_acquisition_ready() degraded to None in CI just

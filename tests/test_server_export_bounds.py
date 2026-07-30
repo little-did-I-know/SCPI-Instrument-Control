@@ -16,6 +16,8 @@ memory. This file covers the fix:
   pre-streaming implementation.
 """
 
+from unittest.mock import patch
+
 import numpy as np
 import pytest
 
@@ -292,21 +294,66 @@ class TestAFailingRecordLengthQueryDoesNotFailTheExport:
 
         assert response.status_code == 200, response.text
 
-    def test_the_modern_mock_really_cannot_answer_the_record_length_query(self):
-        # Pins what makes the two tests above meaningful: modern MAPS
-        # :ACQuire:POINts? (unlike legacy) and the mock cannot answer it, so
-        # the query is genuinely attempted and genuinely fails. If the mock
-        # ever grows a handler, those tests would silently stop covering the
-        # failing-query path and this one fails loudly instead.
+    def test_record_length_degrades_to_none_when_the_query_fails(self):
+        """Pins what makes the failing-query tests below meaningful: modern
+        MAPS :ACQuire:POINts? (unlike legacy), so the query is genuinely
+        attempted, and a failure must degrade to None rather than raise.
+
+        This used to rely on the modern mock having NO handler for the query.
+        It has one now -- the mock could previously only FAIL a query the real
+        instrument answers happily ("1.00E+05" on an SDS824X HD), which meant
+        record_length() and the live view's stride sizing were never exercised
+        against a working answer. The failure is therefore forced explicitly
+        here, which is also what keeps this test honest if the mock grows more
+        handlers later.
+        """
+        from scpi_control.connection.mock.base import MockConnection
+
+        instrument = Oscilloscope("mock", connection=MockConnection("mock", idn="Siglent Technologies,{0},MOCK0001,1.0.0.0".format(MODERN_MODEL), custom_responses={":ACQuire:POINts?": "not-a-number"}))
+        instrument.connect()
+        assert instrument.dialect == "modern"
+        assert instrument._has_command("get_acq_points"), "modern must map :ACQuire:POINts? -- otherwise record_length() short-circuits and no query is sent"
+        assert instrument.record_length() is None, "record_length() must degrade to None on a failing query, not raise"
+
+    def test_the_modern_mock_now_answers_the_record_length_query(self):
+        # The other half: with a working mock the query must actually resolve,
+        # so the healthy path above is real coverage and not another silent
+        # degrade-to-None.
         from scpi_control.connection.mock.base import MockConnection
 
         instrument = Oscilloscope("mock", connection=MockConnection("mock", idn="Siglent Technologies,{0},MOCK0001,1.0.0.0".format(MODERN_MODEL)))
         instrument.connect()
-        assert instrument.dialect == "modern"
-        assert instrument._has_command("get_acq_points"), "modern must map :ACQuire:POINts? -- otherwise record_length() short-circuits and no query is sent"
-        with pytest.raises(SiglentError):
-            instrument.query(instrument._get_command("get_acq_points"))
-        assert instrument.record_length() is None, "record_length() must degrade to None on a failing query, not raise"
+        points = instrument.record_length()
+        assert points is not None and points > 0, "the modern mock must answer :ACQuire:POINts? like the instrument does"
+
+    def _exports_still_succeed_with_a_failing_record_length(self, client):
+        """The Critical-1 path: :ACQuire:POINts? raising must not 504 an export.
+
+        Forced at the query, not by leaning on a missing mock handler, so this
+        keeps covering the failing path now that the mock answers.
+        """
+        real_query = Oscilloscope.query
+
+        def failing_query(self, command, *args, **kwargs):
+            if "ACQuire:POINts" in command:
+                raise SiglentError("forced record-length failure")
+            return real_query(self, command, *args, **kwargs)
+
+        return failing_query, real_query
+
+    def test_capture_csv_returns_200_when_the_record_length_query_fails(self, client):
+        failing_query, _ = self._exports_still_succeed_with_a_failing_record_length(client)
+        with patch.object(Oscilloscope, "query", failing_query):
+            sid = create_modern_mock_session(client)
+            response = client.get("/api/sessions/{0}/scope/capture.csv?channels=1".format(sid))
+        assert response.status_code == 200, response.text
+
+    def test_waveform_json_returns_200_when_the_record_length_query_fails(self, client):
+        failing_query, _ = self._exports_still_succeed_with_a_failing_record_length(client)
+        with patch.object(Oscilloscope, "query", failing_query):
+            sid = create_modern_mock_session(client)
+            response = client.get("/api/sessions/{0}/scope/waveform?channels=1".format(sid))
+        assert response.status_code == 200, response.text
 
 
 class TestUnverifiableOversizedExportLogsAWarning:

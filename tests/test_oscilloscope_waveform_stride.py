@@ -350,3 +350,44 @@ def test_a_stride_needing_more_than_one_window_raises():
 
     with pytest.raises(exceptions.FeatureNotSupportedError):
         scope.get_waveform(1, provenance=False, stride=2)
+
+
+def test_the_modern_mock_reports_its_acquisition_point_count():
+    """MEASURED on the real SDS824X HD (fw 3.8.12.1.1.3.6): :ACQuire:POINts?
+    answers a bare NR3 "1.00E+05". The modern mock had NO handler, so the
+    query raised, Oscilloscope.record_length() caught it and degraded to None
+    ("the dialect can't say"), and the live view's stride sizing -- which is
+    driven entirely by record_length() -- was therefore never exercised
+    against the modern mock at all. Same shape as the INR? gap: a query the
+    instrument answers, that the mock could only fail.
+
+    The count must agree with the preamble's own wave_array_count, or stride
+    sizing computes a ratio against a record length the transfer does not
+    have.
+    """
+    conn = MockConnection(idn=MODERN_IDN, sample_rate=20_000.0, timebase=1e-3)
+    conn.record_length = 1000
+    conn.waveform_source = "C1"
+    scope = Oscilloscope("mock", connection=conn)
+    scope.connect()
+
+    raw = conn.query(":ACQuire:POINts?")
+    assert raw.strip().upper() == "1.00E+03", "bare NR3, as the instrument sends: {0!r}".format(raw)
+    assert scope.record_length() == 1000
+    assert scope.record_length() == _modern_preamble(conn)["wave_array_count"], (
+        "the point count and the preamble must describe the same record"
+    )
+
+
+def test_the_default_modern_mock_can_also_say_how_long_its_record_is():
+    # record_length=None is the common fixture: the count then comes from the
+    # timebase/sample-rate window rather than an explicit override, and must
+    # still be answerable rather than raising.
+    conn = MockConnection(idn=MODERN_IDN, sample_rate=20_000.0, timebase=1e-3)
+    conn.waveform_source = "C1"
+    scope = Oscilloscope("mock", connection=conn)
+    scope.connect()
+
+    points = scope.record_length()
+    assert points is not None and points > 0
+    assert points == _modern_preamble(conn)["wave_array_count"]
