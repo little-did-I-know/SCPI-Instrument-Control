@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.0.0] - 2026-07-30
+
 ### ⚠️ Breaking Changes
 
 - A token name is now an identity rather than a unique credential. `scpi-web token add <name>`
@@ -25,9 +27,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   changes only what happens when the token store is empty.
 - Revoking an identity now also closes that identity's live streams and releases the sessions
   they owned. A revoked colleague mid-capture loses their view, and their session becomes
-  immediately claimable. The revoke route's response code has changed from 204 to 200 with a
-  body carrying `{"devices", "streams", "sessions"}` counts — a wire-visible change for anyone
-  scripting against it.
+  immediately claimable.
+- Waveform values read from a high-resolution Siglent instrument in the default 8-bit transfer
+  mode change by a factor of 256 — they were that much too small, and are now correct. This is a
+  defect fix rather than an API change, but it is the change in this release most likely to
+  affect you, and it is listed here so it is not missed: **waveform data captured from an HD
+  instrument before 6.0.0 should be treated as unusable rather than rescaled**, because the
+  8-bit path also discarded the low byte. The full entry is under Fixed.
 
 ### Added
 
