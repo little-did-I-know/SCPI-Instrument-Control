@@ -62,7 +62,13 @@ Once connected, the main canvas toggles between three modes:
 
 - **Time** — live traces. Channels are drawn as solid lines, math traces
   (M1/M2) and filters (F1/F2) as dashed lines, and an active reference
-  waveform as a gray ghost trace overlaid on the live signal.
+  waveform as a gray ghost trace overlaid on the live signal. On a
+  Siglent-modern instrument the trace updates once per completed acquisition,
+  not on a fixed timer — at a slow timebase that means slow updates (a
+  handful of seconds apart at 1 s/div is normal, not stalled), matching what
+  the scope's own screen is doing. Other dialects have no way to ask the
+  instrument whether a new acquisition has landed, so they poll adaptively
+  instead.
 - **Spectrum** — a server-computed FFT of a chosen channel, with peak
   markers and a THD readout. If spectrum analysis is off, the canvas shows
   an **Enable** button instead of a plot.
@@ -77,6 +83,11 @@ The side rail holds one tab per feature area:
 
 - **Channels** — per-channel enable, V/div, offset, coupling, and probe
   ratio.
+- **Horizontal** — the timebase (time/div), on a 1-2-5 ladder from 1 ns/div
+  to 10 s/div with engineering-unit display (`100 µs`, not `0.000100`). A
+  stepper click only ever lands on the next rung, never an arbitrary value —
+  there's no way to nudge the instrument to a setting it wasn't designed to
+  accept.
 - **Trigger** — mode, source, level, slope, and coupling.
 - **Math** — configure the M1/M2 expressions, e.g. `C1 - C2` or `INTG(C1)`.
 - **Analysis** — spectrum configuration (source channel, window function,
@@ -97,6 +108,11 @@ Across the top: Run / Stop / Single / Auto acquisition controls, the canvas
 view-mode toggle, and CSV / JSON / Screenshot export buttons. Disconnect
 lives in the header, not here — see [Header](#header) above, since it applies
 to every session kind, not just an oscilloscope's.
+
+A CSV or JSON export on a very deep record can be refused rather than
+silently cut down to size — see
+[Acquisition & export](api.md#acquisition-export) for the limit and what the
+error tells you to do about it.
 
 ## Power supply session
 

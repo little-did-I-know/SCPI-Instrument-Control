@@ -117,9 +117,18 @@ All paths under `/api/sessions/{id}/scope/`.
 
 | Method | Path | Params | Response | Errors |
 |---|---|---|---|---|
-| `GET` | `capture.csv` | `?channels=1,2` (comma-separated) | `text/csv` — one `time_s` column plus one `C{n}_V` column per requested channel, aligned to the shortest capture | 400 no/invalid channels; 409 if the session is in an error/closed state |
+| `GET` | `capture.csv` | `?channels=1,2&max_points=N` (comma-separated channels) | `text/csv`, streamed — one `time_s` column plus one `C{n}_V` column per requested channel, aligned to the shortest capture, capped to `max_points` rows (0/omitted = full resolution) | 400 no/invalid channels; 409 if the session is in an error/closed state; 413 record too large (see below) |
 | `GET` | `screenshot.png` | — | `image/png` — the instrument's display | 409 if the session is in an error/closed state |
-| `GET` | `waveform` | `?channels=1,2&max_points=N` | `{"channels": [{channel, t0, dt, sample_rate, voltage_scale, voltage_offset, points}, ...]}` — `points` decimated to `max_points` (0/omitted = full resolution) | 400 no/invalid channels; 409 if the session is in an error/closed state |
+| `GET` | `waveform` | `?channels=1,2&max_points=N` | `{"channels": [{channel, t0, dt, sample_rate, voltage_scale, voltage_offset, points}, ...]}`, streamed — `points` decimated to `max_points` (0/omitted = full resolution) | 400 no/invalid channels; 409 if the session is in an error/closed state; 413 record too large (see below) |
+
+Both routes **refuse rather than truncate** an oversized capture: if the record holds more points than
+`MAX_EXPORT_POINTS` (2,000,000) and no `max_points` (or one still above that cap) was given, the server
+returns **413** naming the actual point count and the `max_points` value that would let the export proceed
+— nothing is ever silently decimated down to a size the caller didn't ask for. This check runs *before* a
+single sample is fetched, by asking the instrument its record length (`:ACQuire:POINts?`). On a dialect that
+doesn't implement that query — legacy Siglent among them — the size can't be checked in advance, so the
+export proceeds unguarded on those dialects exactly as it always has, and the server logs a warning after
+the fact if the fetch turns out to have been oversized.
 
 ## Analysis
 
@@ -181,6 +190,15 @@ All paths under `/api/sessions/{id}/scope/`.
 | `error` | `{"type": "error", "detail": "connection lost"}` |
 | `closed` | `{"type": "closed"}` |
 
+On a Siglent-modern instrument, a `waveform` frame for a real channel (not math/filter) is gated on the
+instrument's own "new acquisition" flag (`INR?` bit 0): the poll loop asks that question every tick, and
+only fetches and publishes a frame when the answer is yes. In practice this means the live view updates
+once per completed acquisition — at a slow sweep that means a slow update, by design, matching what the
+instrument's own display is doing. Every other dialect (legacy Siglent, Tektronix, LeCroy) has no such
+flag to ask — legacy's closest equivalent (`SAST?`) reports a latching trigger state, not an edge on new
+data, so it can't answer the question honestly — and instead falls back to an adaptive poll rate that never
+retries sooner than the previous poll took.
+
 The connection closes with code **4404** if the session ID does not exist, **4410** when the session itself closes (after which the socket receives a final `closed` message), and **4403** if the identity that opened the socket is revoked while it is still connected — distinct from 4410 because the session is untouched; only the viewer's credential is gone (see [Gateway security](security.md#tokens)). The server-side outbox is bounded (256 frames); under sustained backpressure it drops the oldest queued `waveform` frame to make room rather than growing unbounded — `state`/`error`/`closed` control frames are never dropped.
 
 ## Errors
@@ -192,6 +210,7 @@ Every error response is JSON: `{"error": "<ExceptionClassName>", "detail": "<mes
 | 400 | Validation failure — bad/missing parameters, invalid enum value, out-of-range channel |
 | 404 | Unknown resource — session ID, reference name, or (for `log.csv`) no recording ever started |
 | 409 | State conflict — session not accepting jobs (error/closed), already recording, or measurement selection locked while recording |
+| 413 | Export refused — the record (or the requested `max_points`) exceeds what the server will fetch in one go; see [Acquisition & export](#acquisition-export) |
 | 504 | Instrument communication timed out |
 | 500 | Other instrument error |
 

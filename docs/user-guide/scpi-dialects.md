@@ -132,6 +132,7 @@ dialect lacks a command, calling the corresponding property or method raises
 | Waveform transfer bit depth | 8-bit only, all dialects | Tektronix's `DATa:WIDth` is pinned to `1` (8-bit) for now; 16-bit transfer is a follow-up. |
 | LeCroy waveform transfer format | lecroy | Uses `C{ch}:WF? ALL` (descriptor + data in one block), scaled from the `WAVEDESC` descriptor's vertical gain/offset and horizontal interval/offset fields, with `CFMT DEF9,{BYTE\|WORD},BIN` and `CORD LO` (LSB-first) pinning the wire encoding — a different transfer path from the Siglent-style `WF? DAT2` used by legacy and modern. |
 | LeCroy bandwidth limit token | lecroy | The public `ON` token maps to the wire value `20MHZ`; LeCroy's `BWL` vocabulary (`OFF`, `20MHZ`, `200MHZ`, ...) has no `ON` token of its own to map onto. |
+| `new_acquisition_ready()` ("has a new acquisition landed?", `INR?` bit 0) | modern (Siglent) only | Legacy's closest equivalent, `SAST?`, reports a latching trigger state rather than an edge on new data, so it cannot answer honestly and is deliberately not wired up here. Tektronix and LeCroy have no equivalent query at all. Every dialect without this gate returns `None` — callers (the web gateway's live view) must treat that as "no gate available," not as "not ready," and fall back to polling adaptively instead of stalling forever. |
 
 A modern-dialect `measure()` call is not side-effect-free: it sends
 `:MEASure ON`, `:MEASure:SIMPle:SOURce`, and `:MEASure:SIMPle:ITEM
