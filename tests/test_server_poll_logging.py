@@ -125,6 +125,39 @@ def test_recovery_is_logged_so_the_log_shows_the_end_of_the_outage(caplog):
     assert "channel 1" in recoveries[0].getMessage(), "the recovery record must name the operation that recovered"
 
 
+def test_a_query_that_degrades_inside_the_accessor_is_silent_by_design(caplog):
+    """Final-review fix (cheap 1): poll() passed label="acquisition ready
+    check" (and labels for record length / waveform max points) to _safe, but
+    all three accessors catch their own query failure and return None -- so
+    _safe never sees an exception from them and its logging branch is
+    unreachable. The labels promised log lines that could never be written.
+
+    A modern-dialect mock is exactly that situation for real: it has no
+    response for INR? or :ACQuire:POINts?, so both queries genuinely fail and
+    both accessors genuinely degrade to None. The tick must still publish a
+    frame (a gate we cannot read is "no gate", not "not ready") and must stay
+    silent, since nothing was swallowed at this level.
+    """
+    from scpi_control.connection.mock import MockConnection
+    from scpi_control.oscilloscope import Oscilloscope
+
+    conn = MockConnection("mock", idn="Siglent Technologies,SDS824X HD,MOCK0001,1.0.0.0", channel_states={1: True, 2: False, 3: False, 4: False}, sample_rate=1_000_000.0, timebase=1e-3)
+    scope = Oscilloscope("mock", connection=conn)
+    scope.connect()
+    assert scope.dialect == "modern"
+    assert scope.new_acquisition_ready() is None, "fixture broken: the modern mock is expected to fail INR?, degrading the gate to None"
+    assert scope.record_length() is None, "fixture broken: the modern mock is expected to fail :ACQuire:POINts?"
+
+    adapter = ScopeAdapter()
+    published = []
+    with caplog.at_level(logging.WARNING, logger=ADAPTERS_LOGGER):
+        caplog.clear()
+        adapter.poll(scope, published.append, 1)
+
+    assert any(frame.get("type") == "waveform" for frame in published), "an unreadable gate must not stall the live view"
+    assert _adapter_records(caplog, logging.WARNING) == [], "these three queries degrade inside the accessor -- the adapter has nothing to report"
+
+
 def test_a_healthy_poll_logs_nothing(caplog):
     adapter = ScopeAdapter()
     scope = _FakeScope(_OkChannel())

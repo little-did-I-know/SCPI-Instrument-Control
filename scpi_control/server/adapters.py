@@ -238,7 +238,15 @@ class ScopeAdapter(InstrumentAdapter):
         # never be treated as False, or the live view dies on every
         # non-Siglent scope.
         health = self._poll_health
-        ready = _safe(lambda: scope.new_acquisition_ready(), default=None, label="acquisition ready check", state=health)
+        # No label/state on the next three _safe calls, unlike the per-channel
+        # reads below: new_acquisition_ready()/record_length()/
+        # waveform_max_points() each catch their own query failure and return
+        # None (see oscilloscope.py), so _safe never sees an exception from
+        # them and its logging branch is unreachable. A label here would only
+        # promise a log line that can never be written. The bare _safe stays as
+        # the last-resort swallow that keeps the session heartbeat alive if one
+        # of them ever raises something unexpected.
+        ready = _safe(lambda: scope.new_acquisition_ready(), default=None)
         if ready is False and self._published_a_frame:
             return
         # Size the stride from the full record length, capped by whichever is
@@ -248,10 +256,10 @@ class ScopeAdapter(InstrumentAdapter):
         # and turn ModernTransfer's strided-read guard (FeatureNotSupportedError)
         # into a total live-view outage -- capping here makes that guard
         # unreachable by construction.
-        points = _safe(lambda: scope.record_length(), default=None, label="record length", state=health)
+        points = _safe(lambda: scope.record_length(), default=None)
         stride = None
         if points:
-            cap = _safe(lambda: scope.waveform_max_points(), default=None, label="waveform max points", state=health)
+            cap = _safe(lambda: scope.waveform_max_points(), default=None)
             limit = min(MAX_FRAME_POINTS, cap) if cap else MAX_FRAME_POINTS
             stride = max(1, -(-points // limit))
         acquired = {}
