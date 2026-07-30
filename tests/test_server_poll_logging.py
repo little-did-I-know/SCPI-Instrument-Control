@@ -96,23 +96,32 @@ def test_a_failed_poll_query_is_logged_once_per_transition(caplog):
 
 
 def test_recovery_is_logged_so_the_log_shows_the_end_of_the_outage(caplog):
+    """The recovery record must be a WARNING, not a quieter level: an
+    operator or alerting pipeline filtering at WARNING -- the level the
+    onset failure logs at -- must see the outage both begin AND end, or the
+    log is exactly as ambiguous as it was before this fix for that reader.
+    A level-agnostic "a recovery record exists somewhere" assertion cannot
+    tell that design apart from a design that quietly logs recovery at INFO,
+    so this asserts the level explicitly.
+    """
     adapter = ScopeAdapter()
     scope = _FakeScope(_RaisingChannel())
-    with caplog.at_level(logging.INFO, logger=ADAPTERS_LOGGER):
+    with caplog.at_level(logging.WARNING, logger=ADAPTERS_LOGGER):
         caplog.clear()
         adapter.poll(scope, lambda frame: None, 1)  # fail
         adapter.poll(scope, lambda frame: None, 2)  # fail (steady state, no new log)
         scope.channel = _OkChannel()
         adapter.poll(scope, lambda frame: None, 3)  # recover
 
-    warnings = _adapter_records(caplog, logging.WARNING)
-    all_records = [r for r in caplog.records if r.name == ADAPTERS_LOGGER]
-    recoveries = [r for r in all_records if r.levelno < logging.WARNING]
+    all_records = _adapter_records(caplog, logging.WARNING)
+    failures = [r for r in all_records if "failed" in r.getMessage()]
+    recoveries = [r for r in all_records if "recovered" in r.getMessage()]
 
-    assert len(warnings) == 1, "the failure must still log exactly once: {0}".format(warnings)
+    assert len(failures) == 1, "the failure must still log exactly once: {0}".format(all_records)
     # Without a recovery line, a reader of the log has no way to tell whether
     # an outage that shows up as a WARNING is still ongoing.
     assert len(recoveries) == 1, "a failure->success transition must log a recovery record: {0}".format(all_records)
+    assert recoveries[0].levelno == logging.WARNING, "the recovery record must be WARNING, matching the failure's level"
     assert "channel 1" in recoveries[0].getMessage(), "the recovery record must name the operation that recovered"
 
 

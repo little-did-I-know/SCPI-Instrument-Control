@@ -438,8 +438,10 @@ def _note_data_interval_mismatch(scope: "Oscilloscope", channel: int, requested:
     so logging every call would write one WARNING per frame, indefinitely, at
     up to four frames a second if real hardware's echo disagreed persistently.
     Same discipline as the poll-path fix in server/adapters.py: one WARNING
-    when the mismatch starts, one recovery record when it stops, nothing
-    while it persists.
+    when the mismatch starts, one recovery WARNING when it stops (same level,
+    deliberately -- an operator or alert filtering at WARNING must see the
+    disagreement both start AND clear, or the log is exactly as ambiguous as
+    it was before this fix for that reader), nothing while it persists.
 
     State is stored ON THE SCOPE INSTANCE, keyed by channel, rather than on
     `self` of the calling Transfer: make_transfer() builds a brand new
@@ -449,6 +451,13 @@ def _note_data_interval_mismatch(scope: "Oscilloscope", channel: int, requested:
     long, and keying by channel keeps a mismatching channel 1 and a healthy
     channel 2 from flapping each other's state.
     """
+    # Sets `scope._data_interval_mismatch_state` (a private dict, keyed by
+    # channel) on the Oscilloscope instance passed in as `scope` -- an
+    # attribute this module injects rather than one declared in
+    # Oscilloscope.__init__. It has to live somewhere that outlives a single
+    # acquire() call, and the ModernTransfer instance calling this function
+    # does not (see the docstring above); the scope instance is the only
+    # object here that does.
     state = getattr(scope, _DATA_INTERVAL_STATE_ATTR, None)
     if state is None:
         state = {}
@@ -465,8 +474,8 @@ def _note_data_interval_mismatch(scope: "Oscilloscope", channel: int, requested:
             channel,
         )
     elif not mismatched and was_mismatched:
-        logger.info(
-            "DATA_INTERVAL now matches the requested :WAVeform:INTerval %d again (host %s:%s, channel %d) -- the prior mismatch warning has cleared.",
+        logger.warning(
+            "DATA_INTERVAL now matches the requested :WAVeform:INTerval %d again (host %s:%s, channel %d) -- the prior mismatch has cleared.",
             requested,
             scope.host,
             scope.port,

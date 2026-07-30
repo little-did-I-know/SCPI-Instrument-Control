@@ -49,9 +49,12 @@ def _safe(fn, default=None, label=None, state=None):
     interval, logging every tick of a persistent failure would write four
     lines a second and bury everything else in the log. A success->failure
     transition logs one WARNING naming the operation; a failure->success
-    transition logs one recovery record, so a reader can tell an outage in
-    the log actually ended. Steady state -- repeated failures, or repeated
-    successes -- logs nothing.
+    transition logs one recovery WARNING (same level, deliberately -- an
+    operator or alert filtering at WARNING must see the outage both begin
+    and end, or the log is exactly as ambiguous as before this fix for that
+    reader), with distinguishable wording so the two can be told apart at a
+    glance. Steady state -- repeated failures, or repeated successes -- logs
+    nothing.
     """
     try:
         result = fn()
@@ -67,7 +70,13 @@ def _safe(fn, default=None, label=None, state=None):
         return default
     if label is not None and state is not None:
         if state.get(label) is False:
-            logger.info("poll query recovered: %s", label)
+            # Also WARNING, not a quieter level: this is the other half of a
+            # matched pair with the failure log above, not "good news" logged
+            # for its own sake. An operator or alert filtering at WARNING --
+            # which is the level the failure logs at -- must see the outage
+            # both begin AND end, or the log is exactly as ambiguous as before
+            # this fix for anyone reading at that level.
+            logger.warning("poll query recovered, no longer degrading to a default: %s", label)
         state[label] = True
     return result
 

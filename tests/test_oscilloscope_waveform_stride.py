@@ -158,7 +158,13 @@ def test_a_data_interval_mismatch_is_logged_once_per_transition_not_every_frame(
 
     Same once-per-transition discipline as the poll-path fix: one WARNING
     when the mismatch starts, one recovery record when it stops, nothing
-    while it persists.
+    while it persists -- and the recovery record must be WARNING too, not a
+    quieter level: an operator or alerting pipeline filtering at WARNING (the
+    level the onset logs at) must see the disagreement both start AND clear,
+    or the log is exactly as ambiguous as it was before this fix for that
+    reader. A level-agnostic "a recovery record exists" assertion cannot tell
+    that design apart from one that quietly logs recovery at INFO, so this
+    pins the level explicitly.
     """
     import scpi_control.waveform_transfer as wt
 
@@ -175,7 +181,7 @@ def test_a_data_interval_mismatch_is_logged_once_per_transition_not_every_frame(
     monkeypatch.setattr(wt, "parse_modern_wavedesc", fake_parse)
 
     logger_name = "scpi_control.waveform_transfer"
-    with caplog.at_level(logging.INFO, logger=logger_name):
+    with caplog.at_level(logging.WARNING, logger=logger_name):
         caplog.clear()
         scope.get_waveform(1, provenance=False)  # mismatch starts
         scope.get_waveform(1, provenance=False)  # steady state: still mismatched
@@ -183,22 +189,25 @@ def test_a_data_interval_mismatch_is_logged_once_per_transition_not_every_frame(
         # Filtered on "DATA_INTERVAL" too, not just level -- an unrelated INFO
         # line ("Acquired N samples...") is logged by the same acquire() on
         # every call and must not be mistaken for the mismatch/recovery record.
-        warnings = [r for r in caplog.records if r.name == logger_name and r.levelno == logging.WARNING and "DATA_INTERVAL" in r.getMessage()]
-        assert len(warnings) == 1, "a persistent mismatch must log once, not once per frame: {0}".format(warnings)
-        assert "channel 1" in warnings[0].getMessage()
+        # Onset and recovery are both WARNING now, so they're told apart by
+        # message content ("may not be scaled" vs. "cleared"), not level.
+        onsets = [r for r in caplog.records if r.name == logger_name and r.levelno == logging.WARNING and "DATA_INTERVAL" in r.getMessage() and "may not be scaled" in r.getMessage()]
+        assert len(onsets) == 1, "a persistent mismatch must log once, not once per frame: {0}".format(onsets)
+        assert "channel 1" in onsets[0].getMessage()
 
         mismatch["on"] = False
         scope.get_waveform(1, provenance=False)  # recovers
 
-        recoveries = [r for r in caplog.records if r.name == logger_name and r.levelno == logging.INFO and "DATA_INTERVAL" in r.getMessage()]
+        recoveries = [r for r in caplog.records if r.name == logger_name and "DATA_INTERVAL" in r.getMessage() and "cleared" in r.getMessage()]
         assert len(recoveries) == 1, "the recovery must log exactly once: {0}".format(recoveries)
+        assert recoveries[0].levelno == logging.WARNING, "the recovery record must be WARNING, matching the onset's level"
         assert "channel 1" in recoveries[0].getMessage()
 
-        # Still exactly one warning overall -- the recovery must not be a
-        # second warning, and the earlier steady-state mismatch tick must not
-        # have logged again either.
-        warnings_after = [r for r in caplog.records if r.name == logger_name and r.levelno == logging.WARNING and "DATA_INTERVAL" in r.getMessage()]
-        assert len(warnings_after) == 1
+        # Still exactly one onset overall -- the recovery must not be logged
+        # as a second onset, and the earlier steady-state mismatch tick must
+        # not have logged another onset either.
+        onsets_after = [r for r in caplog.records if r.name == logger_name and r.levelno == logging.WARNING and "DATA_INTERVAL" in r.getMessage() and "may not be scaled" in r.getMessage()]
+        assert len(onsets_after) == 1
 
 
 def test_a_stride_needing_more_than_one_window_raises():
