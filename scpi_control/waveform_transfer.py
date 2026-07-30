@@ -682,6 +682,34 @@ class ModernTransfer:
                 data_raw = scope.read_raw()
             codes = parse_ieee_block(data_raw, dtype, error_context=data_context)
 
+            # A short window here is the one failure that would otherwise be
+            # INVISIBLE. Unlike the stride==1 branch above, nothing loops to
+            # collect a remainder, and `n = len(codes)` below sizes the time
+            # axis off whatever did arrive -- so a truncated record comes back
+            # looking perfectly well-formed, just quietly missing its tail.
+            # Nothing in this driver writes :WAVeform:POINt, but it is
+            # instrument state like :WAVeform:INTerval, and another program on
+            # the same scope (EasyScopeX, a colleague's LabVIEW driver) can
+            # leave it small. Same principle as the interval write above: this
+            # read verifies the state it depends on rather than trusting it.
+            #
+            # CAUTION: this compares against wave_array_count, which is only
+            # the STRIDED count under the p.756 assumption flagged at
+            # `record_length` above -- still unconfirmed on real hardware. If
+            # a real instrument instead reports the FULL record here, this
+            # raises on every strided frame (a live-view outage, the failure
+            # mode waveform_max_points() warns about) rather than on the
+            # truncation it is meant to catch. That is the FIRST thing to
+            # check against the scope if the live view starts refusing.
+            if codes.size < record_length:
+                raise exceptions.CommandError(
+                    f"Strided read returned {codes.size} points but the preamble's "
+                    f"WAVE_ARRAY_COUNT says {record_length} (stride={effective_stride}); "
+                    f"a :WAVeform:POINt window cap left set by another program is the "
+                    f"likeliest cause -- refusing to scale a truncated record into a "
+                    f"time axis that would look correct ({data_context})"
+                )
+
         # SDS Series Programming Guide EN11G p.758 ("Read Waveform Data",
         # analog example, Step 3): "voltage value (V) = code value
         # *(vdiv /code_per_div) - voffset". vdiv/voffset/code_per_div are the

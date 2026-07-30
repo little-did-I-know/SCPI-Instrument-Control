@@ -216,6 +216,46 @@ def test_a_data_interval_mismatch_is_logged_once_per_transition_not_every_frame(
         assert len(onsets_after) == 1
 
 
+def test_a_strided_read_that_comes_back_short_raises_instead_of_truncating():
+    """Final-review fix (Important 4): the single-window strided read used
+    `codes` as-is and built its time axis over `len(codes)`, never comparing
+    that against the preamble's own record length. Nothing in this repo writes
+    :WAVeform:POINt -- but another program on the same instrument
+    (EasyScopeX, a colleague's LabVIEW driver) can leave it small, and then
+    every live frame is silently truncated with a time axis that looks
+    perfectly correct for the points that did arrive. This branch's stated
+    principle is that every read sets or verifies the state it depends on, and
+    silently wrong data is the worst artifact available here.
+
+    `conn.waveform_point` is set directly rather than by writing the SCPI
+    command, because "a value this driver never writes was left behind by
+    something else" is exactly the situation under test.
+    """
+    conn = MockConnection(idn=MODERN_IDN, sample_rate=20_000.0, timebase=1e-3)
+    conn.record_length = 1000
+    conn.waveform_point = 100  # a leftover window cap: 100 points of the 143 a stride of 7 should yield
+    scope = Oscilloscope("mock", connection=conn)
+    scope.connect()
+
+    with pytest.raises(exceptions.CommandError) as excinfo:
+        scope.get_waveform(1, provenance=False, stride=7)
+
+    message = str(excinfo.value)
+    assert "100" in message and "143" in message, message
+    assert ":WAVeform:POINt" in message, "the message must name the likeliest cause, or it is another unactionable read failure: {0}".format(message)
+
+
+def test_a_complete_strided_read_still_succeeds():
+    # The guard above must not fire on the normal case -- ceil(1000/7)=143
+    # points asked for, 143 delivered.
+    conn = MockConnection(idn=MODERN_IDN, sample_rate=20_000.0, timebase=1e-3)
+    conn.record_length = 1000
+    scope = Oscilloscope("mock", connection=conn)
+    scope.connect()
+
+    assert len(scope.get_waveform(1, provenance=False, stride=7).voltage) == 143
+
+
 def test_a_stride_needing_more_than_one_window_raises():
     """A strided record that would not fit in a single :WAVeform:DATA?
     transfer must raise rather than mis-assemble: the general chunking loop's
