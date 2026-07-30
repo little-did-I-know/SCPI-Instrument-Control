@@ -129,9 +129,7 @@ class Measurement:
             # an ordinary transient look like an instrument fault in the
             # gateway's poll log.
             if set(reply) == {"*"}:
-                raise exceptions.MeasurementUnavailableError(
-                    f"Instrument reports no value for {wire_type} on channel {channel} right now (answered {reply!r})"
-                )
+                raise exceptions.MeasurementUnavailableError(f"Instrument reports no value for {wire_type} on channel {channel} right now (answered {reply!r})")
             try:
                 return float(reply)
             except ValueError as e:

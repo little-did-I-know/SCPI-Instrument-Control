@@ -309,7 +309,9 @@ class TestAFailingRecordLengthQueryDoesNotFailTheExport:
         """
         from scpi_control.connection.mock.base import MockConnection
 
-        instrument = Oscilloscope("mock", connection=MockConnection("mock", idn="Siglent Technologies,{0},MOCK0001,1.0.0.0".format(MODERN_MODEL), custom_responses={":ACQuire:POINts?": "not-a-number"}))
+        instrument = Oscilloscope(
+            "mock", connection=MockConnection("mock", idn="Siglent Technologies,{0},MOCK0001,1.0.0.0".format(MODERN_MODEL), custom_responses={":ACQuire:POINts?": "not-a-number"})
+        )
         instrument.connect()
         assert instrument.dialect == "modern"
         assert instrument._has_command("get_acq_points"), "modern must map :ACQuire:POINts? -- otherwise record_length() short-circuits and no query is sent"

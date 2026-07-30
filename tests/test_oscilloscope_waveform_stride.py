@@ -287,12 +287,8 @@ def test_a_strided_trace_covers_the_same_time_window_as_an_unstrided_one():
     dt_strided = float(np.mean(np.diff(strided.time)))
     assert dt_strided == pytest.approx(7 * dt_full), "delivered points are `stride` samples apart"
     assert strided.time[0] == pytest.approx(full.time[0])
-    assert strided.time[-1] == pytest.approx(full.time[-1], rel=0.02), (
-        "the strided trace must still end at the end of the sweep"
-    )
-    assert strided.sample_rate == pytest.approx(full.sample_rate / 7), (
-        "the effective rate of a decimated trace is 1/stride of the acquisition rate"
-    )
+    assert strided.time[-1] == pytest.approx(full.time[-1], rel=0.02), "the strided trace must still end at the end of the sweep"
+    assert strided.sample_rate == pytest.approx(full.sample_rate / 7), "the effective rate of a decimated trace is 1/stride of the acquisition rate"
 
 
 def test_a_strided_read_that_fits_only_after_decimation_is_not_refused():
@@ -374,9 +370,7 @@ def test_the_modern_mock_reports_its_acquisition_point_count():
     raw = conn.query(":ACQuire:POINts?")
     assert raw.strip().upper() == "1.00E+03", "bare NR3, as the instrument sends: {0!r}".format(raw)
     assert scope.record_length() == 1000
-    assert scope.record_length() == _modern_preamble(conn)["wave_array_count"], (
-        "the point count and the preamble must describe the same record"
-    )
+    assert scope.record_length() == _modern_preamble(conn)["wave_array_count"], "the point count and the preamble must describe the same record"
 
 
 def test_the_default_modern_mock_can_also_say_how_long_its_record_is():

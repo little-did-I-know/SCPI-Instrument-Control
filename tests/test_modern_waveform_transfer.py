@@ -230,9 +230,7 @@ def test_one_code_per_div_serves_both_widths_on_a_high_resolution_front_end():
     word_meta = _preamble_under(conn, "WORD")
 
     assert byte_meta["adc_bit"] > 8, "an HD front end reports more than 8 ADC bits"
-    assert byte_meta["code_per_div"] == word_meta["code_per_div"], (
-        "the instrument reports one code_per_div regardless of transfer width"
-    )
+    assert byte_meta["code_per_div"] == word_meta["code_per_div"], "the instrument reports one code_per_div regardless of transfer width"
     assert byte_meta["comm_type"] == 0 and word_meta["comm_type"] == 1
 
 
@@ -313,11 +311,6 @@ def test_the_mock_frames_data_the_way_the_instrument_does():
     data = build_waveform_data(conn)
 
     assert data.endswith(b"\n\n"), "DATA? replies carry two trailing newlines"
-    assert data.startswith(b"#41000"), (
-        "1000 bytes must use the general variable-width header (#4 + '1000'), "
-        "not the fixed 9-digit form: {0!r}".format(data[:12])
-    )
+    assert data.startswith(b"#41000"), "1000 bytes must use the general variable-width header (#4 + '1000'), " "not the fixed 9-digit form: {0!r}".format(data[:12])
     assert build_waveform_preamble(conn).endswith(b"\n"), "PREamble? carries one trailing newline"
-    assert build_waveform_preamble(conn).startswith(b"#9000000346"), (
-        "PREamble? does keep the fixed 9-digit header, unlike DATA?"
-    )
+    assert build_waveform_preamble(conn).startswith(b"#9000000346"), "PREamble? does keep the fixed 9-digit header, unlike DATA?"

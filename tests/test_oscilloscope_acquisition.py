@@ -73,10 +73,10 @@ def test_the_gate_parses_the_header_prefixed_reply_hardware_actually_sends():
         idn=MODERN_IDN,
         custom_responses={"INR?": ["INR 8193", "INR 8192", "INR 0", "INR 1"]},
     )
-    assert scope.new_acquisition_ready() is True   # 8193 -> bit 0 set
+    assert scope.new_acquisition_ready() is True  # 8193 -> bit 0 set
     assert scope.new_acquisition_ready() is False  # 8192 -> bit 13 only
     assert scope.new_acquisition_ready() is False  # 0 -> nothing latched
-    assert scope.new_acquisition_ready() is True   # 1 -> bit 0 set
+    assert scope.new_acquisition_ready() is True  # 1 -> bit 0 set
 
 
 def test_the_modern_mock_answers_inr_the_way_the_instrument_does():
@@ -90,7 +90,5 @@ def test_the_modern_mock_answers_inr_the_way_the_instrument_does():
 
     reply = scope._connection.query("INR?")
 
-    assert reply.upper().startswith("INR"), (
-        "the mock must reproduce the instrument's header prefix, or it re-hides the bug: {0!r}".format(reply)
-    )
+    assert reply.upper().startswith("INR"), "the mock must reproduce the instrument's header prefix, or it re-hides the bug: {0!r}".format(reply)
     assert scope.new_acquisition_ready() in (True, False), "the gate must resolve against the unpatched mock"

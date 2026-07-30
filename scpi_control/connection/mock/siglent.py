@@ -3,7 +3,6 @@ write/query dialects, plus the waveform-response builder."""
 
 from __future__ import annotations
 
-import math
 import re
 import struct
 from typing import Dict, Optional, Tuple

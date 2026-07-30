@@ -150,8 +150,7 @@ def test_a_measurement_the_instrument_cannot_compute_is_reported_as_unavailable(
     """
     from scpi_control.exceptions import CommandError, MeasurementUnavailableError
 
-    conn = MockConnection("mock", idn=MODERN_IDN,
-                          custom_responses={":MEASure:SIMPle:VALue? PKPK": "****"})
+    conn = MockConnection("mock", idn=MODERN_IDN, custom_responses={":MEASure:SIMPle:VALue? PKPK": "****"})
     scope = Oscilloscope("mock", connection=conn)
     scope.connect()
 
@@ -160,12 +159,8 @@ def test_a_measurement_the_instrument_cannot_compute_is_reported_as_unavailable(
 
     message = str(excinfo.value)
     assert "PKPK" in message
-    assert "parse" not in message.lower(), (
-        "an unavailable reading is not a parse failure: {0}".format(message)
-    )
-    assert isinstance(excinfo.value, CommandError), (
-        "must stay a CommandError subclass so existing handlers keep catching it"
-    )
+    assert "parse" not in message.lower(), "an unavailable reading is not a parse failure: {0}".format(message)
+    assert isinstance(excinfo.value, CommandError), "must stay a CommandError subclass so existing handlers keep catching it"
     scope.disconnect()
 
 
@@ -173,8 +168,7 @@ def test_a_genuinely_unparseable_measurement_still_fails_as_before():
     # The '****' handling must not swallow real wire corruption.
     from scpi_control.exceptions import CommandError, MeasurementUnavailableError
 
-    conn = MockConnection("mock", idn=MODERN_IDN,
-                          custom_responses={":MEASure:SIMPle:VALue? PKPK": "garbage"})
+    conn = MockConnection("mock", idn=MODERN_IDN, custom_responses={":MEASure:SIMPle:VALue? PKPK": "garbage"})
     scope = Oscilloscope("mock", connection=conn)
     scope.connect()
 
