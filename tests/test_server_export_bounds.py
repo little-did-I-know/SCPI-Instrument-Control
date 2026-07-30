@@ -23,6 +23,7 @@ fastapi = pytest.importorskip("fastapi")
 pytest.importorskip("httpx")  # fastapi.testclient needs it
 from fastapi.testclient import TestClient  # noqa: E402
 
+from scpi_control.exceptions import FeatureNotSupportedError  # noqa: E402
 from scpi_control.oscilloscope import Oscilloscope  # noqa: E402
 from scpi_control.server.api import scope as scope_api  # noqa: E402
 from scpi_control.server.app import create_app  # noqa: E402
@@ -222,3 +223,126 @@ class TestUnknownRecordLengthProceedsUnguarded:
         instrument.connect()
         assert instrument.dialect == "legacy"
         assert instrument.record_length() is None
+
+
+class TestUnverifiableOversizedExportLogsAWarning:
+    # Review fix (Important 1): the unguarded legacy path had no runtime
+    # signal at all when the eventual fetch turned out to be oversized after
+    # the fact -- only a docstring. Prevention is impossible once the array
+    # is already in memory, but the operator deserves a log line, not silence.
+
+    def test_logs_a_warning_naming_the_actual_count_when_size_could_not_be_verified(self, client, monkeypatch, caplog):
+        # MAX_EXPORT_POINTS is shrunk to keep this test fast/light -- the
+        # array itself doesn't need to be huge, only larger than whatever
+        # the threshold is, to reach the "turned out oversized" branch.
+        monkeypatch.setattr(scope_api, "MAX_EXPORT_POINTS", 100)
+        oversized = _fake_waveform(n=107)
+        monkeypatch.setattr(Oscilloscope, "get_waveform", lambda self, channel, provenance=True, stride=None: oversized)
+        monkeypatch.setattr(Oscilloscope, "record_length", lambda self: None)  # unverifiable dialect
+        sid = create_mock_session(client)
+
+        with caplog.at_level("WARNING", logger="scpi_control.server.api.scope"):
+            response = client.get("/api/sessions/{0}/scope/capture.csv?channels=1".format(sid))
+
+        assert response.status_code == 200  # prevention is impossible after the fact -- this still succeeds
+        warnings = [r.message for r in caplog.records if r.levelname == "WARNING"]
+        assert any("107" in w and "record_length" in w for w in warnings), warnings
+
+    def test_no_warning_when_the_unverifiable_fetch_is_actually_small(self, client, monkeypatch, caplog):
+        # The warning is specifically about turning out to be oversized, not
+        # about record_length() being unknown per se -- most legacy exports
+        # are small and must stay silent.
+        small = _fake_waveform(n=41)
+        monkeypatch.setattr(Oscilloscope, "get_waveform", lambda self, channel, provenance=True, stride=None: small)
+        monkeypatch.setattr(Oscilloscope, "record_length", lambda self: None)
+        sid = create_mock_session(client)
+
+        with caplog.at_level("WARNING", logger="scpi_control.server.api.scope"):
+            response = client.get("/api/sessions/{0}/scope/capture.csv?channels=1".format(sid))
+
+        assert response.status_code == 200
+        assert not [r for r in caplog.records if r.levelname == "WARNING"]
+
+    def test_no_warning_when_size_was_verified_in_advance(self, client, monkeypatch, caplog):
+        # size_verified True (record_length() answered) must never trigger
+        # this specific warning, even if -- hypothetically -- the fetch
+        # somehow returned more than the recorded length.
+        fixed = _fake_waveform(n=41)
+        monkeypatch.setattr(Oscilloscope, "get_waveform", lambda self, channel, provenance=True, stride=None: fixed)
+        monkeypatch.setattr(Oscilloscope, "record_length", lambda self: len(fixed.voltage))
+        sid = create_mock_session(client)
+
+        with caplog.at_level("WARNING", logger="scpi_control.server.api.scope"):
+            response = client.get("/api/sessions/{0}/scope/capture.csv?channels=1".format(sid))
+
+        assert response.status_code == 200
+        assert not [r for r in caplog.records if r.levelname == "WARNING"]
+
+
+class TestTransferCapTripBecomes413:
+    # Review fix (Important 2): record_length() and the fetch are two
+    # separate run_job calls with nothing holding the record between them, so
+    # a record that changes in that window -- or an instrument whose real
+    # transfer cap is smaller than assumed -- can still trip
+    # ModernTransfer's single-window ceiling (FeatureNotSupportedError),
+    # which subclasses SiglentError and would otherwise surface as an
+    # uncaught 500. It must become a 413 instead, consistent with the
+    # oversized-record refusal.
+
+    def test_capture_csv_turns_a_transfer_cap_trip_into_413(self, client, monkeypatch):
+        monkeypatch.setattr(Oscilloscope, "record_length", lambda self: 10_000)
+
+        def raising_get_waveform(self, channel, provenance=True, stride=None):
+            raise FeatureNotSupportedError(
+                "Strided read of 10000 points (stride=200) exceeds this instrument's per-transfer cap of 50 points " "(:WAVeform:MAXPoint?); multi-window strided reads are not supported (test)"
+            )
+
+        monkeypatch.setattr(Oscilloscope, "get_waveform", raising_get_waveform)
+        sid = create_mock_session(client)
+
+        response = client.get("/api/sessions/{0}/scope/capture.csv?channels=1&max_points=50".format(sid))
+
+        assert response.status_code == 413
+        detail = response.json()["detail"]
+        assert "max_points" in detail
+        assert "per-transfer" in detail
+
+    def test_waveform_json_turns_a_transfer_cap_trip_into_413(self, client, monkeypatch):
+        monkeypatch.setattr(Oscilloscope, "record_length", lambda self: 10_000)
+
+        def raising_get_waveform(self, channel, provenance=True, stride=None):
+            raise FeatureNotSupportedError(
+                "Strided read of 10000 points (stride=200) exceeds this instrument's per-transfer cap of 50 points " "(:WAVeform:MAXPoint?); multi-window strided reads are not supported (test)"
+            )
+
+        monkeypatch.setattr(Oscilloscope, "get_waveform", raising_get_waveform)
+        sid = create_mock_session(client)
+
+        response = client.get("/api/sessions/{0}/scope/waveform?channels=1&max_points=50".format(sid))
+
+        assert response.status_code == 413
+        assert "max_points" in response.json()["detail"]
+
+
+class TestDefaultPathNeverStrides:
+    # Minor (export-side twin of the Task 7 guard): the guarantee that a
+    # default (no max_points) export is never silently decimated currently
+    # holds only by construction. Pin it directly, so a future change to the
+    # `cap is None` short-circuit in _export_stride cannot regress silently.
+
+    def test_default_path_passes_no_stride(self, client, monkeypatch):
+        fixed = _fake_waveform(n=41)
+        seen_strides = []
+
+        def fake_get_waveform(self, channel, provenance=True, stride=None):
+            seen_strides.append(stride)
+            return fixed
+
+        monkeypatch.setattr(Oscilloscope, "get_waveform", fake_get_waveform)
+        monkeypatch.setattr(Oscilloscope, "record_length", lambda self: len(fixed.voltage))
+        sid = create_mock_session(client)
+
+        response = client.get("/api/sessions/{0}/scope/capture.csv?channels=1".format(sid))
+
+        assert response.status_code == 200
+        assert seen_strides == [None], "the default (no max_points) path must never pass a stride -- an export decimated without being asked is the failure this task must not create"

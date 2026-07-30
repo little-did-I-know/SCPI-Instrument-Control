@@ -1,14 +1,15 @@
 # scpi_control/server/api/scope.py
 import json
+import logging
 from dataclasses import replace
 from datetime import datetime
-from typing import Callable, List, Optional
+from typing import Callable, List, Optional, Tuple
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import PlainTextResponse, Response, StreamingResponse
 
-from scpi_control.exceptions import InvalidParameterError
+from scpi_control.exceptions import FeatureNotSupportedError, InvalidParameterError
 from scpi_control.server.api.commands import send_command_for
 from scpi_control.server.api.sessions import require_kind, require_session, run_job
 from scpi_control.server.ownership import require_owner
@@ -30,6 +31,8 @@ from scpi_control.server.schemas import (
 )
 from scpi_control.server.sessions import InstrumentSession, SessionError, read_state
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(tags=["scope"])
 
 # Safety rail against an export exhausting server memory, not a tuning knob --
@@ -48,47 +51,93 @@ def _parse_channel_list(channels: str) -> List[int]:
     return channel_list
 
 
-async def _export_stride(session, max_points: int) -> Optional[int]:
+async def _export_stride(session, max_points: int) -> Tuple[Optional[int], bool]:
     """Decide the fetch stride for an export, refusing an unbounded one before any fetch happens.
 
     record_length() (:ACQuire:POINts?) is queried BEFORE get_waveform is ever
     called, so an oversized record is refused before a single sample crosses
     the wire -- never after building (or half-building) a response.
 
-    Returns None when no decimation is needed (or, on some dialects, possible):
-    record_length() returns None on dialects with no :ACQuire:POINts? mapping
-    (the legacy dialect is one -- see scpi_commands.py's LEGACY_COMMANDS,
-    which has no "get_acq_points" entry). There the record's size cannot be
-    verified before the fetch at all. This proceeds unstrided and unguarded on
-    those dialects, exactly as every export did before this task, rather than
-    refusing every legacy-dialect export outright -- that would be a blanket
-    regression for every user on those models, not a safety improvement, since
-    they would have no way to learn their own record size to work around it.
-    This is a disclosed, accepted gap (see task-8-report.md), not a silent
-    guess: an operator on an affected dialect gets no guard, same as today.
+    Returns (stride, size_verified). size_verified is False when
+    record_length() itself returned None -- dialects with no :ACQuire:POINts?
+    mapping (the legacy dialect is one -- see scpi_commands.py's
+    LEGACY_COMMANDS, which has no "get_acq_points" entry). There the record's
+    size cannot be verified before the fetch at all. This proceeds unstrided
+    and unguarded on those dialects, exactly as every export did before this
+    task, rather than refusing every legacy-dialect export outright -- that
+    would be a blanket regression for every user on those models, not a
+    safety improvement, since they would have no way to learn their own
+    record size to work around it. This is a disclosed, accepted gap, not a
+    silent guess -- callers use size_verified to log a post-fetch warning
+    when the eventual fetch turns out to have been oversized after all (see
+    _warn_if_export_was_unverifiable_and_oversized below), since prevention
+    is no longer possible once size_verified is False.
 
     When decimation IS needed (an explicit max_points below the actual record
     size), the stride is sized against whichever is smaller: the caller's own
     max_points, or the instrument's own per-transfer cap (:WAVeform:MAXPoint?,
     via waveform_max_points()) -- mirrors ScopeAdapter.poll's sizing
     (server/adapters.py) so a strided export cannot trip ModernTransfer's
-    single-window ceiling (FeatureNotSupportedError) by construction, instead
-    of discovering that ceiling in production.
+    single-window ceiling (FeatureNotSupportedError) by construction for a
+    *stable* record. record_length() and the later get_waveform() fetch are
+    two separate run_job calls with nothing holding the record between them,
+    so a record that grows in that window can still trip the real ceiling --
+    callers must catch FeatureNotSupportedError around the fetch and turn it
+    into a 413 rather than let it become an uncaught 500 (see
+    _reraise_transfer_cap_trip_as_413 below).
     """
     cap = max_points if max_points and max_points > 0 else None
     total = await run_job(session, lambda scope: scope.record_length())
     if total is None:
-        return None
+        return None, False
     if total > MAX_EXPORT_POINTS and (cap is None or cap > MAX_EXPORT_POINTS):
         raise HTTPException(
             status_code=413,
             detail="record holds {0} points, exceeding MAX_EXPORT_POINTS ({1}); pass max_points={1} to proceed with a decimated export".format(total, MAX_EXPORT_POINTS),
         )
     if cap is None or total <= cap:
-        return None
+        return None, True
     transfer_cap = await run_job(session, lambda scope: scope.waveform_max_points())
     limit = min(cap, transfer_cap) if transfer_cap else cap
-    return max(1, -(-total // limit))
+    return max(1, -(-total // limit)), True
+
+
+def _warn_if_export_was_unverifiable_and_oversized(captures, size_verified: bool) -> None:
+    """Log once the fetch's actual size is known, on a dialect that could not
+    verify it in advance (record_length() returned None -- size_verified is
+    False). Prevention is impossible at this point: the array is already in
+    memory. But an operator whose gateway runs out of memory deserves a log
+    line explaining why, not silence -- silent degradation on this branch has
+    already cost an hour of diagnosis once (Task 6).
+    """
+    if size_verified:
+        return
+    for channel, data in captures:
+        n = len(data.voltage)
+        if n > MAX_EXPORT_POINTS:
+            logger.warning(
+                "export fetched %d points on channel %s, exceeding MAX_EXPORT_POINTS (%d); "
+                "this dialect could not report record_length() in advance, so the size could not be checked before the fetch",
+                n,
+                channel,
+                MAX_EXPORT_POINTS,
+            )
+
+
+def _reraise_transfer_cap_trip_as_413(exc: FeatureNotSupportedError) -> HTTPException:
+    """Translate a strided fetch's single-window ceiling trip into a 413.
+
+    FeatureNotSupportedError subclasses SiglentError, which the app-level
+    handler maps to a plain 500 -- indistinguishable from an unrelated
+    instrument fault, and not machine-actionable the way the oversized-record
+    413 above is. This keeps both refusals on the same status: "this export
+    is too big, here is what would work," not two different statuses for the
+    same operator-facing problem.
+    """
+    return HTTPException(
+        status_code=413,
+        detail="export exceeded this instrument's per-transfer capability while fetching ({0}); pass a smaller max_points and retry".format(exc),
+    )
 
 
 async def mutate(session: InstrumentSession, fn: Callable) -> dict:
@@ -221,13 +270,17 @@ async def capture_csv(session_id: str, request: Request, channels: str = "1", ma
     session = require_session(request, session_id)
     require_kind(session, "scope")
     channel_list = _parse_channel_list(channels)
-    stride = await _export_stride(session, max_points)
+    stride, size_verified = await _export_stride(session, max_points)
     cap = max_points if max_points > 0 else None
 
     def capture(scope):
         return [(c, scope.get_waveform(c, stride=stride)) for c in channel_list]
 
-    captures = await run_job(session, capture)
+    try:
+        captures = await run_job(session, capture)
+    except FeatureNotSupportedError as exc:
+        raise _reraise_transfer_cap_trip_as_413(exc) from exc
+    _warn_if_export_was_unverifiable_and_oversized(captures, size_verified)
     filename = "capture_{0}_C{1}.csv".format(session.id, "-".join(str(c) for c in channel_list))
     return StreamingResponse(_build_csv(captures, cap), media_type="text/csv", headers={"Content-Disposition": 'attachment; filename="{0}"'.format(filename)})
 
@@ -292,13 +345,17 @@ async def waveform_json(session_id: str, request: Request, channels: str = "1", 
     session = require_session(request, session_id)
     require_kind(session, "scope")
     channel_list = _parse_channel_list(channels)
-    stride = await _export_stride(session, max_points)
+    stride, size_verified = await _export_stride(session, max_points)
     cap = max_points if max_points > 0 else None
 
     def capture(scope):
         return [(c, scope.get_waveform(c, stride=stride)) for c in channel_list]
 
-    captures = await run_job(session, capture)
+    try:
+        captures = await run_job(session, capture)
+    except FeatureNotSupportedError as exc:
+        raise _reraise_transfer_cap_trip_as_413(exc) from exc
+    _warn_if_export_was_unverifiable_and_oversized(captures, size_verified)
     return StreamingResponse(_stream_waveform_json(captures, cap), media_type="application/json")
 
 
