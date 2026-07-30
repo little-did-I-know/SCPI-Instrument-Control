@@ -151,7 +151,8 @@ python scripts/build_executable.py --archive
 This creates:
 
 - **Windows**: `SiglentGUI-v0.3.1-Windows-x64.zip`
-- **macOS**: `SiglentGUI-v0.3.1-macOS-arm64.zip`
+- **macOS (Apple Silicon)**: `SiglentGUI-v0.3.1-macOS-arm64.zip`
+- **macOS (Intel)**: `SiglentGUI-v0.3.1-macOS-x86_64.zip`
 - **Linux**: `SiglentGUI-v0.3.1-Linux-x86_64.tar.gz`
 
 Each archive includes:
@@ -164,7 +165,7 @@ Each archive includes:
 
 When you push a version tag (e.g., `v0.3.2`), GitHub Actions will:
 
-1. Build executables on Windows, macOS, and Linux runners
+1. Build executables on four runners: Windows, macOS on Apple Silicon, macOS on Intel, and Linux
 2. Create platform-specific archives
 3. Upload to GitHub Releases
 4. Add installation instructions to the release notes
