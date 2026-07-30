@@ -130,12 +130,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A channel whose display query failed is now logged instead of silently failing. Previously a
   poll-path failure made a channel appear 'off': no waveform, no error message, a gateway that
   appeared healthy and did nothing.
-- A thinned waveform read that comes back short now fails loudly instead of returning a truncated
-  trace. On modern Siglent instruments the live view asks for every Nth point, and the driver
-  scaled however many points arrived without checking that against the count the instrument's own
-  preamble promised. If another program sharing the scope (EasyScopeX, a LabVIEW driver) had left
-  a `:WAVeform:POINt` window cap set, every frame lost its tail while its time axis still looked
-  perfectly correct — a silently wrong measurement rather than a visible failure.
 - The timebase control's stepper no longer moves in 0.1 s jumps or hides sub-microsecond sweeps
   under a six-decimal display. It previously lived in the Trigger panel with 100 ms increments —
   one click from 1 ms/div landed on 0.101 s/div — and made sub-microsecond sweeps effectively
