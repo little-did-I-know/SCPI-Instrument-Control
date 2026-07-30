@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { AnalysisPanel } from "../controls/AnalysisPanel";
 import { ChannelsPanel } from "../controls/ChannelsPanel";
+import { HorizontalPanel } from "../controls/HorizontalPanel";
 import { MathPanel } from "../controls/MathPanel";
 import { ScopeToolbar } from "../controls/ScopeToolbar";
 import { TriggerPanel } from "../controls/TriggerPanel";
@@ -16,7 +17,7 @@ import { ViewModeToggle } from "../waveform/ViewModeToggle";
 import { Tabs } from "../../ds/Tabs";
 import { useSession } from "../../store/session";
 
-const RAIL_TABS = ["Channels", "Trigger", "Math", "Analysis", "Reference", "Log", "Measure"];
+const RAIL_TABS = ["Channels", "Horizontal", "Trigger", "Math", "Analysis", "Reference", "Log", "Measure"];
 
 /** Everything below the readout strip for an oscilloscope session: the control
  *  rail and the canvas. Only this component knows a scope has a rail -- the
@@ -33,6 +34,7 @@ export function ScopeBody() {
       <div style={{ width: "280px", flexShrink: 0, overflowY: "auto" }}>
         <Tabs tabs={RAIL_TABS} value={railTab} onChange={setRailTab}>
           {railTab === "Channels" && <ChannelsPanel />}
+          {railTab === "Horizontal" && <HorizontalPanel />}
           {railTab === "Trigger" && <TriggerPanel />}
           {railTab === "Math" && <MathPanel />}
           {railTab === "Analysis" && <AnalysisPanel />}

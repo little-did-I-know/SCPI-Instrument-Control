@@ -16,7 +16,6 @@ function withNull(options: string[], value: string | null) {
 export function TriggerPanel() {
   const session = useSession((s) => s.session);
   const trigger = useSession((s) => s.scope?.trigger);
-  const timebase = useSession((s) => s.scope?.timebase);
   const numChannels = session?.num_channels ?? 0;
   const [error, setError] = useState<string | null>(null);
 
@@ -25,16 +24,6 @@ export function TriggerPanel() {
     setError(null);
     try {
       await api.patchTrigger(session.id, patch);
-    } catch (err) {
-      setError(err instanceof ApiError ? err.detail : String(err));
-    }
-  }
-
-  async function sendTimebase(seconds: number) {
-    if (!session) return;
-    setError(null);
-    try {
-      await api.patchTimebase(session.id, seconds);
     } catch (err) {
       setError(err instanceof ApiError ? err.detail : String(err));
     }
@@ -79,16 +68,6 @@ export function TriggerPanel() {
             value={trigger?.level ?? 0}
             suffix=" V"
             onChange={(value) => send({ level: value })}
-          />
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "var(--text-sm)" }}>
-          Timebase
-          <SpinBox
-            aria-label="Timebase"
-            value={timebase ?? 0}
-            decimals={6}
-            suffix=" s/div"
-            onChange={(value) => sendTimebase(value)}
           />
         </div>
       </div>
