@@ -9,6 +9,7 @@ and a subclass that overrides part of a thread or error path by accident is a
 much worse failure than a little indirection.
 """
 
+import logging
 import time
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
@@ -19,6 +20,8 @@ from scpi_control.server import compute
 from scpi_control.server.netpolicy import validate_target
 from scpi_control.server.recorder import TrendRecorder
 
+logger = logging.getLogger(__name__)
+
 MAX_FRAME_POINTS = 2000
 MEASUREMENT_EVERY_N_POLLS = 4
 
@@ -27,16 +30,46 @@ DEFAULT_MOCK_PSU_IDN = "Siglent Technologies,SPD3303X,SPD123456,1.0"
 DEFAULT_MOCK_AWG_IDN = "Siglent Technologies,SDG1032X,SDG1XXXXX,2.01.01.37R1"
 
 
-def _safe(fn, default=None):
+def _safe(fn, default=None, label=None, state=None):
+    """Run `fn`, degrading to `default` on the exceptions a poll tick must
+    survive. `label`/`state` are both optional and BOTH must be given to opt
+    into logging -- every existing call site that passes neither behaves
+    exactly as before, which is what keeps this signature backward compatible
+    for the many callers that just want the swallow.
+
+    `state` is a dict the caller owns (an adapter's `self._poll_health`,
+    typically), keyed by `label`, holding the last-known-good (True) or
+    last-known-bad (False) status of that one named operation. Passing the
+    SAME dict across calls with DIFFERENT labels is what lets, e.g., a failing
+    channel 1 query and a healthy channel 2 query be tracked independently --
+    otherwise the two would overwrite one shared "is it failing" flag and
+    flap each other's state.
+
+    Logging is once per transition, not once per call: at a 0.25s poll
+    interval, logging every tick of a persistent failure would write four
+    lines a second and bury everything else in the log. A success->failure
+    transition logs one WARNING naming the operation; a failure->success
+    transition logs one recovery record, so a reader can tell an outage in
+    the log actually ended. Steady state -- repeated failures, or repeated
+    successes -- logs nothing.
+    """
     try:
-        return fn()
+        result = fn()
     except (SiglentError, ValueError):
         # ValueError alongside SiglentError: a couple of the callers wrapped
         # here (Oscilloscope.record_length()/waveform_max_points()) parse a
         # numeric response with int(float(...)), which raises ValueError on a
         # malformed reply rather than a SiglentError. Either way, the poll
         # tick is the session heartbeat and must degrade to `default`, not die.
+        if label is not None and state is not None and state.get(label) is not False:
+            logger.warning("poll query failed, degrading to a default: %s", label)
+            state[label] = False
         return default
+    if label is not None and state is not None:
+        if state.get(label) is False:
+            logger.info("poll query recovered: %s", label)
+        state[label] = True
+    return result
 
 
 def _quiet(fn, default=None):
@@ -158,6 +191,10 @@ class ScopeAdapter(InstrumentAdapter):
         # produces a new acquisition, and without this exemption it would show
         # an empty canvas forever instead of its perfectly good last frame.
         self._published_a_frame = False
+        # Last-known-good/bad status per poll-path query, keyed by an
+        # operation label -- see _safe()'s docstring. Worker-thread-only, like
+        # self._shown: nothing else reads or writes it.
+        self._poll_health: Dict[str, bool] = {}
 
     def build(self, address, port, mock, model, allowed_ports, connection):
         if mock:
@@ -189,7 +226,8 @@ class ScopeAdapter(InstrumentAdapter):
         # event and get a meaningless answer. None (dialect has no gate) must
         # never be treated as False, or the live view dies on every
         # non-Siglent scope.
-        ready = _safe(lambda: scope.new_acquisition_ready(), default=None)
+        health = self._poll_health
+        ready = _safe(lambda: scope.new_acquisition_ready(), default=None, label="acquisition ready check", state=health)
         if ready is False and self._published_a_frame:
             return
         # Size the stride from the full record length, capped by whichever is
@@ -199,16 +237,16 @@ class ScopeAdapter(InstrumentAdapter):
         # and turn ModernTransfer's strided-read guard (FeatureNotSupportedError)
         # into a total live-view outage -- capping here makes that guard
         # unreachable by construction.
-        points = _safe(lambda: scope.record_length(), default=None)
+        points = _safe(lambda: scope.record_length(), default=None, label="record length", state=health)
         stride = None
         if points:
-            cap = _safe(lambda: scope.waveform_max_points(), default=None)
+            cap = _safe(lambda: scope.waveform_max_points(), default=None, label="waveform max points", state=health)
             limit = min(MAX_FRAME_POINTS, cap) if cap else MAX_FRAME_POINTS
             stride = max(1, -(-points // limit))
         acquired = {}
         for n in scope.supported_channels:
             ch = scope.get_channel(n)
-            if ch is not None and _safe(lambda: ch.enabled, default=False):
+            if ch is not None and _safe(lambda: ch.enabled, default=False, label="channel {0} enabled".format(n), state=health):
                 data = scope.get_waveform(n, provenance=False, stride=stride)
                 acquired["C{0}".format(n)] = data
                 publish(_decimate_frame(n, data.time, data.voltage))
@@ -216,8 +254,8 @@ class ScopeAdapter(InstrumentAdapter):
         shown_now = set()
         for label, math in (("M1", scope.math1), ("M2", scope.math2)):
             result = None
-            if math is not None and _safe(lambda: math.enabled, default=False):
-                result = _safe(lambda: math.compute(acquired))
+            if math is not None and _safe(lambda: math.enabled, default=False, label="math {0} enabled".format(label), state=health):
+                result = _safe(lambda: math.compute(acquired), label="math {0} compute".format(label), state=health)
             if result is not None:
                 publish(_decimate_frame(label, result.time, result.voltage))
                 shown_now.add(label)
@@ -246,7 +284,7 @@ class ScopeAdapter(InstrumentAdapter):
                 now = time.time()
                 values = []
                 for channel, mtype in self.measurements:
-                    value = _safe(lambda: scope.measurement.measure(mtype, channel))
+                    value = _safe(lambda: scope.measurement.measure(mtype, channel), label="measurement {0} channel {1}".format(mtype, channel), state=health)
                     values.append({"channel": channel, "mtype": mtype, "value": value})
                 publish({"type": "measurements", "values": values, "timestamp": now})
                 self.recorder.append(now, [entry["value"] for entry in values])

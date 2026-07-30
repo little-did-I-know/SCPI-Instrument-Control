@@ -427,6 +427,54 @@ def parse_modern_wavedesc(payload: bytes, *, error_context: str = "") -> dict:
     }
 
 
+_DATA_INTERVAL_STATE_ATTR = "_data_interval_mismatch_state"
+
+
+def _note_data_interval_mismatch(scope: "Oscilloscope", channel: int, requested: int, reported: int) -> None:
+    """Once-per-transition warning for a DATA_INTERVAL echo that disagrees
+    with the stride we asked for (see ModernTransfer.acquire above).
+
+    This runs on every acquire() -- including stride==1 on the export path --
+    so logging every call would write one WARNING per frame, indefinitely, at
+    up to four frames a second if real hardware's echo disagreed persistently.
+    Same discipline as the poll-path fix in server/adapters.py: one WARNING
+    when the mismatch starts, one recovery record when it stops, nothing
+    while it persists.
+
+    State is stored ON THE SCOPE INSTANCE, keyed by channel, rather than on
+    `self` of the calling Transfer: make_transfer() builds a brand new
+    ModernTransfer for every single acquire() call (see waveform.py's
+    Waveform.acquire), so there is no longer-lived Transfer object to carry
+    the previous call's state across. The Oscilloscope instance IS session-
+    long, and keying by channel keeps a mismatching channel 1 and a healthy
+    channel 2 from flapping each other's state.
+    """
+    state = getattr(scope, _DATA_INTERVAL_STATE_ATTR, None)
+    if state is None:
+        state = {}
+        setattr(scope, _DATA_INTERVAL_STATE_ATTR, state)
+    mismatched = reported != requested
+    was_mismatched = state.get(channel, False)
+    if mismatched and not was_mismatched:
+        logger.warning(
+            "Requested :WAVeform:INTerval %d but PREamble reported DATA_INTERVAL %d (host %s:%s, channel %d) -- the returned record length/time axis may not be scaled the way this driver assumes.",
+            requested,
+            reported,
+            scope.host,
+            scope.port,
+            channel,
+        )
+    elif not mismatched and was_mismatched:
+        logger.info(
+            "DATA_INTERVAL now matches the requested :WAVeform:INTerval %d again (host %s:%s, channel %d) -- the prior mismatch warning has cleared.",
+            requested,
+            scope.host,
+            scope.port,
+            channel,
+        )
+    state[channel] = mismatched
+
+
 class ModernTransfer:
     """:WAVeform: SOURce/PREamble/DATA/MAXPoint transfer for modern-dialect Siglent scopes.
 
@@ -535,15 +583,12 @@ class ModernTransfer:
         # DATA_INTERVAL echo (and therefore its HORIZ_INTERVAL scaling, used
         # below for the time axis) actually reflects the stride we requested.
         # A mismatch must not be invisible -- log it, but don't raise; a
-        # disagreement here is a scaling risk, not a malformed read.
-        if meta["data_interval"] != effective_stride:
-            logger.warning(
-                "Requested :WAVeform:INTerval %d but PREamble reported DATA_INTERVAL %d (host %s:%s) -- the returned record length/time axis may not be scaled the way this driver assumes.",
-                effective_stride,
-                meta["data_interval"],
-                scope.host,
-                scope.port,
-            )
+        # disagreement here is a scaling risk, not a malformed read. This runs
+        # on EVERY acquire(), including stride==1 on the export path, so the
+        # cadence has to be once-per-transition rather than once-per-call: a
+        # real instrument that disagreed persistently would otherwise log one
+        # WARNING per frame, indefinitely, at up to four frames a second.
+        _note_data_interval_mismatch(scope, channel, effective_stride, meta["data_interval"])
 
         dtype = np.int16 if meta["comm_type"] == 1 else np.int8
         # wave_array_count (WAVEDESC address 116-119, p.756) is "Number of

@@ -13,6 +13,8 @@ decimated file they believe is complete. So every read sets the interval
 explicitly -- including the default path, which resets it to 1.
 """
 
+import logging
+
 import numpy as np
 import pytest
 
@@ -144,6 +146,59 @@ def test_a_stride_left_over_from_a_prior_read_does_not_leak_into_the_next_one():
     full = scope.get_waveform(1, provenance=False)
 
     assert len(full.voltage) == 1000
+
+
+def test_a_data_interval_mismatch_is_logged_once_per_transition_not_every_frame(monkeypatch, caplog):
+    """Task 3 added a cross-check in ModernTransfer.acquire (waveform_transfer.py)
+    that compares the PREamble's DATA_INTERVAL against the stride we asked
+    for, and logs a warning on disagreement. It runs on EVERY acquire(),
+    including stride==1 on the export path -- so if real hardware's echo
+    disagreed with what this driver reads, the live view would log one
+    WARNING per frame, indefinitely, at up to four frames a second.
+
+    Same once-per-transition discipline as the poll-path fix: one WARNING
+    when the mismatch starts, one recovery record when it stops, nothing
+    while it persists.
+    """
+    import scpi_control.waveform_transfer as wt
+
+    scope = _connected_scope(idn=MODERN_IDN)
+    real_parse = wt.parse_modern_wavedesc
+    mismatch = {"on": True}
+
+    def fake_parse(payload, *, error_context=""):
+        meta = dict(real_parse(payload, error_context=error_context))
+        if mismatch["on"]:
+            meta["data_interval"] = meta["data_interval"] + 1
+        return meta
+
+    monkeypatch.setattr(wt, "parse_modern_wavedesc", fake_parse)
+
+    logger_name = "scpi_control.waveform_transfer"
+    with caplog.at_level(logging.INFO, logger=logger_name):
+        caplog.clear()
+        scope.get_waveform(1, provenance=False)  # mismatch starts
+        scope.get_waveform(1, provenance=False)  # steady state: still mismatched
+
+        # Filtered on "DATA_INTERVAL" too, not just level -- an unrelated INFO
+        # line ("Acquired N samples...") is logged by the same acquire() on
+        # every call and must not be mistaken for the mismatch/recovery record.
+        warnings = [r for r in caplog.records if r.name == logger_name and r.levelno == logging.WARNING and "DATA_INTERVAL" in r.getMessage()]
+        assert len(warnings) == 1, "a persistent mismatch must log once, not once per frame: {0}".format(warnings)
+        assert "channel 1" in warnings[0].getMessage()
+
+        mismatch["on"] = False
+        scope.get_waveform(1, provenance=False)  # recovers
+
+        recoveries = [r for r in caplog.records if r.name == logger_name and r.levelno == logging.INFO and "DATA_INTERVAL" in r.getMessage()]
+        assert len(recoveries) == 1, "the recovery must log exactly once: {0}".format(recoveries)
+        assert "channel 1" in recoveries[0].getMessage()
+
+        # Still exactly one warning overall -- the recovery must not be a
+        # second warning, and the earlier steady-state mismatch tick must not
+        # have logged again either.
+        warnings_after = [r for r in caplog.records if r.name == logger_name and r.levelno == logging.WARNING and "DATA_INTERVAL" in r.getMessage()]
+        assert len(warnings_after) == 1
 
 
 def test_a_stride_needing_more_than_one_window_raises():
