@@ -4264,6 +4264,13 @@ the gate entirely — use them for hardware-free work.</p>
 <li>Full-resolution CSV/JSON serialization of deep-memory captures runs <strong>off the
   event loop</strong>, so one large export does not freeze the gateway for everyone
   else.</li>
+<li>A capture export (<code>capture.csv</code> / <code>waveform</code>) above <strong>2,000,000 points</strong> is
+  <strong>refused with 413</strong> rather than fetched and truncated — the response names
+  the actual point count and the <code>max_points</code> value that would let it through.
+  This is a fixed safety rail against exhausting server memory, not a tuning
+  knob. See <a href="../api/#acquisition-export">Acquisition &amp; export</a> for the one
+  documented exception (a dialect that cannot report its record length in
+  advance).</li>
 </ul>
 <h2 id="reference-file-migration">Reference file migration<a class="headerlink" href="#reference-file-migration" title="Permanent link">&para;</a></h2>
 <p>Reference-waveform metadata used to be stored as a Python pickle, which meant

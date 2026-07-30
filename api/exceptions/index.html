@@ -2134,6 +2134,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#scpi_control.exceptions.MeasurementUnavailableError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;MeasurementUnavailableError
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#scpi_control.exceptions.InvalidParameterError" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3582,6 +3593,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#scpi_control.exceptions.MeasurementUnavailableError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;MeasurementUnavailableError
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#scpi_control.exceptions.InvalidParameterError" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3777,6 +3799,45 @@
 
 
         <p>Raised when a SCPI command fails or returns an error.</p>
+
+
+
+
+
+
+
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="scpi_control.exceptions.MeasurementUnavailableError" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>            <span class="doc doc-object-name doc-class-name">MeasurementUnavailableError</span>
+
+
+<a href="#scpi_control.exceptions.MeasurementUnavailableError" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="            CommandError (scpi_control.exceptions.CommandError)" href="#scpi_control.exceptions.CommandError">CommandError</a></code></p>
+
+
+
+        <p>Raised when the instrument has no value for a measurement right now.</p>
+<p>Distinct from a failed read: the wire worked and the instrument answered,
+it simply has nothing to report for that item yet. A modern Siglent says
+so with the literal "****" (measured on an SDS824X HD: MEAN answered
+while PKPK/MAX/MIN returned "****" on the same live channel).</p>
+<p>Deliberately a CommandError subclass so callers written before it existed
+keep catching it, while callers that care can tell "not available yet"
+apart from "the read is broken" -- the difference between a normal
+transient and something worth alerting on.</p>
 
 
 

@@ -3904,6 +3904,11 @@ dialect lacks a command, calling the corresponding property or method raises
 <td>lecroy</td>
 <td>The public <code>ON</code> token maps to the wire value <code>20MHZ</code>; LeCroy's <code>BWL</code> vocabulary (<code>OFF</code>, <code>20MHZ</code>, <code>200MHZ</code>, ...) has no <code>ON</code> token of its own to map onto.</td>
 </tr>
+<tr>
+<td><code>new_acquisition_ready()</code> ("has a new acquisition landed?", <code>INR?</code> bit 0)</td>
+<td>modern (Siglent) only</td>
+<td>Legacy's closest equivalent, <code>SAST?</code>, reports a latching trigger state rather than an edge on new data, so it cannot answer honestly and is deliberately not wired up here. Tektronix and LeCroy have no equivalent query at all. Every dialect without this gate returns <code>None</code> — callers (the web gateway's live view) must treat that as "no gate available," not as "not ready," and fall back to polling adaptively instead of stalling forever.</td>
+</tr>
 </tbody>
 </table>
 <p>A modern-dialect <code>measure()</code> call is not side-effect-free: it sends

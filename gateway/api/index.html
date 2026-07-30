@@ -4011,9 +4011,9 @@ session's WebSocket subscribers as a <code>state</code> message with <code>"kind
 <tr>
 <td><code>GET</code></td>
 <td><code>capture.csv</code></td>
-<td><code>?channels=1,2</code> (comma-separated)</td>
-<td><code>text/csv</code> — one <code>time_s</code> column plus one <code>C{n}_V</code> column per requested channel, aligned to the shortest capture</td>
-<td>400 no/invalid channels; 409 if the session is in an error/closed state</td>
+<td><code>?channels=1,2&amp;max_points=N</code> (comma-separated channels)</td>
+<td><code>text/csv</code>, streamed — one <code>time_s</code> column plus one <code>C{n}_V</code> column per requested channel, aligned to the shortest capture, capped to <code>max_points</code> rows (0/omitted = full resolution)</td>
+<td>400 no/invalid channels; 409 if the session is in an error/closed state; 413 record too large (see below)</td>
 </tr>
 <tr>
 <td><code>GET</code></td>
@@ -4026,11 +4026,19 @@ session's WebSocket subscribers as a <code>state</code> message with <code>"kind
 <td><code>GET</code></td>
 <td><code>waveform</code></td>
 <td><code>?channels=1,2&amp;max_points=N</code></td>
-<td><code>{"channels": [{channel, t0, dt, sample_rate, voltage_scale, voltage_offset, points}, ...]}</code> — <code>points</code> decimated to <code>max_points</code> (0/omitted = full resolution)</td>
-<td>400 no/invalid channels; 409 if the session is in an error/closed state</td>
+<td><code>{"channels": [{channel, t0, dt, sample_rate, voltage_scale, voltage_offset, points}, ...]}</code>, streamed — <code>points</code> decimated to <code>max_points</code> (0/omitted = full resolution)</td>
+<td>400 no/invalid channels; 409 if the session is in an error/closed state; 413 record too large (see below)</td>
 </tr>
 </tbody>
 </table>
+<p>Both routes <strong>refuse rather than truncate</strong> an oversized capture: if the record holds more points than
+<code>MAX_EXPORT_POINTS</code> (2,000,000) and no <code>max_points</code> (or one still above that cap) was given, the server
+returns <strong>413</strong> naming the actual point count and the <code>max_points</code> value that would let the export proceed
+— nothing is ever silently decimated down to a size the caller didn't ask for. This check runs <em>before</em> a
+single sample is fetched, by asking the instrument its record length (<code>:ACQuire:POINts?</code>). On a dialect that
+doesn't implement that query — legacy Siglent among them — the size can't be checked in advance, so the
+export proceeds unguarded on those dialects exactly as it always has, and the server logs a warning after
+the fact if the fetch turns out to have been oversized.</p>
 <h2 id="analysis">Analysis<a class="headerlink" href="#analysis" title="Permanent link">&para;</a></h2>
 <p>All paths under <code>/api/sessions/{id}/scope/</code>.</p>
 <table>
@@ -4243,6 +4251,14 @@ session's WebSocket subscribers as a <code>state</code> message with <code>"kind
 </tr>
 </tbody>
 </table>
+<p>On a Siglent-modern instrument, a <code>waveform</code> frame for a real channel (not math/filter) is gated on the
+instrument's own "new acquisition" flag (<code>INR?</code> bit 0): the poll loop asks that question every tick, and
+only fetches and publishes a frame when the answer is yes. In practice this means the live view updates
+once per completed acquisition — at a slow sweep that means a slow update, by design, matching what the
+instrument's own display is doing. Every other dialect (legacy Siglent, Tektronix, LeCroy) has no such
+flag to ask — legacy's closest equivalent (<code>SAST?</code>) reports a latching trigger state, not an edge on new
+data, so it can't answer the question honestly — and instead falls back to an adaptive poll rate that never
+retries sooner than the previous poll took.</p>
 <p>The connection closes with code <strong>4404</strong> if the session ID does not exist, <strong>4410</strong> when the session itself closes (after which the socket receives a final <code>closed</code> message), and <strong>4403</strong> if the identity that opened the socket is revoked while it is still connected — distinct from 4410 because the session is untouched; only the viewer's credential is gone (see <a href="../security/#tokens">Gateway security</a>). The server-side outbox is bounded (256 frames); under sustained backpressure it drops the oldest queued <code>waveform</code> frame to make room rather than growing unbounded — <code>state</code>/<code>error</code>/<code>closed</code> control frames are never dropped.</p>
 <h2 id="errors">Errors<a class="headerlink" href="#errors" title="Permanent link">&para;</a></h2>
 <p>Every error response is JSON: <code>{"error": "&lt;ExceptionClassName&gt;", "detail": "&lt;message&gt;"}</code>.</p>
@@ -4265,6 +4281,10 @@ session's WebSocket subscribers as a <code>state</code> message with <code>"kind
 <tr>
 <td>409</td>
 <td>State conflict — session not accepting jobs (error/closed), already recording, or measurement selection locked while recording</td>
+</tr>
+<tr>
+<td>413</td>
+<td>Export refused — the record (or the requested <code>max_points</code>) exceeds what the server will fetch in one go; see <a href="#acquisition-export">Acquisition &amp; export</a></td>
 </tr>
 <tr>
 <td>504</td>
