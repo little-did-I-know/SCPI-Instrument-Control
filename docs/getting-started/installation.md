@@ -9,6 +9,47 @@ This page describes how to install SCPI Instrument Control, a universal Python l
 - **Network**: Ethernet connection to oscilloscope
 - **Oscilloscope**: Siglent SDS series with SCPI support
 
+## Standalone Downloads
+
+If you only want the desktop GUI and would rather not install Python at all, every release
+attaches a prebuilt bundle for each platform. These carry their own Python runtime and every
+dependency, so the Python requirement above does not apply — the network and instrument
+requirements still do.
+
+**[Download the latest release](https://github.com/little-did-I-know/SCPI-Instrument-Control/releases/latest)**
+
+| Platform | File | How to run |
+| --- | --- | --- |
+| Windows (x64) | `SiglentGUI-<version>-Windows-x64.zip` | Extract, then run `SiglentGUI.exe` |
+| macOS (Apple Silicon) | `SiglentGUI-<version>-macOS-arm64.zip` | Extract, then open `SiglentGUI.app` |
+| macOS (Intel) | `SiglentGUI-<version>-macOS-x86_64.zip` | Extract, then open `SiglentGUI.app` |
+| Linux (x86_64) | `SiglentGUI-<version>-Linux-x86_64.tar.gz` | `tar -xzf SiglentGUI-*.tar.gz`, then `./SiglentGUI` |
+
+The bundles are large — roughly 200-300 MB — because each one carries its own Python runtime,
+PyQt6 and the scientific stack.
+
+The Intel macOS build is available from **v6.0.0 onward**. Earlier releases shipped an Apple
+Silicon build only.
+
+### Which macOS build do I need?
+
+Apple menu → **About This Mac**, or run `uname -m` in Terminal:
+
+- `arm64` → Apple Silicon (M1/M2/M3/M4) → the **arm64** download
+- `x86_64` → Intel → the **x86_64** download
+
+### First launch warnings
+
+The executables are **not code-signed**, so each operating system will question them the first
+time. This is expected, and the workaround is per-platform:
+
+- **macOS**: right-click the app → **Open** → confirm. Double-clicking alone will refuse it.
+- **Windows**: SmartScreen shows "Windows protected your PC" → **More info** → **Run anyway**.
+- **Linux**: no warning, but you may need `chmod +x SiglentGUI` before the binary will run.
+
+These bundles give you the desktop GUI only. To use the library from your own scripts, or to run
+the `scpi-web` browser gateway, install the Python package as described below.
+
 ## Basic Installation
 
 Install the base package using pip:
