@@ -241,6 +241,9 @@ async def get_measurements(session_id: str, request: Request):
     return {"measurements": [{"channel": c, "mtype": m} for c, m in session.adapter.measurements]}
 
 
+CSV_ROWS_PER_CHUNK = 2000
+
+
 def _build_csv(captures, max_points: Optional[int] = None):
     """Yield CSV lines lazily so the server never holds the whole body in memory.
 
@@ -253,6 +256,18 @@ def _build_csv(captures, max_points: Optional[int] = None):
     When max_points is None this reproduces the pre-streaming implementation's
     output byte-for-byte: joining the same rows with "\\n" and a single
     trailing newline is exactly what "\\n".join(rows) + "\\n" produced.
+
+    Rows are yielded in batches of CSV_ROWS_PER_CHUNK, not one per row.
+    Starlette wraps a sync iterator in iterate_in_threadpool, which awaits
+    anyio.to_thread.run_sync PER ITEM, and StreamingResponse sends one
+    http.response.body message PER ITEM -- so a 2,000,000-point export yielding
+    row by row would do 2M thread round-trips and 2M chunked frames, where the
+    pre-streaming code did one run_in_threadpool and one body. That is an
+    enormous throughput cost on exactly the deep records this endpoint's
+    memory bound exists for. Batching is byte-transparent: the concatenation
+    of the emitted strings is unchanged, which
+    tests/test_server_export_bounds.py::TestByteIdentity pins against a frozen
+    copy of the pre-streaming algorithm.
     """
     n = min(len(w.voltage) for _, w in captures)
     time_axis = captures[0][1].time
@@ -261,8 +276,14 @@ def _build_csv(captures, max_points: Optional[int] = None):
         step = -(-n // max_points)  # ceiling division keeps row count <= max_points
     header = "time_s," + ",".join("C{0}_V".format(c) for c, _ in captures)
     yield header + "\n"
+    buf: List[str] = []
     for i in range(0, n, step):
-        yield "{0:.9g},{1}\n".format(float(time_axis[i]), ",".join("{0:.9g}".format(float(w.voltage[i])) for _, w in captures))
+        buf.append("{0:.9g},{1}\n".format(float(time_axis[i]), ",".join("{0:.9g}".format(float(w.voltage[i])) for _, w in captures)))
+        if len(buf) >= CSV_ROWS_PER_CHUNK:
+            yield "".join(buf)
+            buf = []
+    if buf:
+        yield "".join(buf)
 
 
 @router.get("/sessions/{session_id}/scope/capture.csv")

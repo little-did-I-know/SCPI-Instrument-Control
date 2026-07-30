@@ -107,6 +107,33 @@ class TestByteIdentity:
         assert response.content.decode("utf-8") == expected
 
 
+class TestCsvChunksAreBatched:
+    # Final-review fix (Important 3): Starlette wraps a sync iterator in
+    # iterate_in_threadpool, which awaits anyio.to_thread.run_sync PER ITEM,
+    # and StreamingResponse sends one http.response.body message PER ITEM. One
+    # row per yield therefore meant one thread round-trip and one chunked frame
+    # PER SAMPLE -- 2M of each on the deep records this endpoint's memory bound
+    # exists for, where the pre-streaming code did one of each in total.
+
+    def test_rows_are_emitted_in_batches_not_one_chunk_per_row(self):
+        rows = 5000
+        captures = [(1, _fake_waveform(n=rows))]
+
+        chunks = list(scope_api._build_csv(captures))
+
+        # 1 header + ceil(5000 / CSV_ROWS_PER_CHUNK) row batches.
+        assert len(chunks) == 1 + -(-rows // scope_api.CSV_ROWS_PER_CHUNK)
+        assert len(chunks) < rows, "one chunk per row costs a threadpool hop and an ASGI body message per sample"
+
+    def test_batching_changes_no_bytes(self):
+        # The batch boundary must not land inside a row, or between rows
+        # without its newline: the concatenation has to be identical to the
+        # unbatched one, whatever the row count does modulo the batch size.
+        captures = [(1, _fake_waveform(n=scope_api.CSV_ROWS_PER_CHUNK * 2 + 7))]
+
+        assert "".join(scope_api._build_csv(captures)) == _reference_build_csv(captures)
+
+
 class TestStreamingResponseType:
     # StreamingResponse never populates Content-Length (Starlette's
     # Response.init_headers only derives it from a fully-built .body, which
