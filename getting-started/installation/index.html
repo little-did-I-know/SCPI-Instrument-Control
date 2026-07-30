@@ -637,6 +637,45 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#standalone-downloads" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Standalone Downloads
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Standalone Downloads">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#which-macos-build-do-i-need" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Which macOS build do I need?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#first-launch-warnings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        First launch warnings
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#basic-installation" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3707,6 +3746,45 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#standalone-downloads" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Standalone Downloads
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Standalone Downloads">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#which-macos-build-do-i-need" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Which macOS build do I need?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#first-launch-warnings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        First launch warnings
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#basic-installation" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3984,6 +4062,63 @@
 <li><strong>Network</strong>: Ethernet connection to oscilloscope</li>
 <li><strong>Oscilloscope</strong>: Siglent SDS series with SCPI support</li>
 </ul>
+<h2 id="standalone-downloads">Standalone Downloads<a class="headerlink" href="#standalone-downloads" title="Permanent link">&para;</a></h2>
+<p>If you only want the desktop GUI and would rather not install Python at all, every release
+attaches a prebuilt bundle for each platform. These carry their own Python runtime and every
+dependency, so the Python requirement above does not apply — the network and instrument
+requirements still do.</p>
+<p><strong><a href="https://github.com/little-did-I-know/SCPI-Instrument-Control/releases/latest">Download the latest release</a></strong></p>
+<table>
+<thead>
+<tr>
+<th>Platform</th>
+<th>File</th>
+<th>How to run</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Windows (x64)</td>
+<td><code>SiglentGUI-&lt;version&gt;-Windows-x64.zip</code></td>
+<td>Extract, then run <code>SiglentGUI.exe</code></td>
+</tr>
+<tr>
+<td>macOS (Apple Silicon)</td>
+<td><code>SiglentGUI-&lt;version&gt;-macOS-arm64.zip</code></td>
+<td>Extract, then open <code>SiglentGUI.app</code></td>
+</tr>
+<tr>
+<td>macOS (Intel)</td>
+<td><code>SiglentGUI-&lt;version&gt;-macOS-x86_64.zip</code></td>
+<td>Extract, then open <code>SiglentGUI.app</code></td>
+</tr>
+<tr>
+<td>Linux (x86_64)</td>
+<td><code>SiglentGUI-&lt;version&gt;-Linux-x86_64.tar.gz</code></td>
+<td><code>tar -xzf SiglentGUI-*.tar.gz</code>, then <code>./SiglentGUI</code></td>
+</tr>
+</tbody>
+</table>
+<p>The bundles are large — roughly 200-300 MB — because each one carries its own Python runtime,
+PyQt6 and the scientific stack.</p>
+<p>The Intel macOS build is available from <strong>v6.0.0 onward</strong>. Earlier releases shipped an Apple
+Silicon build only.</p>
+<h3 id="which-macos-build-do-i-need">Which macOS build do I need?<a class="headerlink" href="#which-macos-build-do-i-need" title="Permanent link">&para;</a></h3>
+<p>Apple menu → <strong>About This Mac</strong>, or run <code>uname -m</code> in Terminal:</p>
+<ul>
+<li><code>arm64</code> → Apple Silicon (M1/M2/M3/M4) → the <strong>arm64</strong> download</li>
+<li><code>x86_64</code> → Intel → the <strong>x86_64</strong> download</li>
+</ul>
+<h3 id="first-launch-warnings">First launch warnings<a class="headerlink" href="#first-launch-warnings" title="Permanent link">&para;</a></h3>
+<p>The executables are <strong>not code-signed</strong>, so each operating system will question them the first
+time. This is expected, and the workaround is per-platform:</p>
+<ul>
+<li><strong>macOS</strong>: right-click the app → <strong>Open</strong> → confirm. Double-clicking alone will refuse it.</li>
+<li><strong>Windows</strong>: SmartScreen shows "Windows protected your PC" → <strong>More info</strong> → <strong>Run anyway</strong>.</li>
+<li><strong>Linux</strong>: no warning, but you may need <code>chmod +x SiglentGUI</code> before the binary will run.</li>
+</ul>
+<p>These bundles give you the desktop GUI only. To use the library from your own scripts, or to run
+the <code>scpi-web</code> browser gateway, install the Python package as described below.</p>
 <h2 id="basic-installation">Basic Installation<a class="headerlink" href="#basic-installation" title="Permanent link">&para;</a></h2>
 <p>Install the base package using pip:</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot;SCPI-Instrument-Control&quot;</span>
