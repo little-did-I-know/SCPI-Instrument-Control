@@ -57,6 +57,13 @@ class InstrumentSession:
         self._subscribers: List[Callable[[Dict[str, Any]], None]] = []
         self._subscribers_lock = threading.Lock()
         self._poll_count = 0
+        # Adaptive backoff (belt and braces beside the adapter's readiness
+        # gate): a tick's own measured duration becomes a floor on how soon
+        # the *next* one may start, so a gate that ever misreports still
+        # degrades to a lower poll rate instead of piling up back-to-back
+        # blocking reads the moment the scope catches up.
+        self._last_poll_duration = 0.0
+        self._next_poll_at = 0.0
         self.owner = ""
         self.owner_last_active = time.monotonic()
         # Live stream watchers, keyed by identity (not by "is this the
@@ -277,7 +284,7 @@ class InstrumentSession:
             try:
                 item = self._queue.get(timeout=self._poll_interval)
             except queue.Empty:
-                self._poll_tick()
+                self._poll_if_due()
                 continue
             if item is _STOP:
                 break
@@ -313,6 +320,28 @@ class InstrumentSession:
             self.adapter.close(self._instrument)
         except SiglentError:
             pass
+
+    def _poll_if_due(self) -> None:
+        """Run `_poll_tick`, but not sooner than `max(poll_interval, last_poll_duration)`
+        after the previous one started.
+
+        The adapter's readiness gate (ScopeAdapter.poll) is what keeps a tick
+        cheap in the common case by never starting a blocking read that
+        isn't needed yet. This is the fallback for when that gate is wrong or
+        unavailable: if a tick genuinely takes longer than `poll_interval`
+        (a real blocking waveform read on a slow acquisition), the next tick
+        is not scheduled until that same duration has elapsed, so a slow
+        scope settles into a lower poll rate instead of queuing up another
+        tick attempt -- and the blocking read that goes with it -- the
+        instant the worker is free again.
+        """
+        now = time.monotonic()
+        if now < self._next_poll_at:
+            return
+        self._poll_tick()
+        end = time.monotonic()
+        self._last_poll_duration = end - now
+        self._next_poll_at = end + max(self._poll_interval, self._last_poll_duration)
 
     def _poll_tick(self) -> None:
         with self._subscribers_lock:

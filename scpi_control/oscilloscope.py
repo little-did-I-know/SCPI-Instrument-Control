@@ -11,6 +11,7 @@ from scpi_control import exceptions
 from scpi_control.analysis import FFTAnalyzer
 from scpi_control.channel import Channel
 from scpi_control.connection import BaseConnection, SocketConnection
+from scpi_control.exceptions import SiglentError
 from scpi_control.math_channel import MathChannel
 from scpi_control.measurement import Measurement
 from scpi_control.models import ModelCapability, detect_model_from_idn
@@ -20,6 +21,31 @@ from scpi_control.trigger import Trigger
 from scpi_control.waveform import Waveform, WaveformData
 
 logger = logging.getLogger(__name__)
+
+
+def _parse_inr(response: str) -> int:
+    """Parse an INR? reply, with or without its response header.
+
+    MEASURED on a real SDS824X HD (fw 3.8.12.1.1.3.6) 2026-07-30: the
+    instrument answers "INR 8193", NOT the bare "8193" the guide's example
+    implies. Only the ":"-prefixed modern queries answer bare; legacy-style
+    ones like INR? carry the header.
+
+    That mattered a great deal: new_acquisition_ready() used int() directly,
+    so every real reply raised ValueError, was caught, and became None = "this
+    dialect has no gate" -- silently, every tick. The modern gate never ran on
+    hardware. Both shapes are accepted here because a bare reply is what the
+    mock and the LeCroy dialect send (and what a CHDR OFF instrument would).
+
+    Raises:
+        ValueError: If the remainder is not an integer -- the caller turns
+            that into None ("cannot tell this tick"), which is the right
+            answer for a genuinely unreadable gate.
+    """
+    token = response.strip()
+    if token[:3].upper() == "INR":
+        token = token[3:].strip()
+    return int(token)
 
 
 class Oscilloscope:
@@ -352,6 +378,69 @@ class Oscilloscope:
             return "AUTO" if mode.endswith("AUTO") else "READY"
         return normalize_status(self.query(self._get_command("get_acq_status")))
 
+    def new_acquisition_ready(self) -> Optional[bool]:
+        """True if a new acquisition has completed since the last check.
+
+        Returns None when the active dialect has no way to tell us, which callers
+        must treat as "no gate available" rather than as False -- a False would
+        stall the live view forever on those dialects.
+
+        The underlying INR? register is READ-AND-CLEAR: reading it consumes the
+        event. This method is therefore the single permitted consumer. Do not read
+        get_new_data anywhere else, and do not call this method twice per tick
+        expecting the same answer.
+        """
+        if not self._has_command("get_new_data"):
+            return None
+        try:
+            response = self.query(self._get_command("get_new_data"))
+            return bool(_parse_inr(response) & 0x01)
+        except (SiglentError, ValueError):
+            # A gate we cannot read is a gate we do not have, for this tick only.
+            return None
+
+    def record_length(self) -> Optional[int]:
+        """The full acquisition length in points, or None if the dialect can't say.
+
+        This is :ACQuire:POINts?, NOT :WAVeform:MAXPoint? -- the latter is the
+        maximum points a single transfer can carry, not how many the record
+        actually holds. A caller sizing a stride from the wrong one would
+        under-decimate a deep record.
+
+        A dialect that MAPS the command is not a promise the instrument will
+        answer it: firmware that doesn't implement the query (or errors on it
+        while stopped) makes it fail, and so does the mock, which has no modern
+        handler for it. A raise here reached the gateway's export path as a 504
+        on an otherwise healthy session, so this degrades to None -- "the
+        dialect can't say" -- exactly like waveform_max_points() below, and
+        callers already handle None.
+        """
+        if not self._has_command("get_acq_points"):
+            return None
+        try:
+            return int(float(self.query(self._get_command("get_acq_points"))))
+        except (SiglentError, ValueError):
+            return None
+
+    def waveform_max_points(self) -> Optional[int]:
+        """The instrument's per-:WAVeform:DATA?-transfer cap, or None if the dialect can't say.
+
+        This is :WAVeform:MAXPoint? -- the same cap ModernTransfer.acquire
+        (waveform_transfer.py) reads before deciding whether a strided record
+        fits in a single window, raising FeatureNotSupportedError when it
+        doesn't. A caller sizing a stride against a frame budget alone,
+        ignoring this number, can turn that guard into a total live-view
+        outage on a model that reports a cap below the frame budget -- size
+        against min(frame_budget, this value) instead.
+        """
+        if not self._has_command("get_waveform_maxpoint"):
+            return None
+        try:
+            value = int(float(self.query(self._get_command("get_waveform_maxpoint"))))
+        except (SiglentError, ValueError):
+            return None
+        return value if value > 0 else None
+
     @property
     def timebase(self) -> float:
         """Get timebase setting in seconds/division."""
@@ -370,7 +459,7 @@ class Oscilloscope:
         """Perform automatic setup."""
         self.write(self._get_command("auto_setup"))
 
-    def get_waveform(self, channel: int, provenance: bool = True) -> WaveformData:
+    def get_waveform(self, channel: int, provenance: bool = True, stride: Optional[int] = None) -> WaveformData:
         """Acquire waveform data from a channel.
 
         Convenience method that calls waveform.acquire().
@@ -379,11 +468,19 @@ class Oscilloscope:
             channel: Channel number (1-4)
             provenance: Snapshot instrument settings alongside the data
                 (default True; pass False on high-rate paths)
+            stride: Ask the instrument to return every Nth point via
+                :WAVeform:INTerval, bounding the transfer instead of pulling
+                the full record and striding it down afterward. This is
+                instrument state, not a per-request argument: every read sets
+                it explicitly, so None means "set it to 1", never "leave it
+                alone" -- otherwise a stride left over from the live view
+                would silently decimate the next export on this session.
+                Ignored on dialects that don't document the command.
 
         Returns:
             WaveformData object with time and voltage arrays
         """
-        return self.waveform.acquire(channel, provenance=provenance)
+        return self.waveform.acquire(channel, provenance=provenance, stride=stride)
 
     @property
     def device_info(self) -> Optional[Dict[str, str]]:

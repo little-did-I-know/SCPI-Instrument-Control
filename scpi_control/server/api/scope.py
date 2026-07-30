@@ -1,13 +1,15 @@
 # scpi_control/server/api/scope.py
+import json
+import logging
 from dataclasses import replace
 from datetime import datetime
-from typing import Callable, List
+from typing import Callable, List, Optional, Tuple
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.concurrency import run_in_threadpool
-from fastapi.responses import PlainTextResponse, Response
+from fastapi.responses import PlainTextResponse, Response, StreamingResponse
 
-from scpi_control.exceptions import InvalidParameterError
+from scpi_control.exceptions import FeatureNotSupportedError, InvalidParameterError
 from scpi_control.server.api.commands import send_command_for
 from scpi_control.server.api.sessions import require_kind, require_session, run_job
 from scpi_control.server.ownership import require_owner
@@ -29,7 +31,113 @@ from scpi_control.server.schemas import (
 )
 from scpi_control.server.sessions import InstrumentSession, SessionError, read_state
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(tags=["scope"])
+
+# Safety rail against an export exhausting server memory, not a tuning knob --
+# no CLI flag or config file for this. A record above it is refused with 413
+# BEFORE it is fetched (see _export_stride); it is never silently decimated.
+MAX_EXPORT_POINTS = 2_000_000
+
+
+def _parse_channel_list(channels: str) -> List[int]:
+    try:
+        channel_list = sorted({int(c) for c in channels.split(",") if c.strip()})
+    except ValueError:
+        raise InvalidParameterError("channels must be a comma-separated list of integers")
+    if not channel_list:
+        raise InvalidParameterError("no channels requested")
+    return channel_list
+
+
+async def _export_stride(session, max_points: int) -> Tuple[Optional[int], bool]:
+    """Decide the fetch stride for an export, refusing an unbounded one before any fetch happens.
+
+    record_length() (:ACQuire:POINts?) is queried BEFORE get_waveform is ever
+    called, so an oversized record is refused before a single sample crosses
+    the wire -- never after building (or half-building) a response.
+
+    Returns (stride, size_verified). size_verified is False when
+    record_length() itself returned None -- dialects with no :ACQuire:POINts?
+    mapping (the legacy dialect is one -- see scpi_commands.py's
+    LEGACY_COMMANDS, which has no "get_acq_points" entry). There the record's
+    size cannot be verified before the fetch at all. This proceeds unstrided
+    and unguarded on those dialects, exactly as every export did before this
+    task, rather than refusing every legacy-dialect export outright -- that
+    would be a blanket regression for every user on those models, not a
+    safety improvement, since they would have no way to learn their own
+    record size to work around it. This is a disclosed, accepted gap, not a
+    silent guess -- callers use size_verified to log a post-fetch warning
+    when the eventual fetch turns out to have been oversized after all (see
+    _warn_if_export_was_unverifiable_and_oversized below), since prevention
+    is no longer possible once size_verified is False.
+
+    When decimation IS needed (an explicit max_points below the actual record
+    size), the stride is sized against whichever is smaller: the caller's own
+    max_points, or the instrument's own per-transfer cap (:WAVeform:MAXPoint?,
+    via waveform_max_points()) -- mirrors ScopeAdapter.poll's sizing
+    (server/adapters.py) so a strided export cannot trip ModernTransfer's
+    single-window ceiling (FeatureNotSupportedError) by construction for a
+    *stable* record. record_length() and the later get_waveform() fetch are
+    two separate run_job calls with nothing holding the record between them,
+    so a record that grows in that window can still trip the real ceiling --
+    callers must catch FeatureNotSupportedError around the fetch and turn it
+    into a 413 rather than let it become an uncaught 500 (see
+    _reraise_transfer_cap_trip_as_413 below).
+    """
+    cap = max_points if max_points and max_points > 0 else None
+    total = await run_job(session, lambda scope: scope.record_length())
+    if total is None:
+        return None, False
+    if total > MAX_EXPORT_POINTS and (cap is None or cap > MAX_EXPORT_POINTS):
+        raise HTTPException(
+            status_code=413,
+            detail="record holds {0} points, exceeding MAX_EXPORT_POINTS ({1}); pass max_points={1} to proceed with a decimated export".format(total, MAX_EXPORT_POINTS),
+        )
+    if cap is None or total <= cap:
+        return None, True
+    transfer_cap = await run_job(session, lambda scope: scope.waveform_max_points())
+    limit = min(cap, transfer_cap) if transfer_cap else cap
+    return max(1, -(-total // limit)), True
+
+
+def _warn_if_export_was_unverifiable_and_oversized(captures, size_verified: bool) -> None:
+    """Log once the fetch's actual size is known, on a dialect that could not
+    verify it in advance (record_length() returned None -- size_verified is
+    False). Prevention is impossible at this point: the array is already in
+    memory. But an operator whose gateway runs out of memory deserves a log
+    line explaining why, not silence -- silent degradation on this branch has
+    already cost an hour of diagnosis once (Task 6).
+    """
+    if size_verified:
+        return
+    for channel, data in captures:
+        n = len(data.voltage)
+        if n > MAX_EXPORT_POINTS:
+            logger.warning(
+                "export fetched %d points on channel %s, exceeding MAX_EXPORT_POINTS (%d); "
+                "this dialect could not report record_length() in advance, so the size could not be checked before the fetch",
+                n,
+                channel,
+                MAX_EXPORT_POINTS,
+            )
+
+
+def _reraise_transfer_cap_trip_as_413(exc: FeatureNotSupportedError) -> HTTPException:
+    """Translate a strided fetch's single-window ceiling trip into a 413.
+
+    FeatureNotSupportedError subclasses SiglentError, which the app-level
+    handler maps to a plain 500 -- indistinguishable from an unrelated
+    instrument fault, and not machine-actionable the way the oversized-record
+    413 above is. This keeps both refusals on the same status: "this export
+    is too big, here is what would work," not two different statuses for the
+    same operator-facing problem.
+    """
+    return HTTPException(
+        status_code=413,
+        detail="export exceeded this instrument's per-transfer capability while fetching ({0}); pass a smaller max_points and retry".format(exc),
+    )
 
 
 async def mutate(session: InstrumentSession, fn: Callable) -> dict:
@@ -133,35 +241,69 @@ async def get_measurements(session_id: str, request: Request):
     return {"measurements": [{"channel": c, "mtype": m} for c, m in session.adapter.measurements]}
 
 
-def _build_csv(captures) -> str:
-    """captures: list of (channel:int, WaveformData). Align to the shortest."""
+CSV_ROWS_PER_CHUNK = 2000
+
+
+def _build_csv(captures, max_points: Optional[int] = None):
+    """Yield CSV lines lazily so the server never holds the whole body in memory.
+
+    captures: list of (channel:int, WaveformData). Align to the shortest.
+    max_points additionally decimates the emitted rows client-side, on top of
+    whatever the fetch stride already achieved -- a safety net for dialects
+    that ignore the stride argument outright (see _export_stride), so the
+    row count is capped regardless of dialect.
+
+    When max_points is None this reproduces the pre-streaming implementation's
+    output byte-for-byte: joining the same rows with "\\n" and a single
+    trailing newline is exactly what "\\n".join(rows) + "\\n" produced.
+
+    Rows are yielded in batches of CSV_ROWS_PER_CHUNK, not one per row.
+    Starlette wraps a sync iterator in iterate_in_threadpool, which awaits
+    anyio.to_thread.run_sync PER ITEM, and StreamingResponse sends one
+    http.response.body message PER ITEM -- so a 2,000,000-point export yielding
+    row by row would do 2M thread round-trips and 2M chunked frames, where the
+    pre-streaming code did one run_in_threadpool and one body. That is an
+    enormous throughput cost on exactly the deep records this endpoint's
+    memory bound exists for. Batching is byte-transparent: the concatenation
+    of the emitted strings is unchanged, which
+    tests/test_server_export_bounds.py::TestByteIdentity pins against a frozen
+    copy of the pre-streaming algorithm.
+    """
     n = min(len(w.voltage) for _, w in captures)
     time_axis = captures[0][1].time
+    step = 1
+    if max_points is not None and max_points > 0 and n > max_points:
+        step = -(-n // max_points)  # ceiling division keeps row count <= max_points
     header = "time_s," + ",".join("C{0}_V".format(c) for c, _ in captures)
-    rows = [header]
-    for i in range(n):
-        rows.append("{0:.9g},{1}".format(float(time_axis[i]), ",".join("{0:.9g}".format(float(w.voltage[i])) for _, w in captures)))
-    return "\n".join(rows) + "\n"
+    yield header + "\n"
+    buf: List[str] = []
+    for i in range(0, n, step):
+        buf.append("{0:.9g},{1}\n".format(float(time_axis[i]), ",".join("{0:.9g}".format(float(w.voltage[i])) for _, w in captures)))
+        if len(buf) >= CSV_ROWS_PER_CHUNK:
+            yield "".join(buf)
+            buf = []
+    if buf:
+        yield "".join(buf)
 
 
 @router.get("/sessions/{session_id}/scope/capture.csv")
-async def capture_csv(session_id: str, request: Request, channels: str = "1"):
+async def capture_csv(session_id: str, request: Request, channels: str = "1", max_points: int = 0):
     session = require_session(request, session_id)
     require_kind(session, "scope")
-    try:
-        channel_list = sorted({int(c) for c in channels.split(",") if c.strip()})
-    except ValueError:
-        raise InvalidParameterError("channels must be a comma-separated list of integers")
-    if not channel_list:
-        raise InvalidParameterError("no channels requested")
+    channel_list = _parse_channel_list(channels)
+    stride, size_verified = await _export_stride(session, max_points)
+    cap = max_points if max_points > 0 else None
 
     def capture(scope):
-        return [(c, scope.get_waveform(c)) for c in channel_list]
+        return [(c, scope.get_waveform(c, stride=stride)) for c in channel_list]
 
-    captures = await run_job(session, capture)
-    csv_text = await run_in_threadpool(_build_csv, captures)
+    try:
+        captures = await run_job(session, capture)
+    except FeatureNotSupportedError as exc:
+        raise _reraise_transfer_cap_trip_as_413(exc) from exc
+    _warn_if_export_was_unverifiable_and_oversized(captures, size_verified)
     filename = "capture_{0}_C{1}.csv".format(session.id, "-".join(str(c) for c in channel_list))
-    return PlainTextResponse(csv_text, media_type="text/csv", headers={"Content-Disposition": 'attachment; filename="{0}"'.format(filename)})
+    return StreamingResponse(_build_csv(captures, cap), media_type="text/csv", headers={"Content-Disposition": 'attachment; filename="{0}"'.format(filename)})
 
 
 @router.get("/sessions/{session_id}/scope/screenshot.png")
@@ -182,8 +324,21 @@ async def screenshot(session_id: str, request: Request):
     return Response(content=png, media_type="image/png", headers={"Content-Disposition": 'attachment; filename="{0}"'.format(filename)})
 
 
-def _build_waveform_response(captures, max_points) -> dict:
-    return {"channels": [_waveform_json(c, data, max_points) for c, data in captures]}
+def _stream_waveform_json(captures, max_points):
+    """Yield the waveform JSON body incrementally, one channel at a time.
+
+    Each chunk's json.dumps() call covers exactly one channel's (already
+    capped) point list, so the server never assembles the full multi-channel
+    body as a single string. Content-equivalent to the pre-streaming dict
+    response (same keys, same values); unlike the CSV export, byte-for-byte
+    whitespace/order identity is not a requirement here.
+    """
+    yield '{"channels": ['
+    for i, (channel, data) in enumerate(captures):
+        if i:
+            yield ", "
+        yield json.dumps(_waveform_json(channel, data, max_points))
+    yield "]}"
 
 
 def _waveform_json(channel, data, max_points):
@@ -210,19 +365,19 @@ def _waveform_json(channel, data, max_points):
 async def waveform_json(session_id: str, request: Request, channels: str = "1", max_points: int = 0):
     session = require_session(request, session_id)
     require_kind(session, "scope")
-    try:
-        channel_list = sorted({int(c) for c in channels.split(",") if c.strip()})
-    except ValueError:
-        raise InvalidParameterError("channels must be a comma-separated list of integers")
-    if not channel_list:
-        raise InvalidParameterError("no channels requested")
+    channel_list = _parse_channel_list(channels)
+    stride, size_verified = await _export_stride(session, max_points)
+    cap = max_points if max_points > 0 else None
 
     def capture(scope):
-        return [(c, scope.get_waveform(c)) for c in channel_list]
+        return [(c, scope.get_waveform(c, stride=stride)) for c in channel_list]
 
-    captures = await run_job(session, capture)
-    cap = max_points if max_points > 0 else None
-    return await run_in_threadpool(_build_waveform_response, captures, cap)
+    try:
+        captures = await run_job(session, capture)
+    except FeatureNotSupportedError as exc:
+        raise _reraise_transfer_cap_trip_as_413(exc) from exc
+    _warn_if_export_was_unverifiable_and_oversized(captures, size_verified)
+    return StreamingResponse(_stream_waveform_json(captures, cap), media_type="application/json")
 
 
 def _math_state(scope):

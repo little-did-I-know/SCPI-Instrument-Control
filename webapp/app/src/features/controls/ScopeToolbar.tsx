@@ -13,6 +13,13 @@ import { ScreenshotButton } from "../export/ScreenshotButton";
 // with no memoization, so a fresh `{}` per snapshot would loop forever while scope is null.
 const NO_CHANNELS: Record<string, ChannelState> = {};
 
+// Explicit max_points=0 asks the server for the full record. The server
+// treats an omitted max_points identically (docs/gateway/api.md: "0/omitted
+// = full resolution") -- there is no distinct wire value for "everything" --
+// but naming it here makes the choice visible at the call site instead of
+// something a reader has to infer from an absent parameter.
+const FULL_RECORD_MAX_POINTS = 0;
+
 export function ScopeToolbar({ viewToggle }: { viewToggle?: ReactNode }) {
   const session = useSession((s) => s.session);
   const runState = useSession((s) => s.scope?.run_state);
@@ -40,7 +47,7 @@ export function ScopeToolbar({ viewToggle }: { viewToggle?: ReactNode }) {
     if (!session) return;
     setError(null);
     try {
-      await downloadAuthenticated(api.waveformJsonUrl(session.id, enabled), "waveform.json");
+      await downloadAuthenticated(`${api.waveformJsonUrl(session.id, enabled)}&max_points=${FULL_RECORD_MAX_POINTS}`, "waveform.json");
     } catch (err) {
       setError(err instanceof ApiError ? err.detail : String(err));
     }

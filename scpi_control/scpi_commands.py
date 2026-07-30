@@ -221,6 +221,10 @@ class SCPICommandSet:
         # to learn how many :WAVeform:STARt-driven DATA? windows a full
         # record needs.
         "get_waveform_maxpoint": ":WAVeform:MAXPoint?",  # p.753
+        # The record length, i.e. how many points the acquisition holds. NOT
+        # :WAVeform:MAXPoint? (p.753), which is the maximum per transfer -- using
+        # that to size a stride would under-decimate a deep record.
+        "get_acq_points": ":ACQuire:POINts?",  # p.36, p.43
         # Measurements — the :MEASure:SIMPle subsystem (p.335 index). The legacy
         # PAVA? command is deliberately ABSENT: it appears zero times in this
         # guide (exhaustive full-text search), so offering it here made measure()
@@ -233,6 +237,13 @@ class SCPICommandSet:
         "set_simple_source": ":MEASure:SIMPle:SOURce C{ch}",  # p.368
         "set_simple_item": ":MEASure:SIMPle:ITEM {param},{state}",  # p.367
         "get_simple_value": ":MEASure:SIMPle:VALue? {param}",  # bare NR3 reply, p.369
+        # INR? bit 0 is a read-and-clear "new signal acquired" latch -- the only
+        # honest "has a new frame landed?" signal on this dialect. The manual's own
+        # example polls exactly this before fetching (SDS800XHD guide p.829).
+        # :TRIGger:STATus? cannot substitute: it reports a state that latches, so
+        # it says TRIGD long after the frame it referred to was consumed.
+        # READ-AND-CLEAR: exactly one consumer, Oscilloscope.new_acquisition_ready().
+        "get_new_data": "INR?",
         # Screen capture (legacy strings accepted on modern scopes today; revisit with screen-capture overhaul)
         "screen_dump": "SCDP",
         "set_hardcopy_format": "HCSU DEV,FORMAT,{format}",

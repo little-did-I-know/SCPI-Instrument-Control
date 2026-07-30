@@ -54,7 +54,7 @@ describe("ScopeToolbar", () => {
     await userEvent.click(screen.getByRole("button", { name: "JSON" }));
     await waitFor(() => expect(fetchMock).toHaveBeenCalled());
     const [url, init] = fetchMock.mock.calls[0];
-    expect(url).toBe("/api/sessions/abc/scope/waveform?channels=1");
+    expect(url).toBe("/api/sessions/abc/scope/waveform?channels=1&max_points=0");
     const headers = new Headers(init.headers);
     expect(headers.get("Authorization")).toBe("Bearer scpi_wave");
   });
@@ -64,5 +64,13 @@ describe("ScopeToolbar", () => {
     render(<ScopeToolbar />);
     await userEvent.click(screen.getByRole("button", { name: "JSON" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("missing bearer token");
+  });
+
+  it("surfaces an oversized-export 413's detail instead of a generic failure", async () => {
+    const detail = "record holds 5000000 points, exceeding MAX_EXPORT_POINTS (2000000); pass max_points=2000000 to proceed with a decimated export";
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ error: "HTTPException", detail }), { status: 413 })));
+    render(<ScopeToolbar />);
+    await userEvent.click(screen.getByRole("button", { name: "JSON" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(detail);
   });
 });

@@ -394,6 +394,13 @@ the gate entirely — use them for hardware-free work.
 - Full-resolution CSV/JSON serialization of deep-memory captures runs **off the
   event loop**, so one large export does not freeze the gateway for everyone
   else.
+- A capture export (`capture.csv` / `waveform`) above **2,000,000 points** is
+  **refused with 413** rather than fetched and truncated — the response names
+  the actual point count and the `max_points` value that would let it through.
+  This is a fixed safety rail against exhausting server memory, not a tuning
+  knob. See [Acquisition & export](api.md#acquisition-export) for the one
+  documented exception (a dialect that cannot report its record length in
+  advance).
 
 ## Reference file migration
 

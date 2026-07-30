@@ -12,7 +12,7 @@ definite-length block framing is shared by all of them.
 import logging
 import re
 import struct
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 import numpy as np
 
@@ -108,12 +108,16 @@ class SiglentTransfer:
     def __init__(self, scope: "Oscilloscope"):
         self._scope = scope
 
-    def acquire(self, channel: int, format: str = "BYTE") -> WaveformData:
+    def acquire(self, channel: int, format: str = "BYTE", stride: Optional[int] = None) -> WaveformData:
         """Acquire waveform data from a channel via WF? DAT2.
 
         Args:
             channel: Channel number (1-4)
             format: Data format - 'BYTE' or 'WORD' (default: 'BYTE')
+            stride: Unused on this dialect -- legacy Siglent has no documented
+                :WAVeform:INTerval-equivalent command, so nothing is written.
+                Accepted only so callers can pass it uniformly regardless of
+                which transfer make_transfer() selected.
 
         Returns:
             WaveformData object with time and voltage arrays
@@ -227,13 +231,17 @@ class TektronixTransfer:
     def __init__(self, scope: "Oscilloscope"):
         self._scope = scope
 
-    def acquire(self, channel: int, format: str = "BYTE") -> WaveformData:
+    def acquire(self, channel: int, format: str = "BYTE", stride: Optional[int] = None) -> WaveformData:
         """Acquire waveform data from a channel via the CURVe protocol.
 
         Args:
             channel: Channel number (1-4)
             format: Data format - only 'BYTE' (8-bit, DATa:WIDth 1) is
                 supported today; 'WORD' (16-bit) is a follow-up.
+            stride: Unused on this dialect -- no documented Tektronix
+                equivalent to :WAVeform:INTerval. Accepted only so callers
+                can pass it uniformly regardless of which transfer
+                make_transfer() selected.
 
         Returns:
             WaveformData scaled by the WFMOutpre preamble (ymult/yoff/yzero for
@@ -335,7 +343,17 @@ class LeCroyTransfer:
     def __init__(self, scope: "Oscilloscope"):
         self._scope = scope
 
-    def acquire(self, channel: int, format: str = "BYTE") -> WaveformData:
+    def acquire(self, channel: int, format: str = "BYTE", stride: Optional[int] = None) -> WaveformData:
+        """Acquire waveform data from a channel via WF? ALL.
+
+        Args:
+            channel: Channel number (1-4)
+            format: Data format - 'BYTE' or 'WORD'
+            stride: Unused on this dialect -- no documented LeCroy equivalent
+                to :WAVeform:INTerval. Accepted only so callers can pass it
+                uniformly regardless of which transfer make_transfer()
+                selected.
+        """
         scope = self._scope
         fmt = "WORD" if format.upper() == "WORD" else "BYTE"
         scope.write(scope._get_command("set_comm_format", fmt=fmt))
@@ -371,9 +389,11 @@ class LeCroyTransfer:
 # dialects must stay independently editable (Task 15 vs Task 18).
 _MODERN_COMM_TYPE = 32  # short: 0=byte, 1=word
 _MODERN_WAVE_ARRAY_COUNT = 116  # long: number of data points
+_MODERN_DATA_INTERVAL = 136  # long: = :WAVeform:INTerval, echoed back (p.755)
 _MODERN_VERTICAL_GAIN = 156  # float: V/div, no probe attenuation
 _MODERN_VERTICAL_OFFSET = 160  # float
 _MODERN_CODE_PER_DIV = 164  # float
+_MODERN_ADC_BIT = 172  # short: front-end resolution (p.756). 16 on an SDS824X HD
 _MODERN_HORIZ_INTERVAL = 176  # float: 1/sample_rate
 _MODERN_HORIZ_OFFSET = 180  # double: trigger offset, seconds
 
@@ -396,12 +416,77 @@ def parse_modern_wavedesc(payload: bytes, *, error_context: str = "") -> dict:
     return {
         "comm_type": struct.unpack_from("<h", payload, _MODERN_COMM_TYPE)[0],
         "wave_array_count": struct.unpack_from("<i", payload, _MODERN_WAVE_ARRAY_COUNT)[0],
+        # Echoed back purely so acquire() can cross-check it against the
+        # stride it actually requested -- see the DATA_INTERVAL mismatch
+        # warning below. Not otherwise used to scale anything.
+        "data_interval": struct.unpack_from("<i", payload, _MODERN_DATA_INTERVAL)[0],
         "vertical_gain": struct.unpack_from("<f", payload, _MODERN_VERTICAL_GAIN)[0],
         "vertical_offset": struct.unpack_from("<f", payload, _MODERN_VERTICAL_OFFSET)[0],
         "code_per_div": struct.unpack_from("<f", payload, _MODERN_CODE_PER_DIV)[0],
+        # Needed to interpret code_per_div: on a >8-bit front end the field
+        # describes the NATIVE code space even when BYTE is the transfer
+        # width -- see the effective_code_per_div note in acquire().
+        "adc_bit": struct.unpack_from("<h", payload, _MODERN_ADC_BIT)[0],
         "horiz_interval": struct.unpack_from("<f", payload, _MODERN_HORIZ_INTERVAL)[0],
         "horiz_offset": struct.unpack_from("<d", payload, _MODERN_HORIZ_OFFSET)[0],
     }
+
+
+_DATA_INTERVAL_STATE_ATTR = "_data_interval_mismatch_state"
+
+
+def _note_data_interval_mismatch(scope: "Oscilloscope", channel: int, requested: int, reported: int) -> None:
+    """Once-per-transition warning for a DATA_INTERVAL echo that disagrees
+    with the stride we asked for (see ModernTransfer.acquire above).
+
+    This runs on every acquire() -- including stride==1 on the export path --
+    so logging every call would write one WARNING per frame, indefinitely, at
+    up to four frames a second if real hardware's echo disagreed persistently.
+    Same discipline as the poll-path fix in server/adapters.py: one WARNING
+    when the mismatch starts, one recovery WARNING when it stops (same level,
+    deliberately -- an operator or alert filtering at WARNING must see the
+    disagreement both start AND clear, or the log is exactly as ambiguous as
+    it was before this fix for that reader), nothing while it persists.
+
+    State is stored ON THE SCOPE INSTANCE, keyed by channel, rather than on
+    `self` of the calling Transfer: make_transfer() builds a brand new
+    ModernTransfer for every single acquire() call (see waveform.py's
+    Waveform.acquire), so there is no longer-lived Transfer object to carry
+    the previous call's state across. The Oscilloscope instance IS session-
+    long, and keying by channel keeps a mismatching channel 1 and a healthy
+    channel 2 from flapping each other's state.
+    """
+    # Sets `scope._data_interval_mismatch_state` (a private dict, keyed by
+    # channel) on the Oscilloscope instance passed in as `scope` -- an
+    # attribute this module injects rather than one declared in
+    # Oscilloscope.__init__. It has to live somewhere that outlives a single
+    # acquire() call, and the ModernTransfer instance calling this function
+    # does not (see the docstring above); the scope instance is the only
+    # object here that does.
+    state = getattr(scope, _DATA_INTERVAL_STATE_ATTR, None)
+    if state is None:
+        state = {}
+        setattr(scope, _DATA_INTERVAL_STATE_ATTR, state)
+    mismatched = reported != requested
+    was_mismatched = state.get(channel, False)
+    if mismatched and not was_mismatched:
+        logger.warning(
+            "Requested :WAVeform:INTerval %d but PREamble reported DATA_INTERVAL %d (host %s:%s, channel %d) -- the returned record length/time axis may not be scaled the way this driver assumes.",
+            requested,
+            reported,
+            scope.host,
+            scope.port,
+            channel,
+        )
+    elif not mismatched and was_mismatched:
+        logger.warning(
+            "DATA_INTERVAL now matches the requested :WAVeform:INTerval %d again (host %s:%s, channel %d) -- the prior mismatch has cleared.",
+            requested,
+            scope.host,
+            scope.port,
+            channel,
+        )
+    state[channel] = mismatched
 
 
 class ModernTransfer:
@@ -417,12 +502,23 @@ class ModernTransfer:
     is capped at :WAVeform:MAXPoint points; acquire() below reads the
     PREamble's wave_array_count (the FULL record length) and loops
     :WAVeform:STARt in MAXPoint-sized windows until the whole record is read.
+
+    Task 3 stride follow-up: that STARt-driven loop is only correct when
+    stride is 1 (`start` is advanced by the count of points already
+    delivered, which is the same space as :WAVeform:STARt only when nothing
+    is being decimated). A stride > 1 therefore takes a DIFFERENT, narrower
+    path below: a single, unlooped window sized to the (already strided)
+    record length, since the live view's <= MAX_FRAME_POINTS request is far
+    below any real :WAVeform:MAXPoint. If a strided record ever needed more
+    than one window, acquire() raises rather than mis-assemble it -- the
+    general chunking loop is deliberately NOT made stride-aware, so the
+    proven stride=1/export path is untouched.
     """
 
     def __init__(self, scope: "Oscilloscope"):
         self._scope = scope
 
-    def acquire(self, channel: int, format: str = "BYTE") -> WaveformData:
+    def acquire(self, channel: int, format: str = "BYTE", stride: Optional[int] = None) -> WaveformData:
         """Acquire waveform data from a channel via :WAVeform:SOURce/PREamble/DATA.
 
         Args:
@@ -430,6 +526,15 @@ class ModernTransfer:
             format: Data format - 'BYTE' or 'WORD' (default: 'BYTE'); sets
                 :WAVeform:WIDTh before the transfer so COMM_TYPE in the
                 preamble matches what DATA? actually sends.
+            stride: Sets :WAVeform:INTerval before the transfer so the
+                instrument returns every Nth point instead of the driver
+                pulling the full record and striding it down after the wire
+                transfer. :WAVeform:INTerval is instrument state, not a
+                per-request argument -- a value left over from a previous
+                caller (e.g. the live view) would silently decimate the next
+                export on this session. So this is ALWAYS written explicitly,
+                including when stride is None, which writes 1 (no
+                decimation) rather than leaving whatever was last set.
 
         Returns:
             WaveformData scaled by the PREamble's vertical_gain/
@@ -440,12 +545,24 @@ class ModernTransfer:
             entire record_length, not just the first window.
 
         Raises:
-            InvalidParameterError: If a non-BYTE/WORD format is requested.
+            InvalidParameterError: If a non-BYTE/WORD format is requested, or
+                stride is not a positive integer.
             CommandError: If either binary block is malformed.
+            FeatureNotSupportedError: If a stride > 1 would need more than one
+                :WAVeform:DATA? window (see the class docstring) -- this is a
+                loud refusal rather than a silently mis-assembled read.
         """
         format = format.upper()
         if format not in ("BYTE", "WORD"):
             raise exceptions.InvalidParameterError(f"Invalid format: {format}")
+        if stride is not None and stride < 1:
+            raise exceptions.InvalidParameterError(f"stride must be a positive integer (got {stride})")
+        # int(...), not just `stride or 1`: a float stride (e.g. a caller's
+        # ceil-division producing 2.5 -- or 2.0, benign here but not
+        # guaranteed elsewhere) must not be written to the wire as-is, since
+        # :WAVeform:INTerval is a real SCPI command argument, not a Python
+        # value.
+        effective_stride = int(stride) if stride else 1
         scope = self._scope
 
         # Source (and width) must be selected before PREamble?/DATA? read
@@ -453,6 +570,29 @@ class ModernTransfer:
         # :WAVeform:SOURce" (guide p.748/p.754).
         scope.write(scope._get_command("set_waveform_source", ch=channel))
         scope.write(scope._get_command("set_waveform_width", value=format))
+
+        if scope._has_command("set_waveform_interval"):
+            # Always explicit, never inherited: see the stride docstring note
+            # above on interval being instrument state rather than a
+            # per-request argument. Guarded so a future dialect without the
+            # command (were one ever routed through ModernTransfer) is
+            # unaffected rather than raising KeyError. Written BEFORE the
+            # PREamble? read below -- load-bearing, not incidental: the
+            # preamble must be read back under the interval this call asked
+            # for, not whatever a previous caller (e.g. the live view) left
+            # set, or that stride would leak into this read.
+            #
+            # DO NOT "optimize" this to skip the write when the value hasn't
+            # changed, or when stride is None -- that reintroduces the exact
+            # leak this comment warns about, silently. The guard is
+            # tests/test_oscilloscope_waveform_stride.py::
+            # test_a_stride_left_over_from_a_prior_read_does_not_leak_into_the_next_one,
+            # which pins the observable failure (a strided read followed by a
+            # plain read on the same connection must return the FULL record).
+            # Confirmed by mutation test (Task 7): making this write
+            # conditional on `stride is not None` makes that test fail with
+            # 143 points back instead of 1000.
+            scope.write(scope._get_command("set_waveform_interval", value=effective_stride))
 
         with scope._connection.lock:
             scope.write(scope._get_command("get_waveform_preamble"))
@@ -464,11 +604,34 @@ class ModernTransfer:
         if meta["code_per_div"] == 0:
             raise exceptions.CommandError(f"Modern WAVEDESC code_per_div is 0 ({preamble_context})")
 
+        # The one thing code cannot settle: whether a real instrument's
+        # DATA_INTERVAL echo (and therefore its HORIZ_INTERVAL scaling, used
+        # below for the time axis) actually reflects the stride we requested.
+        # A mismatch must not be invisible -- log it, but don't raise; a
+        # disagreement here is a scaling risk, not a malformed read. This runs
+        # on EVERY acquire(), including stride==1 on the export path, so the
+        # cadence has to be once-per-transition rather than once-per-call: a
+        # real instrument that disagreed persistently would otherwise log one
+        # WARNING per frame, indefinitely, at up to four frames a second.
+        _note_data_interval_mismatch(scope, channel, effective_stride, meta["data_interval"])
+
         dtype = np.int16 if meta["comm_type"] == 1 else np.int8
         # wave_array_count (WAVEDESC address 116-119, p.756) is "Number of
-        # data points in the data array" -- the FULL record, even when a
-        # single :WAVeform:DATA? transfer cannot carry all of it at once.
+        # data points in the data array" -- the FULL record, at EVERY stride.
+        # Measured on a real SDS824X HD (fw 3.8.12.1.1.3.6) 2026-07-30: with
+        # ACQ:POINts=50000 it reported 50000 at :WAVeform:INTerval 1, 2, 7 and
+        # 10 alike, while DATA? returned 50000/25000/7142/5000. This reverses
+        # the earlier assumption (that it reported the strided count), which
+        # the mock carried too; both changed together, as that assumption's
+        # own note said they would if hardware disagreed.
+        #
+        # WAVE_ARRAY_1 (addr 60) is NOT a substitute: the guide (p.755) calls
+        # it "the number of transmitted bytes" but the instrument leaves it at
+        # the full count as well. Nothing in the preamble reports what DATA?
+        # will actually send, so it has to be computed -- by FLOOR division
+        # (50000/7 -> 7142, not 7143).
         record_length = meta["wave_array_count"]
+        expected_points = record_length // effective_stride
 
         # :WAVeform:MAXPoint? (p.753) is Query-only: the scope reports its own
         # per-transfer cap, there is no setter. int(float(...)) matches this
@@ -481,29 +644,79 @@ class ModernTransfer:
             max_points = max(record_length, 1)
 
         data_context = f"host {scope.host}:{scope.port}, command ':WAVeform:DATA?'"
-        chunks = []
-        start = 0
-        while start < record_length:
-            # STARt and DATA? are coupled (DATA? answers "using the source
-            # specified by :WAVeform:SOURce" AND the current STARt window),
-            # so both live under one lock acquisition -- same reasoning as
-            # the preamble read above, extended to cover the write that picks
-            # which window DATA? answers with.
+
+        if effective_stride == 1:
+            # The proven export path: completely unchanged from before
+            # stride existed.
+            chunks = []
+            start = 0
+            while start < record_length:
+                # STARt and DATA? are coupled (DATA? answers "using the source
+                # specified by :WAVeform:SOURce" AND the current STARt window),
+                # so both live under one lock acquisition -- same reasoning as
+                # the preamble read above, extended to cover the write that picks
+                # which window DATA? answers with.
+                with scope._connection.lock:
+                    scope.write(scope._get_command("set_waveform_start", value=start))
+                    scope.write(scope._get_command("get_waveform_data"))
+                    data_raw = scope.read_raw()
+                chunk = parse_ieee_block(data_raw, dtype, error_context=data_context)
+                if chunk.size == 0:
+                    # A well-behaved instrument only returns an empty window at
+                    # end-of-record, which the `while` condition above already
+                    # excludes -- this guards against a non-conformant one
+                    # instead of looping forever.
+                    break
+                chunks.append(chunk)
+                start += chunk.size
+
+            codes = np.concatenate(chunks) if chunks else np.array([], dtype=dtype)
+        else:
+            # Deliberately NOT the general chunking loop, and deliberately not
+            # made stride-aware: `start` there is advanced by chunk.size (points
+            # already delivered, in the STRIDED/transmitted space) but written
+            # to :WAVeform:STARt and compared against record_length -- the same
+            # space as chunk.size only when stride is 1. Beyond one window, a
+            # second iteration would re-request source points the first window
+            # already delivered, silently duplicating a stretch of the record
+            # (and building `time` over the wrong `n`). The live view's request
+            # is always <= MAX_FRAME_POINTS, far below any real MAXPoint, so a
+            # single window covers every case it actually needs; a strided read
+            # that would not fit raises instead of mis-assembling.
+            #
+            # The cap applies to what CROSSES THE WIRE, so it is compared
+            # against expected_points (the decimated count), not against the
+            # full record -- decimation is precisely what brings a deep record
+            # under the cap, and comparing the full record here would refuse
+            # reads that fit with room to spare.
+            if expected_points > max_points:
+                raise exceptions.FeatureNotSupportedError(
+                    f"Strided read of {expected_points} points ({record_length} at stride="
+                    f"{effective_stride}) exceeds this instrument's per-transfer cap of "
+                    f"{max_points} points (:WAVeform:MAXPoint?); multi-window strided reads "
+                    f"are not supported ({data_context})"
+                )
             with scope._connection.lock:
-                scope.write(scope._get_command("set_waveform_start", value=start))
+                scope.write(scope._get_command("set_waveform_start", value=0))
                 scope.write(scope._get_command("get_waveform_data"))
                 data_raw = scope.read_raw()
-            chunk = parse_ieee_block(data_raw, dtype, error_context=data_context)
-            if chunk.size == 0:
-                # A well-behaved instrument only returns an empty window at
-                # end-of-record, which the `while` condition above already
-                # excludes -- this guards against a non-conformant one
-                # instead of looping forever.
-                break
-            chunks.append(chunk)
-            start += chunk.size
+            codes = parse_ieee_block(data_raw, dtype, error_context=data_context)
 
-        codes = np.concatenate(chunks) if chunks else np.array([], dtype=dtype)
+            # A short window here is the one failure that would otherwise be
+            # INVISIBLE. Unlike the stride==1 branch nothing loops to collect a
+            # remainder, and the time axis below is sized off whatever did
+            # arrive -- so a truncated record comes back looking perfectly
+            # well-formed, just quietly missing its tail. Nothing in the
+            # preamble reports the transmitted count (see expected_points
+            # above), which is exactly why this has to be checked rather than
+            # read back.
+            if codes.size < expected_points:
+                raise exceptions.CommandError(
+                    f"Strided read returned {codes.size} points, but a {record_length}-point "
+                    f"record at stride {effective_stride} should deliver {expected_points}; "
+                    f"refusing to scale a truncated record into a time axis that would look "
+                    f"correct ({data_context})"
+                )
 
         # SDS Series Programming Guide EN11G p.758 ("Read Waveform Data",
         # analog example, Step 3): "voltage value (V) = code value
@@ -513,7 +726,23 @@ class ModernTransfer:
         # guide's own worked numbers: code=-11, vdiv=10, code_per_div=30,
         # voffset=14.5 -> -11*(10/30)-14.5 = -18.167 V, matching the guide's
         # own printed "-18.167 V" exactly.
-        voltage = codes.astype(np.float64) * (meta["vertical_gain"] / meta["code_per_div"]) - meta["vertical_offset"]
+        # code_per_div describes the NATIVE code space, not the transferred
+        # one. MEASURED on a real SDS824X HD (fw 3.8.12.1.1.3.6) 2026-07-30:
+        # the preamble reports Adc_bit=16 and code_per_div=7680 under BOTH
+        # :WAVeform:WIDTh BYTE and WORD -- BYTE does not get its own smaller
+        # scale, the instrument just sends the HIGH BYTE of the 16-bit code.
+        # So a BYTE read must divide code_per_div by 256 (7680 -> 30) or every
+        # volt comes back 256x too small: a 3.075 Vpp signal read as 0.0119792
+        # Vpp, while the scope's own :MEASure MEAN (1.45474 V) agreed with the
+        # WORD read (1.45602 V). BYTE is this driver's DEFAULT width, so that
+        # was every default waveform read on an HD instrument.
+        #
+        # Guarded on adc_bit so a genuinely 8-bit front end (which reports its
+        # code_per_div in the 8-bit space already) is untouched.
+        effective_code_per_div = meta["code_per_div"]
+        if meta["comm_type"] == 0 and meta["adc_bit"] > 8:
+            effective_code_per_div /= 256.0
+        voltage = codes.astype(np.float64) * (meta["vertical_gain"] / effective_code_per_div) - meta["vertical_offset"]
 
         # SDS Series Programming Guide EN11G p.759 ("Read Waveform Data",
         # Step 4): "time value(S) = delay-(timebase*grid/2)+index*interval".
@@ -532,17 +761,32 @@ class ModernTransfer:
         # example (delay=1.72E-8, timebase=20E-9, interval=2E-10): the
         # documented first-point time is -8.28E-08 s, which only the
         # delay-(timebase*grid/2) form reproduces.
+        #
+        # HORIZ_INTERVAL is the ACQUISITION's sample spacing and does NOT
+        # track :WAVeform:INTerval -- measured constant at 1.0e-08 across
+        # strides 1/2/7/10 on a real SDS824X HD (see the record_length note
+        # above). Delivered points are therefore `stride` samples apart, and
+        # the spacing between them is horiz_interval * stride. Using
+        # horiz_interval unscaled compresses the trace into 1/stride of the
+        # real sweep: at stride 7 a live frame claimed 7.14e-5 s of a 5.0e-4 s
+        # window, an x-axis wrong by 7x on every thinned frame while looking
+        # entirely well-formed.
         grid = 10
         timebase = scope.waveform._get_timebase()
         n = len(codes)
-        time = meta["horiz_offset"] - (timebase * grid / 2) + np.arange(n) * meta["horiz_interval"]
+        point_interval = meta["horiz_interval"] * effective_stride
+        time = meta["horiz_offset"] - (timebase * grid / 2) + np.arange(n) * point_interval
 
         logger.info(f"Acquired {n} samples from channel {channel} (modern)")
         return WaveformData(
             time=time,
             voltage=voltage,
             channel=channel,
-            sample_rate=(1.0 / meta["horiz_interval"]) if meta["horiz_interval"] else None,
+            # The EFFECTIVE rate of the trace being returned (1/stride of the
+            # acquisition rate on a decimated read), not the acquisition rate
+            # -- this is what a consumer needs to reconstruct `time`, and what
+            # any FFT or frequency-axis built from it depends on.
+            sample_rate=(1.0 / point_interval) if point_interval else None,
             record_length=n,
             timebase=timebase,
             voltage_scale=meta["vertical_gain"],

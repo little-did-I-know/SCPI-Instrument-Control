@@ -133,7 +133,7 @@ class Waveform:
         """Wire dialect of the parent scope; defaults to legacy before connect."""
         return getattr(self._scope, "dialect", None) or "legacy"
 
-    def acquire(self, channel: int, format: str = "BYTE", provenance: bool = True) -> WaveformData:
+    def acquire(self, channel: int, format: str = "BYTE", provenance: bool = True, stride: Optional[int] = None) -> WaveformData:
         """Acquire waveform data from a channel.
 
         Args:
@@ -141,6 +141,9 @@ class Waveform:
             format: Data format - 'BYTE' or 'WORD' (default: 'BYTE')
             provenance: Snapshot instrument settings alongside the data
                 (default True; pass False on high-rate paths)
+            stride: Forwarded to the transfer's acquire() -- see
+                Oscilloscope.get_waveform for why None still writes 1 rather
+                than skipping the write.
 
         Returns:
             WaveformData object with time and voltage arrays
@@ -155,7 +158,7 @@ class Waveform:
 
         from scpi_control.waveform_transfer import make_transfer
 
-        data = make_transfer(self._scope).acquire(channel, format)
+        data = make_transfer(self._scope).acquire(channel, format, stride=stride)
         if provenance:
             try:
                 data.provenance = AcquisitionProvenance.from_scope(self._scope, channels=[channel])

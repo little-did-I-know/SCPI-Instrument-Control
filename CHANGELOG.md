@@ -97,9 +97,77 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The admin panel gained a page header.
 - The live-session list in the Sessions screen now displays readable right-aligned numeric columns
   for Viewers and Idle time.
+- A Horizontal panel in the oscilloscope controls, containing a new timebase stepper that steps
+  in a 1-2-5 ladder (1 ms → 2 ms → 5 ms → 10 ms) with engineering-unit labels, making both slow
+  sweeps and sub-microsecond settings easily reachable.
+- `capture.csv` gained an optional `max_points` parameter for parity with the JSON export,
+  allowing an oversized record to be trimmed to a smaller sample count before export.
+
+### Changed
+
+- On modern Siglent instruments, the gateway now asks the instrument to thin the waveform record
+  to the points the display needs, rather than transferring everything and discarding most of it
+  client-side — no change to what you see on screen. Dialects without the interval command
+  continue to transfer the full record and thin on the server.
+- The CSV and JSON exports now stream instead of loading into memory; when a waveform is too large
+  to export safely, the endpoints return an error naming the actual point count and showing how to
+  proceed with `max_points`. On dialects that cannot report record length in advance, the export
+  proceeds unguarded and logs a warning if it oversizes — nothing is ever silently truncated or
+  decimated.
 
 ### Fixed
 
+- The gateway no longer freezes while a long capture is in progress. The oscilloscope poll
+  previously fetched a waveform on a timer without checking whether the instrument had finished
+  acquiring — at slow sweep rates this meant requesting much faster than the scope could produce
+  frames, blocking the read until the acquisition was complete, and freezing every control in the
+  web UI (since the session's only worker thread also services commands). On modern Siglent
+  instruments, the poll now checks whether a new acquisition has landed before fetching; other
+  dialects use adaptive timing-based backoff to prevent the freeze.
+- On modern Siglent instruments, the live view updates once per completed acquisition. At slow
+  sweep rates, a single update every 14 seconds (at 1 s/div, for example) is expected behaviour —
+  it matches the instrument's own display rate — and is not a defect or regression.
+- A channel whose display query failed is now logged instead of silently failing. Previously a
+  poll-path failure made a channel appear 'off': no waveform, no error message, a gateway that
+  appeared healthy and did nothing.
+- A thinned live view on a modern Siglent instrument no longer reports a time axis that is too
+  short by the thinning factor. When the live view asks the scope for every Nth point, the
+  instrument keeps reporting the *acquisition's* sample spacing rather than the spacing between
+  the points it actually sends — so a trace thinned 7:1 claimed to cover a seventh of the sweep
+  it really covered, with `sample_rate` wrong by the same factor. Measurements and exports were
+  never affected (they are never thinned); the live view's x-axis was. Verified against an
+  SDS824X HD.
+- A thinned read that comes back short now fails loudly instead of returning a truncated trace
+  scaled onto a time axis that looks correct, and a deep record that fits comfortably once
+  thinned is no longer refused as too large for one transfer.
+- **Waveforms captured from a high-resolution Siglent instrument in the default 8-bit transfer
+  mode were 256 times too small.** These scopes report one code-per-division figure for their
+  native 16-bit samples and reuse it unchanged for an 8-bit transfer, where the instrument sends
+  only the high byte — so a 3.07 V signal was read back as 0.012 V. Every default waveform read
+  on an SDS800X HD was affected: live view, exports, saved records and any analysis derived from
+  them. 16-bit (`WORD`) captures were always correct. Verified against an SDS824X HD by comparing
+  both transfer widths against the instrument's own measurement of the same channel. **Waveform
+  data captured from an HD instrument before this release should be treated as unusable rather
+  than rescaled**, since the 8-bit path also discarded the low byte.
+- The live view's new-acquisition check never actually ran on a modern Siglent instrument. The
+  scope answers that query with a response header (`INR 8193`) rather than a bare number, which
+  the driver could not read, so it concluded the instrument had no such capability — silently, on
+  every poll, with nothing in the log. The poll therefore always fell back to timing-based
+  backoff, which is the very thing the check exists to avoid.
+- A measurement the instrument cannot compute yet is no longer reported as a failure. Modern
+  Siglent scopes answer `****` for an item that has no value at that moment; that surfaced as a
+  parse error and, in the gateway, as a `poll query failed` warning for an entirely routine
+  condition. It now raises the new `MeasurementUnavailableError` (a `CommandError` subclass, so
+  existing handlers keep working) and the gateway reports the reading as unavailable without
+  logging an alarm.
+- A mock oscilloscope now reports its own acquisition length, like a real one. `:ACQuire:POINts?`
+  had no mock answer, so the query failed and the driver concluded the record length was unknown
+  — which meant the live view's frame-thinning was never exercised against a mock at all, on any
+  dialect. A mock session's live view now thins its frames the same way a real instrument's does.
+- The timebase control's stepper no longer moves in 0.1 s jumps or hides sub-microsecond sweeps
+  under a six-decimal display. It previously lived in the Trigger panel with 100 ms increments —
+  one click from 1 ms/div landed on 0.101 s/div — and made sub-microsecond sweeps effectively
+  unreachable.
 - Revoking a token now takes effect immediately. The gateway reloads its token store when the file
   changes, so `scpi-web token revoke` no longer requires restarting the server to lock someone out
   — which meant the documented remedy for a leaked credential silently did nothing until someone

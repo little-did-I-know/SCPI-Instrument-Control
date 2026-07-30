@@ -31,7 +31,7 @@ describe("TriggerPanel null-tolerance", () => {
     // scope is still null here — this is the state right after setSession(), before the
     // first WS `state` broadcast lands.
     expect(() => render(<TriggerPanel />)).not.toThrow();
-    expect(screen.getByLabelText("Timebase")).toBeInTheDocument();
+    expect(screen.getByLabelText("Trigger level")).toBeInTheDocument();
   });
 
   it("still allows setting a value on a null trigger source", async () => {

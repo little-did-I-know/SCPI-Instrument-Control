@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import math
 import re
+import threading
 from typing import TYPE_CHECKING, Callable, Dict, Iterable, List, Optional, Set, Tuple, Union
 
 from scpi_control import exceptions
@@ -40,6 +41,13 @@ class MockConnection(BaseConnection):
     bytes are state-coupled synthesis by default (see connection/mock/synth.py),
     driven by each channel's SignalSpec (or a built-in default); explicit
     waveform_payloads bytes for a channel always take precedence.
+
+    `waveform_gate` (default None) makes a waveform-data read block until the
+    gate is set. A real scope cannot answer a waveform-data query until the
+    acquisition it describes has finished; tests use this to reproduce a long
+    capture deterministically -- no sleeping, no wall-clock dependency -- by
+    holding the gate open across the read. Leaving it None (the default)
+    keeps every read instant, exactly as before this parameter existed.
     """
 
     def __init__(
@@ -53,6 +61,7 @@ class MockConnection(BaseConnection):
         voltage_scales: Optional[Dict[int, float]] = None,
         voltage_offsets: Optional[Dict[int, float]] = None,
         waveform_payloads: Optional[Dict[int, bytes]] = None,
+        waveform_gate: Optional[threading.Event] = None,
         signals: Optional[Dict[int, Union["SignalSpec", Callable[[], "SignalSpec"]]]] = None,
         sample_rate: float = 1_000.0,
         timebase: float = 1e-3,
@@ -91,6 +100,10 @@ class MockConnection(BaseConnection):
         # Explicit payloads only; channels without one get state-coupled synthesis
         # (connection/mock/synth.py). The old fixed 4-byte default is gone.
         self._waveform_payloads: Dict[int, bytes] = dict(waveform_payloads) if waveform_payloads else {}
+        # See the class docstring: None (the default) means every read stays
+        # instant, untouched. Consumed only by read_raw()'s waveform-data
+        # response paths (below), via _wait_for_waveform_gate().
+        self._waveform_gate: Optional[threading.Event] = waveform_gate
         self._signals: Dict[int, Union["SignalSpec", Callable[[], "SignalSpec"]]] = dict(signals) if signals else {}
         self._acquisition_counts: Dict[int, int] = {}
         self._channel_coupling: Dict[int, str] = {ch: "D1M" for ch in channels}
@@ -885,6 +898,20 @@ class MockConnection(BaseConnection):
         """Convenience helper to query multiple commands sequentially."""
         return [self.query(cmd) for cmd in commands]
 
+    def _wait_for_waveform_gate(self) -> None:
+        """Block until `waveform_gate` is released, if one is armed.
+
+        A real scope cannot answer a waveform-data query until the
+        acquisition it describes has finished. Tests use this to reproduce a
+        long capture without sleeping, and without depending on wall-clock
+        time. A `None` gate (the default) makes this a no-op, so every caller
+        that omits it is unaffected. Called from read_raw()'s waveform-DATA
+        response paths only -- not the preamble/metadata or screenshot paths,
+        which a real scope answers without waiting on the acquisition.
+        """
+        if self._waveform_gate is not None:
+            self._waveform_gate.wait()
+
     def read_raw(self, size: Optional[int] = None) -> bytes:
         """Return deterministic raw waveform data (or a mock screenshot BMP after SCDP?)."""
         if not self._connected:
@@ -905,6 +932,7 @@ class MockConnection(BaseConnection):
                 payload = siglent.build_waveform_preamble(self)
                 return payload[:size] if size is not None else payload
             if last_write == ":WAVEFORM:DATA?":
+                self._wait_for_waveform_gate()
                 payload = siglent.build_waveform_data(self)
                 return payload[:size] if size is not None else payload
 
@@ -918,6 +946,7 @@ class MockConnection(BaseConnection):
         if self.scope_dialect == "modern":
             raise exceptions.TimeoutError(f"MockConnection ({self.scope_dialect}) has no response for read_raw() after writes={self.writes!r}")
 
+        self._wait_for_waveform_gate()
         personality = _PERSONALITIES.get(self.scope_vendor, siglent)
         payload = personality.build_waveform_response(self)
         return payload[:size] if size is not None else payload

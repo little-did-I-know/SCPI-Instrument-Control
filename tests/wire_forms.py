@@ -769,6 +769,22 @@ WIRE_FORMS: List[WireForm] = [
         source=f"{MODERN_GUIDE} p.483",
         mock_kwargs={"idn": MODERN_IDN},
     ),
+    # "INR" appears on exactly one page of this 855-page guide -- p.829 -- and
+    # not as a COMMAND/QUERY SYNTAX/RESPONSE FORMAT entry: it is a C# EXAMPLE
+    # ("Acquisition Status" helper) that polls in a loop --
+    # `mbSession.RawIO.Write("INR?"); ... Int16 state = Convert.ToInt16(result);
+    # if ((state & 0x01) == 1) { Console.WriteLine("Acquisition finished"); ... }`
+    # -- exactly the bit new_acquisition_ready() (oscilloscope.py) reads.
+    # Documented by example, not by a syntax block: no concrete request/response
+    # PAIR is worked through (the snippet shows the bit test, never a literal
+    # "INR?" -> "N" value), so `response` is left unset rather than invented.
+    # LeCroy's MAUI Remote Control manual documents the same INR bit-0 register,
+    # at p.7-132/7-133 (see the `get_acq_status`/lecroy comment in
+    # oscilloscope.py's acquisition_status()) -- a different vendor guide for a
+    # different dialect/table not covered by this corpus (LeCroy is UNCITED
+    # throughout, see the module docstring), so it is referenced here rather
+    # than duplicated as a second WireForm entry.
+    WireForm(table="scope", dialect="modern", op="get_new_data", params={}, request="INR?", source=f"{MODERN_GUIDE} p.829", mock_kwargs={"idn": MODERN_IDN}),
     WireForm(table="scope", dialect="modern", op="run", params={}, request=":TRIGger:RUN", source=f"{MODERN_GUIDE} p.483", mock_kwargs={"idn": MODERN_IDN}),
     WireForm(table="scope", dialect="modern", op="stop", params={}, request=":TRIGger:STOP", source=f"{MODERN_GUIDE} p.484", mock_kwargs={"idn": MODERN_IDN}),
     # -- Channel control --
@@ -916,6 +932,17 @@ WIRE_FORMS: List[WireForm] = [
         mock_kwargs={"idn": MODERN_IDN},
         note="Mock default (1000.0) differs from the manual's example value (5.00E9); structure (bare NR3) is what's pinned.",
     ),
+    # p.36 lists :ACQuire:POINts in the ACQUire subsystem's command index only
+    # (query-only, no COMMAND SYNTAX -- just a "?" marker, no worked example).
+    # The full entry -- QUERY SYNTAX ":ACQuire:POINts?", RESPONSE FORMAT
+    # "<point> := Value in NR3 format... like 1.23E+2", EXAMPLE "ACQ:POIN?" ->
+    # "1.25E+08" -- is on p.43, cited below. (p.752's :WAVeform:POINt entry
+    # cross-references :ACQuire:POINts under its own RELATED COMMANDS footer --
+    # a pointer to this same command, not a second specification of it.)
+    # get_acq_points is not mocked (no :ACQuire:POINts? handler in the modern
+    # branch of connection/mock/siglent.py) -- request-only citation, same
+    # rationale as the get_time_offset entry above.
+    WireForm(table="scope", dialect="modern", op="get_acq_points", params={}, request=":ACQuire:POINts?", source=f"{MODERN_GUIDE} p.43", mock_kwargs={"idn": MODERN_IDN}),
     # -- Trigger settings --
     # p.482 <mode>:={SINGle|NORMal|AUTO|FTRIG}; EXAMPLE "TRIG:MODE SING" ->
     # ":TRIGger:MODE SINGle", response bare "SINGle". mode_to_wire('modern',
