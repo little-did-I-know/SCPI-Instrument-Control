@@ -97,9 +97,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The admin panel gained a page header.
 - The live-session list in the Sessions screen now displays readable right-aligned numeric columns
   for Viewers and Idle time.
+- A Horizontal panel in the oscilloscope controls, containing a new timebase stepper that steps
+  in a 1-2-5 ladder (1 ms → 2 ms → 5 ms → 10 ms) with engineering-unit labels, making both slow
+  sweeps and sub-microsecond settings easily reachable.
+- `capture.csv` gained an optional `max_points` parameter for parity with the JSON export,
+  allowing an oversized record to be trimmed to a smaller sample count before export.
+
+### Changed
+
+- The CSV and JSON exports now stream instead of loading into memory; when a waveform is too large
+  to export safely, the endpoints return an error naming the actual point count and showing how to
+  proceed with `max_points`. On dialects that cannot report record length in advance, the export
+  proceeds unguarded and logs a warning if it oversizes — nothing is ever silently truncated or
+  decimated.
 
 ### Fixed
 
+- The gateway no longer freezes while a long capture is in progress. The oscilloscope poll
+  previously fetched a waveform on a timer without checking whether the instrument had finished
+  acquiring — at slow sweep rates this meant requesting much faster than the scope could produce
+  frames, blocking the read until the acquisition was complete, and freezing every control in the
+  web UI (since the session's only worker thread also services commands). The poll now checks
+  whether a new acquisition has landed before fetching, and requests only the display points
+  rather than transferring the entire record and then discarding most of it.
+- The live view updates once per completed acquisition. At slow sweep rates, a single update
+  every 14 seconds (at 1 s/div, for example) is expected behaviour — it matches the instrument's
+  own display rate — and is not a defect or regression.
+- A channel whose display query failed is now logged instead of silently failing. Previously a
+  poll-path failure made a channel appear 'off': no waveform, no error message, a gateway that
+  appeared healthy and did nothing.
+- The timebase control's stepper no longer moves in 0.1 s jumps or hides sub-microsecond sweeps
+  under a six-decimal display. It previously lived in the Trigger panel with 100 ms increments —
+  one click from 1 ms/div landed on 0.101 s/div — and made sub-microsecond sweeps effectively
+  unreachable.
 - Revoking a token now takes effect immediately. The gateway reloads its token store when the file
   changes, so `scpi-web token revoke` no longer requires restarting the server to lock someone out
   — which meant the documented remedy for a leaked credential silently did nothing until someone
