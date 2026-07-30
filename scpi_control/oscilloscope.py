@@ -381,10 +381,21 @@ class Oscilloscope:
         maximum points a single transfer can carry, not how many the record
         actually holds. A caller sizing a stride from the wrong one would
         under-decimate a deep record.
+
+        A dialect that MAPS the command is not a promise the instrument will
+        answer it: firmware that doesn't implement the query (or errors on it
+        while stopped) makes it fail, and so does the mock, which has no modern
+        handler for it. A raise here reached the gateway's export path as a 504
+        on an otherwise healthy session, so this degrades to None -- "the
+        dialect can't say" -- exactly like waveform_max_points() below, and
+        callers already handle None.
         """
         if not self._has_command("get_acq_points"):
             return None
-        return int(float(self.query(self._get_command("get_acq_points"))))
+        try:
+            return int(float(self.query(self._get_command("get_acq_points"))))
+        except (SiglentError, ValueError):
+            return None
 
     def waveform_max_points(self) -> Optional[int]:
         """The instrument's per-:WAVeform:DATA?-transfer cap, or None if the dialect can't say.

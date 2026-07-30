@@ -58,12 +58,14 @@ def _safe(fn, default=None, label=None, state=None):
     """
     try:
         result = fn()
-    except (SiglentError, ValueError):
-        # ValueError alongside SiglentError: a couple of the callers wrapped
-        # here (Oscilloscope.record_length()/waveform_max_points()) parse a
-        # numeric response with int(float(...)), which raises ValueError on a
-        # malformed reply rather than a SiglentError. Either way, the poll
-        # tick is the session heartbeat and must degrade to `default`, not die.
+    except SiglentError:
+        # SiglentError only, deliberately: the one caller that could raise a
+        # ValueError through here (Oscilloscope.record_length(), which parses
+        # its reply with int(float(...))) now swallows that itself, like
+        # waveform_max_points() always did. Widening this to ValueError as
+        # well would silently absorb one from the three unlabelled read_state
+        # call sites too, turning probe_ratio/trigger.source into null instead
+        # of surfacing a genuine bug.
         if label is not None and state is not None and state.get(label) is not False:
             logger.warning("poll query failed, degrading to a default: %s", label)
             state[label] = False

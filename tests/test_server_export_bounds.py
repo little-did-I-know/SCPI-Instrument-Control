@@ -23,7 +23,7 @@ fastapi = pytest.importorskip("fastapi")
 pytest.importorskip("httpx")  # fastapi.testclient needs it
 from fastapi.testclient import TestClient  # noqa: E402
 
-from scpi_control.exceptions import FeatureNotSupportedError  # noqa: E402
+from scpi_control.exceptions import FeatureNotSupportedError, SiglentError  # noqa: E402
 from scpi_control.oscilloscope import Oscilloscope  # noqa: E402
 from scpi_control.server.api import scope as scope_api  # noqa: E402
 from scpi_control.server.app import create_app  # noqa: E402
@@ -42,11 +42,27 @@ def client(gateway_auth):
     manager.close_all()
 
 
+MODERN_MODEL = "SDS824X HD"  # the modern-dialect model the rest of this branch's server tests use
+
+
 def create_mock_session(client):
     # Default (mock=True, no model) is the legacy dialect (SDS1104X-E) --
     # deliberately unpatched, this is what exercises the record_length() is
     # None path (see TestUnknownRecordLengthProceedsUnguarded below).
     response = client.post("/api/sessions", json={"mock": True})
+    assert response.status_code == 201, response.text
+    return response.json()["id"]
+
+
+def create_modern_mock_session(client):
+    """A MODERN-dialect mock session. Every other test in this file uses the
+    default legacy mock, which is exactly the coverage gap that let a
+    modern-dialect 504 through: legacy has no "get_acq_points" mapping at all,
+    so record_length() returns early on _has_command and the query is never
+    sent. Modern DOES map :ACQuire:POINts? -- and the mock has no response for
+    it -- so this is the configuration where the query actually runs and fails.
+    """
+    response = client.post("/api/sessions", json={"mock": True, "model": MODERN_MODEL})
     assert response.status_code == 201, response.text
     return response.json()["id"]
 
@@ -223,6 +239,47 @@ class TestUnknownRecordLengthProceedsUnguarded:
         instrument.connect()
         assert instrument.dialect == "legacy"
         assert instrument.record_length() is None
+
+
+class TestAFailingRecordLengthQueryDoesNotFailTheExport:
+    # Final-review fix (Critical 1): _export_stride calls record_length()
+    # bare, and record_length() only guarded _has_command -- it did not catch a
+    # FAILING query. On a modern-dialect session whose instrument (or the mock)
+    # has no answer for :ACQuire:POINts?, the query raised, run_job re-raised,
+    # and the app-level handler turned it into a 504 for BOTH exports. Both
+    # returned 200 before this branch. record_length() now swallows like its
+    # sibling waveform_max_points() already did, so _export_stride falls into
+    # its designed size_verified=False branch instead.
+
+    def test_capture_csv_returns_200_on_a_modern_dialect_session(self, client):
+        sid = create_modern_mock_session(client)
+
+        response = client.get("/api/sessions/{0}/scope/capture.csv?channels=1".format(sid))
+
+        assert response.status_code == 200, response.text
+
+    def test_waveform_json_returns_200_on_a_modern_dialect_session(self, client):
+        sid = create_modern_mock_session(client)
+
+        response = client.get("/api/sessions/{0}/scope/waveform?channels=1".format(sid))
+
+        assert response.status_code == 200, response.text
+
+    def test_the_modern_mock_really_cannot_answer_the_record_length_query(self):
+        # Pins what makes the two tests above meaningful: modern MAPS
+        # :ACQuire:POINts? (unlike legacy) and the mock cannot answer it, so
+        # the query is genuinely attempted and genuinely fails. If the mock
+        # ever grows a handler, those tests would silently stop covering the
+        # failing-query path and this one fails loudly instead.
+        from scpi_control.connection.mock.base import MockConnection
+
+        instrument = Oscilloscope("mock", connection=MockConnection("mock", idn="Siglent Technologies,{0},MOCK0001,1.0.0.0".format(MODERN_MODEL)))
+        instrument.connect()
+        assert instrument.dialect == "modern"
+        assert instrument._has_command("get_acq_points"), "modern must map :ACQuire:POINts? -- otherwise record_length() short-circuits and no query is sent"
+        with pytest.raises(SiglentError):
+            instrument.query(instrument._get_command("get_acq_points"))
+        assert instrument.record_length() is None, "record_length() must degrade to None on a failing query, not raise"
 
 
 class TestUnverifiableOversizedExportLogsAWarning:
