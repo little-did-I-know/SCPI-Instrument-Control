@@ -98,6 +98,12 @@ def test_a_strided_read_returns_the_decimated_point_count_and_scaled_dt():
     honored :WAVeform:INTerval, a stride changed no bytes on the wire -- same
     point count back, same dt. This pins both halves of striding actually
     working: fewer points, and a time axis scaled to match.
+
+    Both halves used to pass for compensating wrong reasons: the mock
+    reported a STRIDED horiz_interval and the driver used it unscaled, so the
+    dt assertion held while neither side matched the instrument. With the mock
+    corrected to hardware (preamble reports the full record and the raw sample
+    spacing), dt is only right because acquire() now multiplies by the stride.
     """
     conn = MockConnection(idn=MODERN_IDN, sample_rate=20_000.0, timebase=1e-3)
     conn.record_length = 1000
@@ -106,7 +112,7 @@ def test_a_strided_read_returns_the_decimated_point_count_and_scaled_dt():
 
     wf = scope.get_waveform(1, provenance=False, stride=7)
 
-    assert len(wf.voltage) == 143  # ceil(1000 / 7)
+    assert len(wf.voltage) == 142  # floor(1000 / 7) -- the instrument truncates
     dt = float(np.mean(np.diff(wf.time)))
     assert dt == pytest.approx(7 / 20_000.0)
 
@@ -214,6 +220,119 @@ def test_a_data_interval_mismatch_is_logged_once_per_transition_not_every_frame(
         # not have logged another onset either.
         onsets_after = [r for r in caplog.records if r.name == logger_name and r.levelno == logging.WARNING and "DATA_INTERVAL" in r.getMessage() and "may not be scaled" in r.getMessage()]
         assert len(onsets_after) == 1
+
+
+def _modern_preamble(conn):
+    """Parse what the mock would answer :WAVeform:PREamble? with right now."""
+    from scpi_control.connection.mock.siglent import build_waveform_preamble
+    from scpi_control.waveform_transfer import parse_ieee_block, parse_modern_wavedesc
+
+    payload = parse_ieee_block(build_waveform_preamble(conn), np.uint8).tobytes()
+    return parse_modern_wavedesc(payload)
+
+
+def test_the_preamble_reports_the_full_record_and_unstrided_spacing_at_any_stride():
+    """MEASURED on the real SDS824X HD (fw 3.8.12.1.1.3.6), 2026-07-30, at
+    ACQ:POINts=50000 with :WAVeform:INTerval 1/2/7/10:
+
+        INTerval | WAVE_ARRAY_1 | wave_array_count | DATA? pts | horiz_interval
+               1 |        50000 |            50000 |     50000 |        1.0e-08
+               2 |        50000 |            50000 |     25000 |        1.0e-08
+               7 |        50000 |            50000 |      7142 |        1.0e-08
+              10 |        50000 |            50000 |      5000 |        1.0e-08
+
+    Both count fields stay at the FULL record and HORIZ_INTERVAL does not
+    move, at every stride. This replaces the opposite assumption that
+    build_waveform_preamble carried (and said, in its own words, was "not yet
+    confirmed against real hardware" and would "change together" with
+    ModernTransfer.acquire if hardware disagreed). It does disagree.
+
+    Note the guide (p.755) calls WAVE_ARRAY_1 "the number of transmitted
+    bytes" -- the instrument does not honour that, so nothing in the preamble
+    reports the transmitted count and a reader must compute it.
+    """
+    conn = MockConnection(idn=MODERN_IDN, sample_rate=20_000.0, timebase=1e-3)
+    conn.record_length = 1000
+    conn.waveform_source = "C1"
+
+    conn.waveform_interval = 1
+    unstrided = _modern_preamble(conn)
+    conn.waveform_interval = 7
+    strided = _modern_preamble(conn)
+
+    assert unstrided["wave_array_count"] == 1000
+    assert strided["wave_array_count"] == 1000, "the count must not shrink with the stride"
+    assert strided["horiz_interval"] == pytest.approx(unstrided["horiz_interval"])
+    assert strided["horiz_interval"] == pytest.approx(1 / 20_000.0)
+    assert strided["data_interval"] == 7, "DATA_INTERVAL is what echoes the stride"
+
+
+def test_a_strided_trace_covers_the_same_time_window_as_an_unstrided_one():
+    """The bug the compensating mock hid. HORIZ_INTERVAL is the raw sample
+    spacing at every stride (hardware table above), so a time axis built as
+    `arange(n) * horiz_interval` spans only 1/stride of the real sweep --
+    on the instrument, a stride-7 live frame claimed 7.14e-5 s of a 5.0e-4 s
+    sweep. Decimating a trace must change how many points describe the
+    window, never how wide the window is.
+    """
+    conn = MockConnection(idn=MODERN_IDN, sample_rate=20_000.0, timebase=1e-3)
+    conn.record_length = 1000
+    scope = Oscilloscope("mock", connection=conn)
+    scope.connect()
+
+    full = scope.get_waveform(1, provenance=False)
+    strided = scope.get_waveform(1, provenance=False, stride=7)
+
+    dt_full = float(np.mean(np.diff(full.time)))
+    dt_strided = float(np.mean(np.diff(strided.time)))
+    assert dt_strided == pytest.approx(7 * dt_full), "delivered points are `stride` samples apart"
+    assert strided.time[0] == pytest.approx(full.time[0])
+    assert strided.time[-1] == pytest.approx(full.time[-1], rel=0.02), (
+        "the strided trace must still end at the end of the sweep"
+    )
+    assert strided.sample_rate == pytest.approx(full.sample_rate / 7), (
+        "the effective rate of a decimated trace is 1/stride of the acquisition rate"
+    )
+
+
+def test_a_strided_read_that_fits_only_after_decimation_is_not_refused():
+    """The per-transfer cap applies to what crosses the wire, which is the
+    DECIMATED count -- comparing the full record against :WAVeform:MAXPoint
+    refuses reads that fit comfortably. 1000 points at stride 20 is a
+    50-point transfer; a 100-point cap accommodates it easily.
+    """
+    conn = MockConnection(idn=MODERN_IDN, sample_rate=20_000.0, timebase=1e-3)
+    conn.record_length = 1000
+    conn.max_points = 100
+    scope = Oscilloscope("mock", connection=conn)
+    scope.connect()
+
+    assert len(scope.get_waveform(1, provenance=False, stride=20).voltage) == 50
+
+
+def test_a_strided_read_that_comes_back_short_raises_instead_of_truncating():
+    """Nothing in the preamble reports the transmitted count, so a short
+    window is invisible: unlike the stride==1 path nothing loops to collect a
+    remainder, and the time axis is sized off whatever arrived -- a truncated
+    record comes back looking well-formed, just missing its tail. The
+    expected count has to be computed (record // stride) and checked.
+
+    Driven here through :WAVeform:POINt, which caps the transfer. On the real
+    instrument that value is DERIVED from :WAVeform:INTerval (it read 714285 =
+    MAXPoint/7 after setting interval 7), so this stands in for any short
+    window rather than for one specific cause.
+    """
+    conn = MockConnection(idn=MODERN_IDN, sample_rate=20_000.0, timebase=1e-3)
+    conn.record_length = 1000
+    conn.waveform_point = 30  # 30 of the 142 points a stride of 7 should deliver
+    scope = Oscilloscope("mock", connection=conn)
+    scope.connect()
+
+    with pytest.raises(exceptions.CommandError) as excinfo:
+        scope.get_waveform(1, provenance=False, stride=7)
+
+    message = str(excinfo.value)
+    assert "30" in message and "142" in message, message
 
 
 def test_a_stride_needing_more_than_one_window_raises():

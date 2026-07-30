@@ -612,13 +612,21 @@ class ModernTransfer:
 
         dtype = np.int16 if meta["comm_type"] == 1 else np.int8
         # wave_array_count (WAVEDESC address 116-119, p.756) is "Number of
-        # data points in the data array". ASSUMPTION (Task 3 stride
-        # follow-up, not yet confirmed against real hardware): when stride >
-        # 1, this is the STRIDED count, not the full record's -- see the
-        # mock's build_waveform_preamble docstring for why. It is still the
-        # FULL record when stride == 1, even when a single :WAVeform:DATA?
-        # transfer cannot carry all of it at once.
+        # data points in the data array" -- the FULL record, at EVERY stride.
+        # Measured on a real SDS824X HD (fw 3.8.12.1.1.3.6) 2026-07-30: with
+        # ACQ:POINts=50000 it reported 50000 at :WAVeform:INTerval 1, 2, 7 and
+        # 10 alike, while DATA? returned 50000/25000/7142/5000. This reverses
+        # the earlier assumption (that it reported the strided count), which
+        # the mock carried too; both changed together, as that assumption's
+        # own note said they would if hardware disagreed.
+        #
+        # WAVE_ARRAY_1 (addr 60) is NOT a substitute: the guide (p.755) calls
+        # it "the number of transmitted bytes" but the instrument leaves it at
+        # the full count as well. Nothing in the preamble reports what DATA?
+        # will actually send, so it has to be computed -- by FLOOR division
+        # (50000/7 -> 7142, not 7143).
         record_length = meta["wave_array_count"]
+        expected_points = record_length // effective_stride
 
         # :WAVeform:MAXPoint? (p.753) is Query-only: the scope reports its own
         # per-transfer cap, there is no setter. int(float(...)) matches this
@@ -670,17 +678,40 @@ class ModernTransfer:
             # is always <= MAX_FRAME_POINTS, far below any real MAXPoint, so a
             # single window covers every case it actually needs; a strided read
             # that would not fit raises instead of mis-assembling.
-            if record_length > max_points:
+            #
+            # The cap applies to what CROSSES THE WIRE, so it is compared
+            # against expected_points (the decimated count), not against the
+            # full record -- decimation is precisely what brings a deep record
+            # under the cap, and comparing the full record here would refuse
+            # reads that fit with room to spare.
+            if expected_points > max_points:
                 raise exceptions.FeatureNotSupportedError(
-                    f"Strided read of {record_length} points (stride={effective_stride}) exceeds "
-                    f"this instrument's per-transfer cap of {max_points} points (:WAVeform:MAXPoint?); "
-                    f"multi-window strided reads are not supported ({data_context})"
+                    f"Strided read of {expected_points} points ({record_length} at stride="
+                    f"{effective_stride}) exceeds this instrument's per-transfer cap of "
+                    f"{max_points} points (:WAVeform:MAXPoint?); multi-window strided reads "
+                    f"are not supported ({data_context})"
                 )
             with scope._connection.lock:
                 scope.write(scope._get_command("set_waveform_start", value=0))
                 scope.write(scope._get_command("get_waveform_data"))
                 data_raw = scope.read_raw()
             codes = parse_ieee_block(data_raw, dtype, error_context=data_context)
+
+            # A short window here is the one failure that would otherwise be
+            # INVISIBLE. Unlike the stride==1 branch nothing loops to collect a
+            # remainder, and the time axis below is sized off whatever did
+            # arrive -- so a truncated record comes back looking perfectly
+            # well-formed, just quietly missing its tail. Nothing in the
+            # preamble reports the transmitted count (see expected_points
+            # above), which is exactly why this has to be checked rather than
+            # read back.
+            if codes.size < expected_points:
+                raise exceptions.CommandError(
+                    f"Strided read returned {codes.size} points, but a {record_length}-point "
+                    f"record at stride {effective_stride} should deliver {expected_points}; "
+                    f"refusing to scale a truncated record into a time axis that would look "
+                    f"correct ({data_context})"
+                )
 
         # SDS Series Programming Guide EN11G p.758 ("Read Waveform Data",
         # analog example, Step 3): "voltage value (V) = code value
@@ -709,17 +740,32 @@ class ModernTransfer:
         # example (delay=1.72E-8, timebase=20E-9, interval=2E-10): the
         # documented first-point time is -8.28E-08 s, which only the
         # delay-(timebase*grid/2) form reproduces.
+        #
+        # HORIZ_INTERVAL is the ACQUISITION's sample spacing and does NOT
+        # track :WAVeform:INTerval -- measured constant at 1.0e-08 across
+        # strides 1/2/7/10 on a real SDS824X HD (see the record_length note
+        # above). Delivered points are therefore `stride` samples apart, and
+        # the spacing between them is horiz_interval * stride. Using
+        # horiz_interval unscaled compresses the trace into 1/stride of the
+        # real sweep: at stride 7 a live frame claimed 7.14e-5 s of a 5.0e-4 s
+        # window, an x-axis wrong by 7x on every thinned frame while looking
+        # entirely well-formed.
         grid = 10
         timebase = scope.waveform._get_timebase()
         n = len(codes)
-        time = meta["horiz_offset"] - (timebase * grid / 2) + np.arange(n) * meta["horiz_interval"]
+        point_interval = meta["horiz_interval"] * effective_stride
+        time = meta["horiz_offset"] - (timebase * grid / 2) + np.arange(n) * point_interval
 
         logger.info(f"Acquired {n} samples from channel {channel} (modern)")
         return WaveformData(
             time=time,
             voltage=voltage,
             channel=channel,
-            sample_rate=(1.0 / meta["horiz_interval"]) if meta["horiz_interval"] else None,
+            # The EFFECTIVE rate of the trace being returned (1/stride of the
+            # acquisition rate on a decimated read), not the acquisition rate
+            # -- this is what a consumer needs to reconstruct `time`, and what
+            # any FFT or frequency-axis built from it depends on.
+            sample_rate=(1.0 / point_interval) if point_interval else None,
             record_length=n,
             timebase=timebase,
             voltage_scale=meta["vertical_gain"],

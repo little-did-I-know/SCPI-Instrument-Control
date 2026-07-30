@@ -510,17 +510,28 @@ def build_waveform_preamble(conn) -> bytes:
     that build_waveform_data slices from, since PREamble? is read exactly
     once per capture, before the STARt-driven DATA? loop begins.
 
-    ASSUMPTION, made visible (Task 3 stride follow-up, not yet confirmed
-    against real hardware): wave_array_count/WAVE_ARRAY_1 below report the
-    STRIDED (post-:WAVeform:INTerval) point/byte count, and HORIZ_INTERVAL
-    reports the STRIDED sample spacing, not the full record's. We read it
-    this way because WAVE_ARRAY_1 (addr 60) is documented as "bytes in the
-    TRANSMITTED array", and FIRST_POINT (132)/DATA_INTERVAL (136) exist as
-    their own fields precisely because the transmitted array is a sparse
-    subset of the full record -- there would be nothing for DATA_INTERVAL to
-    describe if wave_array_count were always the unstrided count. If a real
-    SDS800X HD disagrees, this mock and ModernTransfer.acquire's DATA_INTERVAL
-    cross-check (waveform_transfer.py) change together.
+    STRIDE (:WAVeform:INTerval), measured on a real SDS824X HD (fw
+    3.8.12.1.1.3.6) on 2026-07-30 at ACQ:POINts=50000:
+
+        INTerval | WAVE_ARRAY_1 | wave_array_count | DATA? pts | horiz_interval
+               1 |        50000 |            50000 |     50000 |        1.0e-08
+               2 |        50000 |            50000 |     25000 |        1.0e-08
+               7 |        50000 |            50000 |      7142 |        1.0e-08
+              10 |        50000 |            50000 |      5000 |        1.0e-08
+
+    So: BOTH count fields stay at the FULL record and HORIZ_INTERVAL keeps
+    reporting the raw sample spacing, no matter the stride. Only DATA_INTERVAL
+    (136) echoes it, and only :WAVeform:DATA? actually shrinks -- by FLOOR
+    division (50000/7 -> 7142, not 7143).
+
+    This reverses the assumption this mock previously carried, which said
+    these fields reported the STRIDED counts and spacing, and which said it
+    would "change together" with ModernTransfer.acquire if hardware
+    disagreed. It disagreed. Note in particular that WAVE_ARRAY_1 stays at
+    the full count even though the guide (p.755) calls it "the number of
+    transmitted bytes" -- the instrument does not honour that description, so
+    NOTHING in the preamble reports the transmitted count and a reader has to
+    compute `record // interval` itself.
     """
     channel = _modern_source_channel(conn)
     word = conn.waveform_width == "WORD"
@@ -529,23 +540,23 @@ def build_waveform_preamble(conn) -> bytes:
     record_length = _effective_record_length(conn, channel)
     conn._modern_waveform_codes[channel] = _synthesize_modern_codes(conn, channel, record_length, word)
 
-    interval = max(1, conn.waveform_interval)
-    strided_length = math.ceil(record_length / interval)
-
     desc = bytearray(_MODERN_WAVEDESC_LEN)
     desc[0:8] = b"WAVEDESC"
     desc[16:23] = b"WAVEACE"
     struct.pack_into("<h", desc, _MODERN_COMM_TYPE, 1 if word else 0)
     struct.pack_into("<h", desc, _MODERN_COMM_ORDER, 0)
     struct.pack_into("<i", desc, _MODERN_WAVE_DESC_LENGTH, _MODERN_WAVEDESC_LEN)
-    struct.pack_into("<i", desc, _MODERN_WAVE_ARRAY_1, strided_length * bytes_per_point)
-    struct.pack_into("<i", desc, _MODERN_WAVE_ARRAY_COUNT, strided_length)
+    struct.pack_into("<i", desc, _MODERN_WAVE_ARRAY_1, record_length * bytes_per_point)
+    struct.pack_into("<i", desc, _MODERN_WAVE_ARRAY_COUNT, record_length)
     struct.pack_into("<i", desc, _MODERN_FIRST_POINT, conn.waveform_start)
     struct.pack_into("<i", desc, _MODERN_DATA_INTERVAL, conn.waveform_interval)
     struct.pack_into("<f", desc, _MODERN_VERTICAL_GAIN, conn._voltage_scales.get(channel, 1.0))
     struct.pack_into("<f", desc, _MODERN_VERTICAL_OFFSET, conn._voltage_offsets.get(channel, 0.0))
     struct.pack_into("<f", desc, _MODERN_CODE_PER_DIV, code_per_div)
-    struct.pack_into("<f", desc, _MODERN_HORIZ_INTERVAL, ((1.0 / conn.sample_rate) * interval) if conn.sample_rate else 0.0)
+    # NOT scaled by the interval -- the instrument reports the raw sample
+    # spacing at every stride (table above). A reader wanting the spacing
+    # BETWEEN DELIVERED POINTS must multiply this by DATA_INTERVAL itself.
+    struct.pack_into("<f", desc, _MODERN_HORIZ_INTERVAL, (1.0 / conn.sample_rate) if conn.sample_rate else 0.0)
     struct.pack_into("<d", desc, _MODERN_HORIZ_OFFSET, 0.0)  # mock triggers at the first sample
     return _build_ieee_block_9digit(bytes(desc))
 
@@ -567,11 +578,13 @@ def build_waveform_data(conn) -> bytes:
     (record length <= max_points, the common case and every Task 18 test)
     still returns the whole record in one call, unchanged.
 
-    `transmitted` is codes[::interval] -- see build_waveform_preamble's
-    ASSUMPTION note on why DATA? is read as answering from the strided
-    subset, not the full record. interval=1 (the default, and every read that
-    never sets :WAVeform:INTerval) makes this identical to the pre-stride
-    behavior.
+    `transmitted` is codes[::interval], truncated to FLOOR(record/interval):
+    the real instrument returned 7142 points for a 50000-point record at
+    interval 7, where a bare codes[::7] yields 7143 (see
+    build_waveform_preamble's hardware table). DATA? is the ONLY response
+    that shrinks with the stride -- the preamble's counts do not.
+    interval=1 (the default, and every read that never sets
+    :WAVeform:INTerval) makes this identical to the pre-stride behavior.
     """
     channel = _modern_source_channel(conn)
     word = conn.waveform_width == "WORD"
@@ -582,10 +595,10 @@ def build_waveform_data(conn) -> bytes:
         # rather than raising, matching this mock's general leniency.
         codes = _synthesize_modern_codes(conn, channel, _effective_record_length(conn, channel), word)
     interval = max(1, conn.waveform_interval)
-    transmitted = codes[::interval] if interval > 1 else codes
-    record_length = len(transmitted)
+    transmitted = codes[::interval][: len(codes) // interval] if interval > 1 else codes
+    transmitted_length = len(transmitted)
     start = max(0, conn.waveform_start)
-    remaining = max(0, record_length - start)
+    remaining = max(0, transmitted_length - start)
     requested = conn.waveform_point if conn.waveform_point else conn.max_points
     window = max(0, min(requested, conn.max_points, remaining))
     return _build_ieee_block_9digit(transmitted[start : start + window].tobytes())

@@ -130,6 +130,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A channel whose display query failed is now logged instead of silently failing. Previously a
   poll-path failure made a channel appear 'off': no waveform, no error message, a gateway that
   appeared healthy and did nothing.
+- A thinned live view on a modern Siglent instrument no longer reports a time axis that is too
+  short by the thinning factor. When the live view asks the scope for every Nth point, the
+  instrument keeps reporting the *acquisition's* sample spacing rather than the spacing between
+  the points it actually sends — so a trace thinned 7:1 claimed to cover a seventh of the sweep
+  it really covered, with `sample_rate` wrong by the same factor. Measurements and exports were
+  never affected (they are never thinned); the live view's x-axis was. Verified against an
+  SDS824X HD.
+- A thinned read that comes back short now fails loudly instead of returning a truncated trace
+  scaled onto a time axis that looks correct, and a deep record that fits comfortably once
+  thinned is no longer refused as too large for one transfer.
 - The timebase control's stepper no longer moves in 0.1 s jumps or hides sub-microsecond sweeps
   under a six-decimal display. It previously lived in the Trigger panel with 100 ms increments —
   one click from 1 ms/div landed on 0.101 s/div — and made sub-microsecond sweeps effectively
