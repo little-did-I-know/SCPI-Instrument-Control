@@ -13,7 +13,7 @@ import uuid
 from collections import Counter
 from concurrent.futures import Future
 from concurrent.futures import TimeoutError as FuturesTimeoutError
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional
 
 from scpi_control.exceptions import SiglentConnectionError, SiglentError
 
@@ -61,12 +61,9 @@ class InstrumentSession:
         # gate): a tick's own measured duration becomes a floor on how soon
         # the *next* one may start, so a gate that ever misreports still
         # degrades to a lower poll rate instead of piling up back-to-back
-        # blocking reads the moment the scope catches up. `poll_log` is a
-        # test seam (see _poll_if_due) recording (tick_number, duration) for
-        # every tick actually run.
+        # blocking reads the moment the scope catches up.
         self._last_poll_duration = 0.0
         self._next_poll_at = 0.0
-        self.poll_log: List[Tuple[int, float]] = []
         self.owner = ""
         self.owner_last_active = time.monotonic()
         # Live stream watchers, keyed by identity (not by "is this the
@@ -343,10 +340,8 @@ class InstrumentSession:
             return
         self._poll_tick()
         end = time.monotonic()
-        duration = end - now
-        self._last_poll_duration = duration
-        self.poll_log.append((self._poll_count, duration))
-        self._next_poll_at = end + max(self._poll_interval, duration)
+        self._last_poll_duration = end - now
+        self._next_poll_at = end + max(self._poll_interval, self._last_poll_duration)
 
     def _poll_tick(self) -> None:
         with self._subscribers_lock:
