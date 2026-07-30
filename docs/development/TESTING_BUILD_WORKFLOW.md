@@ -239,7 +239,8 @@ Once builds complete:
 2. Scroll to **Artifacts** section
 3. Download each artifact:
    - `windows-executable`
-   - `macos-executable`
+   - `macos-arm64-executable`
+   - `macos-x64-executable`
    - `linux-executable`
 
 **Or download from Releases:**
@@ -249,6 +250,7 @@ Once builds complete:
 3. Download the attachments:
    - `SiglentGUI-v0.3.1-test-Windows-x64.zip`
    - `SiglentGUI-v0.3.1-test-macOS-arm64.zip`
+   - `SiglentGUI-v0.3.1-test-macOS-x86_64.zip`
    - `SiglentGUI-v0.3.1-test-Linux-x86_64.tar.gz`
 
 ---
