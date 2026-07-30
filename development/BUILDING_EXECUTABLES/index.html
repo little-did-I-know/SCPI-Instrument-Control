@@ -4589,7 +4589,8 @@
 <p>This creates:</p>
 <ul>
 <li><strong>Windows</strong>: <code>SiglentGUI-v0.3.1-Windows-x64.zip</code></li>
-<li><strong>macOS</strong>: <code>SiglentGUI-v0.3.1-macOS-arm64.zip</code></li>
+<li><strong>macOS (Apple Silicon)</strong>: <code>SiglentGUI-v0.3.1-macOS-arm64.zip</code></li>
+<li><strong>macOS (Intel)</strong>: <code>SiglentGUI-v0.3.1-macOS-x86_64.zip</code></li>
 <li><strong>Linux</strong>: <code>SiglentGUI-v0.3.1-Linux-x86_64.tar.gz</code></li>
 </ul>
 <p>Each archive includes:</p>
@@ -4601,7 +4602,7 @@
 <h3 id="automated-release-process">Automated Release Process<a class="headerlink" href="#automated-release-process" title="Permanent link">&para;</a></h3>
 <p>When you push a version tag (e.g., <code>v0.3.2</code>), GitHub Actions will:</p>
 <ol>
-<li>Build executables on Windows, macOS, and Linux runners</li>
+<li>Build executables on four runners: Windows, macOS on Apple Silicon, macOS on Intel, and Linux</li>
 <li>Create platform-specific archives</li>
 <li>Upload to GitHub Releases</li>
 <li>Add installation instructions to the release notes</li>
