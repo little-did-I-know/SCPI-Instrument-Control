@@ -120,8 +120,20 @@ class Measurement:
             # p.369: RESPONSE FORMAT is a bare <value> in NR3 ("2.000E+00") -- no
             # parameter name and no unit suffix, so the legacy comma-splitting
             # parser below cannot be reused.
+            reply = response.strip()
+            # "****" is the instrument's "no value for this item right now"
+            # marker, not a malformed reply -- measured on an SDS824X HD, where
+            # MEAN answered a normal NR3 while PKPK/MAX/MIN each returned
+            # "****" on the same live channel. p.369 documents only the bare
+            # NR3 and never mentions it. Reporting this as a parse failure made
+            # an ordinary transient look like an instrument fault in the
+            # gateway's poll log.
+            if set(reply) == {"*"}:
+                raise exceptions.MeasurementUnavailableError(
+                    f"Instrument reports no value for {wire_type} on channel {channel} right now (answered {reply!r})"
+                )
             try:
-                return float(response.strip())
+                return float(reply)
             except ValueError as e:
                 raise exceptions.CommandError(f"Failed to parse measurement: {e}")
 

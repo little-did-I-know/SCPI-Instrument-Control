@@ -25,6 +25,23 @@ class CommandError(SiglentError):
     pass
 
 
+class MeasurementUnavailableError(CommandError):
+    """Raised when the instrument has no value for a measurement right now.
+
+    Distinct from a failed read: the wire worked and the instrument answered,
+    it simply has nothing to report for that item yet. A modern Siglent says
+    so with the literal "****" (measured on an SDS824X HD: MEAN answered
+    while PKPK/MAX/MIN returned "****" on the same live channel).
+
+    Deliberately a CommandError subclass so callers written before it existed
+    keep catching it, while callers that care can tell "not available yet"
+    apart from "the read is broken" -- the difference between a normal
+    transient and something worth alerting on.
+    """
+
+    pass
+
+
 class InvalidParameterError(SiglentError):
     """Raised when invalid parameters are provided."""
 

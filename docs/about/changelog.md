@@ -140,6 +140,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A thinned read that comes back short now fails loudly instead of returning a truncated trace
   scaled onto a time axis that looks correct, and a deep record that fits comfortably once
   thinned is no longer refused as too large for one transfer.
+- **Waveforms captured from a high-resolution Siglent instrument in the default 8-bit transfer
+  mode were 256 times too small.** These scopes report one code-per-division figure for their
+  native 16-bit samples and reuse it unchanged for an 8-bit transfer, where the instrument sends
+  only the high byte — so a 3.07 V signal was read back as 0.012 V. Every default waveform read
+  on an SDS800X HD was affected: live view, exports, saved records and any analysis derived from
+  them. 16-bit (`WORD`) captures were always correct. Verified against an SDS824X HD by comparing
+  both transfer widths against the instrument's own measurement of the same channel. **Waveform
+  data captured from an HD instrument before this release should be treated as unusable rather
+  than rescaled**, since the 8-bit path also discarded the low byte.
+- The live view's new-acquisition check never actually ran on a modern Siglent instrument. The
+  scope answers that query with a response header (`INR 8193`) rather than a bare number, which
+  the driver could not read, so it concluded the instrument had no such capability — silently, on
+  every poll, with nothing in the log. The poll therefore always fell back to timing-based
+  backoff, which is the very thing the check exists to avoid.
+- A measurement the instrument cannot compute yet is no longer reported as a failure. Modern
+  Siglent scopes answer `****` for an item that has no value at that moment; that surfaced as a
+  parse error and, in the gateway, as a `poll query failed` warning for an entirely routine
+  condition. It now raises the new `MeasurementUnavailableError` (a `CommandError` subclass, so
+  existing handlers keep working) and the gateway reports the reading as unavailable without
+  logging an alarm.
 - The timebase control's stepper no longer moves in 0.1 s jumps or hides sub-microsecond sweeps
   under a six-decimal display. It previously lived in the Trigger panel with 100 ms increments —
   one click from 1 ms/div landed on 0.101 s/div — and made sub-microsecond sweeps effectively

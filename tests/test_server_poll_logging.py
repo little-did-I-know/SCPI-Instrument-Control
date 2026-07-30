@@ -133,10 +133,15 @@ def test_a_query_that_degrades_inside_the_accessor_is_silent_by_design(caplog):
     unreachable. The labels promised log lines that could never be written.
 
     A modern-dialect mock is exactly that situation for real: it has no
-    response for INR? or :ACQuire:POINts?, so both queries genuinely fail and
-    both accessors genuinely degrade to None. The tick must still publish a
-    frame (a gate we cannot read is "no gate", not "not ready") and must stay
-    silent, since nothing was swallowed at this level.
+    response for :ACQuire:POINts?, so record_length() genuinely fails and
+    genuinely degrades to None. The tick must still publish a frame and must
+    stay silent, since nothing was swallowed at this level.
+
+    This test used to lean on INR? failing here too. It no longer does: the
+    modern mock now answers INR? the way hardware does (header-prefixed
+    "INR 8193"), because that query silently failing was itself the bug that
+    left the new-acquisition gate inert on the instrument. record_length()
+    still degrades, which is all this test needs.
     """
     from scpi_control.connection.mock import MockConnection
     from scpi_control.oscilloscope import Oscilloscope
@@ -145,7 +150,7 @@ def test_a_query_that_degrades_inside_the_accessor_is_silent_by_design(caplog):
     scope = Oscilloscope("mock", connection=conn)
     scope.connect()
     assert scope.dialect == "modern"
-    assert scope.new_acquisition_ready() is None, "fixture broken: the modern mock is expected to fail INR?, degrading the gate to None"
+    assert scope.new_acquisition_ready() is not None, "the modern mock must answer INR? now -- a silently failing gate was the bug"
     assert scope.record_length() is None, "fixture broken: the modern mock is expected to fail :ACQuire:POINts?"
 
     adapter = ScopeAdapter()

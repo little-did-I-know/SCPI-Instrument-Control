@@ -23,6 +23,31 @@ from scpi_control.waveform import Waveform, WaveformData
 logger = logging.getLogger(__name__)
 
 
+def _parse_inr(response: str) -> int:
+    """Parse an INR? reply, with or without its response header.
+
+    MEASURED on a real SDS824X HD (fw 3.8.12.1.1.3.6) 2026-07-30: the
+    instrument answers "INR 8193", NOT the bare "8193" the guide's example
+    implies. Only the ":"-prefixed modern queries answer bare; legacy-style
+    ones like INR? carry the header.
+
+    That mattered a great deal: new_acquisition_ready() used int() directly,
+    so every real reply raised ValueError, was caught, and became None = "this
+    dialect has no gate" -- silently, every tick. The modern gate never ran on
+    hardware. Both shapes are accepted here because a bare reply is what the
+    mock and the LeCroy dialect send (and what a CHDR OFF instrument would).
+
+    Raises:
+        ValueError: If the remainder is not an integer -- the caller turns
+            that into None ("cannot tell this tick"), which is the right
+            answer for a genuinely unreadable gate.
+    """
+    token = response.strip()
+    if token[:3].upper() == "INR":
+        token = token[3:].strip()
+    return int(token)
+
+
 class Oscilloscope:
     """Main class for controlling Siglent oscilloscopes.
 
@@ -369,7 +394,7 @@ class Oscilloscope:
             return None
         try:
             response = self.query(self._get_command("get_new_data"))
-            return bool(int(response.strip()) & 0x01)
+            return bool(_parse_inr(response) & 0x01)
         except (SiglentError, ValueError):
             # A gate we cannot read is a gate we do not have, for this tick only.
             return None

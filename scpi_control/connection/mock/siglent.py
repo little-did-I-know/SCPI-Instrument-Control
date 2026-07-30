@@ -274,6 +274,35 @@ def handle_query(conn, command: str) -> Optional[str]:
     upper = command.upper()
 
     if conn.scope_dialect == "modern":
+        if upper == "INR?":
+            # The modern personality had NO handler here, so INR? raised and
+            # Oscilloscope.new_acquisition_ready() degraded to None in CI just
+            # as it did on hardware -- while every gate test injected a bare
+            # "1"/"0" through custom_responses, a shape the instrument never
+            # sends. Nothing could notice the gate was inert.
+            #
+            # HEADER-PREFIXED, as measured on a real SDS824X HD: "INR 8193",
+            # never "8193". Bit 0 is "new signal acquired"; the 8192 seen
+            # alongside it on hardware is an unrelated bit, reproduced here so
+            # a reader that forgets to mask fails.
+            # Bit 0 is always SET, because this mock genuinely does synthesize a
+            # fresh acquisition on every waveform read -- it free-runs no matter
+            # what label `trigger_status` carries. Deriving bit 0 from
+            # trigger_status instead would have the mock answer "no new data"
+            # while still handing out new data on the next read, and since the
+            # gateway's mock scope is built with trigger_status=["Stop"], its
+            # live view would go dark after one frame.
+            #
+            # The read-and-clear latch is deliberately NOT modelled: there is no
+            # acquisition clock here to re-arm it against, so any timing would be
+            # invented rather than observed. Tests that need a specific gate
+            # answer script it through custom_responses (which is consulted
+            # before this handler) or stub new_acquisition_ready() outright.
+            #
+            # 8193 = bit 13 + bit 0, exactly as the instrument answered, so a
+            # reader that forgets to mask bit 0 fails here rather than on
+            # hardware.
+            return "INR 8193"
         if upper == ":TRIGGER:STATUS?":  # enum Arm|Ready|Auto|Trig'd|Stop|Roll, p.483
             if len(conn.trigger_status) > 1:
                 return conn.trigger_status.pop(0)
@@ -439,14 +468,20 @@ _MODERN_CODE_PER_DIV = 164  # float (p.756)
 _MODERN_HORIZ_INTERVAL = 176  # float: 1/sample_rate (p.756)
 _MODERN_HORIZ_OFFSET = 180  # double: trigger offset, seconds (p.756)
 
-# code_per_div the mock encodes with. BYTE mirrors WAVEFORM_CODE_PER_DIV_8BIT
-# (waveform.py); WORD is that value left-shifted 8 bits (256x), matching
-# p.758's note that >8-bit models transmit word samples "left aligned, and
-# the lower bit is zero filled" -- i.e. WAVEFORM_CODE_PER_DIV_16BIT is
-# WAVEFORM_CODE_PER_DIV_8BIT * 256. Restated here (not imported) to avoid a
-# waveform.py <-> connection.mock import edge; kept numerically identical.
-_MODERN_CODE_PER_DIV_BYTE = 25.0
-_MODERN_CODE_PER_DIV_WORD = 25.0 * 256
+# code_per_div the mock encodes with -- ONE value for both transfer widths,
+# MEASURED on a real SDS824X HD (fw 3.8.12.1.1.3.6) 2026-07-30: the preamble
+# reported code_per_div=7680 and Adc_bit=16 under :WAVeform:WIDTh BYTE and
+# under WORD alike. The instrument does NOT hand BYTE its own smaller scale;
+# it sends the HIGH BYTE of the native code and leaves the field untouched.
+#
+# This replaces a 25.0 (BYTE) / 6400.0 (WORD) pair, which scaled the field by
+# 256 across widths where the instrument does not. That pair round-tripped
+# perfectly against a driver making the same assumption while reading real
+# BYTE captures 256x too small -- the self-consistent-but-wrong defect this
+# mock exists to expose, not to reproduce.
+_MODERN_CODE_PER_DIV_NATIVE = 7680.0
+_MODERN_ADC_BIT_VALUE = 16
+_MODERN_ADC_BIT = 172  # short (p.756)
 
 
 def _modern_source_channel(conn) -> int:
@@ -484,14 +519,19 @@ def _synthesize_modern_codes(conn, channel: int, record_length: int, word: bool)
     explicit = conn._waveform_payloads.get(channel)
     if explicit is not None:
         return np.frombuffer(explicit, dtype="<i2" if word else np.int8)
-    code_per_div = _MODERN_CODE_PER_DIV_WORD if word else _MODERN_CODE_PER_DIV_BYTE
     vdiv = conn._voltage_scales.get(channel, 1.0)
     voffset = conn._voltage_offsets.get(channel, 0.0)
     volts = mock_synth.raw_volts(conn, channel, n_override=record_length)
-    codes = np.rint((volts + voffset) * code_per_div / vdiv)
+    # Always encode in the NATIVE (16-bit) code space the preamble advertises,
+    # then, for a BYTE transfer, send the HIGH BYTE of that code -- which is
+    # what the instrument does. code_per_div stays 7680 either way, so a BYTE
+    # reader must divide it by 256 itself; a reader that does not gets volts
+    # 256x too small, exactly as measured on hardware.
+    codes = np.rint((volts + voffset) * _MODERN_CODE_PER_DIV_NATIVE / vdiv)
+    codes = np.clip(codes, -32768, 32767).astype("<i2")
     if word:
-        return np.clip(codes, -32768, 32767).astype("<i2")
-    return np.clip(codes, -128, 127).astype(np.int8)
+        return codes
+    return (codes >> 8).astype(np.int8)
 
 
 def build_waveform_preamble(conn) -> bytes:
@@ -536,7 +576,7 @@ def build_waveform_preamble(conn) -> bytes:
     channel = _modern_source_channel(conn)
     word = conn.waveform_width == "WORD"
     bytes_per_point = 2 if word else 1
-    code_per_div = _MODERN_CODE_PER_DIV_WORD if word else _MODERN_CODE_PER_DIV_BYTE
+    code_per_div = _MODERN_CODE_PER_DIV_NATIVE  # one value for both widths (hardware)
     record_length = _effective_record_length(conn, channel)
     conn._modern_waveform_codes[channel] = _synthesize_modern_codes(conn, channel, record_length, word)
 
@@ -553,12 +593,15 @@ def build_waveform_preamble(conn) -> bytes:
     struct.pack_into("<f", desc, _MODERN_VERTICAL_GAIN, conn._voltage_scales.get(channel, 1.0))
     struct.pack_into("<f", desc, _MODERN_VERTICAL_OFFSET, conn._voltage_offsets.get(channel, 0.0))
     struct.pack_into("<f", desc, _MODERN_CODE_PER_DIV, code_per_div)
+    struct.pack_into("<h", desc, _MODERN_ADC_BIT, _MODERN_ADC_BIT_VALUE)
     # NOT scaled by the interval -- the instrument reports the raw sample
     # spacing at every stride (table above). A reader wanting the spacing
     # BETWEEN DELIVERED POINTS must multiply this by DATA_INTERVAL itself.
     struct.pack_into("<f", desc, _MODERN_HORIZ_INTERVAL, (1.0 / conn.sample_rate) if conn.sample_rate else 0.0)
     struct.pack_into("<d", desc, _MODERN_HORIZ_OFFSET, 0.0)  # mock triggers at the first sample
-    return _build_ieee_block_9digit(bytes(desc))
+    # Fixed 9-digit header plus ONE trailing newline -- measured:
+    # b'#9000000346WAVEDESC...\n'. DATA? below frames itself differently.
+    return _build_ieee_block_9digit(bytes(desc)) + b"\n"
 
 
 def build_waveform_data(conn) -> bytes:
@@ -601,4 +644,9 @@ def build_waveform_data(conn) -> bytes:
     remaining = max(0, transmitted_length - start)
     requested = conn.waveform_point if conn.waveform_point else conn.max_points
     window = max(0, min(requested, conn.max_points, remaining))
-    return _build_ieee_block_9digit(transmitted[start : start + window].tobytes())
+    # The GENERAL variable-width IEEE-488.2 header plus TWO trailing newlines,
+    # not the fixed "#9<9-digits>" of the guide's p.757 example: a real
+    # SDS824X HD answered 50000 bytes as b'#550000...' + b'\n\n'. PREamble?
+    # above really does use the 9-digit form, so the two replies genuinely
+    # disagree and the mock has to reproduce each separately.
+    return _build_ieee_block(transmitted[start : start + window].tobytes()) + b"\n\n"

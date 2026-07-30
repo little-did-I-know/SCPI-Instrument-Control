@@ -35,10 +35,15 @@ def _build_ieee_block(payload: bytes) -> bytes:
 def _build_ieee_block_9digit(payload: bytes) -> bytes:
     """Wrap payload in the modern Siglent ":WAVeform:" block: "#9<9-digit-length><payload>".
 
-    SDS Series Programming Guide EN11G p.757 (:WAVeform:DATA? example): the
-    header is always "#9" + nine ASCII digits, e.g. "#9000001000" -- a FIXED
-    9-digit length field, unlike the general IEEE-488.2 form (_build_ieee_block
-    above) whose digit count varies with payload size.
+    SDS Series Programming Guide EN11G p.757 (:WAVeform:DATA? example) shows
+    "#9" + nine ASCII digits, e.g. "#9000001000" -- a FIXED 9-digit length
+    field, unlike the general IEEE-488.2 form (_build_ieee_block above) whose
+    digit count varies with payload size.
+
+    CAUTION: the guide's example does not describe :WAVeform:DATA? on real
+    hardware. Measured on an SDS824X HD (2026-07-30), PREamble? uses this
+    fixed form but DATA? uses the GENERAL one -- 50000 bytes came back as
+    "#550000", not "#9000050000". Only PREamble? should use this builder.
     """
     return b"#9" + f"{len(payload):09d}".encode() + payload
 

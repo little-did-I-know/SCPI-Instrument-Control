@@ -393,6 +393,7 @@ _MODERN_DATA_INTERVAL = 136  # long: = :WAVeform:INTerval, echoed back (p.755)
 _MODERN_VERTICAL_GAIN = 156  # float: V/div, no probe attenuation
 _MODERN_VERTICAL_OFFSET = 160  # float
 _MODERN_CODE_PER_DIV = 164  # float
+_MODERN_ADC_BIT = 172  # short: front-end resolution (p.756). 16 on an SDS824X HD
 _MODERN_HORIZ_INTERVAL = 176  # float: 1/sample_rate
 _MODERN_HORIZ_OFFSET = 180  # double: trigger offset, seconds
 
@@ -422,6 +423,10 @@ def parse_modern_wavedesc(payload: bytes, *, error_context: str = "") -> dict:
         "vertical_gain": struct.unpack_from("<f", payload, _MODERN_VERTICAL_GAIN)[0],
         "vertical_offset": struct.unpack_from("<f", payload, _MODERN_VERTICAL_OFFSET)[0],
         "code_per_div": struct.unpack_from("<f", payload, _MODERN_CODE_PER_DIV)[0],
+        # Needed to interpret code_per_div: on a >8-bit front end the field
+        # describes the NATIVE code space even when BYTE is the transfer
+        # width -- see the effective_code_per_div note in acquire().
+        "adc_bit": struct.unpack_from("<h", payload, _MODERN_ADC_BIT)[0],
         "horiz_interval": struct.unpack_from("<f", payload, _MODERN_HORIZ_INTERVAL)[0],
         "horiz_offset": struct.unpack_from("<d", payload, _MODERN_HORIZ_OFFSET)[0],
     }
@@ -721,7 +726,23 @@ class ModernTransfer:
         # guide's own worked numbers: code=-11, vdiv=10, code_per_div=30,
         # voffset=14.5 -> -11*(10/30)-14.5 = -18.167 V, matching the guide's
         # own printed "-18.167 V" exactly.
-        voltage = codes.astype(np.float64) * (meta["vertical_gain"] / meta["code_per_div"]) - meta["vertical_offset"]
+        # code_per_div describes the NATIVE code space, not the transferred
+        # one. MEASURED on a real SDS824X HD (fw 3.8.12.1.1.3.6) 2026-07-30:
+        # the preamble reports Adc_bit=16 and code_per_div=7680 under BOTH
+        # :WAVeform:WIDTh BYTE and WORD -- BYTE does not get its own smaller
+        # scale, the instrument just sends the HIGH BYTE of the 16-bit code.
+        # So a BYTE read must divide code_per_div by 256 (7680 -> 30) or every
+        # volt comes back 256x too small: a 3.075 Vpp signal read as 0.0119792
+        # Vpp, while the scope's own :MEASure MEAN (1.45474 V) agreed with the
+        # WORD read (1.45602 V). BYTE is this driver's DEFAULT width, so that
+        # was every default waveform read on an HD instrument.
+        #
+        # Guarded on adc_bit so a genuinely 8-bit front end (which reports its
+        # code_per_div in the 8-bit space already) is untouched.
+        effective_code_per_div = meta["code_per_div"]
+        if meta["comm_type"] == 0 and meta["adc_bit"] > 8:
+            effective_code_per_div /= 256.0
+        voltage = codes.astype(np.float64) * (meta["vertical_gain"] / effective_code_per_div) - meta["vertical_offset"]
 
         # SDS Series Programming Guide EN11G p.759 ("Read Waveform Data",
         # Step 4): "time value(S) = delay-(timebase*grid/2)+index*interval".

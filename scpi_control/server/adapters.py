@@ -15,7 +15,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from scpi_control import FunctionGenerator, Oscilloscope, PowerSupply
 from scpi_control.connection.mock import MockConnection
-from scpi_control.exceptions import InvalidParameterError, SiglentError
+from scpi_control.exceptions import InvalidParameterError, MeasurementUnavailableError, SiglentError
 from scpi_control.server import compute
 from scpi_control.server.netpolicy import validate_target
 from scpi_control.server.recorder import TrendRecorder
@@ -58,6 +58,15 @@ def _safe(fn, default=None, label=None, state=None):
     """
     try:
         result = fn()
+    except MeasurementUnavailableError:
+        # NOT a failure, so it must not enter the health/transition machinery
+        # below: the instrument answered, it simply has no value for that item
+        # yet ("****" on a modern Siglent). Logging it as "poll query failed"
+        # put a routine, transient condition in the log at WARNING and marked
+        # the operation unhealthy, so the eventual real reading logged a
+        # spurious "recovered" to match. The value still degrades to `default`,
+        # which the UI already renders as an unreadable field.
+        return default
     except SiglentError:
         # SiglentError only, deliberately: the one caller that could raise a
         # ValueError through here (Oscilloscope.record_length(), which parses

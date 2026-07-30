@@ -72,7 +72,9 @@ def test_round_trip_recovers_known_signal_amplitude():
     """
     amplitude = 2.0
     vdiv = 1.0  # MockConnection's default C1 voltage_scales value
-    code_per_div = 25.0  # mock's BYTE-format code_per_div (siglent.py's _MODERN_CODE_PER_DIV_BYTE)
+    # BYTE carries the HIGH BYTE of the native code, so its effective scale is
+    # _MODERN_CODE_PER_DIV_NATIVE / 256 = 30 codes/div (hardware-measured).
+    code_per_div = 7680.0 / 256
     conn = MockConnection(
         idn=MODERN_IDN,
         timebase=1e-3,
@@ -98,7 +100,7 @@ def test_round_trip_honors_nonzero_offset_and_scale():
     amplitude = 0.3
     vdiv = 0.2
     voffset = 0.5
-    code_per_div = 25.0
+    code_per_div = 7680.0 / 256  # BYTE = high byte of the native code
     conn = MockConnection(
         idn=MODERN_IDN,
         timebase=1e-3,
@@ -145,7 +147,7 @@ def test_deep_memory_chunks_preserve_sample_order_and_values():
     """
     amplitude = 1.0
     vdiv = 1.0  # MockConnection's default C1 voltage_scales value
-    code_per_div = 25.0  # mock's BYTE-format code_per_div
+    code_per_div = 7680.0 / 256  # BYTE = high byte of the native code
     conn = MockConnection(
         idn=MODERN_IDN,
         timebase=1e-3,
@@ -191,8 +193,131 @@ def test_word_format_round_trips_too():
     wf = scope.waveform.acquire(1, format="WORD", provenance=False)
 
     assert ":WAVeform:WIDTh WORD" in conn.writes
-    code_per_div_word = 25.0 * 256
+    code_per_div_word = 7680.0  # WORD uses the native scale as reported
     quantization_step = 1.0 / code_per_div_word
     assert np.max(wf.voltage) == pytest.approx(amplitude, abs=quantization_step * 2)
     assert np.min(wf.voltage) == pytest.approx(-amplitude, abs=quantization_step * 2)
     scope.disconnect()
+
+
+def _preamble_under(conn, width):
+    """What the mock would answer :WAVeform:PREamble? with at this width."""
+    from scpi_control.connection.mock.siglent import build_waveform_preamble
+    from scpi_control.waveform_transfer import parse_ieee_block, parse_modern_wavedesc
+
+    conn.waveform_width = width
+    conn.waveform_source = "C1"
+    payload = parse_ieee_block(build_waveform_preamble(conn), np.uint8).tobytes()
+    return parse_modern_wavedesc(payload)
+
+
+def test_one_code_per_div_serves_both_widths_on_a_high_resolution_front_end():
+    """MEASURED on the real SDS824X HD (fw 3.8.12.1.1.3.6), 2026-07-30:
+    the preamble reports Adc_bit=16 and code_per_div=7680 -- the SAME 7680
+    under :WAVeform:WIDTh BYTE and under WORD. BYTE does not get its own
+    smaller code_per_div; the instrument sends the HIGH BYTE of the native
+    code and leaves the scale field alone.
+
+    The mock used to report 25.0 for BYTE and 6400.0 for WORD, i.e. it scaled
+    the field by 256 across widths where the instrument does not. Because the
+    mock's encoder and the driver's decoder both used that same wrong number
+    they round-tripped perfectly, which is precisely the self-consistent-but-
+    wrong defect this module's docstring says it exists to catch.
+    """
+    conn = MockConnection(idn=MODERN_IDN, sample_rate=20_000.0, timebase=1e-3)
+
+    byte_meta = _preamble_under(conn, "BYTE")
+    word_meta = _preamble_under(conn, "WORD")
+
+    assert byte_meta["adc_bit"] > 8, "an HD front end reports more than 8 ADC bits"
+    assert byte_meta["code_per_div"] == word_meta["code_per_div"], (
+        "the instrument reports one code_per_div regardless of transfer width"
+    )
+    assert byte_meta["comm_type"] == 0 and word_meta["comm_type"] == 1
+
+
+def test_a_byte_read_is_not_scaled_off_by_the_word_factor():
+    """THE 256x guard. With one code_per_div serving both widths, a decoder
+    that divides BYTE codes by the native (16-bit) code_per_div returns volts
+    256x too small. On the instrument that showed up as a 3.075 Vpp signal
+    read back as 0.0119792 Vpp, with the scope's own :MEASure MEAN
+    (1.45474 V) agreeing with the WORD read (1.45602 V) and not the BYTE one.
+
+    Both widths must recover the same amplitude, to within BYTE's coarser
+    quantization -- that is the whole claim.
+    """
+    amplitude = 2.0
+    conn = MockConnection(
+        idn=MODERN_IDN,
+        timebase=1e-3,
+        sample_rate=20_000.0,
+        signals={1: SignalSpec(kind="sine", frequency=200.0, amplitude=amplitude, noise_rms=0.0)},
+    )
+    scope = Oscilloscope("mock", connection=conn)
+    scope.connect()
+
+    wf_byte = scope.waveform.acquire(1, format="BYTE", provenance=False)
+    wf_word = scope.waveform.acquire(1, format="WORD", provenance=False)
+
+    vdiv = 1.0
+    byte_step = vdiv / (7680.0 / 256)  # BYTE carries the high byte: 30 codes/div
+    assert np.max(wf_byte.voltage) == pytest.approx(amplitude, abs=byte_step * 2)
+    assert np.max(wf_byte.voltage) == pytest.approx(np.max(wf_word.voltage), abs=byte_step * 2)
+    assert np.min(wf_byte.voltage) == pytest.approx(np.min(wf_word.voltage), abs=byte_step * 2)
+    scope.disconnect()
+
+
+def test_the_parser_accepts_the_block_shapes_the_instrument_actually_sends():
+    """Byte shapes captured off a real SDS824X HD (fw 3.8.12.1.1.3.6),
+    2026-07-30, at ACQ:POINts=50000:
+
+      :WAVeform:PREamble? -> b'#9000000346WAVEDESC...' + b'\n'
+      :WAVeform:DATA?     -> b'#550000' + 50000 bytes + b'\n\n'
+      empty DATA?         -> b'C1:WF DAT2,#9000000000\n\n'
+
+    Two things the guide does not say. DATA? uses the GENERAL IEEE-488.2 form
+    with a variable digit count ("#5" for 50000 bytes), not the fixed
+    "#9<9-digits>" of p.757's example -- which PREamble? does use. And every
+    reply carries trailing newlines, DATA? two of them. The empty reply also
+    arrives behind a legacy "C1:WF DAT2," response header, on the modern
+    subsystem.
+
+    parse_ieee_block already survives all of this (it scans for "#" and reads
+    the declared length), but nothing pinned it, and the mock emitted none of
+    it -- so the tolerance was accidental rather than guaranteed.
+    """
+    from scpi_control.waveform_transfer import parse_ieee_block
+
+    payload = bytes(range(256)) * 4  # 1024 bytes
+    variable_header = b"#4" + b"1024" + payload + b"\n\n"
+    assert parse_ieee_block(variable_header, np.int8).size == 1024
+
+    fixed_header = b"#9" + b"000001024" + payload + b"\n"
+    assert parse_ieee_block(fixed_header, np.int8).size == 1024
+
+    legacy_prefixed_empty = b"C1:WF DAT2,#9000000000\n\n"
+    assert parse_ieee_block(legacy_prefixed_empty, np.int8).size == 0
+
+
+def test_the_mock_frames_data_the_way_the_instrument_does():
+    """The mock emitted a bare fixed-width "#9..." with no trailing bytes for
+    BOTH replies, so CI never exercised the variable-width header or the
+    trailing newlines that every real transfer carries.
+    """
+    from scpi_control.connection.mock.siglent import build_waveform_data, build_waveform_preamble
+
+    conn = MockConnection(idn=MODERN_IDN, sample_rate=20_000.0, timebase=1e-3)
+    conn.record_length = 1000
+    conn.waveform_source = "C1"
+    build_waveform_preamble(conn)  # populates the code cache DATA? slices
+    data = build_waveform_data(conn)
+
+    assert data.endswith(b"\n\n"), "DATA? replies carry two trailing newlines"
+    assert data.startswith(b"#41000"), (
+        "1000 bytes must use the general variable-width header (#4 + '1000'), "
+        "not the fixed 9-digit form: {0!r}".format(data[:12])
+    )
+    assert build_waveform_preamble(conn).endswith(b"\n"), "PREamble? carries one trailing newline"
+    assert build_waveform_preamble(conn).startswith(b"#9000000346"), (
+        "PREamble? does keep the fixed 9-digit header, unlike DATA?"
+    )

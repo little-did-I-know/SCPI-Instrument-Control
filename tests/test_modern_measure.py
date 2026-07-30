@@ -129,3 +129,56 @@ def test_measure_agrees_across_dialects_for_the_same_signal():
     modern = _modern_scope()
     for mtype in ("PKPK", "FREQ", "WID", "NWID", "DUTY"):
         assert modern.measurement.measure(mtype, 1) == pytest.approx(legacy.measurement.measure(mtype, 1)), mtype
+
+
+def test_a_measurement_the_instrument_cannot_compute_is_reported_as_unavailable():
+    """MEASURED on a real SDS824X HD (fw 3.8.12.1.1.3.6), 2026-07-30: with
+    PKPK/MAX/MIN/MEAN all enabled on a live channel, MEAN answered
+    "1.45474E+00" while PKPK, MAX and MIN each answered the literal "****" --
+    the instrument's marker for "no value for this item right now".
+
+    p.369 documents the reply as a bare NR3 and says nothing about "****", so
+    measure() did float("****") and raised "Failed to parse measurement" -- a
+    normal, transient, expected condition surfacing as a parse failure. In the
+    gateway that reaches _safe(), which logs "poll query failed, degrading to
+    a default" at WARNING, so an ordinary unavailable reading looked like an
+    instrument fault in the log.
+
+    It stays an exception (measure() returns float, and inventing a None
+    return would push the check onto every caller), but a DISTINGUISHABLE one,
+    so a caller can tell "not available yet" from "the wire is broken".
+    """
+    from scpi_control.exceptions import CommandError, MeasurementUnavailableError
+
+    conn = MockConnection("mock", idn=MODERN_IDN,
+                          custom_responses={":MEASure:SIMPle:VALue? PKPK": "****"})
+    scope = Oscilloscope("mock", connection=conn)
+    scope.connect()
+
+    with pytest.raises(MeasurementUnavailableError) as excinfo:
+        scope.measurement.measure("PKPK", 1)
+
+    message = str(excinfo.value)
+    assert "PKPK" in message
+    assert "parse" not in message.lower(), (
+        "an unavailable reading is not a parse failure: {0}".format(message)
+    )
+    assert isinstance(excinfo.value, CommandError), (
+        "must stay a CommandError subclass so existing handlers keep catching it"
+    )
+    scope.disconnect()
+
+
+def test_a_genuinely_unparseable_measurement_still_fails_as_before():
+    # The '****' handling must not swallow real wire corruption.
+    from scpi_control.exceptions import CommandError, MeasurementUnavailableError
+
+    conn = MockConnection("mock", idn=MODERN_IDN,
+                          custom_responses={":MEASure:SIMPle:VALue? PKPK": "garbage"})
+    scope = Oscilloscope("mock", connection=conn)
+    scope.connect()
+
+    with pytest.raises(CommandError) as excinfo:
+        scope.measurement.measure("PKPK", 1)
+    assert not isinstance(excinfo.value, MeasurementUnavailableError)
+    scope.disconnect()
