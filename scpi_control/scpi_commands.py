@@ -678,6 +678,44 @@ _SLOPE_FROM_WIRE = {
     "tektronix": {"RISE": "POS", "FALL": "NEG"},
     "lecroy": {"POS": "POS", "NEG": "NEG"},
 }
+
+_TRIGGER_TYPES = {"EDGE", "SLEW", "GLIT", "INTV", "RUNT", "PATTERN"}
+_TRIGGER_TYPE_TO_WIRE = {
+    # Legacy TRSE types ARE the public vocabulary (legacy guide TRSE section).
+    "legacy": {t: t for t in _TRIGGER_TYPES},
+    # SDS800X HD guide EN11G p.485: :TRIGger:TYPE {EDGE|PULSE|SLOPe|INTerval|
+    # PATTern|RUNT|WINDow|DROPout|VIDeo|...}. Public SLEW = slope trigger,
+    # public GLIT = pulse/glitch trigger (MAUI-descended naming).
+    "modern": {"EDGE": "EDGE", "SLEW": "SLOPe", "GLIT": "PULSE", "INTV": "INTerval", "RUNT": "RUNT", "PATTERN": "PATTern"},
+    # Only EDGE is spelled identically across Tek families: TBS is {EDGe|PULSe}
+    # (p.161) while MSO2 (p.2-682) and MSO456 (p.2-1426) use WIDth for the
+    # pulse class. The pulse-class token diverges per family, so everything but
+    # EDGE gates as FeatureNotSupportedError until per-family maps exist.
+    "tektronix": {"EDGE": "EDGE"},
+    # LeCroy TRIG_SELECT types (MAUI p.7-36) -- ancestor of the legacy tokens.
+    "lecroy": {t: t for t in _TRIGGER_TYPES},
+}
+_TRIGGER_TYPE_FROM_WIRE = {
+    "legacy": {t: t for t in _TRIGGER_TYPES},
+    "modern": {"EDGE": "EDGE", "SLOPE": "SLEW", "PULSE": "GLIT", "INTERVAL": "INTV", "RUNT": "RUNT", "PATTERN": "PATTERN"},
+    "tektronix": {"EDGE": "EDGE"},
+    "lecroy": {t: t for t in _TRIGGER_TYPES},
+}
+
+
+def trigger_type_to_wire(dialect: str, trig_type: str) -> str:
+    return _to_wire(_TRIGGER_TYPE_TO_WIRE, _TRIGGER_TYPES, dialect, trig_type, "trigger type")
+
+
+def trigger_type_from_wire(dialect: str, raw: str) -> str:
+    # Unlike slope/coupling, a scope can legitimately sit in a type this API
+    # cannot set (VIDeo, DROPout, IIC, ... via front panel). Reads must not
+    # explode a state snapshot, so unmapped wire tokens pass through
+    # uppercased instead of raising the way _from_wire does.
+    token = _last_token(raw)
+    return _TRIGGER_TYPE_FROM_WIRE.get(dialect, {}).get(token, token)
+
+
 _COUPLING_TO_WIRE = {
     "legacy": {"DC": "D1M", "AC": "A1M", "GND": "GND"},
     "modern": {"DC": "DC", "AC": "AC", "GND": "GND"},

@@ -962,20 +962,15 @@ WIRE_FORMS: List[WireForm] = [
     # p.484 <type>:={EDGE|PULSE|SLOPe|INTerval|PATTern|RUNT|WINDow|DROPout|
     # VIDeo|QUALified|NEDGe|DELay|SHOLd|IIC|SPI|UART|LIN|CAN|FLEXray|CANFd|
     # IIS|M1553|SENT|A429} -- EXAMPLE "TRIG:TYPE EDGE" -> "EDGE" bare. EDGE is
-    # both a valid manual enum member and a valid trigger.py public value
-    # (trigger.py's valid_types = ["EDGE","SLEW","GLIT","INTV","RUNT",
-    # "PATTERN"], sent as-is with no type_to_wire/type_from_wire translation
-    # table anywhere in scpi_commands.py) -- this pins the EDGE case, which is
-    # correct. NOTE (not a wire-form defect, no entry recorded: the {type}
-    # placeholder is a free parameter, not part of the table template): three
-    # of trigger.py's six public values have no modern equivalent at all --
-    # "SLEW"/"GLIT"/"INTV" are not members of the manual's <type> enum (the
-    # nearest concepts are spelled "SLOPe"/"PULSE"/"INTerval"). Sending
-    # set_trigger_type(type="SLEW") on modern would write ":TRIGger:TYPE SLEW",
-    # which this manual does not document at all -- likely rejected on real
-    # hardware. Flagged here for visibility; not a MODERN_COMMANDS table
-    # mismatch (the template ":TRIGger:TYPE {type}" is exactly right) so no
-    # WireForm entry is recorded for it.
+    # both a valid manual enum member and a valid trigger.py public value, so
+    # it pins the identity case. Backend review 2026-07-31, finding High-2: the
+    # other three of trigger.py's six public values have no modern equivalent
+    # at all -- "SLEW"/"GLIT"/"INTV" are not members of the manual's <type>
+    # enum (the nearest concepts are spelled "SLOPe"/"PULSE"/"INTerval"). This
+    # is no longer a gap: _TRIGGER_TYPE_TO_WIRE / _TRIGGER_TYPE_FROM_WIRE
+    # (scpi_commands.py) and the trigger_type_to_wire()/trigger_type_from_wire()
+    # wrappers now translate at the dialect boundary, exercised by the two
+    # entries below (p.485).
     WireForm(table="scope", dialect="modern", op="set_trigger_type", params={"type": "EDGE"}, request=":TRIGger:TYPE EDGE", source=f"{MODERN_GUIDE} p.484", mock_kwargs={"idn": MODERN_IDN}),
     WireForm(
         table="scope",
@@ -987,6 +982,8 @@ WIRE_FORMS: List[WireForm] = [
         source=f"{MODERN_GUIDE} p.484",
         mock_kwargs={"idn": MODERN_IDN},
     ),
+    WireForm(table="scope", dialect="modern", op="set_trigger_type", params={"type": "SLOPe"}, request=":TRIGger:TYPE SLOPe", source=f"{MODERN_GUIDE} p.485", mock_kwargs={"idn": MODERN_IDN}),
+    WireForm(table="scope", dialect="modern", op="get_trigger_type", params={}, request=":TRIGger:TYPE?", response="EDGE", source=f"{MODERN_GUIDE} p.485", mock_kwargs={"idn": MODERN_IDN}),
     # p.495 <source>:={C<n>|D<d>|EX|EX5|LINE}; EXAMPLE "TRIG:EDGE:SOUR C1" ->
     # ":TRIGger:EDGE:SOURce C1", response bare "C1".
     WireForm(table="scope", dialect="modern", op="set_trigger_source", params={"src": "C1"}, request=":TRIGger:EDGE:SOURce C1", source=f"{MODERN_GUIDE} p.495", mock_kwargs={"idn": MODERN_IDN}),

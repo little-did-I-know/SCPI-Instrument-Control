@@ -70,6 +70,41 @@ _MOCK_SIMPLE_VALUES: Dict[str, str] = {
     "DUTY": "5.000E+01",
 }
 
+# Full :TRIGger:TYPE enum, uppercased, verbatim from SDS800X HD guide EN11G
+# p.485: {EDGE|PULSE|SLOPe|INTerval|PATTern|RUNT|WINDow|DROPout|VIDeo|
+# QUALified|NEDGe|DELay|SHOLd|IIC|SPI|UART|LIN|CAN|FLEXray|CANFd|IIS|M1553|
+# SENT|A429}. Used to validate the write handler below instead of accepting
+# any word (measured on hardware 2026-07-31: an invalid token queues -224 and
+# leaves the trigger type unchanged).
+_MODERN_TRIGGER_TYPES = frozenset(
+    {
+        "EDGE",
+        "PULSE",
+        "SLOPE",
+        "INTERVAL",
+        "PATTERN",
+        "RUNT",
+        "WINDOW",
+        "DROPOUT",
+        "VIDEO",
+        "QUALIFIED",
+        "NEDGE",
+        "DELAY",
+        "SHOLD",
+        "IIC",
+        "SPI",
+        "UART",
+        "LIN",
+        "CAN",
+        "FLEXRAY",
+        "CANFD",
+        "IIS",
+        "M1553",
+        "SENT",
+        "A429",
+    }
+)
+
 
 def handle_write(conn, command: str) -> bool:
     """Handle a Siglent-dialect (legacy or modern) scope write. Returns True if consumed."""
@@ -140,7 +175,11 @@ def handle_write(conn, command: str) -> bool:
                 conn.trigger_status = ["Stop"]
             return True
         if match := re.match(r":TRIGger:TYPE\s+(\w+)", command, re.IGNORECASE):
-            conn.trigger_type = match.group(1).upper()
+            token = match.group(1).upper()
+            if token not in _MODERN_TRIGGER_TYPES:
+                conn.push_error(-224, "Illegal parameter value")
+                return True  # consumed, ignored, error queued
+            conn.trigger_type = token
             return True
         if match := re.match(r":TRIGger:EDGE:SOURce\s+(\w+)", command, re.IGNORECASE):
             conn.trigger_source = match.group(1).upper()
