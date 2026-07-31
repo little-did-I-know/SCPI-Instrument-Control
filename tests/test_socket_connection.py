@@ -532,7 +532,28 @@ class TestSocketReadRawTimeout:
         assert conn.is_connected
 
     def test_block_read_timeout_raises_timeout_and_keeps_session(self, mock_socket):
-        """recv raises socket.timeout during block-read; must not kill the session."""
+        """recv raises socket.timeout during block-read; must not kill the session.
+
+        Which layer actually provides this protection: for the size=None path,
+        `_read_ieee_block()`'s own internal `except socket.timeout` handler
+        (socket.py:224-233) converts the raw `socket.timeout` to
+        `SiglentTimeoutError` before it ever reaches `read_raw()`'s try/except.
+        That handler predates this task's fix, so on its own this test does
+        NOT exercise the `except socket.timeout` clause this task added to
+        `read_raw()` (socket.py:194-196) - it was already green before that
+        clause existed.
+
+        The `read_raw()`-level clause is a second, defensive layer: it only
+        fires if a raw `socket.timeout` ever escapes `_read_ieee_block()`
+        uncaught (e.g. a future change to that method's internal handling).
+        Mutation-verified: with `_read_ieee_block()`'s internal timeout
+        handler temporarily neutralized (recv's socket.timeout left to
+        propagate through its outer `except socket.error` re-raise), this
+        test still passed - because `read_raw()`'s clause caught it instead.
+        That confirms the two layers together make the invariant below
+        mutation-proof, even though neither layer alone is exercised in
+        isolation by this single test.
+        """
         mock_socket.recv.side_effect = socket.timeout("timed out")
 
         conn = SocketConnection("192.168.1.100")
