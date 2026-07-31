@@ -13,6 +13,8 @@ from scpi_control.scpi_commands import (
     slope_from_wire,
     slope_to_wire,
     source_from_wire,
+    trigger_type_from_wire,
+    trigger_type_to_wire,
 )
 
 if TYPE_CHECKING:
@@ -166,9 +168,13 @@ class Trigger:
         if not is_flat_trigger(self._dialect):
             self._scope.write(self._cmd("set_trigger_source", src=channel_token(self._dialect, channel)))
         else:
-            # Get current trigger type to preserve it
+            # Get current trigger type to preserve it. self.trigger_type now
+            # yields a PUBLIC token, so it needs converting back to a wire
+            # token before going out on the wire (identity for legacy/lecroy
+            # today, but keeps the frames straight).
             current_type = self.trigger_type
-            self._scope.write(self._cmd("set_trigger_select", type=current_type, src=channel))
+            wire_type = trigger_type_to_wire(self._dialect, current_type)
+            self._scope.write(self._cmd("set_trigger_select", type=wire_type, src=channel))
         logger.info(f"Trigger source set to {channel}")
 
     def set_source(self, channel: Union[int, str]) -> None:
@@ -183,12 +189,13 @@ class Trigger:
             Trigger type: 'EDGE', 'SLEW', 'GLIT', 'INTV', 'RUNT', 'PATTERN', etc.
         """
         if not is_flat_trigger(self._dialect):
-            return self._scope.query(self._cmd("get_trigger_type")).strip().upper()
+            response = self._scope.query(self._cmd("get_trigger_type")).strip()
+            return trigger_type_from_wire(self._dialect, response)
         response = self._scope.query(self._cmd("get_trigger_select"))
         # Response format: "EDGE,SR,C1,..."
         parts = response.split(",")
         if len(parts) >= 1 and parts[0].strip():
-            return parts[0].strip().split()[-1].upper()  # tolerates a residual 'TRSE ' echo
+            return trigger_type_from_wire(self._dialect, parts[0])
         return "EDGE"
 
     @trigger_type.setter
@@ -197,19 +204,17 @@ class Trigger:
 
         Args:
             trig_type: Type - 'EDGE', 'SLEW', 'GLIT', 'INTV', 'RUNT', 'PATTERN'
+
+        Raises:
+            ValueError: If trig_type is not in the public vocabulary
+            FeatureNotSupportedError: If this dialect cannot express it
         """
-        trig_type = trig_type.upper()
-        valid_types = ["EDGE", "SLEW", "GLIT", "INTV", "RUNT", "PATTERN"]
-
-        if trig_type not in valid_types:
-            raise exceptions.InvalidParameterError(f"Invalid trigger type: {trig_type}. Must be one of {valid_types}.")
-
+        wire = trigger_type_to_wire(self._dialect, trig_type)
         if not is_flat_trigger(self._dialect):
-            self._scope.write(self._cmd("set_trigger_type", type=trig_type))
+            self._scope.write(self._cmd("set_trigger_type", type=wire))
         else:
-            # Get current source to preserve it
             current_source = self.source
-            self._scope.write(self._cmd("set_trigger_select", type=trig_type, src=current_source))
+            self._scope.write(self._cmd("set_trigger_select", type=wire, src=current_source))
         logger.info(f"Trigger type set to {trig_type}")
 
     def set_edge_trigger(self, source: str = "C1", slope: str = "POS") -> None:

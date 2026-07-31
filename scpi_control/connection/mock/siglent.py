@@ -70,6 +70,41 @@ _MOCK_SIMPLE_VALUES: Dict[str, str] = {
     "DUTY": "5.000E+01",
 }
 
+# Full :TRIGger:TYPE enum, uppercased, verbatim from SDS800X HD guide EN11G
+# p.485: {EDGE|PULSE|SLOPe|INTerval|PATTern|RUNT|WINDow|DROPout|VIDeo|
+# QUALified|NEDGe|DELay|SHOLd|IIC|SPI|UART|LIN|CAN|FLEXray|CANFd|IIS|M1553|
+# SENT|A429}. Used to validate the write handler below instead of accepting
+# any word (measured on hardware 2026-07-31: an invalid token queues -224 and
+# leaves the trigger type unchanged).
+_MODERN_TRIGGER_TYPES = frozenset(
+    {
+        "EDGE",
+        "PULSE",
+        "SLOPE",
+        "INTERVAL",
+        "PATTERN",
+        "RUNT",
+        "WINDOW",
+        "DROPOUT",
+        "VIDEO",
+        "QUALIFIED",
+        "NEDGE",
+        "DELAY",
+        "SHOLD",
+        "IIC",
+        "SPI",
+        "UART",
+        "LIN",
+        "CAN",
+        "FLEXRAY",
+        "CANFD",
+        "IIS",
+        "M1553",
+        "SENT",
+        "A429",
+    }
+)
+
 
 def handle_write(conn, command: str) -> bool:
     """Handle a Siglent-dialect (legacy or modern) scope write. Returns True if consumed."""
@@ -97,12 +132,54 @@ def handle_write(conn, command: str) -> bool:
         if match := re.match(r":CHANnel(\d+):COUPling\s+(\w+)", command, re.IGNORECASE):
             conn._channel_coupling[int(match.group(1))] = match.group(2).upper()
             return True
+        # :CHANnel:PROBe -- guide p.57. Two documented argument forms:
+        # "VALue,<ratio>" (<ratio> in NR3, documented range [1E-6, 1E6]) and
+        # "DEFault" (resets to 1x, p.57). Any other form -- e.g. the bare
+        # "PROBe 10" a caller might send by analogy with the legacy ATTN
+        # command -- is rejected: MEASURED on a real SDS824X HD 2026-07-31,
+        # ':CHANnel1:PROBe 10' queued -224 and left the ratio unchanged, it
+        # did not accept the value.
+        if match := re.match(r":CHANnel(\d+):PROBe\s+VALue,([\dEe.+-]+)", command, re.IGNORECASE):
+            ch = int(match.group(1))
+            value = float(match.group(2))
+            # A probe ratio is a magnitude (documented range [1E-6, 1E6],
+            # p.57) -- gated on positivity like the legacy ATTN handler
+            # above, and load-bearing here: build_waveform_preamble divides
+            # by this value to report the BNC-frame gain/offset.
+            if conn.reject_if_invalid(value, name="PROBe", max_magnitude=1e6):
+                return True
+            conn.probe_ratios[ch] = value
+            return True
+        if match := re.match(r":CHANnel(\d+):PROBe\s+DEFault", command, re.IGNORECASE):
+            conn.probe_ratios[int(match.group(1))] = 1.0
+            return True
+        if match := re.match(r":CHANnel(\d+):PROBe\s+(.+)", command, re.IGNORECASE):
+            conn.push_error(-224, "Illegal parameter value")
+            return True  # consumed, ignored, error queued -- ratio left as-is
+        # :CHANnel:BWLimit -- guide p.50, <bwlimit>:={FULL|20M|200M} (task 5,
+        # audit High-11). Stored in the SAME `bandwidth_limits` dict the
+        # legacy BWL write handler below already maintains (task 14) rather
+        # than a second piece of state -- see the modern query handler for
+        # why that dict has to carry both vocabularies.
+        if match := re.match(r":CHANnel(\d+):BWLimit\s+(FULL|20M|200M)", command, re.IGNORECASE):
+            conn.bandwidth_limits[int(match.group(1))] = match.group(2).upper()
+            return True
         if match := re.match(r":TIMebase:SCALe\s+(.+)", command, re.IGNORECASE):
             value = float(match.group(1))
             if conn.reject_if_invalid(value, name="TIMebase:SCALe"):
                 return True
             conn.timebase = value
             conn.timebase_updates.append(conn.timebase)
+            return True
+        # :TIMebase:DELay -- guide p.473, EXAMPLE "TIM:DEL 1.00E-05" (task 5,
+        # audit High-11). Trigger-offset delay may legitimately be negative
+        # (pre-trigger) or zero, so it is not gated on positivity, mirroring
+        # :TRIGger:EDGE:LEVel above.
+        if match := re.match(r":TIMebase:DELay\s+(.+)", command, re.IGNORECASE):
+            value = float(match.group(1))
+            if conn.reject_if_invalid(value, name="TIMebase:DELay", positive=False):
+                return True
+            conn.timebase_delay = value
             return True
         # :MEASure <ON|OFF> (p.337). Matched before the :MEASure:SIMPle forms
         # below; the required whitespace after the mnemonic means this pattern
@@ -140,7 +217,11 @@ def handle_write(conn, command: str) -> bool:
                 conn.trigger_status = ["Stop"]
             return True
         if match := re.match(r":TRIGger:TYPE\s+(\w+)", command, re.IGNORECASE):
-            conn.trigger_type = match.group(1).upper()
+            token = match.group(1).upper()
+            if token not in _MODERN_TRIGGER_TYPES:
+                conn.push_error(-224, "Illegal parameter value")
+                return True  # consumed, ignored, error queued
+            conn.trigger_type = token
             return True
         if match := re.match(r":TRIGger:EDGE:SOURce\s+(\w+)", command, re.IGNORECASE):
             conn.trigger_source = match.group(1).upper()
@@ -341,6 +422,35 @@ def handle_query(conn, command: str) -> Optional[str]:
             return _format_nr3(conn._voltage_offsets.get(int(match.group(1)), 0.0))
         if match := re.match(r":CHANNEL(\d+):COUPLING\?", upper):  # DC|AC|GND, p.51
             return conn._channel_coupling.get(int(match.group(1)), "DC")
+        if match := re.match(r":CHANNEL(\d+):PROBE\?", upper):  # bare NR3, p.58
+            # MEASURED on a real SDS824X HD 2026-07-31: "1.00E+00" at the
+            # default 1x ratio -- same bare-NR3 shape as SCALe?/OFFSet? above.
+            return _format_nr3(conn.probe_ratios.get(int(match.group(1)), 1.0))
+        if match := re.match(r":CHANNEL(\d+):BWLIMIT\?", upper):  # p.50
+            # MEASURED on a real SDS824X HD 2026-07-31: "FULL" at the default
+            # (no bandwidth limiting). Reuses the SAME per-channel
+            # `bandwidth_limits` state the legacy BWL?/BWL write handler
+            # below already maintains (task 14) rather than inventing a
+            # second store, since the two dialects describe the same
+            # physical setting -- only the wire vocabulary differs (legacy
+            # {ON,OFF} vs modern {FULL,20M,200M}, guide p.50). The dict
+            # therefore mixes both vocabularies depending on which dialect's
+            # write handler last touched it (never both -- a single
+            # MockConnection speaks one fixed dialect): map the legacy
+            # default/writes (OFF/ON) into modern tokens, and pass through
+            # anything already in modern form (from the :CHANnel:BWLimit
+            # write handler above) unchanged.
+            stored = conn.bandwidth_limits.get(int(match.group(1)), "OFF")
+            if stored == "OFF":
+                return "FULL"
+            if stored == "ON":
+                return "20M"
+            return stored
+        if upper == ":TIMEBASE:DELAY?":  # bare NR3, p.473
+            # MEASURED on a real SDS824X HD 2026-07-31: "0.00E+00" at the
+            # default (no trigger delay) -- same bare-NR3 shape as
+            # TIMebase:SCALe? below.
+            return _format_nr3(conn.timebase_delay)
         if upper == ":TIMEBASE:SCALE?":  # bare NR3, p.476
             return _format_nr3(conn.timebase)
         if upper == ":ACQUIRE:SRATE?":  # bare NR3, p.46
@@ -604,8 +714,17 @@ def build_waveform_preamble(conn) -> bytes:
     struct.pack_into("<i", desc, _MODERN_WAVE_ARRAY_COUNT, record_length)
     struct.pack_into("<i", desc, _MODERN_FIRST_POINT, conn.waveform_start)
     struct.pack_into("<i", desc, _MODERN_DATA_INTERVAL, conn.waveform_interval)
-    struct.pack_into("<f", desc, _MODERN_VERTICAL_GAIN, conn._voltage_scales.get(channel, 1.0))
-    struct.pack_into("<f", desc, _MODERN_VERTICAL_OFFSET, conn._voltage_offsets.get(channel, 0.0))
+    # VERTICAL_GAIN/VERTICAL_OFFSET are probe-FREE (BNC frame), MEASURED on a
+    # real SDS824X HD (fw 3.8.12.1.1.3.6) 2026-07-31: with :CHANnel1:PROBe
+    # VALue,1.00E+01 the display read 20 V/div but the preamble still
+    # reported gain 2.0, and a 1.0 V displayed offset stayed voff 1.0 at
+    # 10x. So the mock reports scale/offset DIVIDED by the probe ratio here,
+    # while _synthesize_modern_codes (above) keeps encoding codes against the
+    # DISPLAYED scale/offset unchanged -- ModernTransfer.acquire is what
+    # multiplies the probe ratio back in on the way out.
+    probe_ratio = conn.probe_ratios.get(channel, 1.0)
+    struct.pack_into("<f", desc, _MODERN_VERTICAL_GAIN, conn._voltage_scales.get(channel, 1.0) / probe_ratio)
+    struct.pack_into("<f", desc, _MODERN_VERTICAL_OFFSET, conn._voltage_offsets.get(channel, 0.0) / probe_ratio)
     struct.pack_into("<f", desc, _MODERN_CODE_PER_DIV, code_per_div)
     struct.pack_into("<h", desc, _MODERN_ADC_BIT, _MODERN_ADC_BIT_VALUE)
     # NOT scaled by the interval -- the instrument reports the raw sample

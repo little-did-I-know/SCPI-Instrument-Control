@@ -103,8 +103,12 @@ PSU_MODEL_REGISTRY = {
         output_specs=[
             OutputSpec(1, 30.0, 5.0, 150.0, 0.001, 0.001),
         ],
-        has_ovp=True,
-        has_ocp=True,
+        # No SPD1000X programming manual in docs/ documents a protection
+        # subsystem; the generic SOUR{ch}:VOLT:PROT fallback previously used
+        # here is uncitable and silently discarded by SPD firmware (same class
+        # as audit H18 on the SPD3303X). Backend review 2026-07-31, High-3.
+        has_ovp=False,
+        has_ocp=False,
         has_timer=False,
         has_waveform=False,
         has_tracking=False,
@@ -119,8 +123,12 @@ PSU_MODEL_REGISTRY = {
         output_specs=[
             OutputSpec(1, 16.0, 8.0, 128.0, 0.001, 0.001),
         ],
-        has_ovp=True,
-        has_ocp=True,
+        # No SPD1000X programming manual in docs/ documents a protection
+        # subsystem; the generic SOUR{ch}:VOLT:PROT fallback previously used
+        # here is uncitable and silently discarded by SPD firmware (same class
+        # as audit H18 on the SPD3303X). Backend review 2026-07-31, High-3.
+        has_ovp=False,
+        has_ocp=False,
         has_timer=False,
         has_waveform=False,
         has_tracking=False,

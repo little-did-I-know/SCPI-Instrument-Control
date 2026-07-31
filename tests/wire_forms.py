@@ -848,40 +848,37 @@ WIRE_FORMS: List[WireForm] = [
     # p.51 EXAMPLE: "CHAN1:COUP AC" -> "CHANnel1:COUPling AC";
     # <coupling_mode>:={DC|AC|GND}.
     WireForm(table="scope", dialect="modern", op="set_coupling", params={"ch": 1, "coupling": "AC"}, request=":CHANnel1:COUPling AC", source=f"{MODERN_GUIDE} p.51", mock_kwargs={"idn": MODERN_IDN}),
+    # RESPONSE FORMAT is a bare wire token (p.51). Backend review 2026-07-31
+    # (Task 5, audit High-11) fixed the mock-fixture bug this entry used to
+    # document as MISMATCH_DEFERRED: MockConnection was seeding
+    # `_channel_coupling` with the LEGACY wire token "D1M" unconditionally
+    # for every dialect (connection/mock/base.py), so a freshly constructed
+    # modern MockConnection's own Channel.coupling getter raised
+    # "ValueError: Unrecognized modern coupling mode response: 'D1M'" before
+    # any set_coupling call. connection/mock/base.py now seeds the default
+    # per-dialect ("DC" for modern, "D1M" otherwise, mirroring the existing
+    # tektronix override a few lines below it), so a fresh modern channel 1
+    # answers the documented default "DC" -- the wire template and
+    # coupling_to_wire/coupling_from_wire mappings (scpi_commands.py) were
+    # already correct for modern ({'DC':'DC','AC':'AC','GND':'GND'}, matching
+    # p.51's <coupling_mode>:={DC|AC|GND} exactly); only the mock's default
+    # state was wrong.
     WireForm(
         table="scope",
         dialect="modern",
         op="get_coupling",
         params={"ch": 1},
         request=":CHANnel1:COUPling?",
-        response="D1M",
+        response="DC",
+        parsed="DC",
         source=f"{MODERN_GUIDE} p.51",
-        status=MISMATCH_DEFERRED,
         mock_kwargs={"idn": MODERN_IDN},
-        note=(
-            "[medium severity] Request matches exactly ('<channel>:COUPling?'). "
-            "The wire template and coupling_to_wire/coupling_from_wire mappings "
-            "(scpi_commands.py) are both correct for modern -- {'DC':'DC', "
-            "'AC':'AC', 'GND':'GND'}, matching p.51's <coupling_mode>:={DC|AC|GND} "
-            "exactly. The bug is in the mock fixture only: MockConnection seeds "
-            "'_channel_coupling' with the LEGACY wire token 'D1M' unconditionally "
-            "for every dialect (connection/mock/base.py, ~line 82: \"{ch: 'D1M' "
-            'for ch in channels}", no scope_dialect branch, unlike trigger_mode/ '
-            "trigger_slope a few lines below which do branch on dialect). 'D1M' "
-            "is not a member of the modern enum, so Channel.coupling on a freshly "
-            "constructed modern MockConnection (before any set_coupling call) "
-            "raises 'ValueError: Unrecognized modern coupling mode response: "
-            "'D1M'' via coupling_from_wire() -- a real, reachable crash against "
-            "this test fixture, though it cannot happen against real hardware "
-            "(this is a mock-state defect, not a driver or table defect). Queued "
-            "for a mock fix (seed _channel_coupling per-dialect), not a code-table "
-            "change."
-        ),
     ),
     # p.57 EXAMPLE: "CHAN1:PROB VAL,1.00E+02" -> "CHANnel1:PROBe VALue,1.00E+02";
-    # <attenuation>:={DEFault|VALue}. Not mocked (no PROBe handler in the
-    # modern branch of connection/mock/siglent.py) -- request-only citation,
-    # same pattern as the legacy get_probe_ratio/set_bandwidth_limit entries.
+    # <attenuation>:={DEFault|VALue}. Backend review 2026-07-31 (Task 4) added
+    # a modern PROBe set/query handler to connection/mock/siglent.py (the
+    # "Not mocked" gap this comment used to describe), driven by the same
+    # hardware measurement that fixed ModernTransfer.acquire's probe scaling.
     WireForm(
         table="scope",
         dialect="modern",
@@ -891,14 +888,48 @@ WIRE_FORMS: List[WireForm] = [
         source=f"{MODERN_GUIDE} p.57",
         mock_kwargs={"idn": MODERN_IDN},
     ),
-    WireForm(table="scope", dialect="modern", op="get_probe_ratio", params={"ch": 1}, request=":CHANnel1:PROBe?", source=f"{MODERN_GUIDE} p.57", mock_kwargs={"idn": MODERN_IDN}),
+    # RESPONSE FORMAT is bare NR3 (p.57 EXAMPLE response "1.00E+02", after the
+    # VALue,1.00E+02 set above) -- same bare-NR3 shape as SCALe?/OFFSet?
+    # above. Queried here on a FRESH mock (no prior set), so the value is the
+    # documented default (DEFault = "1X", p.57) rather than the manual's
+    # post-set example value -- same divergence-is-fine rule as the
+    # get_voltage_div entry above: only the bare-NR3 structure is pinned.
+    WireForm(
+        table="scope",
+        dialect="modern",
+        op="get_probe_ratio",
+        params={"ch": 1},
+        request=":CHANnel1:PROBe?",
+        response="1.00E+00",
+        parsed=1.0,
+        source=f"{MODERN_GUIDE} p.57",
+        mock_kwargs={"idn": MODERN_IDN},
+    ),
     # p.50 EXAMPLE: "CHAN1:BWL 20M" -> "CHANnel1:BWLimit 20M";
     # <bwlimit>:={FULL|20M|200M} -- matches channel.py's modern wire vocabulary
-    # (FULL/20M) exactly. Not mocked (no BWLimit handler in the modern branch).
+    # (FULL/20M) exactly. Backend review 2026-07-31 (Task 5, audit High-11)
+    # added a modern BWLimit set/query handler to connection/mock/siglent.py
+    # (the "Not mocked" gap this comment used to describe).
     WireForm(
         table="scope", dialect="modern", op="set_bandwidth_limit", params={"ch": 1, "limit": "20M"}, request=":CHANnel1:BWLimit 20M", source=f"{MODERN_GUIDE} p.50", mock_kwargs={"idn": MODERN_IDN}
     ),
-    WireForm(table="scope", dialect="modern", op="get_bandwidth_limit", params={"ch": 1}, request=":CHANnel1:BWLimit?", source=f"{MODERN_GUIDE} p.50", mock_kwargs={"idn": MODERN_IDN}),
+    # RESPONSE FORMAT is a bare wire token (p.50); MEASURED on a real SDS824X
+    # HD (fw 3.8.12.1.1.3.6) 2026-07-31: "FULL" at the default (no bandwidth
+    # limiting engaged), queried on a fresh mock with no prior set. `parsed`
+    # is channel.py's PUBLIC value, not the wire token: the modern
+    # bandwidth_limit getter normalizes FULL/20M/200M to public ON/OFF
+    # (channel.py ~L237-241), so FULL on the wire parses to public "OFF".
+    WireForm(
+        table="scope",
+        dialect="modern",
+        op="get_bandwidth_limit",
+        params={"ch": 1},
+        request=":CHANnel1:BWLimit?",
+        response="FULL",
+        parsed="OFF",
+        source=f"{MODERN_GUIDE} p.50",
+        mock_kwargs={"idn": MODERN_IDN},
+    ),
     # -- Timebase control --
     # p.476 EXAMPLE: "TIM:SCAL 1.00E-07" -> "TIMebase:SCALe 1.00E-07".
     WireForm(table="scope", dialect="modern", op="set_time_div", params={"tdiv": "1.00E-07"}, request=":TIMebase:SCALe 1.00E-07", source=f"{MODERN_GUIDE} p.476", mock_kwargs={"idn": MODERN_IDN}),
@@ -913,12 +944,26 @@ WIRE_FORMS: List[WireForm] = [
         source=f"{MODERN_GUIDE} p.476",
         mock_kwargs={"idn": MODERN_IDN},
     ),
-    # p.473 EXAMPLE: "TIM:DEL 1.00E-05" -> "TIMebase:DELay 1.00E-05".
+    # p.473 EXAMPLE: "TIM:DEL 1.00E-05" -> "TIMebase:DELay 1.00E-05". Backend
+    # review 2026-07-31 (Task 5, audit High-11) added a modern TIMebase:DELay
+    # set/query handler to connection/mock/siglent.py (the "not mocked" gap
+    # this comment used to describe).
     WireForm(table="scope", dialect="modern", op="set_time_offset", params={"offset": "1.00E-05"}, request=":TIMebase:DELay 1.00E-05", source=f"{MODERN_GUIDE} p.473", mock_kwargs={"idn": MODERN_IDN}),
-    # get_time_offset is not mocked (no TIMebase:DELay? handler in the modern
-    # branch of connection/mock/siglent.py -- only TIMebase:SCALe? is
-    # implemented there) -- request-only citation.
-    WireForm(table="scope", dialect="modern", op="get_time_offset", params={}, request=":TIMebase:DELay?", source=f"{MODERN_GUIDE} p.473", mock_kwargs={"idn": MODERN_IDN}),
+    # RESPONSE FORMAT is bare NR3 (p.473), same shape as TIMebase:SCALe?
+    # above. MEASURED on a real SDS824X HD (fw 3.8.12.1.1.3.6) 2026-07-31:
+    # "0.00E+00" at the default (no trigger delay), queried on a fresh mock
+    # with no prior set.
+    WireForm(
+        table="scope",
+        dialect="modern",
+        op="get_time_offset",
+        params={},
+        request=":TIMebase:DELay?",
+        response="0.00E+00",
+        parsed=0.0,
+        source=f"{MODERN_GUIDE} p.473",
+        mock_kwargs={"idn": MODERN_IDN},
+    ),
     # p.46 EXAMPLE: "ACQ:SRAT?" -> "5.00E+09" -> ":ACQuire:SRATe?", bare NR3.
     WireForm(
         table="scope",
@@ -962,20 +1007,15 @@ WIRE_FORMS: List[WireForm] = [
     # p.484 <type>:={EDGE|PULSE|SLOPe|INTerval|PATTern|RUNT|WINDow|DROPout|
     # VIDeo|QUALified|NEDGe|DELay|SHOLd|IIC|SPI|UART|LIN|CAN|FLEXray|CANFd|
     # IIS|M1553|SENT|A429} -- EXAMPLE "TRIG:TYPE EDGE" -> "EDGE" bare. EDGE is
-    # both a valid manual enum member and a valid trigger.py public value
-    # (trigger.py's valid_types = ["EDGE","SLEW","GLIT","INTV","RUNT",
-    # "PATTERN"], sent as-is with no type_to_wire/type_from_wire translation
-    # table anywhere in scpi_commands.py) -- this pins the EDGE case, which is
-    # correct. NOTE (not a wire-form defect, no entry recorded: the {type}
-    # placeholder is a free parameter, not part of the table template): three
-    # of trigger.py's six public values have no modern equivalent at all --
-    # "SLEW"/"GLIT"/"INTV" are not members of the manual's <type> enum (the
-    # nearest concepts are spelled "SLOPe"/"PULSE"/"INTerval"). Sending
-    # set_trigger_type(type="SLEW") on modern would write ":TRIGger:TYPE SLEW",
-    # which this manual does not document at all -- likely rejected on real
-    # hardware. Flagged here for visibility; not a MODERN_COMMANDS table
-    # mismatch (the template ":TRIGger:TYPE {type}" is exactly right) so no
-    # WireForm entry is recorded for it.
+    # both a valid manual enum member and a valid trigger.py public value, so
+    # it pins the identity case. Backend review 2026-07-31, finding High-2: the
+    # other three of trigger.py's six public values have no modern equivalent
+    # at all -- "SLEW"/"GLIT"/"INTV" are not members of the manual's <type>
+    # enum (the nearest concepts are spelled "SLOPe"/"PULSE"/"INTerval"). This
+    # is no longer a gap: _TRIGGER_TYPE_TO_WIRE / _TRIGGER_TYPE_FROM_WIRE
+    # (scpi_commands.py) and the trigger_type_to_wire()/trigger_type_from_wire()
+    # wrappers now translate at the dialect boundary, exercised by the two
+    # entries below (p.485).
     WireForm(table="scope", dialect="modern", op="set_trigger_type", params={"type": "EDGE"}, request=":TRIGger:TYPE EDGE", source=f"{MODERN_GUIDE} p.484", mock_kwargs={"idn": MODERN_IDN}),
     WireForm(
         table="scope",
@@ -987,6 +1027,8 @@ WIRE_FORMS: List[WireForm] = [
         source=f"{MODERN_GUIDE} p.484",
         mock_kwargs={"idn": MODERN_IDN},
     ),
+    WireForm(table="scope", dialect="modern", op="set_trigger_type", params={"type": "SLOPe"}, request=":TRIGger:TYPE SLOPe", source=f"{MODERN_GUIDE} p.485", mock_kwargs={"idn": MODERN_IDN}),
+    WireForm(table="scope", dialect="modern", op="get_trigger_type", params={}, request=":TRIGger:TYPE?", response="EDGE", source=f"{MODERN_GUIDE} p.485", mock_kwargs={"idn": MODERN_IDN}),
     # p.495 <source>:={C<n>|D<d>|EX|EX5|LINE}; EXAMPLE "TRIG:EDGE:SOUR C1" ->
     # ":TRIGger:EDGE:SOURce C1", response bare "C1".
     WireForm(table="scope", dialect="modern", op="set_trigger_source", params={"src": "C1"}, request=":TRIGger:EDGE:SOURce C1", source=f"{MODERN_GUIDE} p.495", mock_kwargs={"idn": MODERN_IDN}),

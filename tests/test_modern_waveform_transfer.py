@@ -297,6 +297,68 @@ def test_the_parser_accepts_the_block_shapes_the_instrument_actually_sends():
     assert parse_ieee_block(legacy_prefixed_empty, np.int8).size == 0
 
 
+class TestProbeAttenuationScaling:
+    """Backend review 2026-07-31 High-1, measured on SDS824X HD fw 3.8.12.1.1.3.6:
+    preamble VERTICAL_GAIN/VERTICAL_OFFSET are probe-FREE (BNC frame). At probe
+    10x the display reads 20 V/div but the preamble still says gain=2.0. The
+    driver must multiply by the probe ratio; the mock must keep the preamble
+    probe-free. These two tests pin OPPOSITE sides of the wire so the pair
+    cannot co-validate a shared wrong assumption."""
+
+    def test_mock_preamble_gain_is_probe_free(self, modern_scope):
+        # Wire-level pin of the hardware measurement: scale 20 V/div at probe
+        # 10x -> preamble vertical_gain 2.0 (NOT 20.0).
+        conn = modern_scope._connection
+        modern_scope.channel1.probe_ratio = 10.0
+        modern_scope.channel1.voltage_scale = 20.0
+
+        meta = _preamble_under(conn, "BYTE")
+
+        assert meta["vertical_gain"] == pytest.approx(2.0)
+
+    def test_acquire_multiplies_by_probe_ratio(self):
+        """Expectations adjusted from the brief's illustrative "* 10" form, as
+        its own NOTE anticipates: the mock synthesizes codes against the
+        DISPLAYED :CHANnel:SCALe/:OFFSet (unaffected by a probe-ratio-only
+        change), so the correctly probe-compensated round trip recovers the
+        SAME displayed volts at 10x as at 1x -- not 10x more of them. Without
+        the driver's probe_ratio multiply, the BNC-frame preamble gain alone
+        (scale/probe) decodes the 10x capture at 1/10 the correct volts; that
+        1/10 is what this test actually catches (confirmed by reverting just
+        the multiply -- see the report).
+
+        Uses an explicit noise-free signal/sample_rate rather than the
+        `modern_scope` fixture's defaults: channel 1's default square wave
+        (1 kHz) against that fixture's default 1 kHz sample_rate aliases
+        badly (14 points/acquisition), so successive free-run acquisitions'
+        ptp is not stably comparable -- the same reason the round-trip tests
+        above configure their own MockConnection instead of reusing it.
+        """
+        conn = MockConnection(
+            idn=MODERN_IDN,
+            timebase=1e-3,
+            sample_rate=20_000.0,
+            signals={1: SignalSpec(kind="sine", frequency=200.0, amplitude=1.0, noise_rms=0.0)},
+        )
+        scope = Oscilloscope("mock", connection=conn)
+        scope.connect()
+
+        wf_1x = scope.get_waveform(1)
+        scope.channel1.probe_ratio = 10.0
+        wf_10x = scope.get_waveform(1)
+
+        assert wf_10x.voltage_scale == pytest.approx(wf_1x.voltage_scale)
+        assert np.ptp(wf_10x.voltage) == pytest.approx(np.ptp(wf_1x.voltage), rel=0.05)
+        scope.disconnect()
+
+    def test_mock_rejects_bare_probe_set_form_like_hardware(self, modern_scope):
+        # Measured 2026-07-31: ':CHANnel1:PROBe 10' -> -224, setting unchanged.
+        conn = modern_scope._connection
+        conn.write(":CHANnel1:PROBe 10")
+        assert conn.error_queue and conn.error_queue[0][0] == -224
+        assert conn.query(":CHANnel1:PROBe?") == "1.00E+00"
+
+
 def test_the_mock_frames_data_the_way_the_instrument_does():
     """The mock emitted a bare fixed-width "#9..." with no trailing bytes for
     BOTH replies, so CI never exercised the variable-width header or the
