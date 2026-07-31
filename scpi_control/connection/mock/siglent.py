@@ -156,12 +156,30 @@ def handle_write(conn, command: str) -> bool:
         if match := re.match(r":CHANnel(\d+):PROBe\s+(.+)", command, re.IGNORECASE):
             conn.push_error(-224, "Illegal parameter value")
             return True  # consumed, ignored, error queued -- ratio left as-is
+        # :CHANnel:BWLimit -- guide p.50, <bwlimit>:={FULL|20M|200M} (task 5,
+        # audit High-11). Stored in the SAME `bandwidth_limits` dict the
+        # legacy BWL write handler below already maintains (task 14) rather
+        # than a second piece of state -- see the modern query handler for
+        # why that dict has to carry both vocabularies.
+        if match := re.match(r":CHANnel(\d+):BWLimit\s+(FULL|20M|200M)", command, re.IGNORECASE):
+            conn.bandwidth_limits[int(match.group(1))] = match.group(2).upper()
+            return True
         if match := re.match(r":TIMebase:SCALe\s+(.+)", command, re.IGNORECASE):
             value = float(match.group(1))
             if conn.reject_if_invalid(value, name="TIMebase:SCALe"):
                 return True
             conn.timebase = value
             conn.timebase_updates.append(conn.timebase)
+            return True
+        # :TIMebase:DELay -- guide p.473, EXAMPLE "TIM:DEL 1.00E-05" (task 5,
+        # audit High-11). Trigger-offset delay may legitimately be negative
+        # (pre-trigger) or zero, so it is not gated on positivity, mirroring
+        # :TRIGger:EDGE:LEVel above.
+        if match := re.match(r":TIMebase:DELay\s+(.+)", command, re.IGNORECASE):
+            value = float(match.group(1))
+            if conn.reject_if_invalid(value, name="TIMebase:DELay", positive=False):
+                return True
+            conn.timebase_delay = value
             return True
         # :MEASure <ON|OFF> (p.337). Matched before the :MEASure:SIMPle forms
         # below; the required whitespace after the mnemonic means this pattern
@@ -408,6 +426,31 @@ def handle_query(conn, command: str) -> Optional[str]:
             # MEASURED on a real SDS824X HD 2026-07-31: "1.00E+00" at the
             # default 1x ratio -- same bare-NR3 shape as SCALe?/OFFSet? above.
             return _format_nr3(conn.probe_ratios.get(int(match.group(1)), 1.0))
+        if match := re.match(r":CHANNEL(\d+):BWLIMIT\?", upper):  # p.50
+            # MEASURED on a real SDS824X HD 2026-07-31: "FULL" at the default
+            # (no bandwidth limiting). Reuses the SAME per-channel
+            # `bandwidth_limits` state the legacy BWL?/BWL write handler
+            # below already maintains (task 14) rather than inventing a
+            # second store, since the two dialects describe the same
+            # physical setting -- only the wire vocabulary differs (legacy
+            # {ON,OFF} vs modern {FULL,20M,200M}, guide p.50). The dict
+            # therefore mixes both vocabularies depending on which dialect's
+            # write handler last touched it (never both -- a single
+            # MockConnection speaks one fixed dialect): map the legacy
+            # default/writes (OFF/ON) into modern tokens, and pass through
+            # anything already in modern form (from the :CHANnel:BWLimit
+            # write handler above) unchanged.
+            stored = conn.bandwidth_limits.get(int(match.group(1)), "OFF")
+            if stored == "OFF":
+                return "FULL"
+            if stored == "ON":
+                return "20M"
+            return stored
+        if upper == ":TIMEBASE:DELAY?":  # bare NR3, p.473
+            # MEASURED on a real SDS824X HD 2026-07-31: "0.00E+00" at the
+            # default (no trigger delay) -- same bare-NR3 shape as
+            # TIMebase:SCALe? below.
+            return _format_nr3(conn.timebase_delay)
         if upper == ":TIMEBASE:SCALE?":  # bare NR3, p.476
             return _format_nr3(conn.timebase)
         if upper == ":ACQUIRE:SRATE?":  # bare NR3, p.46

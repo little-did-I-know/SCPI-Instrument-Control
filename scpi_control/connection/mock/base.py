@@ -106,7 +106,20 @@ class MockConnection(BaseConnection):
         self._waveform_gate: Optional[threading.Event] = waveform_gate
         self._signals: Dict[int, Union["SignalSpec", Callable[[], "SignalSpec"]]] = dict(signals) if signals else {}
         self._acquisition_counts: Dict[int, int] = {}
-        self._channel_coupling: Dict[int, str] = {ch: "D1M" for ch in channels}
+        # Coupling default is dialect-specific: modern wire vocabulary is
+        # {DC,AC,GND} (scpi_commands.py's _COUPLING_FROM_WIRE); legacy/LeCroy
+        # speak {D1M,A1M,D50,A50,GND}. "D1M" (DC, 1MOhm) previously seeded
+        # EVERY dialect unconditionally, so a fresh modern-dialect channel's
+        # own `coupling` getter -- whose wire parser only recognizes
+        # {DC,AC,GND} -- raised ValueError("Unrecognized modern coupling mode
+        # response: 'D1M'") before any coupling write ever happened. That
+        # exception is not individually caught by Channel.get_configuration()
+        # (task 5, audit High-11), so it blanked the ENTIRE channel
+        # provenance snapshot to None, not just coupling -- the same failure
+        # shape the modern BWLimit?/TIMebase:DELay? gaps produced elsewhere
+        # in this file. Tektronix already overrides this below with its own
+        # "DC" default for the identical reason; modern needs the same.
+        self._channel_coupling: Dict[int, str] = {ch: ("DC" if self.scope_dialect == "modern" else "D1M") for ch in channels}
         # Legacy scope probe attenuation / bandwidth-limit state (Task 14,
         # audit L3): the GUI's channel refresh reads both on every poll.
         self.probe_ratios: Dict[int, float] = {ch: 1.0 for ch in channels}
@@ -148,6 +161,10 @@ class MockConnection(BaseConnection):
 
         self.sample_rate = sample_rate
         self.timebase = timebase
+        # Modern :TIMebase:DELay state (guide p.473; task 5, audit High-11):
+        # trigger-offset delay, seconds. MEASURED on a real SDS824X HD (fw
+        # 3.8.12.1.1.3.6) 2026-07-31: "0.00E+00" at the default (no delay).
+        self.timebase_delay: float = 0.0
         self.trigger_type = "EDGE"
         self.trigger_source = "C1"
         if self.scope_dialect == "modern":
@@ -640,6 +657,20 @@ class MockConnection(BaseConnection):
                 return self.psu_idn
             else:
                 return self.idn
+
+        if upper == "*OPC?":
+            # IEEE 488.2 SS10.18: "1" is placed in the Output Queue once all
+            # pending operations complete. MEASURED on a real SDS824X HD (fw
+            # 3.8.12.1.1.3.6) 2026-07-31: "1". Universal across every
+            # personality/dialect this mock speaks (scope legacy/modern,
+            # PSU, AWG, DAQ) -- *OPC? is IEEE-488.2 common-command
+            # vocabulary, not a vendor/dialect-specific query, so this
+            # answers before any personality/mode dispatch below, unlike the
+            # scope-only modern handlers in connection/mock/siglent.py.
+            # oscilloscope.py's wait_complete() previously had no answer to
+            # this query at all and raised SiglentTimeoutError on every
+            # dialect.
+            return "1"
 
         # SYST:ERR? for the three instrument classes that expose get_error()
         # (psu_scpi_commands.py:70, awg_scpi_commands.py:65,

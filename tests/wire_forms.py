@@ -911,11 +911,29 @@ WIRE_FORMS: List[WireForm] = [
     ),
     # p.50 EXAMPLE: "CHAN1:BWL 20M" -> "CHANnel1:BWLimit 20M";
     # <bwlimit>:={FULL|20M|200M} -- matches channel.py's modern wire vocabulary
-    # (FULL/20M) exactly. Not mocked (no BWLimit handler in the modern branch).
+    # (FULL/20M) exactly. Backend review 2026-07-31 (Task 5, audit High-11)
+    # added a modern BWLimit set/query handler to connection/mock/siglent.py
+    # (the "Not mocked" gap this comment used to describe).
     WireForm(
         table="scope", dialect="modern", op="set_bandwidth_limit", params={"ch": 1, "limit": "20M"}, request=":CHANnel1:BWLimit 20M", source=f"{MODERN_GUIDE} p.50", mock_kwargs={"idn": MODERN_IDN}
     ),
-    WireForm(table="scope", dialect="modern", op="get_bandwidth_limit", params={"ch": 1}, request=":CHANnel1:BWLimit?", source=f"{MODERN_GUIDE} p.50", mock_kwargs={"idn": MODERN_IDN}),
+    # RESPONSE FORMAT is a bare wire token (p.50); MEASURED on a real SDS824X
+    # HD (fw 3.8.12.1.1.3.6) 2026-07-31: "FULL" at the default (no bandwidth
+    # limiting engaged), queried on a fresh mock with no prior set. `parsed`
+    # is channel.py's PUBLIC value, not the wire token: the modern
+    # bandwidth_limit getter normalizes FULL/20M/200M to public ON/OFF
+    # (channel.py ~L237-241), so FULL on the wire parses to public "OFF".
+    WireForm(
+        table="scope",
+        dialect="modern",
+        op="get_bandwidth_limit",
+        params={"ch": 1},
+        request=":CHANnel1:BWLimit?",
+        response="FULL",
+        parsed="OFF",
+        source=f"{MODERN_GUIDE} p.50",
+        mock_kwargs={"idn": MODERN_IDN},
+    ),
     # -- Timebase control --
     # p.476 EXAMPLE: "TIM:SCAL 1.00E-07" -> "TIMebase:SCALe 1.00E-07".
     WireForm(table="scope", dialect="modern", op="set_time_div", params={"tdiv": "1.00E-07"}, request=":TIMebase:SCALe 1.00E-07", source=f"{MODERN_GUIDE} p.476", mock_kwargs={"idn": MODERN_IDN}),
@@ -930,12 +948,26 @@ WIRE_FORMS: List[WireForm] = [
         source=f"{MODERN_GUIDE} p.476",
         mock_kwargs={"idn": MODERN_IDN},
     ),
-    # p.473 EXAMPLE: "TIM:DEL 1.00E-05" -> "TIMebase:DELay 1.00E-05".
+    # p.473 EXAMPLE: "TIM:DEL 1.00E-05" -> "TIMebase:DELay 1.00E-05". Backend
+    # review 2026-07-31 (Task 5, audit High-11) added a modern TIMebase:DELay
+    # set/query handler to connection/mock/siglent.py (the "not mocked" gap
+    # this comment used to describe).
     WireForm(table="scope", dialect="modern", op="set_time_offset", params={"offset": "1.00E-05"}, request=":TIMebase:DELay 1.00E-05", source=f"{MODERN_GUIDE} p.473", mock_kwargs={"idn": MODERN_IDN}),
-    # get_time_offset is not mocked (no TIMebase:DELay? handler in the modern
-    # branch of connection/mock/siglent.py -- only TIMebase:SCALe? is
-    # implemented there) -- request-only citation.
-    WireForm(table="scope", dialect="modern", op="get_time_offset", params={}, request=":TIMebase:DELay?", source=f"{MODERN_GUIDE} p.473", mock_kwargs={"idn": MODERN_IDN}),
+    # RESPONSE FORMAT is bare NR3 (p.473), same shape as TIMebase:SCALe?
+    # above. MEASURED on a real SDS824X HD (fw 3.8.12.1.1.3.6) 2026-07-31:
+    # "0.00E+00" at the default (no trigger delay), queried on a fresh mock
+    # with no prior set.
+    WireForm(
+        table="scope",
+        dialect="modern",
+        op="get_time_offset",
+        params={},
+        request=":TIMebase:DELay?",
+        response="0.00E+00",
+        parsed=0.0,
+        source=f"{MODERN_GUIDE} p.473",
+        mock_kwargs={"idn": MODERN_IDN},
+    ),
     # p.46 EXAMPLE: "ACQ:SRAT?" -> "5.00E+09" -> ":ACQuire:SRATe?", bare NR3.
     WireForm(
         table="scope",
