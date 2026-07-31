@@ -191,6 +191,9 @@ class SocketConnection(BaseConnection):
                     return data
                 else:
                     return self._read_ieee_block()
+            except socket.timeout:
+                command_context = f"after '{self._last_command}' " if self._last_command else ""
+                raise exceptions.SiglentTimeoutError(f"Raw read timeout {command_context}from {self.host}:{self.port}")
             except socket.error as e:
                 self._connected = False
                 command_context = f" after '{self._last_command}'" if self._last_command else ""

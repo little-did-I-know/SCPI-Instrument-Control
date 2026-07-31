@@ -515,3 +515,29 @@ class TestReadRawIeeeBlock:
 
         assert conn.read_raw() == blob
         assert mock_socket.recv.call_count == 1
+
+
+class TestSocketReadRawTimeout:
+    """Test that socket timeouts in read_raw are classified as timeouts, not dead connections."""
+
+    def test_sized_read_timeout_raises_timeout_and_keeps_session(self, mock_socket):
+        """recv raises socket.timeout during sized-read; must not kill the session."""
+        mock_socket.recv.side_effect = socket.timeout("timed out")
+
+        conn = SocketConnection("192.168.1.100")
+        conn.connect()
+
+        with pytest.raises(TimeoutError):
+            conn.read_raw(100)
+        assert conn.is_connected
+
+    def test_block_read_timeout_raises_timeout_and_keeps_session(self, mock_socket):
+        """recv raises socket.timeout during block-read; must not kill the session."""
+        mock_socket.recv.side_effect = socket.timeout("timed out")
+
+        conn = SocketConnection("192.168.1.100")
+        conn.connect()
+
+        with pytest.raises(TimeoutError):
+            conn.read_raw(None)
+        assert conn.is_connected
