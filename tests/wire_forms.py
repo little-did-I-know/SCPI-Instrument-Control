@@ -848,35 +848,31 @@ WIRE_FORMS: List[WireForm] = [
     # p.51 EXAMPLE: "CHAN1:COUP AC" -> "CHANnel1:COUPling AC";
     # <coupling_mode>:={DC|AC|GND}.
     WireForm(table="scope", dialect="modern", op="set_coupling", params={"ch": 1, "coupling": "AC"}, request=":CHANnel1:COUPling AC", source=f"{MODERN_GUIDE} p.51", mock_kwargs={"idn": MODERN_IDN}),
+    # RESPONSE FORMAT is a bare wire token (p.51). Backend review 2026-07-31
+    # (Task 5, audit High-11) fixed the mock-fixture bug this entry used to
+    # document as MISMATCH_DEFERRED: MockConnection was seeding
+    # `_channel_coupling` with the LEGACY wire token "D1M" unconditionally
+    # for every dialect (connection/mock/base.py), so a freshly constructed
+    # modern MockConnection's own Channel.coupling getter raised
+    # "ValueError: Unrecognized modern coupling mode response: 'D1M'" before
+    # any set_coupling call. connection/mock/base.py now seeds the default
+    # per-dialect ("DC" for modern, "D1M" otherwise, mirroring the existing
+    # tektronix override a few lines below it), so a fresh modern channel 1
+    # answers the documented default "DC" -- the wire template and
+    # coupling_to_wire/coupling_from_wire mappings (scpi_commands.py) were
+    # already correct for modern ({'DC':'DC','AC':'AC','GND':'GND'}, matching
+    # p.51's <coupling_mode>:={DC|AC|GND} exactly); only the mock's default
+    # state was wrong.
     WireForm(
         table="scope",
         dialect="modern",
         op="get_coupling",
         params={"ch": 1},
         request=":CHANnel1:COUPling?",
-        response="D1M",
+        response="DC",
+        parsed="DC",
         source=f"{MODERN_GUIDE} p.51",
-        status=MISMATCH_DEFERRED,
         mock_kwargs={"idn": MODERN_IDN},
-        note=(
-            "[medium severity] Request matches exactly ('<channel>:COUPling?'). "
-            "The wire template and coupling_to_wire/coupling_from_wire mappings "
-            "(scpi_commands.py) are both correct for modern -- {'DC':'DC', "
-            "'AC':'AC', 'GND':'GND'}, matching p.51's <coupling_mode>:={DC|AC|GND} "
-            "exactly. The bug is in the mock fixture only: MockConnection seeds "
-            "'_channel_coupling' with the LEGACY wire token 'D1M' unconditionally "
-            "for every dialect (connection/mock/base.py, ~line 82: \"{ch: 'D1M' "
-            'for ch in channels}", no scope_dialect branch, unlike trigger_mode/ '
-            "trigger_slope a few lines below which do branch on dialect). 'D1M' "
-            "is not a member of the modern enum, so Channel.coupling on a freshly "
-            "constructed modern MockConnection (before any set_coupling call) "
-            "raises 'ValueError: Unrecognized modern coupling mode response: "
-            "'D1M'' via coupling_from_wire() -- a real, reachable crash against "
-            "this test fixture, though it cannot happen against real hardware "
-            "(this is a mock-state defect, not a driver or table defect). Queued "
-            "for a mock fix (seed _channel_coupling per-dialect), not a code-table "
-            "change."
-        ),
     ),
     # p.57 EXAMPLE: "CHAN1:PROB VAL,1.00E+02" -> "CHANnel1:PROBe VALue,1.00E+02";
     # <attenuation>:={DEFault|VALue}. Backend review 2026-07-31 (Task 4) added
