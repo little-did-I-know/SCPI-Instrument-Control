@@ -390,8 +390,15 @@ class LeCroyTransfer:
 _MODERN_COMM_TYPE = 32  # short: 0=byte, 1=word
 _MODERN_WAVE_ARRAY_COUNT = 116  # long: number of data points
 _MODERN_DATA_INTERVAL = 136  # long: = :WAVeform:INTerval, echoed back (p.755)
-_MODERN_VERTICAL_GAIN = 156  # float: V/div, no probe attenuation
-_MODERN_VERTICAL_OFFSET = 160  # float
+# VERTICAL_GAIN/VERTICAL_OFFSET (156/160) are probe-FREE (BNC frame) --
+# CONFIRMED on real hardware, not just the guide's wording: on a real
+# SDS824X HD (fw 3.8.12.1.1.3.6, measured 2026-07-31), setting
+# :CHANnel1:PROBe VALue,1.00E+01 makes the display read 20 V/div while this
+# field still reports 2.0, and a 1.0 V displayed offset stays 1.0 at 10x.
+# ModernTransfer.acquire multiplies both by the probe ratio (queried via
+# :CHANnel:PROBe?) to recover the displayed (probe-referred) values.
+_MODERN_VERTICAL_GAIN = 156  # float: V/div, no probe attenuation (measured 2026-07-31)
+_MODERN_VERTICAL_OFFSET = 160  # float, also probe-free -- see comment above
 _MODERN_CODE_PER_DIV = 164  # float
 _MODERN_ADC_BIT = 172  # short: front-end resolution (p.756). 16 on an SDS824X HD
 _MODERN_HORIZ_INTERVAL = 176  # float: 1/sample_rate
@@ -604,6 +611,17 @@ class ModernTransfer:
         if meta["code_per_div"] == 0:
             raise exceptions.CommandError(f"Modern WAVEDESC code_per_div is 0 ({preamble_context})")
 
+        # Hardware truth (SDS824X HD fw 3.8.12.1.1.3.6, measured 2026-07-31):
+        # the preamble's VERTICAL_GAIN and VERTICAL_OFFSET are probe-FREE
+        # (BNC frame). With :CHANnel1:PROBe VALue,1.00E+01 the display reads
+        # 20 V/div but the preamble still reports gain 2.0, and a 1.0 V
+        # displayed offset stays voff 1.0 at 10x. The p.756 note "without
+        # probe attenuation" is literal. Multiply the BNC-frame result by the
+        # probe ratio or every 10x-probe capture is 10x too small. Queried
+        # ONCE per acquire (not per chunking window below) -- the ratio is
+        # channel state, not something that changes mid-transfer.
+        probe_ratio = float(scope.query(scope._get_command("get_probe_ratio", ch=channel)))
+
         # The one thing code cannot settle: whether a real instrument's
         # DATA_INTERVAL echo (and therefore its HORIZ_INTERVAL scaling, used
         # below for the time axis) actually reflects the stride we requested.
@@ -742,7 +760,11 @@ class ModernTransfer:
         effective_code_per_div = meta["code_per_div"]
         if meta["comm_type"] == 0 and meta["adc_bit"] > 8:
             effective_code_per_div /= 256.0
-        voltage = codes.astype(np.float64) * (meta["vertical_gain"] / effective_code_per_div) - meta["vertical_offset"]
+        # probe_ratio (queried above, once per acquire) converts the BNC-frame
+        # result back to the probe-referred (displayed) volts -- see the
+        # probe_ratio comment above and the _MODERN_VERTICAL_GAIN comment at
+        # the top of this module.
+        voltage = (codes.astype(np.float64) * (meta["vertical_gain"] / effective_code_per_div) - meta["vertical_offset"]) * probe_ratio
 
         # SDS Series Programming Guide EN11G p.759 ("Read Waveform Data",
         # Step 4): "time value(S) = delay-(timebase*grid/2)+index*interval".
@@ -789,8 +811,10 @@ class ModernTransfer:
             sample_rate=(1.0 / point_interval) if point_interval else None,
             record_length=n,
             timebase=timebase,
-            voltage_scale=meta["vertical_gain"],
-            voltage_offset=meta["vertical_offset"],
+            # Also probe-referred (display frame), consistent with `voltage`
+            # above and with provenance's :CHANnel:SCALe? readback.
+            voltage_scale=meta["vertical_gain"] * probe_ratio,
+            voltage_offset=meta["vertical_offset"] * probe_ratio,
         )
 
 

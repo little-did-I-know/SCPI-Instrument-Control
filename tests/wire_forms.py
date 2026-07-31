@@ -879,9 +879,10 @@ WIRE_FORMS: List[WireForm] = [
         ),
     ),
     # p.57 EXAMPLE: "CHAN1:PROB VAL,1.00E+02" -> "CHANnel1:PROBe VALue,1.00E+02";
-    # <attenuation>:={DEFault|VALue}. Not mocked (no PROBe handler in the
-    # modern branch of connection/mock/siglent.py) -- request-only citation,
-    # same pattern as the legacy get_probe_ratio/set_bandwidth_limit entries.
+    # <attenuation>:={DEFault|VALue}. Backend review 2026-07-31 (Task 4) added
+    # a modern PROBe set/query handler to connection/mock/siglent.py (the
+    # "Not mocked" gap this comment used to describe), driven by the same
+    # hardware measurement that fixed ModernTransfer.acquire's probe scaling.
     WireForm(
         table="scope",
         dialect="modern",
@@ -891,7 +892,23 @@ WIRE_FORMS: List[WireForm] = [
         source=f"{MODERN_GUIDE} p.57",
         mock_kwargs={"idn": MODERN_IDN},
     ),
-    WireForm(table="scope", dialect="modern", op="get_probe_ratio", params={"ch": 1}, request=":CHANnel1:PROBe?", source=f"{MODERN_GUIDE} p.57", mock_kwargs={"idn": MODERN_IDN}),
+    # RESPONSE FORMAT is bare NR3 (p.57 EXAMPLE response "1.00E+02", after the
+    # VALue,1.00E+02 set above) -- same bare-NR3 shape as SCALe?/OFFSet?
+    # above. Queried here on a FRESH mock (no prior set), so the value is the
+    # documented default (DEFault = "1X", p.57) rather than the manual's
+    # post-set example value -- same divergence-is-fine rule as the
+    # get_voltage_div entry above: only the bare-NR3 structure is pinned.
+    WireForm(
+        table="scope",
+        dialect="modern",
+        op="get_probe_ratio",
+        params={"ch": 1},
+        request=":CHANnel1:PROBe?",
+        response="1.00E+00",
+        parsed=1.0,
+        source=f"{MODERN_GUIDE} p.57",
+        mock_kwargs={"idn": MODERN_IDN},
+    ),
     # p.50 EXAMPLE: "CHAN1:BWL 20M" -> "CHANnel1:BWLimit 20M";
     # <bwlimit>:={FULL|20M|200M} -- matches channel.py's modern wire vocabulary
     # (FULL/20M) exactly. Not mocked (no BWLimit handler in the modern branch).
