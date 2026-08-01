@@ -151,6 +151,9 @@ class Waveform:
         Raises:
             InvalidParameterError: If channel number is invalid
             CommandError: If acquisition fails
+            FeatureNotSupportedError: If the active dialect's transfer
+                doesn't support the requested format (e.g. 'WORD' on legacy
+                Siglent or Tektronix)
         """
         validate_channel(self._scope, channel)
 

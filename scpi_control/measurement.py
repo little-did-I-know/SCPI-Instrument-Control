@@ -88,6 +88,22 @@ class Measurement:
                 self._scope.write(self._scope._get_command("set_meas_immed_type", type=wire_type))
                 self._scope.write(self._scope._get_command("set_meas_immed_source", ch=channel))
                 response = self._scope.query(self._scope._get_command("get_meas_immed_value"))
+                # No sentinel check here (unlike the DAQ overload check in
+                # data_logger.py and the "****" check below for the modern
+                # dialect): MEASUrement:IMMed:VALue? is a TBS1000C-family
+                # command (TBS p.121, per scpi_commands.py), and that manual
+                # is not available in this repo to confirm what it returns
+                # when no valid measurement exists. The 4/5/6 Series MSO
+                # Programmer Manual (also in docs/) documents a 9.91E+37
+                # "invalid value" sentinel for unrelated subsystems (cursor
+                # readouts p.2-393/2-429, cycle-cycle measurement statistics
+                # p.2-610-2-615, unset trigger thresholds in Appendix C) but
+                # never for this specific query, and that manual's own
+                # RESUlts:CURRentacq:MEAN/MINimum/PK2PK/POPUlation? examples
+                # (p.2-690/2-691, the badge-path command actually used below)
+                # show ordinary numbers with no sentinel mentioned. Applying
+                # the MSO family's convention to a TBS1000C-only command would
+                # be a guess, not a citation -- do not add a check without one.
                 try:
                     return float(response.strip())
                 except ValueError as e:

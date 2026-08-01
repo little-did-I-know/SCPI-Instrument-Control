@@ -80,6 +80,14 @@ class MockConnection(BaseConnection):
         daq_idn: str = "Keysight Technologies,34970A,MY12345678,A.01.02",
         daq_readings: str = "1.234,2.345,3.456",
         tek_badges: Optional[Dict[int, Dict[str, str]]] = None,
+        # DATa:STARt/STOP window state (MSO4/5/6 PM p.2-341/2-342). Defaults
+        # match the manual's own defaults: DATa:STARt is 1-based and starts
+        # at 1; data_stop=None means "no window narrower than the record has
+        # been set" (WFMOutpre:NR_Pt? then reports the full record). Tests
+        # pass data_stop explicitly to seed a stale narrow window left by a
+        # prior script or a recalled setup.
+        data_start: int = 1,
+        data_stop: Optional[int] = None,
         # strict: When True (the default as of v5.0.0), unmatched PSU/AWG/DAQ
         # queries raise TimeoutError instead of returning "", matching real
         # instruments. Pass strict=False to restore the old lenient
@@ -189,6 +197,12 @@ class MockConnection(BaseConnection):
         # Tektronix wire-vocabulary state (shared across tek_tbs/tek_mso variants)
         self.tek_stop_after = "RUNSTOP"
         self.data_source: int = 1
+        # DATa:STARt/STOP window (MSO4/5/6 PM p.2-341/2-342): the write
+        # handler in tektronix.py updates these; WFMOutpre:NR_Pt? and the
+        # CURVe? response both read them so the mock's reported point count
+        # and its actual transmitted bytes agree, matching real hardware.
+        self.data_start: int = data_start
+        self.data_stop: Optional[int] = data_stop
         self.probe_gains: Dict[int, float] = {ch: 0.1 for ch in channels}
         self.holdoff_time = 0.0
         # Measurement badges: slot -> {"type": ..., "source": ...}. Seed via
@@ -214,6 +228,13 @@ class MockConnection(BaseConnection):
         self.error_queue: List[Tuple[int, str]] = []
         self.writes: List[str] = []
         self.queries: List[str] = []
+        # Combined, call-ORDER trace of every write and query. writes/queries
+        # above are each append-only to their own list, so neither alone can
+        # show a write's position relative to a query -- this is what lets a
+        # test assert "X was sent before Y" across the two (e.g. the Tek
+        # DATa:STARt/STOP window-widening writes happening before the
+        # WFMOutpre:NR_Pt? query that measures it).
+        self.command_log: List[str] = []
         self.timebase_updates: List[float] = []
         self.scale_updates: Dict[int, List[float]] = {ch: [] for ch in channels}
         self.waveform_requests: List[int] = []
@@ -331,6 +352,7 @@ class MockConnection(BaseConnection):
 
         command = command.strip()
         self.writes.append(command)
+        self.command_log.append(command)
 
         if command.upper() in ("*CLS", "*RST"):
             # Real instruments clear the error queue on both *CLS and *RST
@@ -637,6 +659,7 @@ class MockConnection(BaseConnection):
 
         command = command.strip()
         self.queries.append(command)
+        self.command_log.append(command)
 
         if command in self.custom_responses:
             override = self.custom_responses[command]
@@ -708,7 +731,17 @@ class MockConnection(BaseConnection):
             # anchored at the end: MEAS:*? and read_remove's "R?" commands
             # carry trailing arguments (e.g. "MEAS:VOLT:DC? AUTO,AUTO,(@101)"
             # or "R? 10"), which a full-string anchor would reject.
-            if re.match(r"^(READ\?|FETC\??|MEAS:[\w:]*\?|R\?)", upper):
+
+            # R? wraps its CSV payload in an IEEE 488.2 definite-length block
+            # (34970A/34972A Command Reference p.40; worked example p.41:
+            # `R? 2` -> `#231+2.87536000E-04,+3.18131400E-03`). READ?/FETC?/
+            # MEAS:*? send the same CSV bare (p.49-50, 16-17), so only R? is
+            # wrapped here -- answering them all alike is what hid the parser
+            # bug from CI.
+            if re.match(r"^R\?", upper):
+                payload = self.daq_readings
+                return f"#{len(str(len(payload)))}{len(payload)}{payload}"
+            if re.match(r"^(READ\?|FETC\??|MEAS:[\w:]*\?)", upper):
                 return self.daq_readings
 
         # Function generator (AWG) queries

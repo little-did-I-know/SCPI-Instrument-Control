@@ -113,7 +113,9 @@ class SiglentTransfer:
 
         Args:
             channel: Channel number (1-4)
-            format: Data format - 'BYTE' or 'WORD' (default: 'BYTE')
+            format: Data format - 'BYTE' only ('WORD' raises
+                FeatureNotSupportedError; this dialect has no documented
+                width selector)
             stride: Unused on this dialect -- legacy Siglent has no documented
                 :WAVeform:INTerval-equivalent command, so nothing is written.
                 Accepted only so callers can pass it uniformly regardless of
@@ -123,8 +125,22 @@ class SiglentTransfer:
             WaveformData object with time and voltage arrays
 
         Raises:
+            FeatureNotSupportedError: If format='WORD' is requested
+            InvalidParameterError: If an invalid format is requested
             CommandError: If acquisition fails
         """
+        # Validate format pre-flight, before any wire access
+        fmt = format.upper()
+        if fmt == "WORD":
+            raise exceptions.FeatureNotSupportedError(
+                "format='WORD' is not supported on the legacy Siglent dialect: the programming guide "
+                "(RC01020-E01C) documents no command to select 16-bit transfer width -- WAVEFORM_SETUP/WFSU "
+                "(p.144-145) sets only sparsing, point count and first point -- and WF? DAT2 answers one byte "
+                "per sample (p.141-142). Use format='BYTE'."
+            )
+        if fmt != "BYTE":
+            raise exceptions.InvalidParameterError(f"Invalid format: {format}")
+
         # Get channel configuration
         ch = f"C{channel}"
         voltage_scale = self._scope.waveform._get_voltage_scale(ch)
@@ -139,13 +155,8 @@ class SiglentTransfer:
             self._scope.write(waveform_command)
             raw_data = self._scope.read_raw()
 
-        # Parse waveform data
-        if format == "BYTE":
-            dtype = np.int8
-        elif format == "WORD":
-            dtype = np.int16
-        else:
-            raise exceptions.InvalidParameterError(f"Invalid format: {format}")
+        # Parse waveform data - only BYTE is supported on legacy dialect
+        dtype = np.int8
 
         error_context = f"host {self._scope.host}:{self._scope.port}, command '{waveform_command}'"
         voltage_data = parse_ieee_block(raw_data, dtype, error_context=error_context)
@@ -225,6 +236,12 @@ class SiglentTransfer:
         return time
 
 
+# "or larger" per the MSO4/5/6 manual p.2-341/2-342 -- deliberately above any
+# shipping Tek record length so the window always covers the whole record; the
+# instrument clamps to its own maximum and NR_Pt? then reports the real count.
+_TEK_MAX_RECORD_POINTS = 1_000_000_000
+
+
 class TektronixTransfer:
     """CURVe? transfer scaled by the WFMOutpre preamble (Tek PMs, Task 7 citations)."""
 
@@ -257,9 +274,18 @@ class TektronixTransfer:
         scope.write(scope._get_command("set_data_source", ch=channel))
         scope.write(scope._get_command("set_data_encoding"))
         scope.write(scope._get_command("set_data_width"))
-        n_points = int(float(scope.query(scope._get_command("get_wfm_nr_pt"))))
+        # Widen the transfer window BEFORE asking how many points it holds.
+        # NR_Pt? is window-relative (MSO4/5/6 manual p.2-1461), so querying it
+        # first measures whatever narrow window a prior script or a recalled
+        # setup left behind -- and the old code then wrote that same number
+        # back to DATa:STOP, making the truncation permanent. p.2-341/2-342
+        # sanctions exactly this: "set DATa:STARt to 1 and DATa:STOP to the
+        # maximum record length, or larger". Using "or larger" avoids needing
+        # HORizontal:RECOrdlength?, whose spelling we cannot cite for the
+        # TBS1000/MSO2 families (their manuals are not in docs/).
         scope.write(scope._get_command("set_data_start", start=1))
-        scope.write(scope._get_command("set_data_stop", stop=n_points))
+        scope.write(scope._get_command("set_data_stop", stop=_TEK_MAX_RECORD_POINTS))
+        n_points = int(float(scope.query(scope._get_command("get_wfm_nr_pt"))))
         xincr = float(scope.query(scope._get_command("get_wfm_xincr")))
         xzero = float(scope.query(scope._get_command("get_wfm_xzero")))
         # WFMOutpre:PT_Off? is MSO2-only (absent from the TBS1000C WFMOutpre
@@ -278,6 +304,20 @@ class TektronixTransfer:
             scope.write(command)
             raw = scope.read_raw()
         codes = parse_ieee_block(raw, np.int8, error_context=f"host {scope.host}:{scope.port}, command '{command}'")
+
+        # Detects a short/truncated transfer (NR_Pt? promised more samples
+        # than CURVe? actually delivered). It does NOT catch a rejected
+        # DATa:STOP write-back: in that case NR_Pt? and CURVe? would agree on
+        # the stale window, so this comparison would see no mismatch.
+        if n_points != len(codes):
+            logger.warning(
+                "WFMOutpre:NR_Pt? promised %d points but CURVe? returned %d (host %s:%s, channel %d) -- the record may be truncated.",
+                n_points,
+                len(codes),
+                scope.host,
+                scope.port,
+                channel,
+            )
 
         voltage = (codes.astype(np.float64) - yoff) * ymult + yzero
         time = xzero + (np.arange(len(codes)) - pt_off) * xincr

@@ -79,6 +79,28 @@ class TestSiglentPathUnchanged:
         assert any(w.startswith("C1:WF?") for w in conn.writes)
         scope.disconnect()
 
+    def test_word_format_raises_before_touching_the_wire(self):
+        """Legacy has no documented way to ask for 16-bit samples.
+
+        RC01020-E01C documents only WAVEFORM_SETUP/WFSU (p.144-145: Sparsing,
+        Number of points, First point, and an SPO-only TYPE flag) -- no width
+        selector anywhere, and CFMT/COMM_ORDER are LeCroy commands absent from
+        this guide. WF? DAT2's response is one byte per sample (p.141-142's
+        worked example transfers 70 bytes for 70 points). The old code sent the
+        same request and reinterpreted the bytes as int16, returning half the
+        samples as plausible-but-wrong voltages with no error.
+
+        The failure must be pre-flight: no waveform request may be sent.
+        """
+        conn = MockConnection("mock", idn=LEGACY_IDN, channel_states={1: True}, sample_rate=1_000.0, timebase=1e-3)
+        scope = Oscilloscope("mock", connection=conn)
+        scope.connect()
+        before_log = list(conn.command_log)
+        with pytest.raises(exceptions.FeatureNotSupportedError):
+            scope.waveform.acquire(1, format="WORD")
+        assert conn.command_log[len(before_log) :] == []
+        scope.disconnect()
+
 
 def build_wavedesc(
     codes: bytes,
@@ -92,16 +114,16 @@ def build_wavedesc(
 ) -> bytes:
     desc = bytearray(346)
     desc[0:8] = b"WAVEDESC"
-    struct.pack_into("<h", desc, 32, comm_type)          # COMM_TYPE: 0=byte, 1=word
-    struct.pack_into("<i", desc, 36, 346)                # WAVE_DESCRIPTOR length
-    struct.pack_into("<i", desc, 40, 0)                  # USER_TEXT length
-    struct.pack_into("<i", desc, 48, trigtime_len)       # TRIGTIME_ARRAY length
-    struct.pack_into("<i", desc, 52, ristime_len)        # RIS_TIME_ARRAY length
-    struct.pack_into("<i", desc, 116, len(codes))        # WAVE_ARRAY_COUNT
-    struct.pack_into("<f", desc, 156, gain)              # VERTICAL_GAIN
-    struct.pack_into("<f", desc, 160, offset)            # VERTICAL_OFFSET
-    struct.pack_into("<f", desc, 176, hinterval)         # HORIZ_INTERVAL
-    struct.pack_into("<d", desc, 180, hoffset)           # HORIZ_OFFSET
+    struct.pack_into("<h", desc, 32, comm_type)  # COMM_TYPE: 0=byte, 1=word
+    struct.pack_into("<i", desc, 36, 346)  # WAVE_DESCRIPTOR length
+    struct.pack_into("<i", desc, 40, 0)  # USER_TEXT length
+    struct.pack_into("<i", desc, 48, trigtime_len)  # TRIGTIME_ARRAY length
+    struct.pack_into("<i", desc, 52, ristime_len)  # RIS_TIME_ARRAY length
+    struct.pack_into("<i", desc, 116, len(codes))  # WAVE_ARRAY_COUNT
+    struct.pack_into("<f", desc, 156, gain)  # VERTICAL_GAIN
+    struct.pack_into("<f", desc, 160, offset)  # VERTICAL_OFFSET
+    struct.pack_into("<f", desc, 176, hinterval)  # HORIZ_INTERVAL
+    struct.pack_into("<d", desc, 180, hoffset)  # HORIZ_OFFSET
     # DATA_ARRAY_1 follows the two optional time arrays; pad them with the
     # declared number of filler bytes so data_offset has something to skip.
     return bytes(desc) + b"\x00" * (trigtime_len + ristime_len) + codes

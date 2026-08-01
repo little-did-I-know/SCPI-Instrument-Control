@@ -163,7 +163,21 @@ def handle_write(conn, command: str) -> bool:
         conn.data_source = int(match.group(1))
         conn._last_waveform_channel = conn.data_source
         return True
-    if re.match(r"DATA:(ENCDG|WIDTH|START|STOP)\s+", upper):
+    if match := re.match(r"DATA:START\s+(\d+)", upper):
+        # MSO4/5/6 PM p.2-341: DATa:STARt is the first point of the window
+        # CURVe?/NR_Pt? operate on. Storing it (rather than discarding the
+        # write, as before) is what lets a test seed or observe the window a
+        # driver is measuring/widening.
+        conn.data_start = int(match.group(1))
+        return True
+    if match := re.match(r"DATA:STOP\s+(\d+)", upper):
+        # MSO4/5/6 PM p.2-341/2-342: DATa:STOP is the last point of the
+        # window; the manual is explicit that a record-length change is NOT
+        # automatically reflected here, which is the whole hazard this state
+        # models (a stale STOP left behind by a prior script or recall).
+        conn.data_stop = int(match.group(1))
+        return True
+    if re.match(r"DATA:(ENCDG|WIDTH)\s+", upper):
         return True
     if upper == "CURVE?":
         conn.waveform_requests.append(conn.data_source)
@@ -227,7 +241,14 @@ def handle_query(conn, command: str) -> Optional[str]:
     if upper == "TRIGGER:A:HOLDOFF:TIME?":
         return _format_nr3(conn.holdoff_time)
     if upper == "WFMOUTPRE:NR_PT?":
-        return str(mock_synth.point_count(conn, conn.data_source))
+        # MSO4/5/6 programmer manual p.2-1461: NR_Pt? reports the points that will
+        # be TRANSMITTED for the current DATa:STARt/STOP window, not the acquisition
+        # record length (p.2-1455's own example: a 1250-point record reporting
+        # NR_PT 1000). Modelling the window is what lets a test catch a driver that
+        # measures the record through a stale window.
+        record = mock_synth.point_count(conn, conn.data_source)
+        stop = record if conn.data_stop is None else min(conn.data_stop, record)
+        return str(max(0, stop - conn.data_start + 1))
     if upper == "WFMOUTPRE:XINCR?":
         return _format_nr3(1.0 / conn.sample_rate)
     if upper == "WFMOUTPRE:XZERO?":
@@ -261,4 +282,14 @@ def build_waveform_response(conn) -> bytes:
     # Tek's converter is (code - yoff)*ymult + yzero with yoff=yzero=0 here, so
     # codes carry no channel-offset term (include_offset=False).
     payload = mock_synth.payload_for(conn, conn.data_source, include_offset=False)
-    return _build_ieee_block(payload)  # CURVe? responses are a bare IEEE block
+    # CURVe? only transmits the DATa:STARt/STOP window -- the same semantics
+    # WFMOutpre:NR_Pt? reports above (MSO4/5/6 PM p.2-1461) -- so the actual
+    # byte count returned here must agree with NR_Pt?'s answer. Sliced here,
+    # not inside the shared payload_for()/point_count() (also used by the
+    # Siglent/LeCroy personalities, which never touch data_start/data_stop),
+    # so those dialects are unaffected.
+    record = len(payload)
+    stop = record if conn.data_stop is None else min(conn.data_stop, record)
+    start = max(1, conn.data_start)
+    windowed = payload[start - 1 : stop]
+    return _build_ieee_block(windowed)  # CURVe? responses are a bare IEEE block
