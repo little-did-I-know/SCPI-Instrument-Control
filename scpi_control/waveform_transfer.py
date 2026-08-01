@@ -113,7 +113,9 @@ class SiglentTransfer:
 
         Args:
             channel: Channel number (1-4)
-            format: Data format - 'BYTE' or 'WORD' (default: 'BYTE')
+            format: Data format - 'BYTE' only ('WORD' raises
+                FeatureNotSupportedError; this dialect has no documented
+                width selector)
             stride: Unused on this dialect -- legacy Siglent has no documented
                 :WAVeform:INTerval-equivalent command, so nothing is written.
                 Accepted only so callers can pass it uniformly regardless of
@@ -302,6 +304,20 @@ class TektronixTransfer:
             scope.write(command)
             raw = scope.read_raw()
         codes = parse_ieee_block(raw, np.int8, error_context=f"host {scope.host}:{scope.port}, command '{command}'")
+
+        # Detects a short/truncated transfer (NR_Pt? promised more samples
+        # than CURVe? actually delivered). It does NOT catch a rejected
+        # DATa:STOP write-back: in that case NR_Pt? and CURVe? would agree on
+        # the stale window, so this comparison would see no mismatch.
+        if n_points != len(codes):
+            logger.warning(
+                "WFMOutpre:NR_Pt? promised %d points but CURVe? returned %d (host %s:%s, channel %d) -- the record may be truncated.",
+                n_points,
+                len(codes),
+                scope.host,
+                scope.port,
+                channel,
+            )
 
         voltage = (codes.astype(np.float64) - yoff) * ymult + yzero
         time = xzero + (np.arange(len(codes)) - pt_off) * xincr

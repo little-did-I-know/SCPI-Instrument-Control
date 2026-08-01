@@ -95,10 +95,10 @@ class TestSiglentPathUnchanged:
         conn = MockConnection("mock", idn=LEGACY_IDN, channel_states={1: True}, sample_rate=1_000.0, timebase=1e-3)
         scope = Oscilloscope("mock", connection=conn)
         scope.connect()
-        before = list(conn.writes)
+        before_log = list(conn.command_log)
         with pytest.raises(exceptions.FeatureNotSupportedError):
             scope.waveform.acquire(1, format="WORD")
-        assert [w for w in conn.writes[len(before) :] if "WF?" in w.upper()] == []
+        assert conn.command_log[len(before_log) :] == []
         scope.disconnect()
 
 

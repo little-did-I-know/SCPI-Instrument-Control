@@ -58,7 +58,7 @@ def test_acquire_widens_the_window_before_asking_how_many_points():
     widen = [i for i, c in enumerate(log) if "DATA:STAR" in c or "DATA:STOP" in c]
     measure = [i for i, c in enumerate(log) if "NR_PT" in c]
     assert widen, f"no DATa:STARt/STOP write observed in {log}"
-    assert measure, f"no NR_Pt? query observed in {log} -- if queries are not recorded in this log, find the log that records them (see the adaptation note) rather than deleting this assertion"
+    assert measure, f"no NR_Pt? query observed in {log}"
     assert max(widen) < min(measure), f"window was measured before it was widened: {log}"
 
 
