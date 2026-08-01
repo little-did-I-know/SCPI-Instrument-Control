@@ -44,6 +44,8 @@ class SocketConnection(BaseConnection):
             self._socket.settimeout(self.timeout)
             self._socket.connect((self.host, self.port))
             self._connected = True
+            # A fresh socket has nothing stranded on it from a prior session.
+            self._desynced = False
         except socket.timeout:
             raise exceptions.SiglentTimeoutError(f"Connection timeout: {self.host}:{self.port}")
         except socket.error as e:
@@ -133,22 +135,27 @@ class SocketConnection(BaseConnection):
                     if not chunk:
                         break
                     data += chunk
-                    # Leading terminator/NUL bytes are leftovers from an earlier
-                    # response, never the start of this one. Without this, a single
-                    # stray "\n" satisfies the endswith() check below and returns
-                    # an EMPTY response -- which is how one late newline shifted
-                    # every later answer by one query (High-7).
-                    cleaned = data.lstrip(b"\r\n\x00")
+                    # A leading NUL is a normal prefix some instruments prepend
+                    # to every response -- strip it silently, same as always.
+                    data = data.lstrip(b"\x00")
+                    # A leading terminator, in contrast, is a leftover from an
+                    # earlier response, never the start of this one. Without
+                    # this, a single stray "\n" satisfies the endswith() check
+                    # below and returns an EMPTY response -- which is how one
+                    # late newline shifted every later answer by one query
+                    # (High-7). This case is worth a warning: it means the
+                    # PREVIOUS exchange left something behind.
+                    cleaned = data.lstrip(b"\r\n")
                     if cleaned != data:
                         logger.warning("Discarded %d stray terminator byte(s) left before the response to '%s' on %s:%s", len(data) - len(cleaned), self._last_command, self.host, self.port)
                         data = cleaned
                     if data.endswith(b"\n"):
                         break
 
-                # Decode and strip whitespace and null bytes
+                # Decode and strip whitespace. Leading NULs are already gone
+                # (stripped above); .strip() takes care of surrounding
+                # whitespace left by the terminator.
                 response = data.decode("ascii").strip()
-                # Remove null bytes that some oscilloscopes prepend to responses
-                response = response.lstrip("\x00")
                 return response
             except socket.timeout:
                 self._desynced = True
@@ -312,26 +319,31 @@ class SocketConnection(BaseConnection):
 
         The old fixed recv(2) was the bug: when the second "\\n" of "\\n\\n"
         arrived late, one newline stayed queued and became the entire next
-        response. Peeking first means we never consume a byte that belongs to
-        the next response, and never leave one we could have taken.
+        response. A single bounded peek fixes that without a loop: recv()
+        returns as soon as ANY bytes are queued, so peeking for up to two
+        bytes never waits for a second terminator byte that may not have
+        arrived yet -- a late partner is instead caught by read()'s
+        leading-terminator skip. This still pays the 0.05s timeout only when
+        nothing at all is queued yet, exactly like the old recv(2); unlike a
+        peek-in-a-loop, it never pays that timeout a second time waiting for
+        a byte that may never come (that would cost the live view 50ms on
+        every single block read, not just a desynced one).
         """
-        consumed = b""
         previous = self._socket.gettimeout()
         self._socket.settimeout(0.05)
         try:
-            while True:
-                try:
-                    peeked = self._socket.recv(1, socket.MSG_PEEK)
-                except socket.timeout:
-                    return consumed
-                if not peeked:
-                    return consumed
-                if peeked not in (b"\n", b"\r"):
-                    # Surplus that is not a terminator belongs to nobody yet:
-                    # leave it and let the next write() drain it.
-                    self._desynced = True
-                    return consumed
-                consumed += self._socket.recv(1)
+            try:
+                peeked = self._socket.recv(2, socket.MSG_PEEK)
+            except socket.timeout:
+                return b""
+            terminator_run = len(peeked) - len(peeked.lstrip(b"\r\n"))
+            if terminator_run < len(peeked):
+                # Surplus beyond the terminator run belongs to nobody yet:
+                # leave it and let the next write() drain it.
+                self._desynced = True
+            if terminator_run == 0:
+                return b""
+            return self._socket.recv(terminator_run)
         finally:
             self._socket.settimeout(previous if previous is not None else self.timeout)
 
