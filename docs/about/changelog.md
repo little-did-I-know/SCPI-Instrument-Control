@@ -14,6 +14,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Oscilloscope: setting an invalid trigger type now raises `ValueError` (consistent with the mode/slope setters) where it previously raised `InvalidParameterError`; callers catching `SiglentError` around `trigger.trigger_type` assignments should catch `ValueError` too.
 - DAQ: an overload reading is no longer returned as the raw `9.9E+37` sentinel. `Reading` gains an `overload: bool` field; overload readings carry `value=NaN` with `overload=True`. Code that compared readings against `9.9e37` should check `reading.overload` instead.
 - Oscilloscope (legacy Siglent): `acquire(..., format="WORD")` now raises `FeatureNotSupportedError` instead of returning fabricated data. The legacy programming guide documents no way to request 16-bit samples; use `format="BYTE"`.
+- Connections: `read_raw()` takes a `framing` argument (`Framing.AUTO` by default, so existing calls are unchanged). Custom `BaseConnection` subclasses must accept it.
+- Sockets: a response cut short by the peer now raises `SiglentConnectionError` instead of being returned as a successful short read. A truncated measurement or screenshot was previously indistinguishable from a complete one.
+- Sockets: a non-ASCII byte in a text response now raises `SiglentConnectionError` instead of `UnicodeDecodeError`. Code catching `ValueError` around `read()`/`query()` was silently swallowing it and must catch the transport error instead.
+- VISA: `is_connected` now requires a successful `connect()`. A connection that failed after opening the resource previously reported itself connected.
+
+### Added
+
+- Connections: `resync()` discards anything the instrument left unread and reports the byte count. Called automatically before the next send after a read times out.
 
 ### Fixed
 
@@ -25,6 +33,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - DAQ: reading tokens that cannot be parsed are now logged at warning level instead of being dropped silently at debug level.
 - Oscilloscope (Tektronix): captures now widen the transfer window before measuring it, so a narrow `DATa:STOP` left behind by another program or a recalled setup no longer truncates every capture indefinitely.
 - Mock: the DAQ mock wraps `R?` in a definite-length block (leaving `READ?`/`FETCh?` bare, as the instrument does) and the Tektronix mock models the `DATa:STARt`/`DATa:STOP` window, so both regressions are now catchable in CI.
+- Sockets: a reply that arrives after its read timed out is no longer returned to the NEXT query — the connection discards anything left unread before it sends again, and reports the discarded byte count. Every value after a single timeout could previously be shifted by one query. (A reply still in flight when the next command is sent cannot be distinguished from that command's answer; call `resync()` or reconnect if you need certainty after a timeout.)
+- Sockets: binary content containing `#` followed by digits is no longer mistaken for an IEEE 488.2 block header, which truncated the response and left the remainder to poison the next read. A block header is now only recognised after a printable-ASCII prefix.
+- Sockets: the terminator following a binary block is consumed by peeking rather than a fixed two-byte read, so a late second newline can no longer become an empty response to the next query.
+- VISA: every exchange now holds the connection lock, so a GUI and the server can no longer interleave mid-transfer; `connect()` is a no-op when already connected instead of leaking a second resource over the first, and a failed `connect()` closes and clears both the resource and the ResourceManager; `read()` skips a leading stray terminator instead of returning it as an empty response, and `read()`/`read_raw()` now translate `VisaIOError` the way `write()`/`query()` already did; `read_raw(None)` frames definite-length blocks like the socket transport, with the read termination character disabled during binary reads so a `0x0A` inside a waveform cannot end the read; and `query_binary()` no longer demands exactly `max_bytes` (which blocked the full timeout and then raised, after the data had arrived). These are contract fixes checked against a stub VISA resource, not against hardware — this repo has none, and `pyvisa` is not installed locally.
+- Oscilloscope: a whole acquisition holds the connection lock, rather than each exchange inside it, so a concurrent source or interval change cannot be assembled into the middle of one waveform. The screenshot path holds it across its write, wait and read.
 
 ## [6.0.0] - 2026-07-30
 
