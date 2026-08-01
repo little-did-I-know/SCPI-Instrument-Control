@@ -13,7 +13,7 @@ Features:
     - Data logging; `Reading.timestamp` is populated only if the caller sets it
       -- this module never reads it back from the instrument. Instrument-side
       timestamps would require FORMat:READing:TIME (34970A/34972A Command
-      Reference p.411), which this library does not enable.
+      Reference p.417-424), which this library does not enable.
     - Context manager support for automatic connection management
 
 Feedback:
@@ -42,8 +42,8 @@ class Reading:
     channel: Optional[int] = None
     # Never set by this module -- callers must supply it themselves. This is
     # NOT "when the instrument sampled": getting that would require enabling
-    # FORMat:READing:TIME (34970A/34972A Command Reference p.411) and parsing
-    # the returned time stamp, which this library does not do.
+    # FORMat:READing:TIME (34970A/34972A Command Reference p.417-424) and
+    # parsing the returned time stamp, which this library does not do.
     timestamp: Optional[float] = None
     unit: Optional[str] = None
     alarm_state: Optional[str] = None
