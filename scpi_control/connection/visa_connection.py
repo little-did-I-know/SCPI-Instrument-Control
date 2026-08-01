@@ -586,15 +586,42 @@ class VISAConnection(BaseConnection):
             logger.debug(f"VISA Binary Response: {len(response)} bytes")
             return response
 
+    def drain_input(self) -> int:
+        """Discard bytes the instrument has already queued; return the count.
+
+        Passive by contract (see BaseConnection.drain_input): short-timeout
+        reads until the session goes quiet, and NOTHING else. In particular it
+        never calls clear() -- a VISA device clear aborts the instrument's
+        pending operation, which is a far larger request than "mop up the
+        terminator behind a block I have already read", and no caller with
+        housekeeping to do should be made to make it. resync() below is the
+        method that may take that action, which is why they are two methods
+        (backend review 2026-07-31 wave 3, whole-branch review: the screenshot
+        path asked for a resync when it wanted a drain, and so issued a device
+        clear on every modern capture over VISA).
+
+        It does not touch `_desynced` either: emptying the buffer is not a
+        claim that the session position is known again.
+        """
+        with self.lock:
+            if not self.is_connected:
+                return 0
+            return self._drain()
+
     def resync(self) -> int:
-        """Discard anything the instrument left unread; return the byte count.
+        """Recover a session whose position is unknown; return bytes discarded.
 
         Called before the next send when a read has been abandoned. The bytes
         are gone either way -- the alternative is handing them to a caller who
         asked a different question (backend review 2026-07-31, High-7).
 
-        Prefers a VISA device clear, the protocol-level way to say "abandon the
-        current transfer". Two limits, stated plainly:
+        The ACTIVE counterpart to drain_input(): this one prefers a VISA device
+        clear, the protocol-level way to say "abandon the current transfer".
+        That is exactly why the two are separate verbs -- a caller who only
+        wants queued bytes gone must be able to ask for that without aborting
+        whatever the instrument is in the middle of.
+
+        Two limits, stated plainly:
 
         - `clear()`'s effect is UNVERIFIED against hardware here. pyvisa is not
           installed in this environment, so it is known to be CALLED, not known
@@ -617,16 +644,20 @@ class VISAConnection(BaseConnection):
                 else:
                     self._desynced = False
                     return 0
-            return self._drain()
+            try:
+                return self._drain()
+            finally:
+                self._desynced = False
 
     def _drain(self) -> int:
         """Read whole messages until the session goes quiet; count what went.
 
-        The fallback for a resource exposing no clear(). pyvisa documents
-        clear() on MessageBasedResource, so this is expected to be the path for
-        resources and test doubles that do not expose it rather than the normal
-        route -- expected, not confirmed: nothing in this module is checked
-        against a real backend.
+        The whole of drain_input(), and resync()'s fallback for a resource
+        exposing no clear(). pyvisa documents clear() on MessageBasedResource,
+        so on the resync path this is expected to serve resources and test
+        doubles that do not expose it rather than being the normal route --
+        expected, not confirmed: nothing in this module is checked against a
+        real backend.
 
         read_raw(), not read_bytes(): there is no length to ask for here, and a
         fixed-length read would wait out the timeout for bytes that are not
@@ -634,6 +665,9 @@ class VISAConnection(BaseConnection):
         instrument never terminates times out with what was read so far
         discarded uncounted -- but the bytes are gone either way, which is the
         point of a drain. The number only feeds a log line.
+
+        Deliberately does not touch `_desynced`: whether the drain has restored
+        the session is the CALLER's verdict, and only resync() makes it.
         """
         discarded = 0
         previous_timeout = self._resource.timeout
@@ -652,7 +686,6 @@ class VISAConnection(BaseConnection):
         finally:
             self._resource.timeout = previous_timeout
             self._resource.read_termination = previous_termination
-            self._desynced = False
         return discarded
 
     def _configure_serial(self) -> None:

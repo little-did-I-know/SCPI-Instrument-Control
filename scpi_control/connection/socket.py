@@ -250,21 +250,20 @@ class SocketConnection(BaseConnection):
                 command_context = f" after '{self._last_command}'" if self._last_command else ""
                 raise exceptions.SiglentConnectionError(f"Read error from {self.host}:{self.port}{command_context}: {e}")
 
-    def resync(self) -> int:
-        """Discard anything the instrument left unread; return the byte count.
+    def drain_input(self) -> int:
+        """Discard bytes already queued on the socket; return the byte count.
 
-        Called automatically before the next send when a read has timed out.
-        The bytes are gone either way -- the alternative is handing them to a
-        caller who asked a different question (High-7).
+        Passive by contract (see BaseConnection.drain_input): recv() until the
+        socket goes quiet, and nothing else. It sends nothing, resets nothing,
+        and does not touch `_desynced` -- "empty the buffer" is not a claim
+        that the session position is known again. A caller that wants THAT
+        wants resync(), which is a different request and says so in its name.
 
         LIMIT, stated plainly: this discards what has ARRIVED. A reply still in
-        flight when the next command goes out cannot be told apart from the
-        answer to that command, and will still be misattributed. Callers that
-        need certainty after a timeout should reconnect, or call resync()
-        themselves once they are willing to wait for the straggler.
+        flight is indistinguishable from the answer to whatever goes out next,
+        and will still be misattributed.
         """
         if not self._connected or not self._socket:
-            self._desynced = False
             return 0
         discarded = 0
         with self.lock:
@@ -281,8 +280,36 @@ class SocketConnection(BaseConnection):
                     discarded += len(chunk)
             finally:
                 self._socket.settimeout(previous if previous is not None else self.timeout)
-                self._desynced = False
         return discarded
+
+    def resync(self) -> int:
+        """Recover a session whose position is unknown; return bytes discarded.
+
+        Called automatically before the next send when a read has timed out.
+        The bytes are gone either way -- the alternative is handing them to a
+        caller who asked a different question (High-7).
+
+        On this transport recovery IS the drain, so it delegates to
+        drain_input() and then records that the session is back in step. The
+        two still have separate names because they are separate requests, and
+        the other transport answers them differently: VISAConnection.resync()
+        issues a device clear, which aborts whatever the instrument is doing.
+        A caller with a stray terminator to mop up must not be made to ask for
+        that (backend review 2026-07-31 wave 3, whole-branch review).
+
+        Inherits drain_input()'s limit: a reply still in flight when the next
+        command goes out cannot be told apart from the answer to that command.
+        Callers that need certainty after a timeout should reconnect, or call
+        resync() themselves once they are willing to wait for the straggler.
+        """
+        if not self._connected or not self._socket:
+            self._desynced = False
+            return 0
+        with self.lock:
+            try:
+                return self.drain_input()
+            finally:
+                self._desynced = False
 
     def _read_chunk(self, hint: int) -> bytes:
         """Read up to `hint` bytes, translating socket states for read_framed.

@@ -93,6 +93,31 @@ def test_a_nul_prefix_survives_a_leading_terminator_strip():
     assert conn.read() == "1.5"
 
 
+def test_drain_input_discards_the_queue_without_declaring_the_session_recovered():
+    # "Throw away what is queued" and "recover the session" are separate
+    # requests. drain_input() answers only the first: the bytes go, and the
+    # verdict on whether the session position is known again stays with
+    # resync(), which is the verb that may take a protocol-level action.
+    conn, _ = connected([b"leftovers"], timeout=0.05)
+    conn._desynced = True
+    assert conn.drain_input() == len(b"leftovers")
+    assert conn._desynced is True
+
+
+def test_resync_still_clears_the_flag_after_delegating_the_drain():
+    conn, _ = connected([b"leftovers"], timeout=0.05)
+    conn._desynced = True
+    assert conn.resync() == len(b"leftovers")
+    assert conn._desynced is False
+
+
+def test_drain_input_restores_the_read_timeout_it_borrowed():
+    conn, fake = connected([b"leftovers"], timeout=0.05)
+    fake.settimeout(conn.timeout)
+    conn.drain_input()
+    assert fake.gettimeout() == conn.timeout
+
+
 def test_the_terminator_drain_never_eats_real_data():
     # A non-terminator byte after the block belongs to nobody yet: leave it,
     # and mark the session so the next write() clears it.

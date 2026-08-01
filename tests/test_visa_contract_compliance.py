@@ -18,6 +18,7 @@ the behaviour under test. The existing contract tests only get away with it
 because they never touch an error path.
 """
 
+import struct
 import types
 from unittest.mock import MagicMock, patch
 
@@ -475,3 +476,52 @@ class TestResync:
         conn.query("*IDN?")
         resource.clear.assert_called_once()
         assert conn._desynced is False
+
+
+class TestDrainInput:
+    """Discarding what is queued differs from aborting what the instrument is doing.
+
+    resync() prefers a VISA device clear -- a protocol-level abort of the
+    instrument's pending operation. A caller who only wants leftover bytes gone
+    must be able to say so without requesting that, which is why drain_input()
+    is a separate verb (whole-branch review of the wave-3 transport branch).
+    """
+
+    def test_drain_input_never_issues_a_device_clear(self, visa):
+        module, stub = visa
+        conn, resource = _connected(module, stub)
+        resource.read_raw.side_effect = _serve(b"\n")
+        assert conn.drain_input() == 1
+        resource.clear.assert_not_called()
+
+    def test_drain_input_leaves_the_desync_flag_alone(self, visa):
+        # Emptying the buffer is not a claim that the session position is
+        # known again -- that verdict belongs to resync().
+        module, stub = visa
+        conn, resource = _connected(module, stub)
+        conn._desynced = True
+        resource.read_raw.side_effect = _serve(b"\n")
+        conn.drain_input()
+        assert conn._desynced is True
+
+    def test_drain_input_borrows_the_short_timeout_rather_than_keeping_it(self, visa):
+        module, stub = visa
+        conn, resource = _connected(module, stub)
+        resource.read_raw.side_effect = _serve(b"\n")
+        conn.drain_input()
+        assert resource.timeout == int(conn.timeout * 1000)
+        assert resource.read_termination == "\n"
+
+    def test_a_modern_screen_capture_does_not_clear_the_instrument(self, visa):
+        # The defect drain_input() exists to fix: _capture_with_scdp asked for
+        # a resync when it wanted a drain, so EVERY modern SCDP capture over
+        # VISA ended with a device clear nobody requested.
+        from scpi_control.screen_capture import ScreenCapture
+
+        module, stub = visa
+        conn, resource = _connected(module, stub)
+        bmp = b"BM" + struct.pack("<I", 10) + b"\xab\xab\xab\xab"
+        _serve_session(resource, bmp + b"\n")
+        scope = types.SimpleNamespace(_connection=conn, dialect="modern", write=lambda command: None)
+        assert ScreenCapture(scope).capture_screenshot() == bmp
+        resource.clear.assert_not_called()

@@ -132,7 +132,22 @@ class ScreenCapture:
                 self._scope.write("SCDP")
                 time.sleep(0.2)  # let the scope prepare the screen dump
                 image_data = _read_bmp_by_header(connection.read_raw)
-                connection.resync()  # discard any trailing terminator byte
+                # The image is already in hand. What is left is the terminator
+                # the scope sends behind it, which belongs to nobody and would
+                # otherwise become the next response -- so drain it, and only
+                # drain it. resync() is the wrong verb here: on VISA it prefers
+                # a device clear, which aborts the instrument's pending
+                # operation for what is pure housekeeping. And because the
+                # drain is housekeeping for the NEXT caller, a fault in it must
+                # not destroy a screenshot that arrived intact: capture_
+                # screenshot() turns any exception into "Failed to capture
+                # screenshot", which would be a lie with the complete image
+                # sitting in this local (backend review 2026-07-31 wave 3,
+                # whole-branch review).
+                try:
+                    connection.drain_input()
+                except Exception as e:
+                    logger.warning("Screen dump captured, but draining the bytes behind it failed: %s", e)
                 return image_data
             self._scope.write("SCDP?")
             time.sleep(0.2)

@@ -104,8 +104,37 @@ class BaseConnection(ABC):
         """
         pass
 
+    def drain_input(self) -> int:
+        """Discard bytes the instrument has already queued; return the count.
+
+        "Throw away what is queued" and "abort what the instrument is doing"
+        are DIFFERENT requests, which is why they are different methods. This
+        one is passive: it consumes buffered bytes and takes no protocol-level
+        action at all. Use it for housekeeping after a completed exchange --
+        e.g. the terminator a scope sends behind a screen dump, which belongs
+        to nobody and would otherwise become the next response. Use `resync()`
+        when the session position is genuinely unknown and recovering it is
+        worth interrupting the instrument for.
+
+        No-op by default, returning 0: a transport with no readable buffer has
+        nothing to discard. Overridden by SocketConnection and VISAConnection.
+
+        Best-effort in what it RECOVERS: it can only discard bytes that have
+        ARRIVED, so a reply still in flight is not covered. It does not promise
+        never to RAISE -- a transport fault during the drain is a real fault
+        and is reported rather than hidden. Callers for whom the drain is
+        incidental to work already completed should guard the call.
+        """
+        return 0
+
     def resync(self) -> int:
-        """Discard anything the instrument left unread; return the byte count.
+        """Recover a session whose position is unknown; return bytes discarded.
+
+        The active counterpart to `drain_input()`: this one MAY take a
+        protocol-level action -- VISAConnection prefers a VISA device clear,
+        which aborts the instrument's pending operation. That is not something
+        a caller who merely wants the buffer emptied should trigger, so callers
+        with buffered leftovers and nothing to recover want `drain_input()`.
 
         No-op by default. A transport that can be left mid-response overrides
         this -- see SocketConnection, where a reply that arrives after a
