@@ -123,8 +123,22 @@ class SiglentTransfer:
             WaveformData object with time and voltage arrays
 
         Raises:
+            FeatureNotSupportedError: If format='WORD' is requested
+            InvalidParameterError: If an invalid format is requested
             CommandError: If acquisition fails
         """
+        # Validate format pre-flight, before any wire access
+        fmt = format.upper()
+        if fmt == "WORD":
+            raise exceptions.FeatureNotSupportedError(
+                "format='WORD' is not supported on the legacy Siglent dialect: the programming guide "
+                "(RC01020-E01C) documents no command to select 16-bit transfer width -- WAVEFORM_SETUP/WFSU "
+                "(p.144-145) sets only sparsing, point count and first point -- and WF? DAT2 answers one byte "
+                "per sample (p.141-142). Use format='BYTE'."
+            )
+        if fmt != "BYTE":
+            raise exceptions.InvalidParameterError(f"Invalid format: {format}")
+
         # Get channel configuration
         ch = f"C{channel}"
         voltage_scale = self._scope.waveform._get_voltage_scale(ch)
@@ -139,13 +153,8 @@ class SiglentTransfer:
             self._scope.write(waveform_command)
             raw_data = self._scope.read_raw()
 
-        # Parse waveform data
-        if format == "BYTE":
-            dtype = np.int8
-        elif format == "WORD":
-            dtype = np.int16
-        else:
-            raise exceptions.InvalidParameterError(f"Invalid format: {format}")
+        # Parse waveform data - only BYTE is supported on legacy dialect
+        dtype = np.int8
 
         error_context = f"host {self._scope.host}:{self._scope.port}, command '{waveform_command}'"
         voltage_data = parse_ieee_block(raw_data, dtype, error_context=error_context)
