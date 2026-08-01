@@ -708,7 +708,17 @@ class MockConnection(BaseConnection):
             # anchored at the end: MEAS:*? and read_remove's "R?" commands
             # carry trailing arguments (e.g. "MEAS:VOLT:DC? AUTO,AUTO,(@101)"
             # or "R? 10"), which a full-string anchor would reject.
-            if re.match(r"^(READ\?|FETC\??|MEAS:[\w:]*\?|R\?)", upper):
+
+            # R? wraps its CSV payload in an IEEE 488.2 definite-length block
+            # (34970A/34972A Command Reference p.40; worked example p.41:
+            # `R? 2` -> `#231+2.87536000E-04,+3.18131400E-03`). READ?/FETC?/
+            # MEAS:*? send the same CSV bare (p.49-50, 16-17), so only R? is
+            # wrapped here -- answering them all alike is what hid the parser
+            # bug from CI.
+            if re.match(r"^R\?", upper):
+                payload = self.daq_readings
+                return f"#{len(str(len(payload)))}{len(payload)}{payload}"
+            if re.match(r"^(READ\?|FETC\??|MEAS:[\w:]*\?)", upper):
                 return self.daq_readings
 
         # Function generator (AWG) queries

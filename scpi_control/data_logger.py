@@ -40,16 +40,49 @@ class Reading:
     timestamp: Optional[float] = None
     unit: Optional[str] = None
     alarm_state: Optional[str] = None
+    # True when the instrument reported an overload instead of a measurement
+    # (34970A/34972A Command Reference p.251: "the instrument gives an overload
+    # indication: +-OVLD from the front panel or +-9.9E+37 from the remote
+    # interface"). `value` is NaN in that case -- an impossible reading must not
+    # enter the record as a number.
+    overload: bool = False
 
     def __repr__(self) -> str:
-        parts = [f"{self.value}"]
-        if self.unit:
+        parts = ["OVLD" if self.overload else f"{self.value}"]
+        if self.unit and not self.overload:
             parts[0] += f" {self.unit}"
         if self.channel:
             parts.append(f"ch={self.channel}")
         if self.timestamp:
             parts.append(f"t={self.timestamp:.3f}s")
         return f"Reading({', '.join(parts)})"
+
+
+# 34970A/34972A Command Reference p.251/266/275/839/905/946/1128: an overload
+# reads back as +-9.9E+37. Test on magnitude -- the sign follows the input.
+# NOT to be confused with TRIG:COUNt?'s infinite-count sentinel 9.90000200E+37
+# (p.1501), which is a different query this parser never sees.
+_OVERLOAD_MAGNITUDE = 9.9e37
+
+
+def _strip_definite_length_block(response: str) -> str:
+    """Return the payload of an IEEE 488.2 definite-length block, or the input unchanged.
+
+    `R?` wraps its CSV payload in `#<n><length>` (34970A/34972A Command Reference
+    p.40, example p.41); `DATA:REMove?`/`FETCh?`/`READ?` send the same CSV bare
+    (p.334-335, 16-17, 49-50). Both must parse, so the header is optional.
+    """
+    text = response.strip()
+    if not text.startswith("#"):
+        return text
+    if len(text) < 2 or not text[1].isdigit() or text[1] == "0":
+        return text
+    digits = int(text[1])
+    header_end = 2 + digits
+    length_field = text[2:header_end]
+    if len(length_field) < digits or not length_field.isdigit():
+        return text
+    return text[header_end : header_end + int(length_field)]
 
 
 class DataLogger:
@@ -698,14 +731,18 @@ class DataLogger:
     # --- Helper Methods ---
 
     def _parse_readings(self, response: str) -> List[Reading]:
-        """Parse comma-separated readings from response string."""
+        """Parse comma-separated readings from response string.
+
+        `R?` wraps the CSV in an IEEE 488.2 definite-length block; other
+        readback queries send it bare (see `_strip_definite_length_block`).
+        """
         readings = []
 
         if not response or response.strip() == "":
             return readings
 
-        # Split by comma and parse each value
-        values = response.strip().split(",")
+        # Strip an optional definite-length block header, then split by comma.
+        values = _strip_definite_length_block(response).split(",")
 
         for val in values:
             val = val.strip()
@@ -713,12 +750,18 @@ class DataLogger:
                 continue
 
             try:
-                # Try to parse as float
-                reading = Reading(value=float(val))
-                readings.append(reading)
+                value = float(val)
             except ValueError:
-                # May contain additional info like channel or alarm state
-                logger.debug(f"Could not parse reading value: {val}")
+                # Never swallow this silently: R? erases readings on the
+                # instrument, so a token we cannot parse is data the caller
+                # can never get back.
+                logger.warning("Discarding unparseable DAQ reading token %r", val)
+                continue
+
+            if abs(value) >= _OVERLOAD_MAGNITUDE:
+                readings.append(Reading(value=float("nan"), overload=True))
+            else:
+                readings.append(Reading(value=value))
 
         return readings
 
