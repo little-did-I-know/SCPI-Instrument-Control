@@ -219,9 +219,16 @@ class TestBinaryReads:
         conn, resource = _connected(module, stub)
         _serve_session(resource, b"BM\x36\x00\x00\x00 no header here")
         assert conn.read_raw(framing=framing) == b"BM\x36\x00\x00\x00 no header here"
-        # AUTO still probes byte-by-byte until it can rule a header out; what it
-        # must never do is ask for a fixed length it has no reason to expect.
-        assert all(call.args[0] == 1 for call in resource.read_bytes.call_args_list)
+        if framing is Framing.STREAM:
+            # Nothing to rule out, so the fixed-length read is never reached at
+            # all. Spelled out rather than left to all([]) being vacuously true.
+            assert not resource.read_bytes.call_args_list
+        else:
+            # AUTO still probes byte-by-byte until it can rule a header out;
+            # what it must never do is ask for a fixed length it has no reason
+            # to expect.
+            assert resource.read_bytes.call_args_list
+            assert all(call.args[0] == 1 for call in resource.read_bytes.call_args_list)
 
     def test_a_declared_stream_does_not_shorten_the_first_read(self, visa):
         # Only the idle read that proves a response ENDED may be cut short.
@@ -244,7 +251,7 @@ class TestBinaryReads:
         _serve_session(resource, b"BM\x36\x00\x00\x00 no header here", watcher=lambda: seen.append(resource.timeout))
         conn.read_raw(framing=Framing.AUTO)
         assert seen[0] == int(conn.timeout * 1000)
-        assert seen[-1] == module._IDLE_DRAIN_TIMEOUT_MS
+        assert seen[-1] == module._HEADERLESS_TAIL_TIMEOUT_MS
         assert resource.timeout == int(conn.timeout * 1000), "the shortened timeout must not outlive the read"
 
     def test_query_binary_does_not_demand_exactly_max_bytes(self, visa):
@@ -262,6 +269,79 @@ class TestBinaryReads:
         resource.read_bytes.side_effect = _serve(b"#3012" + b"0123456789ab")
         with pytest.raises(exceptions.CommandError):
             conn.query_binary("C1:WF? DAT2", max_bytes=8)
+
+
+class TestBlockTerminator:
+    """read_framed stops on the last payload byte; the terminator is still queued.
+
+    Left there it is not harmless -- it becomes the whole of the next response,
+    and since nothing timed out, _desynced is never set, so the
+    resync-before-send cannot catch it either. SocketConnection has its own
+    _drain_terminator for exactly this.
+    """
+
+    def test_a_completed_block_consumes_its_trailing_terminator(self, visa):
+        module, stub = visa
+        conn, resource = _connected(module, stub)
+        _serve_session(resource, b"#15he\nlo" + b"\n")
+        assert conn.read_raw(framing=Framing.BLOCK) == b"#15he\nlo" + b"\n"
+        # Nothing may be left for the next reader to trip over.
+        with pytest.raises(FakeVisaIOError):
+            resource.read_bytes(1)
+        assert conn._desynced is False
+
+    def test_a_two_byte_terminator_run_is_consumed_whole(self, visa):
+        module, stub = visa
+        conn, resource = _connected(module, stub)
+        _serve_session(resource, b"#15he\nlo" + b"\r\n")
+        assert conn.read_raw(framing=Framing.BLOCK) == b"#15he\nlo" + b"\r\n"
+        assert conn._desynced is False
+
+    def test_surplus_behind_a_block_is_flagged_not_silently_dropped(self, visa, caplog):
+        # VISA cannot peek, so by the time we know it is not a terminator we
+        # have eaten it. The honest response is to say so, not to pretend the
+        # session is intact -- SocketConnection can leave it in the buffer,
+        # this cannot.
+        module, stub = visa
+        conn, resource = _connected(module, stub)
+        _serve_session(resource, b"#15he\nlo" + b"XYZ")
+        with caplog.at_level("WARNING"):
+            assert conn.read_raw(framing=Framing.BLOCK) == b"#15he\nlo"
+        assert conn._desynced is True, "a consumed surplus byte leaves the session out of step"
+        assert "X" in caplog.text, "the discarded byte must be named in the log"
+
+    def test_no_terminator_queued_is_not_an_error(self, visa):
+        # Normal for a resource class whose own read already took the
+        # terminator: the probe times out and the block is returned as-is.
+        module, stub = visa
+        conn, resource = _connected(module, stub)
+        _serve_session(resource, b"#15he\nlo")
+        assert conn.read_raw(framing=Framing.BLOCK) == b"#15he\nlo"
+        assert conn._desynced is False
+
+    def test_the_terminator_probe_reads_one_byte_at_a_time(self, visa):
+        # read_bytes(2) is a fixed-length read: against a one-byte terminator
+        # run it would wait out the timeout and then raise, losing the very
+        # byte this drain exists to remove.
+        module, stub = visa
+        conn, resource = _connected(module, stub)
+        _serve_session(resource, b"#15he\nlo" + b"\n")
+        conn.read_raw(framing=Framing.BLOCK)
+        sizes = [call.args[0] for call in resource.read_bytes.call_args_list]
+        # 1,1,1 resolving the header, then 5 for the rest of the declared
+        # block -- both are lengths we know are coming. What follows the block
+        # is not, so the probe has to be the single-byte reads at the tail.
+        assert sizes[:4] == [1, 1, 1, 5], sizes
+        assert sizes[4:] and set(sizes[4:]) == {1}, f"the terminator probe must read one byte at a time, got {sizes}"
+
+    def test_the_probe_timeout_does_not_outlive_the_read(self, visa):
+        module, stub = visa
+        conn, resource = _connected(module, stub)
+        seen = []
+        _serve_session(resource, b"#15he\nlo" + b"\n", watcher=lambda: seen.append(resource.timeout))
+        conn.read_raw(framing=Framing.BLOCK)
+        assert seen[-1] == module._QUIET_PROBE_TIMEOUT_MS, "the terminator probe must not wait the full timeout"
+        assert resource.timeout == int(conn.timeout * 1000)
 
 
 class TestResync:

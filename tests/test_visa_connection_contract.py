@@ -70,11 +70,16 @@ def test_read_raw_honors_size():
 
 def test_read_raw_none_frames_the_response():
     # Wave 3 changed what "no size" means here: read_raw(None) frames the
-    # response through connection.framing instead of delegating to pyvisa's
-    # read_raw(), so the 0x0A in the middle of this block no longer ends the
-    # read. A complete definite-length block terminates on its own declared
-    # length, which is what lets this run in a file that deliberately has no
-    # pyvisa (and so no VISA timeout to end an open-ended read with).
+    # response through connection.framing, reading to the block's declared
+    # length via read_bytes, rather than handing the whole read to pyvisa's
+    # read_raw(). That switch is what this pins -- NOT terminator handling.
+    # The resource here is a bare MagicMock with no termination behaviour at
+    # all, so the embedded 0x0A could never have ended this read either way;
+    # the real terminator guard is test_visa_contract_compliance.py's
+    # test_termination_is_disabled_for_a_binary_read_and_restored.
+    # A complete definite-length block ends on its own declared length, which
+    # is what lets this run in a file that deliberately has no pyvisa (and so
+    # no VISA timeout to end an open-ended read with).
     conn = _fake_session()
     block = b"#15he\nlo"
     remaining = [block]
