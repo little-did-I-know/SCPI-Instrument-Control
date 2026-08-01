@@ -1,11 +1,15 @@
 """TCP socket implementation for SCPI communication."""
 
+import logging
 import socket
 import time
-from typing import Optional, Tuple
+from typing import Optional
 
 from scpi_control import exceptions
 from scpi_control.connection.base import BaseConnection
+from scpi_control.connection.framing import Framing, TransportClosed, TransportIdle, read_framed
+
+logger = logging.getLogger(__name__)
 
 
 class SocketConnection(BaseConnection):
@@ -158,13 +162,15 @@ class SocketConnection(BaseConnection):
             time.sleep(0.01)
             return self.read()
 
-    def read_raw(self, size: Optional[int] = None) -> bytes:
+    def read_raw(self, size: Optional[int] = None, framing: Framing = Framing.AUTO) -> bytes:
         """Read raw binary data from oscilloscope.
 
         Used for reading waveform data in binary format.
 
         Args:
             size: Number of bytes to read (None for all available)
+            framing: How to interpret the response when size is None (see
+                connection.framing.Framing). Ignored when size is given.
 
         Returns:
             Raw binary data
@@ -190,7 +196,7 @@ class SocketConnection(BaseConnection):
                         remaining -= len(chunk)
                     return data
                 else:
-                    return self._read_ieee_block()
+                    return self._read_ieee_block(framing)
             except socket.timeout:
                 command_context = f"after '{self._last_command}' " if self._last_command else ""
                 raise exceptions.SiglentTimeoutError(f"Raw read timeout {command_context}from {self.host}:{self.port}")
@@ -199,95 +205,50 @@ class SocketConnection(BaseConnection):
                 command_context = f" after '{self._last_command}'" if self._last_command else ""
                 raise exceptions.SiglentConnectionError(f"Read error from {self.host}:{self.port}{command_context}: {e}")
 
-    def _read_ieee_block(self) -> bytes:
-        """Read a response that may carry an IEEE 488.2 definite-length block.
+    def _read_chunk(self, hint: int) -> bytes:
+        """Read up to `hint` bytes, translating socket states for read_framed.
 
-        Once a '#<n><length>' header is seen, reads exactly the declared
-        number of bytes (plus the trailing terminator when present) instead
-        of draining until the line goes idle. Responses without a block
-        header keep the legacy idle-drain behavior. A headerless response
-        shorter than 128 bytes is indistinguishable from a block header that
-        has not arrived yet, so it is returned only after the full connection
-        timeout elapses - an accepted trade-off so slow scopes that pause
-        between the command echo and the block header are not truncated.
-
-        Raises:
-            SiglentTimeoutError: If no data arrives at all, or the line
-                stalls before the declared byte count is received.
+        TransportIdle/TransportClosed are raised rather than returned so the
+        framing module can tell a finished response from a cut-off one --
+        the connection state that goes with a peer close is set here, because
+        the transport is what knows about it.
         """
-        data = b""
-        expected_total: Optional[int] = None
-        header_absent = False
-
         try:
-            while True:
-                try:
-                    chunk = self._socket.recv(self._buffer_size)
-                except socket.timeout:
-                    command_context = f"for '{self._last_command}' " if self._last_command else ""
-                    if expected_total is not None:
-                        raise exceptions.SiglentTimeoutError(f"Binary read stalled {command_context}(received {len(data)} of {expected_total} declared bytes) from {self.host}:{self.port}")
-                    if data:
-                        # Headerless response finished (line went idle)
-                        return data
-                    raise exceptions.SiglentTimeoutError(f"Binary read timeout {command_context}- no data received from {self.host}:{self.port}")
+            chunk = self._socket.recv(min(hint, self._buffer_size))
+        except socket.timeout:
+            raise TransportIdle()
+        if not chunk:
+            logger.warning("Connection closed by %s:%s after '%s'", self.host, self.port, self._last_command)
+            self._connected = False
+            raise TransportClosed()
+        return chunk
 
-                if not chunk:
-                    return data  # Peer closed the connection
-
-                data += chunk
-
-                if expected_total is None and not header_absent:
-                    expected_total, header_absent = self._parse_block_total(data)
-                    if header_absent:
-                        # Legacy path: no way to know the length, drain until idle
-                        self._socket.settimeout(0.5)
-
-                if expected_total is not None and len(data) >= expected_total:
-                    if len(data) == expected_total:
-                        # Terminator not seen yet; grab it so callers get the same
-                        # trailing bytes the legacy drain produced. When surplus
-                        # already arrived, skip the extra recv entirely.
-                        data += self._drain_terminator()
-                    return data
-        except socket.error as e:
-            if not isinstance(e, socket.timeout):
-                self._connected = False
-                command_context = f" after '{self._last_command}'" if self._last_command else ""
-                raise exceptions.SiglentConnectionError(f"Read error from {self.host}:{self.port}{command_context}: {e}")
-            raise
+    def _read_ieee_block(self, framing: Framing = Framing.AUTO) -> bytes:
+        """Read a response, framed as the caller declared (see connection.framing)."""
+        context = f"{self.host}:{self.port}" + (f", after '{self._last_command}'" if self._last_command else "")
+        try:
+            result = read_framed(
+                self._read_chunk,
+                framing,
+                max_chunk=self._buffer_size,
+                # A headerless response has no length to read to, so fall back
+                # to the pre-existing idle-drain: a shorter timeout is what
+                # ends it.
+                on_headerless=lambda: self._socket.settimeout(0.5),
+                context=context,
+            )
         finally:
             self._socket.settimeout(self.timeout)
 
-    def _parse_block_total(self, data: bytes) -> Tuple[Optional[int], bool]:
-        """Locate an IEEE 488.2 block header and compute the total response size.
-
-        Returns:
-            (total_bytes, header_absent): total_bytes is prefix + '#' + digit
-            count + length digits + payload, or None if the header has not
-            fully arrived yet. header_absent is True when the response is
-            judged to have no definite-length block at all.
-        """
-        idx = data.find(b"#")
-        if idx == -1:
-            # Command echo prefixes are short; if no '#' this deep in, there is no block.
-            # Below 128 bytes we keep waiting on the full timeout rather than risk
-            # truncating a split header.
-            return None, len(data) >= 128
-        if len(data) < idx + 2:
-            return None, False  # '#' seen, digit count not yet arrived
-        digit_char = data[idx + 1 : idx + 2]
-        if not digit_char.isdigit() or digit_char == b"0":
-            # '#0' (indefinite length) or stray '#': not a definite-length block
-            return None, True
-        num_digits = int(digit_char)
-        if len(data) < idx + 2 + num_digits:
-            return None, False  # Length field not yet complete
-        length_field = data[idx + 2 : idx + 2 + num_digits]
-        if not length_field.isdigit():
-            return None, True
-        payload_length = int(length_field)
-        return idx + 2 + num_digits + payload_length, False
+        if result.block_total is not None:
+            # Task 1's reader never over-reads: while the header is unresolved
+            # it asks for one byte at a time, and once the length is known the
+            # hint is capped to exactly the remainder. So a completed block is
+            # always exactly `block_total` bytes here, and the terminator is
+            # deliberately still unread -- grab it so callers get the same
+            # trailing bytes the legacy drain produced.
+            return result.data + self._drain_terminator()
+        return result.data
 
     def _drain_terminator(self) -> bytes:
         """Opportunistically read the trailing terminator ("\\n\\n") after a block."""
