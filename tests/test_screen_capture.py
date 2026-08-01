@@ -83,7 +83,7 @@ class _Conn:
         self._seq = _SeqReader(data)
         self._sequential = sequential
 
-    def read_raw(self, n=None) -> bytes:
+    def read_raw(self, n=None, framing=None) -> bytes:
         return self._seq(n) if self._sequential else self._data
 
 

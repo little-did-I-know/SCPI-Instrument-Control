@@ -11,6 +11,7 @@ from scpi_control import exceptions
 from scpi_control.analysis import FFTAnalyzer
 from scpi_control.channel import Channel
 from scpi_control.connection import BaseConnection, SocketConnection
+from scpi_control.connection.framing import Framing
 from scpi_control.exceptions import SiglentError
 from scpi_control.math_channel import MathChannel
 from scpi_control.measurement import Measurement
@@ -286,16 +287,18 @@ class Oscilloscope:
         logger.debug(f"Response: {response}")
         return response
 
-    def read_raw(self, size: Optional[int] = None) -> bytes:
+    def read_raw(self, size: Optional[int] = None, framing: Framing = Framing.AUTO) -> bytes:
         """Read raw binary data from oscilloscope.
 
         Args:
             size: Number of bytes to read (None for all available)
+            framing: What the caller knows the response to be (see
+                connection.framing.Framing). Ignored when size is given.
 
         Returns:
             Raw binary data
         """
-        return self._connection.read_raw(size)
+        return self._connection.read_raw(size, framing=framing)
 
     def identify(self) -> str:
         """Get device identification string.

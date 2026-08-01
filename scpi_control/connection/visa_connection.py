@@ -17,6 +17,7 @@ import logging
 from typing import Optional
 
 from scpi_control.connection.base import BaseConnection
+from scpi_control.connection.framing import Framing
 from scpi_control.exceptions import CommandError, SiglentConnectionError, SiglentTimeoutError
 
 logger = logging.getLogger(__name__)
@@ -268,11 +269,14 @@ class VISAConnection(BaseConnection):
         logger.debug(f"VISA Response: {response!r}")
         return response.strip()
 
-    def read_raw(self, size: Optional[int] = None) -> bytes:
+    def read_raw(self, size: Optional[int] = None, *, framing: Framing = Framing.AUTO) -> bytes:
         """Read raw bytes from the instrument (e.g. a waveform or screenshot block).
 
         Args:
             size: Maximum number of bytes to read. None reads until the terminator.
+            framing: What the caller knows the response to be. Accepted for
+                interface parity with the other transports; AUTO's behaviour
+                here is unchanged -- implementing it is Task 6's job.
 
         Returns:
             The raw bytes read from the instrument.

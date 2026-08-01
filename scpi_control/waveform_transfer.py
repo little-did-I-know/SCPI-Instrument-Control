@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING, Optional
 import numpy as np
 
 from scpi_control import exceptions
+from scpi_control.connection.framing import Framing
 from scpi_control.waveform import (
     WAVEFORM_CODE_CENTER,
     WAVEFORM_CODE_PER_DIV_8BIT,
@@ -153,7 +154,7 @@ class SiglentTransfer:
         waveform_command = self._scope._get_command("get_waveform", ch=channel)
         with self._scope._connection.lock:
             self._scope.write(waveform_command)
-            raw_data = self._scope.read_raw()
+            raw_data = self._scope.read_raw(framing=Framing.BLOCK)
 
         # Parse waveform data - only BYTE is supported on legacy dialect
         dtype = np.int8
@@ -302,7 +303,7 @@ class TektronixTransfer:
         command = scope._get_command("get_waveform")
         with scope._connection.lock:
             scope.write(command)
-            raw = scope.read_raw()
+            raw = scope.read_raw(framing=Framing.BLOCK)
         codes = parse_ieee_block(raw, np.int8, error_context=f"host {scope.host}:{scope.port}, command '{command}'")
 
         # Detects a short/truncated transfer (NR_Pt? promised more samples
@@ -401,7 +402,7 @@ class LeCroyTransfer:
         command = scope._get_command("get_waveform", ch=channel)
         with scope._connection.lock:
             scope.write(command)
-            raw = scope.read_raw()
+            raw = scope.read_raw(framing=Framing.BLOCK)
         context = f"host {scope.host}:{scope.port}, command '{command}'"
         payload = parse_ieee_block(raw, np.uint8, error_context=context).tobytes()
         meta = parse_wavedesc(payload, error_context=context)
@@ -643,7 +644,7 @@ class ModernTransfer:
 
         with scope._connection.lock:
             scope.write(scope._get_command("get_waveform_preamble"))
-            preamble_raw = scope.read_raw()
+            preamble_raw = scope.read_raw(framing=Framing.BLOCK)
         preamble_context = f"host {scope.host}:{scope.port}, command ':WAVeform:PREamble?'"
         preamble_payload = parse_ieee_block(preamble_raw, np.uint8, error_context=preamble_context).tobytes()
         meta = parse_modern_wavedesc(preamble_payload, error_context=preamble_context)
@@ -717,7 +718,7 @@ class ModernTransfer:
                 with scope._connection.lock:
                     scope.write(scope._get_command("set_waveform_start", value=start))
                     scope.write(scope._get_command("get_waveform_data"))
-                    data_raw = scope.read_raw()
+                    data_raw = scope.read_raw(framing=Framing.BLOCK)
                 chunk = parse_ieee_block(data_raw, dtype, error_context=data_context)
                 if chunk.size == 0:
                     # A well-behaved instrument only returns an empty window at
@@ -757,7 +758,7 @@ class ModernTransfer:
             with scope._connection.lock:
                 scope.write(scope._get_command("set_waveform_start", value=0))
                 scope.write(scope._get_command("get_waveform_data"))
-                data_raw = scope.read_raw()
+                data_raw = scope.read_raw(framing=Framing.BLOCK)
             codes = parse_ieee_block(data_raw, dtype, error_context=data_context)
 
             # A short window here is the one failure that would otherwise be

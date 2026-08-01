@@ -14,6 +14,8 @@ import time
 from io import BytesIO
 from typing import Callable, Optional
 
+from scpi_control.connection.framing import Framing
+
 logger = logging.getLogger(__name__)
 
 
@@ -128,7 +130,7 @@ class ScreenCapture:
             return image_data
         self._scope.write("SCDP?")
         time.sleep(0.2)
-        return _extract_ieee_block(connection.read_raw())
+        return _extract_ieee_block(connection.read_raw(framing=Framing.BLOCK))
 
     @staticmethod
     def _drain(connection) -> None:

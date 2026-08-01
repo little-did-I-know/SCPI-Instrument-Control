@@ -4,6 +4,8 @@ import threading
 from abc import ABC, abstractmethod
 from typing import Optional, Union
 
+from scpi_control.connection.framing import Framing
+
 
 class BaseConnection(ABC):
     """Abstract base class defining the connection interface for SCPI communication."""
@@ -84,11 +86,14 @@ class BaseConnection(ABC):
         pass
 
     @abstractmethod
-    def read_raw(self, size: Optional[int] = None) -> bytes:
-        """Read raw binary data from oscilloscope.
+    def read_raw(self, size: Optional[int] = None, framing: Framing = Framing.AUTO) -> bytes:
+        """Read raw binary data from the instrument.
 
         Args:
-            size: Number of bytes to read (None for all available)
+            size: Number of bytes to read (None reads one whole response).
+            framing: What the CALLER knows the response to be. Declaring it is
+                what keeps the transport from inferring framing out of binary
+                payload bytes (backend review 2026-07-31, High-6).
 
         Returns:
             Raw binary data
@@ -98,6 +103,15 @@ class BaseConnection(ABC):
             SiglentTimeoutError: If read times out
         """
         pass
+
+    def resync(self) -> int:
+        """Discard anything the instrument left unread; return the byte count.
+
+        No-op by default. A transport that can be left mid-response overrides
+        this -- see SocketConnection, where a reply that arrives after a
+        timeout would otherwise be returned to the NEXT caller (High-7).
+        """
+        return 0
 
     @property
     def is_connected(self) -> bool:
