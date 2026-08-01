@@ -7,6 +7,7 @@ oscilloscope -- the readers are driven by fakes.
 """
 
 import struct
+import threading
 
 import pytest
 
@@ -76,15 +77,22 @@ def test_extract_ieee_block_empty_raises():
 
 
 class _Conn:
-    _socket = None  # so the trailing-byte drain is a no-op
-
     def __init__(self, data: bytes, sequential: bool):
         self._data = data
         self._seq = _SeqReader(data)
         self._sequential = sequential
+        self.lock = threading.RLock()
+        self.resync_calls = 0
 
     def read_raw(self, n=None, framing=None) -> bytes:
         return self._seq(n) if self._sequential else self._data
+
+    def resync(self) -> int:
+        # A no-op stand-in for BaseConnection.resync(): _capture_with_scdp
+        # calls this after the modern read to discard a trailing byte, but
+        # this fake has nothing buffered to discard.
+        self.resync_calls += 1
+        return 0
 
 
 class _Scope:
@@ -99,9 +107,11 @@ class _Scope:
 
 def test_capture_modern_sends_scdp_and_reads_bmp_by_size():
     bmp = _raw_bmp(500)
-    scope = _Scope(_Conn(bmp, sequential=True), dialect="modern")
+    conn = _Conn(bmp, sequential=True)
+    scope = _Scope(conn, dialect="modern")
     assert ScreenCapture(scope).capture_screenshot() == bmp
     assert scope.written == ["SCDP"]
+    assert conn.resync_calls == 1
 
 
 def test_capture_legacy_sends_scdp_query_and_extracts_block():

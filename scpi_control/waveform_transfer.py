@@ -613,169 +613,172 @@ class ModernTransfer:
         effective_stride = int(stride) if stride else 1
         scope = self._scope
 
-        # Source (and width) must be selected before PREamble?/DATA? read
-        # them back -- both act "using the source specified by
-        # :WAVeform:SOURce" (guide p.748/p.754).
-        scope.write(scope._get_command("set_waveform_source", ch=channel))
-        scope.write(scope._get_command("set_waveform_width", value=format))
-
-        if scope._has_command("set_waveform_interval"):
-            # Always explicit, never inherited: see the stride docstring note
-            # above on interval being instrument state rather than a
-            # per-request argument. Guarded so a future dialect without the
-            # command (were one ever routed through ModernTransfer) is
-            # unaffected rather than raising KeyError. Written BEFORE the
-            # PREamble? read below -- load-bearing, not incidental: the
-            # preamble must be read back under the interval this call asked
-            # for, not whatever a previous caller (e.g. the live view) left
-            # set, or that stride would leak into this read.
-            #
-            # DO NOT "optimize" this to skip the write when the value hasn't
-            # changed, or when stride is None -- that reintroduces the exact
-            # leak this comment warns about, silently. The guard is
-            # tests/test_oscilloscope_waveform_stride.py::
-            # test_a_stride_left_over_from_a_prior_read_does_not_leak_into_the_next_one,
-            # which pins the observable failure (a strided read followed by a
-            # plain read on the same connection must return the FULL record).
-            # Confirmed by mutation test (Task 7): making this write
-            # conditional on `stride is not None` makes that test fail with
-            # 143 points back instead of 1000.
-            scope.write(scope._get_command("set_waveform_interval", value=effective_stride))
-
+        # One acquisition is ONE compound exchange (base.py:23-24). Source,
+        # width and interval are instrument state that DATA? answers against,
+        # so a concurrent caller flipping either between two windows would have
+        # its halves assembled into a single waveform. Held across the whole
+        # transfer rather than per window -- which is all the inner locks this
+        # replaces ever covered.
         with scope._connection.lock:
+            # Source (and width) must be selected before PREamble?/DATA? read
+            # them back -- both act "using the source specified by
+            # :WAVeform:SOURce" (guide p.748/p.754).
+            scope.write(scope._get_command("set_waveform_source", ch=channel))
+            scope.write(scope._get_command("set_waveform_width", value=format))
+
+            if scope._has_command("set_waveform_interval"):
+                # Always explicit, never inherited: see the stride docstring note
+                # above on interval being instrument state rather than a
+                # per-request argument. Guarded so a future dialect without the
+                # command (were one ever routed through ModernTransfer) is
+                # unaffected rather than raising KeyError. Written BEFORE the
+                # PREamble? read below -- load-bearing, not incidental: the
+                # preamble must be read back under the interval this call asked
+                # for, not whatever a previous caller (e.g. the live view) left
+                # set, or that stride would leak into this read.
+                #
+                # DO NOT "optimize" this to skip the write when the value hasn't
+                # changed, or when stride is None -- that reintroduces the exact
+                # leak this comment warns about, silently. The guard is
+                # tests/test_oscilloscope_waveform_stride.py::
+                # test_a_stride_left_over_from_a_prior_read_does_not_leak_into_the_next_one,
+                # which pins the observable failure (a strided read followed by a
+                # plain read on the same connection must return the FULL record).
+                # Confirmed by mutation test (Task 7): making this write
+                # conditional on `stride is not None` makes that test fail with
+                # 143 points back instead of 1000.
+                scope.write(scope._get_command("set_waveform_interval", value=effective_stride))
+
             scope.write(scope._get_command("get_waveform_preamble"))
             preamble_raw = scope.read_raw(framing=Framing.BLOCK)
-        preamble_context = f"host {scope.host}:{scope.port}, command ':WAVeform:PREamble?'"
-        preamble_payload = parse_ieee_block(preamble_raw, np.uint8, error_context=preamble_context).tobytes()
-        meta = parse_modern_wavedesc(preamble_payload, error_context=preamble_context)
+            preamble_context = f"host {scope.host}:{scope.port}, command ':WAVeform:PREamble?'"
+            preamble_payload = parse_ieee_block(preamble_raw, np.uint8, error_context=preamble_context).tobytes()
+            meta = parse_modern_wavedesc(preamble_payload, error_context=preamble_context)
 
-        if meta["code_per_div"] == 0:
-            raise exceptions.CommandError(f"Modern WAVEDESC code_per_div is 0 ({preamble_context})")
+            if meta["code_per_div"] == 0:
+                raise exceptions.CommandError(f"Modern WAVEDESC code_per_div is 0 ({preamble_context})")
 
-        # Hardware truth (SDS824X HD fw 3.8.12.1.1.3.6, measured 2026-07-31):
-        # the preamble's VERTICAL_GAIN and VERTICAL_OFFSET are probe-FREE
-        # (BNC frame). With :CHANnel1:PROBe VALue,1.00E+01 the display reads
-        # 20 V/div but the preamble still reports gain 2.0, and a 1.0 V
-        # displayed offset stays voff 1.0 at 10x. The p.756 note "without
-        # probe attenuation" is literal. Multiply the BNC-frame result by the
-        # probe ratio or every 10x-probe capture is 10x too small. Queried
-        # ONCE per acquire (not per chunking window below) -- the ratio is
-        # channel state, not something that changes mid-transfer.
-        probe_ratio = float(scope.query(scope._get_command("get_probe_ratio", ch=channel)))
+            # Hardware truth (SDS824X HD fw 3.8.12.1.1.3.6, measured 2026-07-31):
+            # the preamble's VERTICAL_GAIN and VERTICAL_OFFSET are probe-FREE
+            # (BNC frame). With :CHANnel1:PROBe VALue,1.00E+01 the display reads
+            # 20 V/div but the preamble still reports gain 2.0, and a 1.0 V
+            # displayed offset stays voff 1.0 at 10x. The p.756 note "without
+            # probe attenuation" is literal. Multiply the BNC-frame result by the
+            # probe ratio or every 10x-probe capture is 10x too small. Queried
+            # ONCE per acquire (not per chunking window below) -- the ratio is
+            # channel state, not something that changes mid-transfer.
+            probe_ratio = float(scope.query(scope._get_command("get_probe_ratio", ch=channel)))
 
-        # The one thing code cannot settle: whether a real instrument's
-        # DATA_INTERVAL echo (and therefore its HORIZ_INTERVAL scaling, used
-        # below for the time axis) actually reflects the stride we requested.
-        # A mismatch must not be invisible -- log it, but don't raise; a
-        # disagreement here is a scaling risk, not a malformed read. This runs
-        # on EVERY acquire(), including stride==1 on the export path, so the
-        # cadence has to be once-per-transition rather than once-per-call: a
-        # real instrument that disagreed persistently would otherwise log one
-        # WARNING per frame, indefinitely, at up to four frames a second.
-        _note_data_interval_mismatch(scope, channel, effective_stride, meta["data_interval"])
+            # The one thing code cannot settle: whether a real instrument's
+            # DATA_INTERVAL echo (and therefore its HORIZ_INTERVAL scaling, used
+            # below for the time axis) actually reflects the stride we requested.
+            # A mismatch must not be invisible -- log it, but don't raise; a
+            # disagreement here is a scaling risk, not a malformed read. This runs
+            # on EVERY acquire(), including stride==1 on the export path, so the
+            # cadence has to be once-per-transition rather than once-per-call: a
+            # real instrument that disagreed persistently would otherwise log one
+            # WARNING per frame, indefinitely, at up to four frames a second.
+            _note_data_interval_mismatch(scope, channel, effective_stride, meta["data_interval"])
 
-        dtype = np.int16 if meta["comm_type"] == 1 else np.int8
-        # wave_array_count (WAVEDESC address 116-119, p.756) is "Number of
-        # data points in the data array" -- the FULL record, at EVERY stride.
-        # Measured on a real SDS824X HD (fw 3.8.12.1.1.3.6) 2026-07-30: with
-        # ACQ:POINts=50000 it reported 50000 at :WAVeform:INTerval 1, 2, 7 and
-        # 10 alike, while DATA? returned 50000/25000/7142/5000. This reverses
-        # the earlier assumption (that it reported the strided count), which
-        # the mock carried too; both changed together, as that assumption's
-        # own note said they would if hardware disagreed.
-        #
-        # WAVE_ARRAY_1 (addr 60) is NOT a substitute: the guide (p.755) calls
-        # it "the number of transmitted bytes" but the instrument leaves it at
-        # the full count as well. Nothing in the preamble reports what DATA?
-        # will actually send, so it has to be computed -- by FLOOR division
-        # (50000/7 -> 7142, not 7143).
-        record_length = meta["wave_array_count"]
-        expected_points = record_length // effective_stride
+            dtype = np.int16 if meta["comm_type"] == 1 else np.int8
+            # wave_array_count (WAVEDESC address 116-119, p.756) is "Number of
+            # data points in the data array" -- the FULL record, at EVERY stride.
+            # Measured on a real SDS824X HD (fw 3.8.12.1.1.3.6) 2026-07-30: with
+            # ACQ:POINts=50000 it reported 50000 at :WAVeform:INTerval 1, 2, 7 and
+            # 10 alike, while DATA? returned 50000/25000/7142/5000. This reverses
+            # the earlier assumption (that it reported the strided count), which
+            # the mock carried too; both changed together, as that assumption's
+            # own note said they would if hardware disagreed.
+            #
+            # WAVE_ARRAY_1 (addr 60) is NOT a substitute: the guide (p.755) calls
+            # it "the number of transmitted bytes" but the instrument leaves it at
+            # the full count as well. Nothing in the preamble reports what DATA?
+            # will actually send, so it has to be computed -- by FLOOR division
+            # (50000/7 -> 7142, not 7143).
+            record_length = meta["wave_array_count"]
+            expected_points = record_length // effective_stride
 
-        # :WAVeform:MAXPoint? (p.753) is Query-only: the scope reports its own
-        # per-transfer cap, there is no setter. int(float(...)) matches this
-        # module's existing NR1/NR3-tolerant parsing (see TektronixTransfer's
-        # get_wfm_nr_pt above).
-        max_points = int(float(scope.query(scope._get_command("get_waveform_maxpoint"))))
-        if max_points <= 0:
-            # A malformed/zero response must not spin the loop forever --
-            # fall back to reading the whole record in one window.
-            max_points = max(record_length, 1)
+            # :WAVeform:MAXPoint? (p.753) is Query-only: the scope reports its own
+            # per-transfer cap, there is no setter. int(float(...)) matches this
+            # module's existing NR1/NR3-tolerant parsing (see TektronixTransfer's
+            # get_wfm_nr_pt above).
+            max_points = int(float(scope.query(scope._get_command("get_waveform_maxpoint"))))
+            if max_points <= 0:
+                # A malformed/zero response must not spin the loop forever --
+                # fall back to reading the whole record in one window.
+                max_points = max(record_length, 1)
 
-        data_context = f"host {scope.host}:{scope.port}, command ':WAVeform:DATA?'"
+            data_context = f"host {scope.host}:{scope.port}, command ':WAVeform:DATA?'"
 
-        if effective_stride == 1:
-            # The proven export path: completely unchanged from before
-            # stride existed.
-            chunks = []
-            start = 0
-            while start < record_length:
-                # STARt and DATA? are coupled (DATA? answers "using the source
-                # specified by :WAVeform:SOURce" AND the current STARt window),
-                # so both live under one lock acquisition -- same reasoning as
-                # the preamble read above, extended to cover the write that picks
-                # which window DATA? answers with.
-                with scope._connection.lock:
+            if effective_stride == 1:
+                # The proven export path: completely unchanged from before
+                # stride existed.
+                chunks = []
+                start = 0
+                while start < record_length:
+                    # STARt and DATA? are coupled (DATA? answers "using the source
+                    # specified by :WAVeform:SOURce" AND the current STARt window),
+                    # which is why this whole transfer -- not just this window --
+                    # lives under one lock acquisition (see the outer `with` above).
                     scope.write(scope._get_command("set_waveform_start", value=start))
                     scope.write(scope._get_command("get_waveform_data"))
                     data_raw = scope.read_raw(framing=Framing.BLOCK)
-                chunk = parse_ieee_block(data_raw, dtype, error_context=data_context)
-                if chunk.size == 0:
-                    # A well-behaved instrument only returns an empty window at
-                    # end-of-record, which the `while` condition above already
-                    # excludes -- this guards against a non-conformant one
-                    # instead of looping forever.
-                    break
-                chunks.append(chunk)
-                start += chunk.size
+                    chunk = parse_ieee_block(data_raw, dtype, error_context=data_context)
+                    if chunk.size == 0:
+                        # A well-behaved instrument only returns an empty window at
+                        # end-of-record, which the `while` condition above already
+                        # excludes -- this guards against a non-conformant one
+                        # instead of looping forever.
+                        break
+                    chunks.append(chunk)
+                    start += chunk.size
 
-            codes = np.concatenate(chunks) if chunks else np.array([], dtype=dtype)
-        else:
-            # Deliberately NOT the general chunking loop, and deliberately not
-            # made stride-aware: `start` there is advanced by chunk.size (points
-            # already delivered, in the STRIDED/transmitted space) but written
-            # to :WAVeform:STARt and compared against record_length -- the same
-            # space as chunk.size only when stride is 1. Beyond one window, a
-            # second iteration would re-request source points the first window
-            # already delivered, silently duplicating a stretch of the record
-            # (and building `time` over the wrong `n`). The live view's request
-            # is always <= MAX_FRAME_POINTS, far below any real MAXPoint, so a
-            # single window covers every case it actually needs; a strided read
-            # that would not fit raises instead of mis-assembling.
-            #
-            # The cap applies to what CROSSES THE WIRE, so it is compared
-            # against expected_points (the decimated count), not against the
-            # full record -- decimation is precisely what brings a deep record
-            # under the cap, and comparing the full record here would refuse
-            # reads that fit with room to spare.
-            if expected_points > max_points:
-                raise exceptions.FeatureNotSupportedError(
-                    f"Strided read of {expected_points} points ({record_length} at stride="
-                    f"{effective_stride}) exceeds this instrument's per-transfer cap of "
-                    f"{max_points} points (:WAVeform:MAXPoint?); multi-window strided reads "
-                    f"are not supported ({data_context})"
-                )
-            with scope._connection.lock:
+                codes = np.concatenate(chunks) if chunks else np.array([], dtype=dtype)
+            else:
+                # Deliberately NOT the general chunking loop, and deliberately not
+                # made stride-aware: `start` there is advanced by chunk.size (points
+                # already delivered, in the STRIDED/transmitted space) but written
+                # to :WAVeform:STARt and compared against record_length -- the same
+                # space as chunk.size only when stride is 1. Beyond one window, a
+                # second iteration would re-request source points the first window
+                # already delivered, silently duplicating a stretch of the record
+                # (and building `time` over the wrong `n`). The live view's request
+                # is always <= MAX_FRAME_POINTS, far below any real MAXPoint, so a
+                # single window covers every case it actually needs; a strided read
+                # that would not fit raises instead of mis-assembling.
+                #
+                # The cap applies to what CROSSES THE WIRE, so it is compared
+                # against expected_points (the decimated count), not against the
+                # full record -- decimation is precisely what brings a deep record
+                # under the cap, and comparing the full record here would refuse
+                # reads that fit with room to spare.
+                if expected_points > max_points:
+                    raise exceptions.FeatureNotSupportedError(
+                        f"Strided read of {expected_points} points ({record_length} at stride="
+                        f"{effective_stride}) exceeds this instrument's per-transfer cap of "
+                        f"{max_points} points (:WAVeform:MAXPoint?); multi-window strided reads "
+                        f"are not supported ({data_context})"
+                    )
                 scope.write(scope._get_command("set_waveform_start", value=0))
                 scope.write(scope._get_command("get_waveform_data"))
                 data_raw = scope.read_raw(framing=Framing.BLOCK)
-            codes = parse_ieee_block(data_raw, dtype, error_context=data_context)
+                codes = parse_ieee_block(data_raw, dtype, error_context=data_context)
 
-            # A short window here is the one failure that would otherwise be
-            # INVISIBLE. Unlike the stride==1 branch nothing loops to collect a
-            # remainder, and the time axis below is sized off whatever did
-            # arrive -- so a truncated record comes back looking perfectly
-            # well-formed, just quietly missing its tail. Nothing in the
-            # preamble reports the transmitted count (see expected_points
-            # above), which is exactly why this has to be checked rather than
-            # read back.
-            if codes.size < expected_points:
-                raise exceptions.CommandError(
-                    f"Strided read returned {codes.size} points, but a {record_length}-point "
-                    f"record at stride {effective_stride} should deliver {expected_points}; "
-                    f"refusing to scale a truncated record into a time axis that would look "
-                    f"correct ({data_context})"
-                )
+                # A short window here is the one failure that would otherwise be
+                # INVISIBLE. Unlike the stride==1 branch nothing loops to collect a
+                # remainder, and the time axis below is sized off whatever did
+                # arrive -- so a truncated record comes back looking perfectly
+                # well-formed, just quietly missing its tail. Nothing in the
+                # preamble reports the transmitted count (see expected_points
+                # above), which is exactly why this has to be checked rather than
+                # read back.
+                if codes.size < expected_points:
+                    raise exceptions.CommandError(
+                        f"Strided read returned {codes.size} points, but a {record_length}-point "
+                        f"record at stride {effective_stride} should deliver {expected_points}; "
+                        f"refusing to scale a truncated record into a time axis that would look "
+                        f"correct ({data_context})"
+                    )
 
         # SDS Series Programming Guide EN11G p.758 ("Read Waveform Data",
         # analog example, Step 3): "voltage value (V) = code value

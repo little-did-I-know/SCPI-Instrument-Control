@@ -120,42 +120,23 @@ class ScreenCapture:
         mock) answer ``SCDP?`` with an IEEE-488.2 block. The two forms are not
         interchangeable: ``SCDP?`` times out on the modern scope, and ``SCDP``
         is unanswered by the legacy path.
+
+        The write, sleep and read are one compound exchange (base.py:23-24) --
+        held under the connection lock throughout so a concurrent caller
+        cannot interleave a command between the write and the read of the
+        same response.
         """
         connection = self._scope._connection
-        if getattr(self._scope, "dialect", None) == "modern":
-            self._scope.write("SCDP")
-            time.sleep(0.2)  # let the scope prepare the screen dump
-            image_data = _read_bmp_by_header(connection.read_raw)
-            self._drain(connection)  # discard any trailing terminator byte
-            return image_data
-        self._scope.write("SCDP?")
-        time.sleep(0.2)
-        return _extract_ieee_block(connection.read_raw(framing=Framing.BLOCK))
-
-    @staticmethod
-    def _drain(connection) -> None:
-        """Discard any bytes the scope left buffered after the image.
-
-        The SCDP BMP is typically followed by a single terminator byte; left
-        unread, it would be returned as the start of the next query's response.
-        Best-effort and non-fatal: a scope without a raw socket (e.g. a mock) is
-        simply skipped.
-        """
-        sock = getattr(connection, "_socket", None)
-        if sock is None:
-            return
-        previous_timeout = sock.gettimeout()
-        try:
-            sock.settimeout(0.2)
-            while sock.recv(4096):
-                pass
-        except Exception:
-            pass
-        finally:
-            try:
-                sock.settimeout(previous_timeout)
-            except Exception:
-                pass
+        with connection.lock:
+            if getattr(self._scope, "dialect", None) == "modern":
+                self._scope.write("SCDP")
+                time.sleep(0.2)  # let the scope prepare the screen dump
+                image_data = _read_bmp_by_header(connection.read_raw)
+                connection.resync()  # discard any trailing terminator byte
+                return image_data
+            self._scope.write("SCDP?")
+            time.sleep(0.2)
+            return _extract_ieee_block(connection.read_raw(framing=Framing.BLOCK))
 
     def save_screenshot(self, filename: str, image_format: Optional[str] = None) -> None:
         """Capture and save a screenshot to a file.
