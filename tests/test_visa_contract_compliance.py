@@ -151,6 +151,60 @@ class TestErrorTranslation:
         assert conn._desynced is True
 
 
+class TestStrayTerminators:
+    """read() must skip leftovers rather than return them as an answer.
+
+    Reachable precisely because _drain_terminator's window is finite: it takes
+    the first "\\n" of a split "\\r\\n", times out, and the partner lands
+    afterwards. pyvisa reads to a terminator and strips it, so that one
+    stranded byte comes back as an EMPTY response with the real answer still
+    queued -- the off-by-one SocketConnection.read exists to catch.
+    """
+
+    def test_a_stray_terminator_is_not_returned_as_the_response(self, visa, caplog):
+        module, stub = visa
+        conn, resource = _connected(module, stub)
+        # pyvisa strips the terminator it read to, so a stranded "\n" arrives
+        # as "" -- and the real answer is the read after it.
+        resource.read.side_effect = ["", "3.301"]
+        with caplog.at_level("WARNING"):
+            assert conn.read() == "3.301"
+        assert "stray terminator" in caplog.text
+
+    def test_a_leading_terminator_run_is_stripped_with_a_warning(self, visa, caplog):
+        module, stub = visa
+        conn, resource = _connected(module, stub)
+        resource.read.side_effect = ["\n3.301"]
+        with caplog.at_level("WARNING"):
+            assert conn.read() == "3.301"
+        assert "stray terminator" in caplog.text
+
+    def test_a_bare_nul_prefix_is_stripped_without_a_warning(self, visa, caplog):
+        # Some instruments prefix EVERY response with a NUL. Normal, and not
+        # worth a warning on every query -- but it must still come off, and in
+        # the same pass as a terminator, as in SocketConnection.read.
+        module, stub = visa
+        conn, resource = _connected(module, stub)
+        resource.read.side_effect = ["\x00\x00Siglent,SDS824X HD"]
+        with caplog.at_level("WARNING"):
+            assert conn.read() == "Siglent,SDS824X HD"
+        assert caplog.text == ""
+
+    def test_a_terminator_ahead_of_a_nul_prefixed_response_is_stripped_too(self, visa):
+        # The case that made SocketConnection strip both kinds in ONE pass.
+        module, stub = visa
+        conn, resource = _connected(module, stub)
+        resource.read.side_effect = ["\r\n\x003.301"]
+        assert conn.read() == "3.301"
+
+    def test_nothing_but_strays_raises_rather_than_answering_empty(self, visa):
+        module, stub = visa
+        conn, resource = _connected(module, stub)
+        resource.read.side_effect = ["", "", "", "", ""]
+        with pytest.raises(exceptions.SiglentTimeoutError):
+            conn.read()
+
+
 class TestConnectCleanup:
     def test_a_failure_after_open_does_not_report_connected(self, visa):
         module, stub = visa
@@ -334,6 +388,25 @@ class TestBlockTerminator:
         assert sizes[:4] == [1, 1, 1, 5], sizes
         assert sizes[4:] and set(sizes[4:]) == {1}, f"the terminator probe must read one byte at a time, got {sizes}"
 
+    def test_a_real_fault_during_the_drain_is_not_reported_as_a_clean_read(self, visa):
+        # Only a TIMEOUT means "nothing queued". Swallowing every VisaIOError
+        # would report a dead session as a successful block read, with the
+        # block that did arrive hiding the death.
+        module, stub = visa
+        conn, resource = _connected(module, stub)
+        reader = _serve(b"#15he\nlo")
+        calls = []
+
+        def read_bytes(count, *args, **kwargs):
+            calls.append(count)
+            if len(calls) > 4:  # the block is done; the drain is what asks next
+                raise FakeVisaIOError(error_code=-1073807194, message="VI_ERROR_CONN_LOST")
+            return reader(count)
+
+        resource.read_bytes.side_effect = read_bytes
+        with pytest.raises(exceptions.SiglentConnectionError):
+            conn.read_raw(framing=Framing.BLOCK)
+
     def test_the_probe_timeout_does_not_outlive_the_read(self, visa):
         module, stub = visa
         conn, resource = _connected(module, stub)
@@ -373,6 +446,18 @@ class TestResync:
         conn.write("*RST")
         resource.clear.assert_called_once()
         assert conn._desynced is False
+
+    @pytest.mark.parametrize("method", ["write", "query"])
+    def test_a_rejected_command_does_not_trigger_a_device_clear(self, visa, method):
+        # Validation runs BEFORE the resync: a command that is about to be
+        # refused is not a reason to reset the instrument.
+        module, stub = visa
+        conn, resource = _connected(module, stub)
+        conn._desynced = True
+        with pytest.raises(exceptions.CommandError):
+            getattr(conn, method)("VOLT 5.0V–")  # en-dash
+        resource.clear.assert_not_called()
+        assert conn._desynced is True, "a refused command must not clear the desync flag either"
 
     def test_query_resyncs_before_sending_when_desynced(self, visa):
         module, stub = visa

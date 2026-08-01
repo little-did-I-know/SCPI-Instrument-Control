@@ -32,9 +32,20 @@ _HEADERLESS_TAIL_TIMEOUT_MS = 500
 # 0.05s on both of its equivalents (_drain_terminator and resync).
 _QUIET_PROBE_TIMEOUT_MS = 50
 
-# A terminator run is "\n" or "\r\n"; nothing legitimate follows a block with
-# more than that.
+# How many bytes the block terminator drain will clear. "\n" and "\r\n" are
+# the runs Siglent instruments are expected to send, but that is an assumption
+# about the instrument, not a measurement -- nothing in this module is checked
+# against hardware. Note the transports DISAGREE: SocketConnection peeks 4
+# bytes and will clear a run of up to 4, because peeking costs it nothing,
+# while every extra byte here costs a probe read. A run longer than this is
+# left queued and shows up as a stray terminator on the next read(), which
+# skips it (see read()).
 _MAX_TERMINATOR_BYTES = 2
+
+# How many reads read() will spend skipping stray terminators before giving up.
+# SocketConnection keeps going until its own timeout; a VISA read is one call,
+# so the equivalent has to be a bounded retry rather than a loop on one recv.
+_MAX_STRAY_TERMINATOR_READS = 3
 
 # Optional import - only required if user wants USB/VISA support
 try:
@@ -302,25 +313,54 @@ class VISAConnection(BaseConnection):
     def read(self) -> str:
         """Read a response string from the instrument.
 
+        Skips a leading run of stray terminators before deciding it has an
+        answer, mirroring SocketConnection.read. That run is reachable here
+        precisely because _drain_terminator's window is finite: it consumes
+        the first "\\n" of a split "\\r\\n", times out, and the partner lands
+        afterwards. pyvisa reads to a terminator and strips it, so that one
+        stranded byte otherwise comes back as an EMPTY response while the real
+        answer stays queued -- the off-by-one that shifts every later answer
+        by one query (backend review 2026-07-31, High-7).
+
+        Leading NUL and terminator bytes are stripped TOGETHER in one pass,
+        as in SocketConnection.read where separating them was a regression: a
+        terminator can arrive ahead of a NUL-prefixed response in the same
+        message. Only a run that actually contained a terminator is worth a
+        warning -- a bare NUL prefix is normal on some instruments.
+
         Returns:
             The response with trailing whitespace/terminators stripped.
 
         Raises:
             SiglentConnectionError: If not connected
-            SiglentTimeoutError: If the read times out
+            SiglentTimeoutError: If the read times out, or nothing but stray
+                terminators arrives
         """
         with self.lock:
             if not self.is_connected:
                 raise SiglentConnectionError("Not connected to VISA resource")
 
             logger.debug("VISA Read")
-            try:
-                response = self._resource.read()
-            except pyvisa.errors.VisaIOError as e:
-                raise self._translate(e, "reading") from e
+            for _ in range(_MAX_STRAY_TERMINATOR_READS):
+                try:
+                    response = self._resource.read()
+                except pyvisa.errors.VisaIOError as e:
+                    raise self._translate(e, "reading") from e
 
-            logger.debug(f"VISA Response: {response!r}")
-            return response.strip()
+                stripped = response.lstrip("\r\n\x00")
+                leftovers = response[: len(response) - len(stripped)]
+                if "\r" in leftovers or "\n" in leftovers:
+                    logger.warning("Discarded %d stray terminator byte(s) before the response on %s", len(leftovers), self.resource_string)
+                if stripped:
+                    logger.debug(f"VISA Response: {stripped!r}")
+                    return stripped.strip()
+
+                # Only leftovers: pyvisa read to a terminator and found nothing
+                # but the terminator, so this is the tail of an earlier
+                # exchange, not this one's answer. Returning "" here is the bug.
+                logger.warning("Empty response on %s: a stray terminator, not an answer -- reading again", self.resource_string)
+
+            raise SiglentTimeoutError(f"Only stray terminators on {self.resource_string} after {_MAX_STRAY_TERMINATOR_READS} reads")
 
     def _begin_streaming(self) -> None:
         """Give up on reading to a length: read whole messages from here on."""
@@ -362,10 +402,13 @@ class VISAConnection(BaseConnection):
         binary read, so on that resource class a headerless read has nothing
         to end on but the timeout -- and pyvisa raises rather than returning
         the partial buffer, so the bytes are lost and the caller sees
-        SiglentTimeoutError for a response that did arrive. Every call site in
-        this library declares Framing.BLOCK, which does not take this branch;
-        a caller that declares STREAM over a raw-socket VISA resource is the
-        untested case.
+        SiglentTimeoutError for a response that did arrive. No call site in
+        this library DECLARES Framing.STREAM -- which is not the same as
+        saying none reaches this branch, and the difference matters: both
+        query_binary here and the public Oscilloscope.read_raw passthrough
+        default to AUTO, and AUTO arrives here for any response that turns out
+        to carry no header. On a raw-socket VISA resource that is the untested
+        case above.
         """
         try:
             chunk = self._resource.read_raw() if self._streaming else self._resource.read_bytes(max(1, hint))
@@ -452,6 +495,15 @@ class VISAConnection(BaseConnection):
         One byte at a time on purpose: read_bytes(2) is a fixed-length read
         and would wait out the timeout, then raise, for a terminator run of
         one -- losing it, which is the exact bug this method exists to avoid.
+
+        THE COST, since the socket's version names it as the whole reason it
+        peeks instead of looping: with the usual one-byte run, the second
+        iteration finds nothing and pays _QUIET_PROBE_TIMEOUT_MS in full. That
+        is on EVERY block read, not only a desynced one, and
+        waveform_transfer performs up to six block reads per capture. The
+        socket avoids it with a single bounded MSG_PEEK; VISA has no peek, so
+        a loop that stops on an idle read is the only option here, and this is
+        what it costs.
         """
         drained = b""
         previous_timeout = self._resource.timeout
@@ -461,9 +513,16 @@ class VISAConnection(BaseConnection):
                 try:
                     byte = self._resource.read_bytes(1)
                 except pyvisa.errors.VisaIOError as e:
-                    # Nothing queued. Normal for a resource whose own read
-                    # already consumed the terminator, and the reason this is
-                    # not an error.
+                    if getattr(e, "error_code", None) != pyvisa.constants.StatusCode.error_timeout:
+                        # Only a TIMEOUT means "nothing queued". Anything else
+                        # is a real fault, and swallowing it here would report
+                        # a dead session as a clean read, with the block that
+                        # did arrive hiding the death. _read_chunk keys on the
+                        # same code for the same reason; read_raw translates
+                        # what this re-raises.
+                        raise
+                    # Normal for a resource whose own read already consumed the
+                    # terminator, and the reason this is not an error.
                     logger.debug("No terminator queued after the block on %s: %s", self.resource_string, e)
                     break
                 if not byte:
