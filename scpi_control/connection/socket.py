@@ -133,7 +133,11 @@ class SocketConnection(BaseConnection):
 
                     chunk = self._socket.recv(self._buffer_size)
                     if not chunk:
-                        break
+                        # Peer closed before the newline terminator: what we
+                        # have is a fragment, and returning it as an answer is
+                        # how "3.301" became "3.3".
+                        self._connected = False
+                        raise exceptions.SiglentConnectionError(f"Connection closed by {self.host}:{self.port} after {len(data)} byte(s) while waiting for the response to '{self._last_command}'")
                     data += chunk
                     # Leading NUL and terminator bytes are both leftovers,
                     # never the start of this response: NUL is a normal
@@ -160,7 +164,15 @@ class SocketConnection(BaseConnection):
                         break
 
                 # Decode and strip whitespace and null bytes
-                response = data.decode("ascii").strip()
+                try:
+                    response = data.decode("ascii").strip()
+                except UnicodeDecodeError as e:
+                    # Binary on a text read means the stream position is wrong,
+                    # so this is a connection fault, not a command fault -- and
+                    # it must NOT be a ValueError subclass, which is what let
+                    # callers swallow it.
+                    self._desynced = True
+                    raise exceptions.SiglentConnectionError(f"Non-ASCII byte in the response to '{self._last_command}' from {self.host}:{self.port}: {data[:32]!r}") from e
                 # Remove null bytes that some oscilloscopes prepend to responses
                 response = response.lstrip("\x00")
                 return response
@@ -222,7 +234,8 @@ class SocketConnection(BaseConnection):
                     while remaining > 0:
                         chunk = self._socket.recv(min(remaining, self._buffer_size))
                         if not chunk:
-                            break
+                            self._connected = False
+                            raise exceptions.SiglentConnectionError(f"Connection closed by {self.host}:{self.port} after {len(data)} of {size} requested byte(s) following '{self._last_command}'")
                         data += chunk
                         remaining -= len(chunk)
                     return data
