@@ -269,7 +269,7 @@ class VISAConnection(BaseConnection):
         logger.debug(f"VISA Response: {response!r}")
         return response.strip()
 
-    def read_raw(self, size: Optional[int] = None, *, framing: Framing = Framing.AUTO) -> bytes:
+    def read_raw(self, size: Optional[int] = None, framing: Framing = Framing.AUTO) -> bytes:
         """Read raw bytes from the instrument (e.g. a waveform or screenshot block).
 
         Args:

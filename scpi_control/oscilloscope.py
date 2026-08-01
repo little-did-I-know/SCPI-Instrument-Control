@@ -293,7 +293,15 @@ class Oscilloscope:
         Args:
             size: Number of bytes to read (None for all available)
             framing: What the caller knows the response to be (see
-                connection.framing.Framing). Ignored when size is given.
+                connection.framing.Framing). What happens when BOTH size and
+                framing are given is transport-specific, not a uniform
+                "ignored": SocketConnection's exact-size path never reaches
+                the framing code, so framing is genuinely ignored there.
+                MockConnection's BLOCK check instead runs unconditionally,
+                BEFORE size truncation -- a declaration the canned response
+                cannot honour still raises CommandError even with size set,
+                deliberately, so a wrong wire-shape declaration cannot hide
+                behind a truncated read.
 
         Returns:
             Raw binary data

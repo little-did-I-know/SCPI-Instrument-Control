@@ -27,11 +27,25 @@ def test_read_raw_accepts_a_framing_declaration(cls):
     parameters = inspect.signature(cls.read_raw).parameters
     assert "framing" in parameters
     assert parameters["framing"].default is Framing.AUTO
+    # A caller holding a BaseConnection-typed reference must be able to call
+    # read_raw(size, framing) positionally against ANY implementation. Keyword-only
+    # on one connection (VISA once did this) breaks that uniformly for callers
+    # that don't know which concrete class they're holding.
+    assert parameters["framing"].kind is inspect.Parameter.POSITIONAL_OR_KEYWORD
 
 
 @pytest.mark.parametrize("cls", [BaseConnection, SocketConnection, VISAConnection, MockConnection])
 def test_every_connection_can_resync(cls):
     assert callable(getattr(cls, "resync", None))
+
+
+def test_resync_no_op_returns_zero():
+    # The interface is resync() -> int, a no-op default returning 0 -- not
+    # just "callable". BaseConnection is abstract and cannot be instantiated
+    # directly, so prove the concrete return value via MockConnection, which
+    # inherits the base no-op unchanged.
+    conn = MockConnection("mock", idn=LEGACY_IDN, channel_states={1: True})
+    assert conn.resync() == 0
 
 
 def test_mock_serves_a_block_when_block_is_declared():
@@ -58,3 +72,27 @@ def test_mock_stream_framing_returns_the_payload_untouched():
     conn.write("SCDP?")
     payload = conn.read_raw(framing=Framing.STREAM)
     assert payload == conn.read_raw(framing=Framing.STREAM)
+
+
+def test_mock_honours_size_and_block_together_on_a_genuine_block():
+    # Documented on Oscilloscope.read_raw: MockConnection's BLOCK check and
+    # size truncation both apply to the same read -- a genuine block still
+    # gets truncated to `size`.
+    conn = MockConnection("mock", idn=LEGACY_IDN, channel_states={1: True})
+    conn.connect()
+    conn.write("SCDP?")
+    truncated = conn.read_raw(size=4, framing=Framing.BLOCK)
+    assert truncated == conn.read_raw(framing=Framing.BLOCK)[:4]
+
+
+def test_mock_block_declaration_is_enforced_even_when_size_is_given():
+    # The specific claim Oscilloscope.read_raw's docstring pins for
+    # MockConnection: the BLOCK check runs unconditionally, BEFORE size
+    # truncation -- passing `size` does not suppress it. A call site that
+    # declares the wrong wire shape must fail loudly even on a sized read.
+    conn = MockConnection("mock", idn=LEGACY_IDN, channel_states={1: True})
+    conn.connect()
+    conn.write("SCDP?")
+    conn.mock_raw_response = b"BM\x36\x00\x00\x00 not a block"
+    with pytest.raises(exceptions.CommandError):
+        conn.read_raw(size=8, framing=Framing.BLOCK)
