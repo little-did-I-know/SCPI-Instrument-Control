@@ -48,6 +48,30 @@ def test_resync_no_op_returns_zero():
     assert conn.resync() == 0
 
 
+@pytest.mark.parametrize("cls", [BaseConnection, SocketConnection, VISAConnection, MockConnection])
+def test_every_connection_can_drain_its_input(cls):
+    # Separate from resync() on purpose: discarding queued bytes and aborting
+    # the instrument's current operation are different requests, and a caller
+    # with housekeeping to do must be able to make only the first one.
+    assert callable(getattr(cls, "drain_input", None))
+
+
+def test_drain_input_no_op_returns_zero():
+    conn = MockConnection("mock", idn=LEGACY_IDN, channel_states={1: True})
+    assert conn.drain_input() == 0
+
+
+def test_framing_is_exported_from_the_connection_package():
+    # `framing` is a public argument of BaseConnection.read_raw and of
+    # Oscilloscope.read_raw, and the changelog tells subclass authors they must
+    # accept it -- so the type has to be importable from the package that
+    # documents it, not only from a submodule path.
+    import scpi_control.connection as package
+
+    assert "Framing" in package.__all__
+    assert package.Framing is Framing
+
+
 def test_mock_serves_a_block_when_block_is_declared():
     conn = MockConnection("mock", idn=LEGACY_IDN, channel_states={1: True})
     conn.connect()

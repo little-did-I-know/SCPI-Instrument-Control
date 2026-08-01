@@ -7,6 +7,7 @@ Supports multiple connection types:
 """
 
 from scpi_control.connection.base import BaseConnection
+from scpi_control.connection.framing import Framing
 from scpi_control.connection.mock import MockConnection
 from scpi_control.connection.socket import SocketConnection
 
@@ -22,9 +23,13 @@ except ImportError:
     list_visa_resources = None
     find_siglent_devices = None
 
-# Export all available connections
+# Export all available connections. Framing belongs here too: it is the type of
+# read_raw()'s public `framing` argument, so a caller of Oscilloscope.read_raw
+# or an author of a BaseConnection subclass needs it, and importing it from a
+# private submodule is not an API.
 __all__ = [
     "BaseConnection",
+    "Framing",
     "MockConnection",
     "SocketConnection",
 ]
