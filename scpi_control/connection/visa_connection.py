@@ -365,8 +365,8 @@ class VISAConnection(BaseConnection):
             # this read was for is either still queued or never coming, and
             # either way it must not be handed to the NEXT caller. Without this
             # flag the resync-before-send never runs and the whole High-7 shape
-            # comes back. SocketConnection.read sets it on both of its own
-            # give-up paths (socket.py:128 and :180) for the same reason.
+            # comes back. SocketConnection.read sets it on all three of its own
+            # give-up paths (socket.py:134, :182, and :188) for the same reason.
             self._desynced = True
             raise SiglentTimeoutError(f"Only stray terminators on {self.resource_string} after {_MAX_STRAY_TERMINATOR_READS} reads")
 
