@@ -3,7 +3,7 @@
 import socket
 import threading
 import time
-from unittest.mock import MagicMock, Mock, call, patch
+from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
@@ -451,19 +451,28 @@ class TestSocketThreadSafety:
 class TestReadRawIeeeBlock:
     """read_raw(None) must honor the IEEE 488.2 definite-length header."""
 
-    def test_reads_exactly_declared_block_length(self, mock_socket):
+    def test_reads_exactly_declared_block_length(self):
         # "C1:WF DAT2," prefix (11 bytes) + "#9" + 9-digit length (20) + payload
+        #
+        # Task 4 (backend review 2026-07-31, High-7): this used to script
+        # `mock_socket.recv.side_effect = [..., b"\n\n", ...]`, pinning the OLD
+        # `_drain_terminator`'s fixed `recv(2)` -- a MagicMock hands back the
+        # whole `b"\n\n"` chunk to a single call regardless of the size or
+        # MSG_PEEK flag requested, which is exactly the dishonesty the new
+        # peek-and-consume drain cannot tolerate (each byte costs one peek
+        # call and one consuming call). `tests.fake_socket.FakeSocket` buffers
+        # honestly -- it honors requested sizes and never lets MSG_PEEK
+        # consume -- so it can model the terminator arriving as its own
+        # two-byte chunk without over-delivering.
         part1 = b"C1:WF DAT2,#9000000020" + b"A" * 10
         part2 = b"B" * 10
-        mock_socket.recv.side_effect = [part1, part2, b"\n\n", socket.timeout()]
+        conn, fake = connected([part1, part2, b"\n\n"])
 
-        conn = SocketConnection("192.168.1.100")
-        conn.connect()
         data = conn.read_raw()
 
         assert data == part1 + part2 + b"\n\n"
         # The block path must never fall back to the legacy 0.5s idle drain
-        assert call(0.5) not in mock_socket.settimeout.call_args_list
+        assert 0.5 not in fake.timeouts
 
     def test_header_split_across_chunks(self, mock_socket):
         part1 = b"C1:WF DAT2,#"

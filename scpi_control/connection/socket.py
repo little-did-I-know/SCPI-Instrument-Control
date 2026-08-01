@@ -27,6 +27,7 @@ class SocketConnection(BaseConnection):
         self._socket: Optional[socket.socket] = None
         self._buffer_size = 4096
         self._last_command: Optional[str] = None
+        self._desynced = False
 
     def connect(self) -> None:
         """Establish TCP connection to the oscilloscope.
@@ -75,6 +76,12 @@ class SocketConnection(BaseConnection):
 
         with self.lock:
             try:
+                if self._desynced:
+                    stranded = self._last_command
+                    discarded = self.resync()
+                    if discarded:
+                        logger.warning("Discarded %d stale byte(s) left over from '%s' before sending on %s:%s", discarded, stranded, self.host, self.port)
+
                 # Ensure command ends with newline
                 if not command.endswith("\n"):
                     command += "\n"
@@ -116,6 +123,7 @@ class SocketConnection(BaseConnection):
                 while True:
                     # Check for timeout in the read loop
                     if time.time() - start_time > self.timeout:
+                        self._desynced = True
                         command_context = f"for '{self._last_command}' " if self._last_command else ""
                         raise exceptions.SiglentTimeoutError(
                             f"Read timeout {command_context}after {self.timeout}s waiting for newline terminator " f"(received {len(data)} bytes so far) from {self.host}:{self.port}"
@@ -125,7 +133,15 @@ class SocketConnection(BaseConnection):
                     if not chunk:
                         break
                     data += chunk
-                    # Check if we received a complete response (ends with newline)
+                    # Leading terminator/NUL bytes are leftovers from an earlier
+                    # response, never the start of this one. Without this, a single
+                    # stray "\n" satisfies the endswith() check below and returns
+                    # an EMPTY response -- which is how one late newline shifted
+                    # every later answer by one query (High-7).
+                    cleaned = data.lstrip(b"\r\n\x00")
+                    if cleaned != data:
+                        logger.warning("Discarded %d stray terminator byte(s) left before the response to '%s' on %s:%s", len(data) - len(cleaned), self._last_command, self.host, self.port)
+                        data = cleaned
                     if data.endswith(b"\n"):
                         break
 
@@ -135,6 +151,7 @@ class SocketConnection(BaseConnection):
                 response = response.lstrip("\x00")
                 return response
             except socket.timeout:
+                self._desynced = True
                 command_context = f"for '{self._last_command}' " if self._last_command else ""
                 raise exceptions.SiglentTimeoutError(f"Read timeout {command_context}from {self.host}:{self.port}")
             except socket.error as e:
@@ -198,12 +215,47 @@ class SocketConnection(BaseConnection):
                 else:
                     return self._read_ieee_block(framing)
             except socket.timeout:
+                self._desynced = True
                 command_context = f"after '{self._last_command}' " if self._last_command else ""
                 raise exceptions.SiglentTimeoutError(f"Raw read timeout {command_context}from {self.host}:{self.port}")
             except socket.error as e:
                 self._connected = False
                 command_context = f" after '{self._last_command}'" if self._last_command else ""
                 raise exceptions.SiglentConnectionError(f"Read error from {self.host}:{self.port}{command_context}: {e}")
+
+    def resync(self) -> int:
+        """Discard anything the instrument left unread; return the byte count.
+
+        Called automatically before the next send when a read has timed out.
+        The bytes are gone either way -- the alternative is handing them to a
+        caller who asked a different question (High-7).
+
+        LIMIT, stated plainly: this discards what has ARRIVED. A reply still in
+        flight when the next command goes out cannot be told apart from the
+        answer to that command, and will still be misattributed. Callers that
+        need certainty after a timeout should reconnect, or call resync()
+        themselves once they are willing to wait for the straggler.
+        """
+        if not self._connected or not self._socket:
+            self._desynced = False
+            return 0
+        discarded = 0
+        with self.lock:
+            previous = self._socket.gettimeout()
+            self._socket.settimeout(0.05)
+            try:
+                while True:
+                    try:
+                        chunk = self._socket.recv(self._buffer_size)
+                    except socket.timeout:
+                        break
+                    if not chunk:
+                        break
+                    discarded += len(chunk)
+            finally:
+                self._socket.settimeout(previous if previous is not None else self.timeout)
+                self._desynced = False
+        return discarded
 
     def _read_chunk(self, hint: int) -> bytes:
         """Read up to `hint` bytes, translating socket states for read_framed.
@@ -237,6 +289,11 @@ class SocketConnection(BaseConnection):
                 on_headerless=lambda: self._socket.settimeout(0.5),
                 context=context,
             )
+        except exceptions.SiglentTimeoutError:
+            # A stalled or empty binary read leaves the stream position
+            # unknown, exactly like a line-read timeout.
+            self._desynced = True
+            raise
         finally:
             self._socket.settimeout(self.timeout)
 
@@ -251,14 +308,32 @@ class SocketConnection(BaseConnection):
         return result.data
 
     def _drain_terminator(self) -> bytes:
-        """Opportunistically read the trailing terminator ("\\n\\n") after a block."""
+        """Consume the terminator that follows a block -- and only that.
+
+        The old fixed recv(2) was the bug: when the second "\\n" of "\\n\\n"
+        arrived late, one newline stayed queued and became the entire next
+        response. Peeking first means we never consume a byte that belongs to
+        the next response, and never leave one we could have taken.
+        """
+        consumed = b""
+        previous = self._socket.gettimeout()
         self._socket.settimeout(0.05)
         try:
-            return self._socket.recv(2)
-        except socket.timeout:
-            return b""
+            while True:
+                try:
+                    peeked = self._socket.recv(1, socket.MSG_PEEK)
+                except socket.timeout:
+                    return consumed
+                if not peeked:
+                    return consumed
+                if peeked not in (b"\n", b"\r"):
+                    # Surplus that is not a terminator belongs to nobody yet:
+                    # leave it and let the next write() drain it.
+                    self._desynced = True
+                    return consumed
+                consumed += self._socket.recv(1)
         finally:
-            self._socket.settimeout(self.timeout)
+            self._socket.settimeout(previous if previous is not None else self.timeout)
 
     def __repr__(self) -> str:
         """String representation of connection."""
