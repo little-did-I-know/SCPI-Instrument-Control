@@ -135,27 +135,34 @@ class SocketConnection(BaseConnection):
                     if not chunk:
                         break
                     data += chunk
-                    # A leading NUL is a normal prefix some instruments prepend
-                    # to every response -- strip it silently, same as always.
-                    data = data.lstrip(b"\x00")
-                    # A leading terminator, in contrast, is a leftover from an
-                    # earlier response, never the start of this one. Without
-                    # this, a single stray "\n" satisfies the endswith() check
-                    # below and returns an EMPTY response -- which is how one
-                    # late newline shifted every later answer by one query
-                    # (High-7). This case is worth a warning: it means the
-                    # PREVIOUS exchange left something behind.
-                    cleaned = data.lstrip(b"\r\n")
-                    if cleaned != data:
-                        logger.warning("Discarded %d stray terminator byte(s) left before the response to '%s' on %s:%s", len(data) - len(cleaned), self._last_command, self.host, self.port)
-                        data = cleaned
+                    # Leading NUL and terminator bytes are both leftovers,
+                    # never the start of this response: NUL is a normal
+                    # prefix some instruments prepend to EVERY response, and
+                    # a stray terminator is what's left behind by an earlier
+                    # exchange. They must be stripped TOGETHER in one pass --
+                    # a terminator can arrive ahead of a NUL-prefixed
+                    # response in the SAME chunk, and stripping only one kind
+                    # per iteration would break on endswith(b"\n") before the
+                    # NUL underneath it was ever reached. Without stripping
+                    # the terminator, a single stray "\n" satisfies the
+                    # endswith() check below and returns an EMPTY response --
+                    # which is how one late newline shifted every later
+                    # answer by one query (High-7). Only warn when the run
+                    # actually contained a terminator byte: a bare NUL prefix
+                    # is normal and not worth logging on every query.
+                    stripped = data.lstrip(b"\r\n\x00")
+                    if stripped != data:
+                        leftovers = data[: len(data) - len(stripped)]
+                        if b"\n" in leftovers or b"\r" in leftovers:
+                            logger.warning("Discarded %d stray terminator byte(s) left before the response to '%s' on %s:%s", len(leftovers), self._last_command, self.host, self.port)
+                        data = stripped
                     if data.endswith(b"\n"):
                         break
 
-                # Decode and strip whitespace. Leading NULs are already gone
-                # (stripped above); .strip() takes care of surrounding
-                # whitespace left by the terminator.
+                # Decode and strip whitespace and null bytes
                 response = data.decode("ascii").strip()
+                # Remove null bytes that some oscilloscopes prepend to responses
+                response = response.lstrip("\x00")
                 return response
             except socket.timeout:
                 self._desynced = True
@@ -320,20 +327,27 @@ class SocketConnection(BaseConnection):
         The old fixed recv(2) was the bug: when the second "\\n" of "\\n\\n"
         arrived late, one newline stayed queued and became the entire next
         response. A single bounded peek fixes that without a loop: recv()
-        returns as soon as ANY bytes are queued, so peeking for up to two
-        bytes never waits for a second terminator byte that may not have
-        arrived yet -- a late partner is instead caught by read()'s
-        leading-terminator skip. This still pays the 0.05s timeout only when
-        nothing at all is queued yet, exactly like the old recv(2); unlike a
-        peek-in-a-loop, it never pays that timeout a second time waiting for
-        a byte that may never come (that would cost the live view 50ms on
-        every single block read, not just a desynced one).
+        returns as soon as ANY bytes are queued, so peeking never waits for a
+        second terminator byte that may not have arrived yet -- a late
+        partner is instead caught by read()'s leading-terminator skip. This
+        still pays the 0.05s timeout only when nothing at all is queued yet,
+        exactly like the old recv(2); unlike a peek-in-a-loop, it never pays
+        that timeout a second time waiting for a byte that may never come
+        (that would cost the live view 50ms on every single block read, not
+        just a desynced one).
+
+        Peeking 4 bytes rather than exactly 2 costs nothing extra (MSG_PEEK
+        doesn't wait for a fuller buffer, same as any recv) but means real
+        surplus right behind the terminator -- e.g. a queue of "\\n\\nXYZ" --
+        is still visible in this one call, so the desync flag below still
+        catches it instead of silently leaving it for whatever read() does
+        next.
         """
         previous = self._socket.gettimeout()
         self._socket.settimeout(0.05)
         try:
             try:
-                peeked = self._socket.recv(2, socket.MSG_PEEK)
+                peeked = self._socket.recv(4, socket.MSG_PEEK)
             except socket.timeout:
                 return b""
             terminator_run = len(peeked) - len(peeked.lstrip(b"\r\n"))

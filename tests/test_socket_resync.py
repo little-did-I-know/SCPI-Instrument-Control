@@ -57,19 +57,40 @@ def test_a_late_second_newline_does_not_become_the_next_response():
     # arrived when the drain runs -- the bounded, single-peek drain (fix
     # round 1: no more looping until timeout, see _drain_terminator) finds
     # nothing queued and gives up immediately rather than blocking for it.
-    # Both terminator bytes arrive later, bundled with the real answer, once
-    # query 2's own command goes out. AfterSend has to gate the FIRST byte
-    # the drain would otherwise see -- if a terminator byte were available
-    # immediately, the drain's one bounded peek would consume it without
-    # ever touching the AfterSend step, and AfterSend only releases for a
-    # probe that reaches it BEFORE the send that's supposed to unblock it;
-    # a probe that reaches it only afterwards (as query 2's own read() would
-    # here) sees the barrier arm and reject in the same instant. The leftover
-    # terminator bytes must not be read as an (empty) answer to that query --
-    # read()'s leading-terminator skip is what actually discards them.
-    conn, _ = connected([b"#3012" + b"0123456789ab", AfterSend, b"\n\n7.25\n"], timeout=0.5)
+    # Both terminator bytes arrive later, once query 2's own command goes
+    # out -- AND as their OWN chunk, separate from the real answer: fix
+    # round 2 found that bundling them into the SAME chunk as "7.25\n" let
+    # this test pass via data.endswith(b"\n") + str.strip() alone (the
+    # answer's own trailing newline satisfies the loop, and .strip() eats
+    # the leading "\n\n" for free), with or without the leading-terminator
+    # skip this test exists to guard. Keeping the leftover as its own
+    # step means read()'s FIRST recv() in this exchange returns ONLY
+    # "\n\n" -- which ends with "\n" and would look like a complete (empty)
+    # response if the skip didn't force another read past it.
+    #
+    # AfterSend has to gate the FIRST byte the drain would otherwise see --
+    # if a terminator byte were available immediately, the drain's one
+    # bounded peek would consume it without ever touching the AfterSend
+    # step, and AfterSend only releases for a probe that reaches it BEFORE
+    # the send that's supposed to unblock it; a probe that reaches it only
+    # afterwards (as query 2's own read() would here) sees the barrier arm
+    # and reject in the same instant.
+    conn, _ = connected([b"#3012" + b"0123456789ab", AfterSend, b"\n\n", b"7.25\n"], timeout=0.5)
     conn.read_raw(framing=Framing.BLOCK)
     assert conn.query("MEAS:VOLT?") == "7.25"
+
+
+def test_a_nul_prefix_survives_a_leading_terminator_strip():
+    # NUL is a normal response prefix on some instruments; a stray leading
+    # terminator arriving in the SAME chunk must not stop it from being
+    # stripped too. Regression for fix round 2: an earlier version stripped
+    # NUL and terminator bytes in two separate passes, one per loop
+    # iteration -- a NUL that only becomes leading AFTER the terminator is
+    # stripped never got a second pass, because the very same iteration
+    # then broke on endswith(b"\n"), leaving the NUL byte inside the
+    # returned response ('\x001.5' instead of '1.5').
+    conn, _ = connected([b"\n\x001.5\n"], timeout=0.5)
+    assert conn.read() == "1.5"
 
 
 def test_the_terminator_drain_never_eats_real_data():
