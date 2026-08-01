@@ -22,9 +22,6 @@ from scpi_control import exceptions
 # into a printable response there is no block, but below it we keep waiting
 # rather than risk truncating a header that arrived split across two reads.
 _MAX_HEADER_PREFIX = 128
-# Enough to cover the longest legal header (`#9` + 9 digits) plus a short echo
-# prefix in one or two reads, while the length is still unknown.
-_HEADER_PROBE = 16
 
 
 class Framing(Enum):
@@ -132,7 +129,14 @@ def read_framed(
         elif streaming:
             hint = max_chunk
         else:
-            hint = _HEADER_PROBE
+            # One byte at a time until the header resolves. Never ask for more
+            # than we can attribute: a bigger probe can swallow the frame AND
+            # whatever followed it in the same read, and those trailing bytes
+            # belong to the transport's buffer, where the terminator drain and
+            # the desync check can still see them. The cost is a handful of
+            # one-byte reads across a command echo -- nothing against a
+            # waveform transfer.
+            hint = 1
 
         try:
             chunk = read_chunk(hint)

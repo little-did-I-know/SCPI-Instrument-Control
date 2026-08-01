@@ -26,17 +26,25 @@ from scpi_control.connection.framing import (
 def chunks(*items):
     """A read_chunk callable that plays `items` and then raises TransportIdle.
 
-    bytes -> delivered; TransportIdle/TransportClosed classes -> raised.
+    bytes -> buffered and handed out up to `hint` bytes at a time, like a real
+    socket: anything past `hint` stays queued for the next call instead of
+    being dropped. TransportIdle/TransportClosed classes -> raised once the
+    buffer they follow is drained.
     """
     queue = list(items)
+    pending = b""
 
     def read_chunk(hint):
-        if not queue:
+        nonlocal pending
+        while not pending and queue:
+            step = queue.pop(0)
+            if isinstance(step, type) and issubclass(step, Exception):
+                raise step()
+            pending = step
+        if not pending:
             raise TransportIdle()
-        step = queue.pop(0)
-        if isinstance(step, type) and issubclass(step, Exception):
-            raise step()
-        return step[:hint] if hint else step
+        piece, pending = (pending, b"") if not hint else (pending[:hint], pending[hint:])
+        return piece
 
     return read_chunk
 
@@ -70,8 +78,51 @@ class TestParseBlockHeader:
     def test_non_digit_length_field_is_absent(self):
         assert parse_block_header(b"#2ab").verdict == "absent"
 
+    def test_empty_buffer_is_incomplete(self):
+        assert parse_block_header(b"").verdict == "incomplete"
+
+    def test_hash_at_or_beyond_the_max_header_prefix_bound_is_absent(self):
+        # The scan only looks at the first _MAX_HEADER_PREFIX printable bytes.
+        # A '#' sitting exactly at that boundary (index _MAX_HEADER_PREFIX,
+        # one past the last scanned index) is never seen, so a response that
+        # took its time getting there is correctly given up on rather than
+        # scanned forever.
+        from scpi_control.connection.framing import _MAX_HEADER_PREFIX
+
+        at_bound = b"x" * _MAX_HEADER_PREFIX + b"#3000" + b"y" * 100
+        assert parse_block_header(at_bound).verdict == "absent"
+
 
 class TestReadFramed:
+    def test_never_over_reads_past_the_declared_block_length(self):
+        # Regression: while the header is unresolved, read_framed must never
+        # request more than it can attribute to this frame. A read_chunk that
+        # can hand back a big chunk in one call must not be allowed to swallow
+        # the frame AND whatever the transport buffered right after it --
+        # those trailing bytes belong to the transport's buffer, where a
+        # terminator drain or a desync check still needs to see them.
+        # Reviewer's repro: b"#15abcde" is a complete 8-byte block ('#','1'
+        # digit-count, '5' length field -> 5-byte payload "abcde"); 8 bytes of
+        # "X" follow it in the same underlying buffer and must not be read.
+        buffer = b"#15abcde" + b"X" * 8
+        cursor = [0]
+
+        def read_chunk(hint):
+            pos = cursor[0]
+            if pos >= len(buffer):
+                raise TransportIdle()
+            take = min(hint, 16, len(buffer) - pos)
+            piece = buffer[pos : pos + take]
+            cursor[0] = pos + take
+            return piece
+
+        read = read_framed(read_chunk, Framing.AUTO)
+        assert read.data == b"#15abcde"
+        assert read.block_total == 8
+        assert len(read.data) == read.block_total
+        # The trailing "X"s were never consumed; they're still on the buffer.
+        assert cursor[0] == 8
+
     def test_block_assembled_across_chunks(self):
         read = read_framed(chunks(b"#210", b"0123456789"), Framing.BLOCK)
         assert read.data == b"#2100123456789"
