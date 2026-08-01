@@ -120,6 +120,12 @@ class SocketConnection(BaseConnection):
         with self.lock:
             try:
                 data = b""
+                # Counted so the timeout message below can tell "the instrument
+                # sent nothing" apart from "the instrument sent leftovers we
+                # threw away". Reporting only len(data) said "received 0 bytes"
+                # for the second case, which points the reader at a silent
+                # instrument when the real fault is a desynced stream.
+                strays = 0
                 start_time = time.time()
 
                 while True:
@@ -127,8 +133,9 @@ class SocketConnection(BaseConnection):
                     if time.time() - start_time > self.timeout:
                         self._desynced = True
                         command_context = f"for '{self._last_command}' " if self._last_command else ""
+                        stray_context = f", after discarding {strays} leading stray byte(s)" if strays else ""
                         raise exceptions.SiglentTimeoutError(
-                            f"Read timeout {command_context}after {self.timeout}s waiting for newline terminator " f"(received {len(data)} bytes so far) from {self.host}:{self.port}"
+                            f"Read timeout {command_context}after {self.timeout}s waiting for newline terminator " f"(received {len(data)} bytes so far{stray_context}) from {self.host}:{self.port}"
                         )
 
                     chunk = self._socket.recv(self._buffer_size)
@@ -157,6 +164,7 @@ class SocketConnection(BaseConnection):
                     stripped = data.lstrip(b"\r\n\x00")
                     if stripped != data:
                         leftovers = data[: len(data) - len(stripped)]
+                        strays += len(leftovers)
                         if b"\n" in leftovers or b"\r" in leftovers:
                             logger.warning("Discarded %d stray terminator byte(s) left before the response to '%s' on %s:%s", len(leftovers), self._last_command, self.host, self.port)
                         data = stripped

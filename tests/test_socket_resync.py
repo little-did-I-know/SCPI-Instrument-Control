@@ -9,9 +9,12 @@ and became the ENTIRE next response (read() sees endswith(b"\\n") on the first
 chunk and returns an empty string).
 """
 
+from types import SimpleNamespace
+
 import pytest
 
 from scpi_control import exceptions
+from scpi_control.connection import socket as socket_module
 from scpi_control.connection.framing import Framing
 from tests.fake_socket import AfterSend, Timeout, connected
 
@@ -125,3 +128,38 @@ def test_the_terminator_drain_never_eats_real_data():
     conn.read_raw(framing=Framing.BLOCK)
     assert conn._desynced is True
     assert conn.query("MEAS:VOLT?") == "1.5"
+
+
+def test_surplus_right_behind_the_terminator_run_is_still_seen():
+    # The reason _drain_terminator peeks FOUR bytes and not exactly two: with
+    # a two-byte peek, "\n\nXYZ" looks like a pure terminator run (the peek is
+    # full, so nothing appears to follow it), the surplus is left queued with
+    # _desynced unset, and XYZ then poisons the next read with no timeout
+    # anywhere to trigger a resync. Peeking past the run is what makes the
+    # surplus visible in the same call. The test that already covered the
+    # surplus case used "XYZ" with NO terminator ahead of it, which a two-byte
+    # peek catches just as well -- which is why this one exists.
+    conn, _ = connected([b"#3012" + b"0123456789ab", b"\n\nXYZ", AfterSend, b"1.5\n"], timeout=0.5)
+    assert conn.read_raw(framing=Framing.BLOCK) == b"#3012" + b"0123456789ab" + b"\n\n"
+    assert conn._desynced is True, "surplus behind a full terminator run must still mark the session"
+    assert conn.query("MEAS:VOLT?") == "1.5"
+
+
+def test_the_loop_timeout_names_the_strays_it_discarded():
+    # "(received 0 bytes so far)" was a lie whenever the loop HAD received
+    # bytes and discarded them as strays: it describes a silent instrument,
+    # sending whoever reads the log after the wrong fault. The loop's own
+    # deadline (as opposed to a recv() timeout) is only reachable when reads
+    # keep succeeding, so the clock is what has to be scripted here.
+    ticks = iter([0.0, 0.0, 99.0])
+    conn, _ = connected([b"\n"], timeout=5.0)
+    original = socket_module.time
+    socket_module.time = SimpleNamespace(time=lambda: next(ticks), sleep=lambda seconds: None)
+    try:
+        with pytest.raises(exceptions.SiglentTimeoutError) as raised:
+            conn.read()
+    finally:
+        socket_module.time = original
+    message = str(raised.value)
+    assert "received 0 bytes so far" in message, message
+    assert "discarding 1 leading stray byte" in message, message
