@@ -225,6 +225,12 @@ class SiglentTransfer:
         return time
 
 
+# "or larger" per the MSO4/5/6 manual p.2-341/2-342 -- deliberately above any
+# shipping Tek record length so the window always covers the whole record; the
+# instrument clamps to its own maximum and NR_Pt? then reports the real count.
+_TEK_MAX_RECORD_POINTS = 1_000_000_000
+
+
 class TektronixTransfer:
     """CURVe? transfer scaled by the WFMOutpre preamble (Tek PMs, Task 7 citations)."""
 
@@ -257,9 +263,18 @@ class TektronixTransfer:
         scope.write(scope._get_command("set_data_source", ch=channel))
         scope.write(scope._get_command("set_data_encoding"))
         scope.write(scope._get_command("set_data_width"))
-        n_points = int(float(scope.query(scope._get_command("get_wfm_nr_pt"))))
+        # Widen the transfer window BEFORE asking how many points it holds.
+        # NR_Pt? is window-relative (MSO4/5/6 manual p.2-1461), so querying it
+        # first measures whatever narrow window a prior script or a recalled
+        # setup left behind -- and the old code then wrote that same number
+        # back to DATa:STOP, making the truncation permanent. p.2-341/2-342
+        # sanctions exactly this: "set DATa:STARt to 1 and DATa:STOP to the
+        # maximum record length, or larger". Using "or larger" avoids needing
+        # HORizontal:RECOrdlength?, whose spelling we cannot cite for the
+        # TBS1000/MSO2 families (their manuals are not in docs/).
         scope.write(scope._get_command("set_data_start", start=1))
-        scope.write(scope._get_command("set_data_stop", stop=n_points))
+        scope.write(scope._get_command("set_data_stop", stop=_TEK_MAX_RECORD_POINTS))
+        n_points = int(float(scope.query(scope._get_command("get_wfm_nr_pt"))))
         xincr = float(scope.query(scope._get_command("get_wfm_xincr")))
         xzero = float(scope.query(scope._get_command("get_wfm_xzero")))
         # WFMOutpre:PT_Off? is MSO2-only (absent from the TBS1000C WFMOutpre
