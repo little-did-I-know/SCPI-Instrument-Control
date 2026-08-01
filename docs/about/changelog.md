@@ -12,6 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - PSU: `ovp_level`/`ocp_level` on SPD1305X/SPD1168X now raise `NotImplementedError` instead of silently sending a command the firmware discards. No SPD1000X programming manual documents a SCPI protection subsystem; set protection on the front panel. (Same honesty gate the SPD3303X received in v5.0.0.)
 - Oscilloscope: setting `trigger.trigger_type` to a type the connected dialect cannot express (everything except `EDGE` on Tektronix) now raises `FeatureNotSupportedError` instead of silently leaving the scope on its previous trigger.
 - Oscilloscope: setting an invalid trigger type now raises `ValueError` (consistent with the mode/slope setters) where it previously raised `InvalidParameterError`; callers catching `SiglentError` around `trigger.trigger_type` assignments should catch `ValueError` too.
+- DAQ: an overload reading is no longer returned as the raw `9.9E+37` sentinel. `Reading` gains an `overload: bool` field; overload readings carry `value=NaN` with `overload=True`. Code that compared readings against `9.9e37` should check `reading.overload` instead.
+- Oscilloscope (legacy Siglent): `acquire(..., format="WORD")` now raises `FeatureNotSupportedError` instead of returning fabricated data. The legacy programming guide documents no way to request 16-bit samples; use `format="BYTE"`.
 
 ### Fixed
 
@@ -19,6 +21,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Oscilloscope (modern Siglent): `trigger.trigger_type = "SLEW"/"GLIT"/"INTV"` now sends the dialect's real tokens (`SLOPe`/`PULSE`/`INTerval`) instead of legacy spellings the scope rejects.
 - Connection: a timeout during a sized binary read (e.g. slow screenshot start) now raises `SiglentTimeoutError` and keeps the session usable, instead of misclassifying as a dead connection.
 - Mock: the modern mock now answers `:CHANnel<n>:PROBe?`, `:CHANnel<n>:BWLimit?`, `:TIMebase:DELay?`, and `*OPC?` with hardware-measured response shapes, rejects invalid probe/trigger-type parameters with `-224` like real firmware, and reports probe-free preamble gain — so provenance channel snapshots are exercised in CI. The mock also now seeds the modern dialect's default channel coupling as `DC` instead of the legacy `D1M` token.
+- DAQ: `R?` responses are parsed as the IEEE 488.2 definite-length block the instrument actually sends, so the first reading of every batch is no longer silently discarded. Because `R?` erases readings on the instrument, those readings were previously unrecoverable.
+- DAQ: reading tokens that cannot be parsed are now logged at warning level instead of being dropped silently at debug level.
+- Oscilloscope (Tektronix): captures now widen the transfer window before measuring it, so a narrow `DATa:STOP` left behind by another program or a recalled setup no longer truncates every capture indefinitely.
+- Mock: the DAQ mock wraps `R?` in a definite-length block (leaving `READ?`/`FETCh?` bare, as the instrument does) and the Tektronix mock models the `DATa:STARt`/`DATa:STOP` window, so both regressions are now catchable in CI.
 
 ## [6.0.0] - 2026-07-30
 
