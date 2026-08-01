@@ -360,6 +360,14 @@ class VISAConnection(BaseConnection):
                 # exchange, not this one's answer. Returning "" here is the bug.
                 logger.warning("Empty response on %s: a stray terminator, not an answer -- reading again", self.resource_string)
 
+            # Giving up on a read leaves the session position unknown, exactly
+            # like the timeout paths _translate and read_raw handle: the answer
+            # this read was for is either still queued or never coming, and
+            # either way it must not be handed to the NEXT caller. Without this
+            # flag the resync-before-send never runs and the whole High-7 shape
+            # comes back. SocketConnection.read sets it on both of its own
+            # give-up paths (socket.py:128 and :180) for the same reason.
+            self._desynced = True
             raise SiglentTimeoutError(f"Only stray terminators on {self.resource_string} after {_MAX_STRAY_TERMINATOR_READS} reads")
 
     def _begin_streaming(self) -> None:

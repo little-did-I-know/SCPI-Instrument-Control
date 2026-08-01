@@ -203,6 +203,14 @@ class TestStrayTerminators:
         resource.read.side_effect = ["", "", "", "", ""]
         with pytest.raises(exceptions.SiglentTimeoutError):
             conn.read()
+        # Raising is only half the job. Giving up leaves the session position
+        # unknown, and unless that is RECORDED the next send issues no device
+        # clear -- so whatever is still queued becomes that command's answer,
+        # which is the whole of High-7. Asserting the flag alone would not
+        # show that, so the consequence is exercised too.
+        assert conn._desynced is True, "a read that gave up must mark the session out of step"
+        conn.write("*RST")
+        resource.clear.assert_called_once()
 
 
 class TestConnectCleanup:
