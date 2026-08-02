@@ -11,6 +11,7 @@ from scpi_control import exceptions
 from scpi_control.analysis import FFTAnalyzer
 from scpi_control.channel import Channel
 from scpi_control.connection import BaseConnection, SocketConnection
+from scpi_control.connection.framing import Framing
 from scpi_control.exceptions import SiglentError
 from scpi_control.math_channel import MathChannel
 from scpi_control.measurement import Measurement
@@ -286,16 +287,26 @@ class Oscilloscope:
         logger.debug(f"Response: {response}")
         return response
 
-    def read_raw(self, size: Optional[int] = None) -> bytes:
+    def read_raw(self, size: Optional[int] = None, framing: Framing = Framing.AUTO) -> bytes:
         """Read raw binary data from oscilloscope.
 
         Args:
             size: Number of bytes to read (None for all available)
+            framing: What the caller knows the response to be (see
+                connection.framing.Framing). What happens when BOTH size and
+                framing are given is transport-specific, not a uniform
+                "ignored": SocketConnection's exact-size path never reaches
+                the framing code, so framing is genuinely ignored there.
+                MockConnection's BLOCK check instead runs unconditionally,
+                BEFORE size truncation -- a declaration the canned response
+                cannot honour still raises CommandError even with size set,
+                deliberately, so a wrong wire-shape declaration cannot hide
+                behind a truncated read.
 
         Returns:
             Raw binary data
         """
-        return self._connection.read_raw(size)
+        return self._connection.read_raw(size, framing=framing)
 
     def identify(self) -> str:
         """Get device identification string.

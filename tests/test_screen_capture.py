@@ -7,6 +7,7 @@ oscilloscope -- the readers are driven by fakes.
 """
 
 import struct
+import threading
 
 import pytest
 
@@ -76,15 +77,34 @@ def test_extract_ieee_block_empty_raises():
 
 
 class _Conn:
-    _socket = None  # so the trailing-byte drain is a no-op
-
-    def __init__(self, data: bytes, sequential: bool):
+    def __init__(self, data: bytes, sequential: bool, drain_error: Exception = None):
         self._data = data
         self._seq = _SeqReader(data)
         self._sequential = sequential
+        self.lock = threading.RLock()
+        self.drain_calls = 0
+        self.resync_calls = 0
+        self._drain_error = drain_error
 
-    def read_raw(self, n=None) -> bytes:
+    def read_raw(self, n=None, framing=None) -> bytes:
         return self._seq(n) if self._sequential else self._data
+
+    def drain_input(self) -> int:
+        # A stand-in for BaseConnection.drain_input(): _capture_with_scdp
+        # calls this after the modern read to discard a trailing byte, but
+        # this fake has nothing buffered to discard.
+        self.drain_calls += 1
+        if self._drain_error is not None:
+            raise self._drain_error
+        return 0
+
+    def resync(self) -> int:
+        # Present so a capture that asks for the WRONG verb is visible rather
+        # than an AttributeError: resync() may take a protocol-level action
+        # (VISAConnection prefers a device clear), which post-capture
+        # housekeeping has no business requesting.
+        self.resync_calls += 1
+        return 0
 
 
 class _Scope:
@@ -99,9 +119,38 @@ class _Scope:
 
 def test_capture_modern_sends_scdp_and_reads_bmp_by_size():
     bmp = _raw_bmp(500)
-    scope = _Scope(_Conn(bmp, sequential=True), dialect="modern")
+    conn = _Conn(bmp, sequential=True)
+    scope = _Scope(conn, dialect="modern")
     assert ScreenCapture(scope).capture_screenshot() == bmp
     assert scope.written == ["SCDP"]
+    # Discarding the terminator behind the image is a DRAIN, not a session
+    # recovery. resync() may abort the instrument's pending operation
+    # (VISAConnection prefers a device clear), which is not something a
+    # finished screenshot should trigger.
+    assert conn.drain_calls == 1
+    assert conn.resync_calls == 0
+
+
+def test_a_failed_drain_does_not_throw_away_a_captured_screenshot():
+    # The image has already been read when the drain runs. A transport fault
+    # in that housekeeping used to propagate out of capture_screenshot() as
+    # "Failed to capture screenshot" -- with the complete image in hand.
+    # SocketConnection's drain catches only socket.timeout, so a peer reset
+    # mid-drain is exactly this.
+    bmp = _raw_bmp(500)
+    conn = _Conn(bmp, sequential=True, drain_error=ConnectionResetError("peer reset during the drain"))
+    scope = _Scope(conn, dialect="modern")
+    assert ScreenCapture(scope).capture_screenshot() == bmp
+    assert conn.drain_calls == 1
+
+
+def test_a_failed_drain_is_reported_rather_than_swallowed(caplog):
+    bmp = _raw_bmp(64)
+    conn = _Conn(bmp, sequential=True, drain_error=ConnectionResetError("peer reset during the drain"))
+    scope = _Scope(conn, dialect="modern")
+    with caplog.at_level("WARNING"):
+        ScreenCapture(scope).capture_screenshot()
+    assert "peer reset during the drain" in caplog.text
 
 
 def test_capture_legacy_sends_scdp_query_and_extracts_block():

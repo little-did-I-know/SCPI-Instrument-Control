@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Callable, Dict, Iterable, List, Optional, Set,
 
 from scpi_control import exceptions
 from scpi_control.connection.base import BaseConnection
+from scpi_control.connection.framing import Framing, parse_block_header
 from scpi_control.connection.mock.helpers import MOCK_SCREENSHOT_BMP, _build_ieee_block
 from scpi_control.connection.mock import lecroy, siglent, tektronix
 from scpi_control.models import detect_model_from_idn
@@ -62,6 +63,12 @@ class MockConnection(BaseConnection):
         voltage_offsets: Optional[Dict[int, float]] = None,
         waveform_payloads: Optional[Dict[int, bytes]] = None,
         waveform_gate: Optional[threading.Event] = None,
+        # Raw override: when set, read_raw() returns this verbatim (subject to
+        # `size` truncation and the `framing` declaration) instead of whatever
+        # branch below would otherwise answer. Lets a test hand read_raw() a
+        # response the mock could not otherwise produce -- e.g. one with no
+        # block header, to prove a BLOCK declaration against it is rejected.
+        mock_raw_response: Optional[bytes] = None,
         signals: Optional[Dict[int, Union["SignalSpec", Callable[[], "SignalSpec"]]]] = None,
         sample_rate: float = 1_000.0,
         timebase: float = 1e-3,
@@ -112,6 +119,11 @@ class MockConnection(BaseConnection):
         # instant, untouched. Consumed only by read_raw()'s waveform-data
         # response paths (below), via _wait_for_waveform_gate().
         self._waveform_gate: Optional[threading.Event] = waveform_gate
+        # See the constructor docstring above: None (the default) means
+        # read_raw() answers from its normal dispatch, untouched. Public (not
+        # underscore-prefixed) because tests set it directly, mid-test, after
+        # the write() that would otherwise select a response.
+        self.mock_raw_response: Optional[bytes] = mock_raw_response
         self._signals: Dict[int, Union["SignalSpec", Callable[[], "SignalSpec"]]] = dict(signals) if signals else {}
         self._acquisition_counts: Dict[int, int] = {}
         # Coupling default is dialect-specific: modern wire vocabulary is
@@ -976,16 +988,32 @@ class MockConnection(BaseConnection):
         if self._waveform_gate is not None:
             self._waveform_gate.wait()
 
-    def read_raw(self, size: Optional[int] = None) -> bytes:
+    def _framed(self, payload: bytes, size: Optional[int], framing: Framing) -> bytes:
+        """Return a canned payload, holding the caller to its framing declaration.
+
+        A BLOCK declaration the mock's own answer cannot honour is a CI
+        failure by design: the point of the mock is to catch a call site that
+        expects the wrong wire shape BEFORE hardware does.
+        """
+        if framing is Framing.BLOCK and parse_block_header(payload).verdict != "block":
+            raise exceptions.CommandError(f"MockConnection: read_raw(framing=BLOCK) but the response carries no definite-length block header (writes={self.writes[-1:]!r})")
+        return payload[:size] if size is not None else payload
+
+    def read_raw(self, size: Optional[int] = None, framing: Framing = Framing.AUTO) -> bytes:
         """Return deterministic raw waveform data (or a mock screenshot BMP after SCDP?)."""
         if not self._connected:
             raise exceptions.ConnectionError(f"Not connected to oscilloscope at {self.host}:{self.port}")
+
+        if self.mock_raw_response is not None:
+            # Override: a test-supplied response, e.g. one with no block
+            # header, so a BLOCK declaration against it can be proven to fail.
+            return self._framed(self.mock_raw_response, size, framing)
 
         if self.writes and self.writes[-1].upper() == "SCDP?":
             # Bare IEEE 488.2 block (no "DESC," prefix), matching how a real
             # scope's SCDP? reply is parsed in screen_capture.py.
             payload = _build_ieee_block(MOCK_SCREENSHOT_BMP)
-            return payload[:size] if size is not None else payload
+            return self._framed(payload, size, framing)
 
         # Modern :WAVeform:PREamble?/:WAVeform:DATA? binary blocks (Task 18,
         # audit H9): which one read_raw() returns is determined by the last
@@ -994,11 +1022,11 @@ class MockConnection(BaseConnection):
             last_write = self.writes[-1].upper()
             if last_write == ":WAVEFORM:PREAMBLE?":
                 payload = siglent.build_waveform_preamble(self)
-                return payload[:size] if size is not None else payload
+                return self._framed(payload, size, framing)
             if last_write == ":WAVEFORM:DATA?":
                 self._wait_for_waveform_gate()
                 payload = siglent.build_waveform_data(self)
-                return payload[:size] if size is not None else payload
+                return self._framed(payload, size, framing)
 
         # v5.0.0: the legacy C<n>:WF? DAT2/DESC block was answered on modern
         # dialects as a back-compat shim "until v5.0.0" (Task 18). That date
@@ -1013,4 +1041,4 @@ class MockConnection(BaseConnection):
         self._wait_for_waveform_gate()
         personality = _PERSONALITIES.get(self.scope_vendor, siglent)
         payload = personality.build_waveform_response(self)
-        return payload[:size] if size is not None else payload
+        return self._framed(payload, size, framing)

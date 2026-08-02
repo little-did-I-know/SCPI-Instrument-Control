@@ -1,0 +1,527 @@
+"""VISAConnection must honour the same contract SocketConnection does.
+
+Backend review 2026-07-31, High-4. The file contained ZERO lock references
+(base.py:23-24 requires the reentrant lock across compound exchanges), read()
+and read_raw() leaked raw VisaIOError while write()/query() translated it, a
+failed connect left _resource set (so is_connected reported True) and leaked
+the ResourceManager, and read_termination="\\n" stayed in force for binary
+reads, where a 0x0A inside a waveform ends the read.
+
+NOTE ON EVIDENCE: there is no VISA instrument here and pyvisa is not installed,
+so these tests pin OUR contract against a stub resource. Nothing here is
+confirmed against instrument behaviour, and no comment in the module may imply
+otherwise.
+
+The stub matters: with pyvisa absent the module-level name is None, so patching
+PYVISA_AVAILABLE alone makes every error path die with AttributeError instead of
+the behaviour under test. The existing contract tests only get away with it
+because they never touch an error path.
+"""
+
+import struct
+import types
+from unittest.mock import MagicMock, patch
+
+import pytest
+
+from scpi_control import exceptions
+from scpi_control.connection.framing import Framing
+
+
+class FakeVisaIOError(Exception):
+    def __init__(self, error_code=-1073807339, message="VI_ERROR_TMO: Timeout expired"):
+        super().__init__(message)
+        self.error_code = error_code
+
+
+def _stub_pyvisa():
+    """A stand-in pyvisa module with just the surface visa_connection touches."""
+    module = types.ModuleType("pyvisa")
+    module.errors = types.SimpleNamespace(VisaIOError=FakeVisaIOError)
+    module.constants = types.SimpleNamespace(
+        StatusCode=types.SimpleNamespace(error_timeout=-1073807339), Parity=types.SimpleNamespace(none=0), StopBits=types.SimpleNamespace(one=10), ControlFlow=types.SimpleNamespace(none=0)
+    )
+    module.ResourceManager = MagicMock()
+    return module
+
+
+@pytest.fixture
+def visa():
+    """Yield a VISAConnection class with a stub pyvisa injected."""
+    from scpi_control.connection import visa_connection as module
+
+    stub = _stub_pyvisa()
+    with patch.object(module, "pyvisa", stub), patch.object(module, "PYVISA_AVAILABLE", True):
+        yield module, stub
+
+
+def _connected(module, stub):
+    conn = module.VISAConnection("USB0::0x1234::0x5678::SN::INSTR")
+    resource = MagicMock()
+    stub.ResourceManager.return_value.open_resource.return_value = resource
+    conn.connect()
+    return conn, resource
+
+
+def _serve(payload, watcher=None):
+    """A read side effect that hands out `payload`, then times out.
+
+    Fits either primitive: called with a count (read_bytes) it takes that many
+    bytes, called with none (read_raw) it takes everything left, standing in
+    for a read to END. A finished VISA read raises a timeout rather than
+    returning b"" -- there is no peer-close to observe on a USB/GPIB session --
+    so that is what this does once the payload runs out. `watcher` is called
+    with no arguments on every read, for tests that need to observe state from
+    inside the call.
+    """
+    remaining = [payload]
+
+    def read(count=None, *args, **kwargs):
+        if watcher is not None:
+            watcher()
+        if not remaining[0]:
+            raise FakeVisaIOError()
+        if count is None:
+            head, remaining[0] = remaining[0], b""
+        else:
+            head, remaining[0] = remaining[0][:count], remaining[0][count:]
+        return head
+
+    return read
+
+
+def _serve_session(resource, payload, watcher=None):
+    """Serve one payload across BOTH read primitives, from one buffer.
+
+    Lets a test watch the transport switch primitives part-way through a
+    response without the same bytes being handed out twice -- and means
+    neither primitive is left as a bare MagicMock handing back an object that
+    is not bytes.
+    """
+    reader = _serve(payload, watcher=watcher)
+    resource.read_bytes.side_effect = reader
+    resource.read_raw.side_effect = reader
+
+
+# A minimal definite-length block: '#1' + one length digit + zero payload bytes.
+TINY_BLOCK = b"#10"
+
+
+class TestLocking:
+    @pytest.mark.parametrize("method,args", [("write", ("*IDN?",)), ("query", ("*IDN?",)), ("read", ()), ("read_raw", ())])
+    def test_exchanges_hold_the_lock(self, visa, method, args):
+        module, stub = visa
+        conn, resource = _connected(module, stub)
+        held = []
+        resource.write.side_effect = lambda *a, **k: held.append(conn.lock._is_owned())
+        resource.query.side_effect = lambda *a, **k: held.append(conn.lock._is_owned()) or "x"
+        resource.read.side_effect = lambda *a, **k: held.append(conn.lock._is_owned()) or "x"
+        # read_raw() reads through the framing reader, so the observable call is
+        # read_bytes, not read_raw.
+        resource.read_bytes.side_effect = _serve(TINY_BLOCK, watcher=lambda: held.append(conn.lock._is_owned()))
+        getattr(conn, method)(*args)
+        assert held and all(held), f"{method}() ran without holding the connection lock"
+
+
+class TestErrorTranslation:
+    @pytest.mark.parametrize("method,args", [("read", ()), ("read_raw", ())])
+    def test_timeouts_are_translated(self, visa, method, args):
+        module, stub = visa
+        conn, resource = _connected(module, stub)
+        resource.read.side_effect = FakeVisaIOError()
+        resource.read_raw.side_effect = FakeVisaIOError()
+        resource.read_bytes.side_effect = FakeVisaIOError()
+        with pytest.raises(exceptions.SiglentTimeoutError):
+            getattr(conn, method)(*args)
+
+    def test_non_timeout_errors_become_connection_errors(self, visa):
+        module, stub = visa
+        conn, resource = _connected(module, stub)
+        resource.read.side_effect = FakeVisaIOError(error_code=-1073807194, message="VI_ERROR_CONN_LOST")
+        with pytest.raises(exceptions.SiglentConnectionError):
+            conn.read()
+
+    def test_a_timeout_marks_the_session_desynced(self, visa):
+        # Mirrors SocketConnection: an abandoned read leaves the session
+        # position unknown, and the next send has to clear it.
+        module, stub = visa
+        conn, resource = _connected(module, stub)
+        resource.read.side_effect = FakeVisaIOError()
+        with pytest.raises(exceptions.SiglentTimeoutError):
+            conn.read()
+        assert conn._desynced is True
+
+
+class TestStrayTerminators:
+    """read() must skip leftovers rather than return them as an answer.
+
+    Reachable precisely because _drain_terminator's window is finite: it takes
+    the first "\\n" of a split "\\r\\n", times out, and the partner lands
+    afterwards. pyvisa reads to a terminator and strips it, so that one
+    stranded byte comes back as an EMPTY response with the real answer still
+    queued -- the off-by-one SocketConnection.read exists to catch.
+    """
+
+    def test_a_stray_terminator_is_not_returned_as_the_response(self, visa, caplog):
+        module, stub = visa
+        conn, resource = _connected(module, stub)
+        # pyvisa strips the terminator it read to, so a stranded "\n" arrives
+        # as "" -- and the real answer is the read after it.
+        resource.read.side_effect = ["", "3.301"]
+        with caplog.at_level("WARNING"):
+            assert conn.read() == "3.301"
+        assert "stray terminator" in caplog.text
+
+    def test_a_leading_terminator_run_is_stripped_with_a_warning(self, visa, caplog):
+        module, stub = visa
+        conn, resource = _connected(module, stub)
+        resource.read.side_effect = ["\n3.301"]
+        with caplog.at_level("WARNING"):
+            assert conn.read() == "3.301"
+        assert "stray terminator" in caplog.text
+
+    def test_a_bare_nul_prefix_is_stripped_without_a_warning(self, visa, caplog):
+        # Some instruments prefix EVERY response with a NUL. Normal, and not
+        # worth a warning on every query -- but it must still come off, and in
+        # the same pass as a terminator, as in SocketConnection.read.
+        module, stub = visa
+        conn, resource = _connected(module, stub)
+        resource.read.side_effect = ["\x00\x00Siglent,SDS824X HD"]
+        with caplog.at_level("WARNING"):
+            assert conn.read() == "Siglent,SDS824X HD"
+        assert caplog.text == ""
+
+    def test_a_terminator_ahead_of_a_nul_prefixed_response_is_stripped_too(self, visa):
+        # The case that made SocketConnection strip both kinds in ONE pass.
+        module, stub = visa
+        conn, resource = _connected(module, stub)
+        resource.read.side_effect = ["\r\n\x003.301"]
+        assert conn.read() == "3.301"
+
+    def test_nothing_but_strays_raises_rather_than_answering_empty(self, visa):
+        module, stub = visa
+        conn, resource = _connected(module, stub)
+        resource.read.side_effect = ["", "", "", "", ""]
+        with pytest.raises(exceptions.SiglentTimeoutError):
+            conn.read()
+        # Raising is only half the job. Giving up leaves the session position
+        # unknown, and unless that is RECORDED the next send issues no device
+        # clear -- so whatever is still queued becomes that command's answer,
+        # which is the whole of High-7. Asserting the flag alone would not
+        # show that, so the consequence is exercised too.
+        assert conn._desynced is True, "a read that gave up must mark the session out of step"
+        conn.write("*RST")
+        resource.clear.assert_called_once()
+
+
+class TestConnectCleanup:
+    def test_a_failure_after_open_does_not_report_connected(self, visa):
+        module, stub = visa
+        conn = module.VISAConnection("USB0::0x1234::0x5678::SN::INSTR")
+        resource = MagicMock()
+        type(resource).timeout = property(lambda self: 0, lambda self, value: (_ for _ in ()).throw(FakeVisaIOError(error_code=-1, message="cannot set timeout")))
+        stub.ResourceManager.return_value.open_resource.return_value = resource
+        with pytest.raises(exceptions.SiglentConnectionError):
+            conn.connect()
+        assert conn.is_connected is False
+        assert conn._resource is None
+        assert conn._resource_manager is None
+        resource.close.assert_called_once()
+
+    def test_connecting_twice_does_not_open_a_second_resource(self, visa):
+        module, stub = visa
+        conn, _ = _connected(module, stub)
+        conn.connect()
+        assert stub.ResourceManager.return_value.open_resource.call_count == 1
+
+    def test_disconnect_releases_both_handles(self, visa):
+        module, stub = visa
+        conn, resource = _connected(module, stub)
+        manager = stub.ResourceManager.return_value
+        conn.disconnect()
+        resource.close.assert_called_once()
+        manager.close.assert_called_once()
+        assert conn.is_connected is False
+        assert conn._resource is None
+        assert conn._resource_manager is None
+
+
+class TestBinaryReads:
+    def test_termination_is_disabled_for_a_binary_read_and_restored(self, visa):
+        module, stub = visa
+        conn, resource = _connected(module, stub)
+        seen = []
+        # A declared STREAM has no length to read to, so the read primitive is
+        # read_raw (read-to-END), not the fixed-length read_bytes -- see
+        # test_a_headerless_read_does_not_over_demand_a_fixed_length.
+        _serve_session(resource, b"#3012", watcher=lambda: seen.append(resource.read_termination))
+        conn.read_raw(framing=Framing.STREAM)
+        assert seen and all(value is None for value in seen), "read_termination must be disabled while reading binary"
+        assert resource.read_termination == "\n"
+        assert resource.timeout == int(conn.timeout * 1000)
+
+    def test_termination_is_restored_when_the_binary_read_fails(self, visa):
+        module, stub = visa
+        conn, resource = _connected(module, stub)
+        resource.read_raw.side_effect = FakeVisaIOError(error_code=-1073807194, message="VI_ERROR_CONN_LOST")
+        resource.read_bytes.side_effect = FakeVisaIOError(error_code=-1073807194, message="VI_ERROR_CONN_LOST")
+        with pytest.raises(exceptions.SiglentConnectionError):
+            conn.read_raw(framing=Framing.STREAM)
+        assert resource.read_termination == "\n"
+        assert resource.timeout == int(conn.timeout * 1000)
+
+    @pytest.mark.parametrize("framing", [Framing.STREAM, Framing.AUTO])
+    def test_a_headerless_read_does_not_over_demand_a_fixed_length(self, visa, framing):
+        # pyvisa's read_bytes(count) loops until it holds `count` bytes and
+        # raises on timeout, discarding the partial read (pyvisa docs,
+        # MessageBasedResource.read_bytes). Asking it for a 4096-byte chunk of
+        # a response with no declared length is therefore the same over-demand
+        # this task removed from query_binary. A VISA session ends its messages
+        # with END/EOI, so a headerless read uses read_raw() instead.
+        module, stub = visa
+        conn, resource = _connected(module, stub)
+        _serve_session(resource, b"BM\x36\x00\x00\x00 no header here")
+        assert conn.read_raw(framing=framing) == b"BM\x36\x00\x00\x00 no header here"
+        if framing is Framing.STREAM:
+            # Nothing to rule out, so the fixed-length read is never reached at
+            # all. Spelled out rather than left to all([]) being vacuously true.
+            assert not resource.read_bytes.call_args_list
+        else:
+            # AUTO still probes byte-by-byte until it can rule a header out;
+            # what it must never do is ask for a fixed length it has no reason
+            # to expect.
+            assert resource.read_bytes.call_args_list
+            assert all(call.args[0] == 1 for call in resource.read_bytes.call_args_list)
+
+    def test_a_declared_stream_does_not_shorten_the_first_read(self, visa):
+        # Only the idle read that proves a response ENDED may be cut short.
+        # A declared STREAM has not seen a byte yet when it starts, so the
+        # instrument still gets the full configured timeout to answer in.
+        module, stub = visa
+        conn, resource = _connected(module, stub)
+        seen = []
+        _serve_session(resource, b"payload", watcher=lambda: seen.append(resource.timeout))
+        conn.read_raw(framing=Framing.STREAM)
+        assert seen[0] == int(conn.timeout * 1000)
+
+    def test_a_headerless_auto_read_shortens_only_the_idle_tail(self, visa):
+        # The mirror image: AUTO rules out a header only after bytes have
+        # arrived, so from that point the wait is just proof the response
+        # ended -- and that wait is the short one.
+        module, stub = visa
+        conn, resource = _connected(module, stub)
+        seen = []
+        _serve_session(resource, b"BM\x36\x00\x00\x00 no header here", watcher=lambda: seen.append(resource.timeout))
+        conn.read_raw(framing=Framing.AUTO)
+        assert seen[0] == int(conn.timeout * 1000)
+        assert seen[-1] == module._HEADERLESS_TAIL_TIMEOUT_MS
+        assert resource.timeout == int(conn.timeout * 1000), "the shortened timeout must not outlive the read"
+
+    def test_query_binary_does_not_demand_exactly_max_bytes(self, visa):
+        module, stub = visa
+        conn, resource = _connected(module, stub)
+        resource.read_bytes.side_effect = _serve(b"#3012" + b"0123456789ab")
+        assert conn.query_binary("C1:WF? DAT2", max_bytes=1_000_000).startswith(b"#3012")
+        # The bug: read_bytes(1_000_000) demands exactly that many bytes and
+        # blocks the whole timeout before raising, after the data arrived.
+        assert all(call.args[0] < 1_000_000 for call in resource.read_bytes.call_args_list)
+
+    def test_query_binary_rejects_a_response_over_the_ceiling(self, visa):
+        module, stub = visa
+        conn, resource = _connected(module, stub)
+        resource.read_bytes.side_effect = _serve(b"#3012" + b"0123456789ab")
+        with pytest.raises(exceptions.CommandError):
+            conn.query_binary("C1:WF? DAT2", max_bytes=8)
+
+
+class TestBlockTerminator:
+    """read_framed stops on the last payload byte; the terminator is still queued.
+
+    Left there it is not harmless -- it becomes the whole of the next response,
+    and since nothing timed out, _desynced is never set, so the
+    resync-before-send cannot catch it either. SocketConnection has its own
+    _drain_terminator for exactly this.
+    """
+
+    def test_a_completed_block_consumes_its_trailing_terminator(self, visa):
+        module, stub = visa
+        conn, resource = _connected(module, stub)
+        _serve_session(resource, b"#15he\nlo" + b"\n")
+        assert conn.read_raw(framing=Framing.BLOCK) == b"#15he\nlo" + b"\n"
+        # Nothing may be left for the next reader to trip over.
+        with pytest.raises(FakeVisaIOError):
+            resource.read_bytes(1)
+        assert conn._desynced is False
+
+    def test_a_two_byte_terminator_run_is_consumed_whole(self, visa):
+        module, stub = visa
+        conn, resource = _connected(module, stub)
+        _serve_session(resource, b"#15he\nlo" + b"\r\n")
+        assert conn.read_raw(framing=Framing.BLOCK) == b"#15he\nlo" + b"\r\n"
+        assert conn._desynced is False
+
+    def test_surplus_behind_a_block_is_flagged_not_silently_dropped(self, visa, caplog):
+        # VISA cannot peek, so by the time we know it is not a terminator we
+        # have eaten it. The honest response is to say so, not to pretend the
+        # session is intact -- SocketConnection can leave it in the buffer,
+        # this cannot.
+        module, stub = visa
+        conn, resource = _connected(module, stub)
+        _serve_session(resource, b"#15he\nlo" + b"XYZ")
+        with caplog.at_level("WARNING"):
+            assert conn.read_raw(framing=Framing.BLOCK) == b"#15he\nlo"
+        assert conn._desynced is True, "a consumed surplus byte leaves the session out of step"
+        assert "X" in caplog.text, "the discarded byte must be named in the log"
+
+    def test_no_terminator_queued_is_not_an_error(self, visa):
+        # Normal for a resource class whose own read already took the
+        # terminator: the probe times out and the block is returned as-is.
+        module, stub = visa
+        conn, resource = _connected(module, stub)
+        _serve_session(resource, b"#15he\nlo")
+        assert conn.read_raw(framing=Framing.BLOCK) == b"#15he\nlo"
+        assert conn._desynced is False
+
+    def test_the_terminator_probe_reads_one_byte_at_a_time(self, visa):
+        # read_bytes(2) is a fixed-length read: against a one-byte terminator
+        # run it would wait out the timeout and then raise, losing the very
+        # byte this drain exists to remove.
+        module, stub = visa
+        conn, resource = _connected(module, stub)
+        _serve_session(resource, b"#15he\nlo" + b"\n")
+        conn.read_raw(framing=Framing.BLOCK)
+        sizes = [call.args[0] for call in resource.read_bytes.call_args_list]
+        # 1,1,1 resolving the header, then 5 for the rest of the declared
+        # block -- both are lengths we know are coming. What follows the block
+        # is not, so the probe has to be the single-byte reads at the tail.
+        assert sizes[:4] == [1, 1, 1, 5], sizes
+        assert sizes[4:] and set(sizes[4:]) == {1}, f"the terminator probe must read one byte at a time, got {sizes}"
+
+    def test_a_real_fault_during_the_drain_is_not_reported_as_a_clean_read(self, visa):
+        # Only a TIMEOUT means "nothing queued". Swallowing every VisaIOError
+        # would report a dead session as a successful block read, with the
+        # block that did arrive hiding the death.
+        module, stub = visa
+        conn, resource = _connected(module, stub)
+        reader = _serve(b"#15he\nlo")
+        calls = []
+
+        def read_bytes(count, *args, **kwargs):
+            calls.append(count)
+            if len(calls) > 4:  # the block is done; the drain is what asks next
+                raise FakeVisaIOError(error_code=-1073807194, message="VI_ERROR_CONN_LOST")
+            return reader(count)
+
+        resource.read_bytes.side_effect = read_bytes
+        with pytest.raises(exceptions.SiglentConnectionError):
+            conn.read_raw(framing=Framing.BLOCK)
+
+    def test_the_probe_timeout_does_not_outlive_the_read(self, visa):
+        module, stub = visa
+        conn, resource = _connected(module, stub)
+        seen = []
+        _serve_session(resource, b"#15he\nlo" + b"\n", watcher=lambda: seen.append(resource.timeout))
+        conn.read_raw(framing=Framing.BLOCK)
+        assert seen[-1] == module._QUIET_PROBE_TIMEOUT_MS, "the terminator probe must not wait the full timeout"
+        assert resource.timeout == int(conn.timeout * 1000)
+
+
+class TestResync:
+    def test_resync_prefers_a_device_clear(self, visa):
+        module, stub = visa
+        conn, resource = _connected(module, stub)
+        conn.resync()
+        resource.clear.assert_called_once()
+
+    def test_resync_drains_when_the_resource_cannot_clear(self, visa):
+        # Pins OUR drain loop -- read whole messages, count them, stop on the
+        # first error -- and nothing about pyvisa. The count is a floor by
+        # design: a message the instrument never terminates is discarded
+        # uncounted, which _drain's docstring says outright.
+        module, stub = visa
+        conn, resource = _connected(module, stub)
+        del resource.clear  # a resource type that exposes no device clear
+        resource.read_raw.side_effect = _serve(b"stale bytes")
+        assert conn.resync() == len(b"stale bytes")
+        assert conn._desynced is False
+        # The drain's short timeout and disabled terminator are borrowed, not kept.
+        assert resource.timeout == int(conn.timeout * 1000)
+        assert resource.read_termination == "\n"
+
+    def test_write_resyncs_before_sending_when_desynced(self, visa):
+        module, stub = visa
+        conn, resource = _connected(module, stub)
+        conn._desynced = True
+        conn.write("*RST")
+        resource.clear.assert_called_once()
+        assert conn._desynced is False
+
+    @pytest.mark.parametrize("method", ["write", "query"])
+    def test_a_rejected_command_does_not_trigger_a_device_clear(self, visa, method):
+        # Validation runs BEFORE the resync: a command that is about to be
+        # refused is not a reason to reset the instrument.
+        module, stub = visa
+        conn, resource = _connected(module, stub)
+        conn._desynced = True
+        with pytest.raises(exceptions.CommandError):
+            getattr(conn, method)("VOLT 5.0V–")  # en-dash
+        resource.clear.assert_not_called()
+        assert conn._desynced is True, "a refused command must not clear the desync flag either"
+
+    def test_query_resyncs_before_sending_when_desynced(self, visa):
+        module, stub = visa
+        conn, resource = _connected(module, stub)
+        resource.query.return_value = "x"
+        conn._desynced = True
+        conn.query("*IDN?")
+        resource.clear.assert_called_once()
+        assert conn._desynced is False
+
+
+class TestDrainInput:
+    """Discarding what is queued differs from aborting what the instrument is doing.
+
+    resync() prefers a VISA device clear -- a protocol-level abort of the
+    instrument's pending operation. A caller who only wants leftover bytes gone
+    must be able to say so without requesting that, which is why drain_input()
+    is a separate verb (whole-branch review of the wave-3 transport branch).
+    """
+
+    def test_drain_input_never_issues_a_device_clear(self, visa):
+        module, stub = visa
+        conn, resource = _connected(module, stub)
+        resource.read_raw.side_effect = _serve(b"\n")
+        assert conn.drain_input() == 1
+        resource.clear.assert_not_called()
+
+    def test_drain_input_leaves_the_desync_flag_alone(self, visa):
+        # Emptying the buffer is not a claim that the session position is
+        # known again -- that verdict belongs to resync().
+        module, stub = visa
+        conn, resource = _connected(module, stub)
+        conn._desynced = True
+        resource.read_raw.side_effect = _serve(b"\n")
+        conn.drain_input()
+        assert conn._desynced is True
+
+    def test_drain_input_borrows_the_short_timeout_rather_than_keeping_it(self, visa):
+        module, stub = visa
+        conn, resource = _connected(module, stub)
+        resource.read_raw.side_effect = _serve(b"\n")
+        conn.drain_input()
+        assert resource.timeout == int(conn.timeout * 1000)
+        assert resource.read_termination == "\n"
+
+    def test_a_modern_screen_capture_does_not_clear_the_instrument(self, visa):
+        # The defect drain_input() exists to fix: _capture_with_scdp asked for
+        # a resync when it wanted a drain, so EVERY modern SCDP capture over
+        # VISA ended with a device clear nobody requested.
+        from scpi_control.screen_capture import ScreenCapture
+
+        module, stub = visa
+        conn, resource = _connected(module, stub)
+        bmp = b"BM" + struct.pack("<I", 10) + b"\xab\xab\xab\xab"
+        _serve_session(resource, bmp + b"\n")
+        scope = types.SimpleNamespace(_connection=conn, dialect="modern", write=lambda command: None)
+        assert ScreenCapture(scope).capture_screenshot() == bmp
+        resource.clear.assert_not_called()

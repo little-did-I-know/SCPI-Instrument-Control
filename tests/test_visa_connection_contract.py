@@ -40,29 +40,56 @@ def test_base_init_ran():
     assert conn.is_connected is False
 
 
-def test_read_strips_terminator():
+def _fake_session():
+    """A connection with a stub resource attached, as connect() would leave it.
+
+    `_connected` has to be set alongside `_resource`: since wave 3, is_connected
+    is "_connected AND _resource is not None", so that a connect that failed
+    half-way stops reporting itself connected (see
+    tests/test_visa_contract_compliance.py).
+    """
     with patch("scpi_control.connection.visa_connection.PYVISA_AVAILABLE", True):
         conn = VISAConnection("GPIB0::12::INSTR")
     conn._resource = MagicMock()
+    conn._connected = True
+    return conn
+
+
+def test_read_strips_terminator():
+    conn = _fake_session()
     conn._resource.read.return_value = "response\n"
     assert conn.read() == "response"
 
 
 def test_read_raw_honors_size():
-    with patch("scpi_control.connection.visa_connection.PYVISA_AVAILABLE", True):
-        conn = VISAConnection("GPIB0::12::INSTR")
-    conn._resource = MagicMock()
+    conn = _fake_session()
     conn._resource.read_bytes.return_value = b"12345678"
     assert conn.read_raw(8) == b"12345678"
     conn._resource.read_bytes.assert_called_once_with(8)
 
 
-def test_read_raw_none_reads_until_terminator():
-    with patch("scpi_control.connection.visa_connection.PYVISA_AVAILABLE", True):
-        conn = VISAConnection("GPIB0::12::INSTR")
-    conn._resource = MagicMock()
-    conn._resource.read_raw.return_value = b"block"
-    assert conn.read_raw() == b"block"
+def test_read_raw_none_frames_the_response():
+    # Wave 3 changed what "no size" means here: read_raw(None) frames the
+    # response through connection.framing, reading to the block's declared
+    # length via read_bytes, rather than handing the whole read to pyvisa's
+    # read_raw(). That switch is what this pins -- NOT terminator handling.
+    # The resource here is a bare MagicMock with no termination behaviour at
+    # all, so the embedded 0x0A could never have ended this read either way;
+    # the real terminator guard is test_visa_contract_compliance.py's
+    # test_termination_is_disabled_for_a_binary_read_and_restored.
+    # A complete definite-length block ends on its own declared length, which
+    # is what lets this run in a file that deliberately has no pyvisa (and so
+    # no VISA timeout to end an open-ended read with).
+    conn = _fake_session()
+    block = b"#15he\nlo"
+    remaining = [block]
+
+    def read_bytes(count, *args, **kwargs):
+        head, remaining[0] = remaining[0][:count], remaining[0][count:]
+        return head
+
+    conn._resource.read_bytes.side_effect = read_bytes
+    assert conn.read_raw() == block
 
 
 def test_read_without_connection_raises():

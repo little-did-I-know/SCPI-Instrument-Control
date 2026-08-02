@@ -17,9 +17,35 @@ import logging
 from typing import Optional
 
 from scpi_control.connection.base import BaseConnection
+from scpi_control.connection.framing import Framing, TransportClosed, TransportIdle, read_framed
 from scpi_control.exceptions import CommandError, SiglentConnectionError, SiglentTimeoutError
 
 logger = logging.getLogger(__name__)
+
+# Milliseconds to wait for the tail of a headerless response: the bytes have
+# stopped, but the framing reader only learns that from a read that comes back
+# empty-handed. Mirrors SocketConnection's 0.5s on the same on_headerless hook.
+_HEADERLESS_TAIL_TIMEOUT_MS = 500
+
+# Milliseconds for a read that only asks "is anything queued?" -- the
+# terminator behind a block, and the resync drain. Mirrors SocketConnection's
+# 0.05s on both of its equivalents (_drain_terminator and resync).
+_QUIET_PROBE_TIMEOUT_MS = 50
+
+# How many bytes the block terminator drain will clear. "\n" and "\r\n" are
+# the runs Siglent instruments are expected to send, but that is an assumption
+# about the instrument, not a measurement -- nothing in this module is checked
+# against hardware. Note the transports DISAGREE: SocketConnection peeks 4
+# bytes and will clear a run of up to 4, because peeking costs it nothing,
+# while every extra byte here costs a probe read. A run longer than this is
+# left queued and shows up as a stray terminator on the next read(), which
+# skips it (see read()).
+_MAX_TERMINATOR_BYTES = 2
+
+# How many reads read() will spend skipping stray terminators before giving up.
+# SocketConnection keeps going until its own timeout; a VISA read is one call,
+# so the equivalent has to be a bounded retry rather than a loop on one recv.
+_MAX_STRAY_TERMINATOR_READS = 3
 
 # Optional import - only required if user wants USB/VISA support
 try:
@@ -106,9 +132,31 @@ class VISAConnection(BaseConnection):
 
         self._resource_manager: Optional[pyvisa.ResourceManager] = None
         self._resource: Optional[pyvisa.resources.MessageBasedResource] = None
+        # Set when a read is abandoned part-way: whatever the instrument still
+        # has queued would otherwise be handed to the NEXT caller as its answer.
+        self._desynced = False
+        # True only inside a read that has no length to read to; see _read_chunk.
+        self._streaming = False
 
         logger.info(f"VISAConnection initialized: {resource_string}")
         logger.debug(f"Backend: {backend}, Timeout: {timeout}s")
+
+    def _translate(self, exc: Exception, context: str) -> Exception:
+        """Convert a VisaIOError into this library's exception vocabulary.
+
+        Keyed on the status code, not on the message text: matching on an
+        error string is not a contract. The string check stays as a fallback
+        for backends that report a bare code.
+
+        Which codes a given VISA backend actually reports is UNVERIFIED here --
+        pyvisa is not installed in this environment, so the mapping is pinned
+        against a stub, not against an instrument.
+        """
+        timed_out = getattr(exc, "error_code", None) == pyvisa.constants.StatusCode.error_timeout or "timeout" in str(exc).lower()
+        if timed_out:
+            self._desynced = True
+            return SiglentTimeoutError(f"Timeout {context} on {self.resource_string}: {exc}")
+        return SiglentConnectionError(f"VISA error {context} on {self.resource_string}: {exc}")
 
     def connect(self) -> None:
         """Establish VISA connection to the instrument.
@@ -117,57 +165,60 @@ class VISAConnection(BaseConnection):
             SiglentConnectionError: If connection fails
             SiglentTimeoutError: If connection times out
         """
-        try:
-            # Initialize resource manager with specified backend
-            logger.info(f"Opening VISA resource manager (backend: {self.backend})")
-            self._resource_manager = pyvisa.ResourceManager(self.backend)
+        with self.lock:
+            if self.is_connected:
+                # Opening a second resource over the first leaks the first and
+                # gives two half-owned sessions to the same instrument.
+                logger.debug("Already connected to %s", self.resource_string)
+                return
 
-            # Open the resource
-            logger.info(f"Connecting to VISA resource: {self.resource_string}")
-            self._resource = self._resource_manager.open_resource(self.resource_string)
+            try:
+                logger.info(f"Opening VISA resource manager (backend: {self.backend})")
+                self._resource_manager = pyvisa.ResourceManager(self.backend)
 
-            # Configure resource
-            self._resource.timeout = int(self.timeout * 1000)  # VISA uses milliseconds
-            self._resource.read_termination = self.read_termination
-            self._resource.write_termination = self.write_termination
+                logger.info(f"Connecting to VISA resource: {self.resource_string}")
+                self._resource = self._resource_manager.open_resource(self.resource_string)
 
-            # For serial connections, configure additional parameters
-            if "ASRL" in self.resource_string or "COM" in self.resource_string:
-                self._configure_serial()
+                self._resource.timeout = int(self.timeout * 1000)  # VISA uses milliseconds
+                self._resource.read_termination = self.read_termination
+                self._resource.write_termination = self.write_termination
 
+                # For serial connections, configure additional parameters
+                if "ASRL" in self.resource_string or "COM" in self.resource_string:
+                    self._configure_serial()
+            except Exception as e:
+                # Anything after open_resource() succeeded used to leave
+                # _resource set -- and is_connected was defined as "_resource
+                # is not None", so a FAILED connect reported itself connected,
+                # with the ResourceManager leaked on top.
+                self._close_quietly()
+                error_msg = f"Failed to connect to VISA resource {self.resource_string}: {e}"
+                logger.error(error_msg)
+                raise SiglentConnectionError(error_msg) from e
+
+            self._connected = True
+            # A freshly opened session has nothing stranded on it from before.
+            self._desynced = False
             logger.info(f"VISA connection established: {self.resource_string}")
 
-        except pyvisa.errors.VisaIOError as e:
-            error_msg = f"Failed to connect to VISA resource {self.resource_string}: {e}"
-            logger.error(error_msg)
-            raise SiglentConnectionError(error_msg)
-
-        except Exception as e:
-            error_msg = f"Unexpected error connecting to {self.resource_string}: {e}"
-            logger.error(error_msg)
-            raise SiglentConnectionError(error_msg)
+    def _close_quietly(self) -> None:
+        """Release the resource and the manager, ignoring secondary failures."""
+        for attribute in ("_resource", "_resource_manager"):
+            handle = getattr(self, attribute)
+            if handle is not None:
+                try:
+                    handle.close()
+                except Exception as e:  # pragma: no cover - secondary failure
+                    logger.warning("Error closing %s for %s: %s", attribute, self.resource_string, e)
+                finally:
+                    setattr(self, attribute, None)
+        self._connected = False
 
     def disconnect(self) -> None:
         """Close VISA connection to the instrument."""
-        logger.info("Disconnecting from VISA resource")
-
-        if self._resource is not None:
-            try:
-                self._resource.close()
-                logger.debug("VISA resource closed")
-            except Exception as e:
-                logger.warning(f"Error closing VISA resource: {e}")
-            finally:
-                self._resource = None
-
-        if self._resource_manager is not None:
-            try:
-                self._resource_manager.close()
-                logger.debug("VISA resource manager closed")
-            except Exception as e:
-                logger.warning(f"Error closing resource manager: {e}")
-            finally:
-                self._resource_manager = None
+        with self.lock:
+            logger.info("Disconnecting from VISA resource")
+            self._close_quietly()
 
     @property
     def is_connected(self) -> bool:
@@ -176,7 +227,28 @@ class VISAConnection(BaseConnection):
         Returns:
             True if connected, False otherwise
         """
-        return self._resource is not None
+        return self._connected and self._resource is not None
+
+    def _resync_if_desynced(self) -> None:
+        """Clear anything stranded by an earlier timeout before sending again.
+
+        Mirrors SocketConnection.write(): a reply that arrives after its reader
+        gave up becomes the answer to the NEXT command unless it is discarded
+        first (backend review 2026-07-31, High-7).
+        """
+        if not self._desynced:
+            return
+        discarded = self.resync()
+        if discarded:
+            logger.warning("Discarded %d stale byte(s) before sending on %s", discarded, self.resource_string)
+
+    @staticmethod
+    def _require_ascii(command: str) -> None:
+        """Reject a command VISA cannot put on the wire as SCPI."""
+        try:
+            command.encode("ascii")
+        except UnicodeEncodeError as e:
+            raise CommandError(f"SCPI command contains non-ASCII characters: {command!r}") from e
 
     def write(self, command: str) -> None:
         """Send a SCPI command to the instrument.
@@ -189,28 +261,24 @@ class VISAConnection(BaseConnection):
             SiglentTimeoutError: If write times out
             CommandError: If command contains invalid characters
         """
-        if not self.is_connected:
-            raise SiglentConnectionError("Not connected to VISA resource")
+        with self.lock:
+            if not self.is_connected:
+                raise SiglentConnectionError("Not connected to VISA resource")
 
-        # Validate command for ASCII-only
-        try:
-            command.encode("ascii")
-        except UnicodeEncodeError:
-            raise CommandError(f"SCPI command contains non-ASCII characters: {command!r}")
+            # Validate before resyncing: a command that is about to be rejected
+            # is not a reason to issue a device clear.
+            self._require_ascii(command)
+            self._resync_if_desynced()
 
-        try:
-            logger.debug(f"VISA Write: {command}")
-            self._resource.write(command)
-
-        except pyvisa.errors.VisaIOError as e:
-            if "timeout" in str(e).lower():
-                error_msg = f"Timeout writing command to {self.resource_string}: {command}"
-                logger.error(error_msg)
-                raise SiglentTimeoutError(error_msg)
-            else:
-                error_msg = f"VISA write error on {self.resource_string}: {e}"
-                logger.error(error_msg)
-                raise SiglentConnectionError(error_msg)
+            try:
+                logger.debug(f"VISA Write: {command}")
+                self._resource.write(command)
+            except pyvisa.errors.VisaIOError as e:
+                # _translate marks the session out of step on a timeout, which
+                # SocketConnection.write does not do. Deliberate: a write that
+                # timed out part-way leaves the instrument's parser mid-command,
+                # and the next send has to clear that before it means anything.
+                raise self._translate(e, f"writing '{command}'") from e
 
     def query(self, command: str) -> str:
         """Send a SCPI query and read the response.
@@ -226,103 +294,399 @@ class VISAConnection(BaseConnection):
             SiglentTimeoutError: If query times out
             CommandError: If command contains invalid characters
         """
-        if not self.is_connected:
-            raise SiglentConnectionError("Not connected to VISA resource")
+        with self.lock:
+            if not self.is_connected:
+                raise SiglentConnectionError("Not connected to VISA resource")
 
-        # Validate command for ASCII-only
-        try:
-            command.encode("ascii")
-        except UnicodeEncodeError:
-            raise CommandError(f"SCPI command contains non-ASCII characters: {command!r}")
+            self._require_ascii(command)
+            self._resync_if_desynced()
 
-        try:
-            logger.debug(f"VISA Query: {command}")
-            response = self._resource.query(command)
+            try:
+                logger.debug(f"VISA Query: {command}")
+                response = self._resource.query(command)
+            except pyvisa.errors.VisaIOError as e:
+                raise self._translate(e, f"querying '{command}'") from e
+
             logger.debug(f"VISA Response: {response!r}")
             return response.strip()
 
-        except pyvisa.errors.VisaIOError as e:
-            if "timeout" in str(e).lower():
-                error_msg = f"Timeout querying {self.resource_string}: {command}"
-                logger.error(error_msg)
-                raise SiglentTimeoutError(error_msg)
-            else:
-                error_msg = f"VISA query error on {self.resource_string}: {e}"
-                logger.error(error_msg)
-                raise SiglentConnectionError(error_msg)
-
     def read(self) -> str:
         """Read a response string from the instrument.
+
+        Skips a leading run of stray terminators before deciding it has an
+        answer, mirroring SocketConnection.read. That run is reachable here
+        precisely because _drain_terminator's window is finite: it consumes
+        the first "\\n" of a split "\\r\\n", times out, and the partner lands
+        afterwards. pyvisa reads to a terminator and strips it, so that one
+        stranded byte otherwise comes back as an EMPTY response while the real
+        answer stays queued -- the off-by-one that shifts every later answer
+        by one query (backend review 2026-07-31, High-7).
+
+        Leading NUL and terminator bytes are stripped TOGETHER in one pass,
+        as in SocketConnection.read where separating them was a regression: a
+        terminator can arrive ahead of a NUL-prefixed response in the same
+        message. Only a run that actually contained a terminator is worth a
+        warning -- a bare NUL prefix is normal on some instruments.
 
         Returns:
             The response with trailing whitespace/terminators stripped.
 
         Raises:
             SiglentConnectionError: If not connected
+            SiglentTimeoutError: If the read times out, or nothing but stray
+                terminators arrives
         """
-        if not self.is_connected:
-            raise SiglentConnectionError("Not connected to VISA resource")
+        with self.lock:
+            if not self.is_connected:
+                raise SiglentConnectionError("Not connected to VISA resource")
 
-        logger.debug("VISA Read")
-        response = self._resource.read()
-        logger.debug(f"VISA Response: {response!r}")
-        return response.strip()
+            logger.debug("VISA Read")
+            for _ in range(_MAX_STRAY_TERMINATOR_READS):
+                try:
+                    response = self._resource.read()
+                except pyvisa.errors.VisaIOError as e:
+                    raise self._translate(e, "reading") from e
 
-    def read_raw(self, size: Optional[int] = None) -> bytes:
+                stripped = response.lstrip("\r\n\x00")
+                leftovers = response[: len(response) - len(stripped)]
+                if "\r" in leftovers or "\n" in leftovers:
+                    logger.warning("Discarded %d stray terminator byte(s) before the response on %s", len(leftovers), self.resource_string)
+                if stripped:
+                    logger.debug(f"VISA Response: {stripped!r}")
+                    return stripped.strip()
+
+                # Only leftovers: pyvisa read to a terminator and found nothing
+                # but the terminator, so this is the tail of an earlier
+                # exchange, not this one's answer. Returning "" here is the bug.
+                logger.warning("Empty response on %s: a stray terminator, not an answer -- reading again", self.resource_string)
+
+            # Giving up on a read leaves the session position unknown, exactly
+            # like the timeout paths _translate and read_raw handle: the answer
+            # this read was for is either still queued or never coming, and
+            # either way it must not be handed to the NEXT caller. Without this
+            # flag the resync-before-send never runs and the whole High-7 shape
+            # comes back. SocketConnection.read sets it on all three of its own
+            # give-up paths (socket.py:134, :182, and :188) for the same reason.
+            self._desynced = True
+            raise SiglentTimeoutError(f"Only stray terminators on {self.resource_string} after {_MAX_STRAY_TERMINATOR_READS} reads")
+
+    def _begin_streaming(self) -> None:
+        """Give up on reading to a length: read whole messages from here on."""
+        self._streaming = True
+
+    def _on_headerless(self) -> None:
+        """read_framed's hook: AUTO looked, and this response has no header.
+
+        The same switch as _begin_streaming, plus a shorter timeout, mirroring
+        SocketConnection. Shortening is safe HERE and not for a declared
+        STREAM, because read_framed only reaches this verdict after bytes have
+        arrived: what remains is the idle read that proves the response ended,
+        not the wait for it to begin. A declared STREAM keeps the full timeout
+        precisely because its first read may still be waiting on a slow
+        instrument.
+        """
+        self._begin_streaming()
+        self._resource.timeout = _HEADERLESS_TAIL_TIMEOUT_MS
+
+    def _read_chunk(self, hint: int) -> bytes:
+        """Read for read_framed (see connection.framing).
+
+        Two different VISA reads sit behind this, and the difference is the
+        whole point. While a length is known -- one byte at a time until the
+        header resolves, then exactly the remainder -- read_bytes(count) is
+        the right call: pyvisa documents it as looping low-level reads until
+        it holds `count` bytes ("if count > chunk_size multiple low level
+        operations will be performed"), and those bytes are genuinely on their
+        way. Once the response turns out to carry no header there is no such
+        count, and asking read_bytes for a chunk bigger than the response is
+        the same over-demand this task took out of query_binary -- per the
+        same docs it waits out the entire timeout and then raises, dropping
+        what it did read. So the headerless case uses read_raw() instead.
+
+        LIMIT, since the whole of this module is stub-tested and none of it is
+        hardware-verified: read_raw() ends a read on END/EOI, which USB-TMC,
+        GPIB and VXI-11 sessions carry. A "TCPIP::...::SOCKET" resource does
+        NOT, and read_termination is deliberately off for the duration of a
+        binary read, so on that resource class a headerless read has nothing
+        to end on but the timeout -- and pyvisa raises rather than returning
+        the partial buffer, so the bytes are lost and the caller sees
+        SiglentTimeoutError for a response that did arrive. No call site in
+        this library DECLARES Framing.STREAM -- which is not the same as
+        saying none reaches this branch, and the difference matters: both
+        query_binary here and the public Oscilloscope.read_raw passthrough
+        default to AUTO, and AUTO arrives here for any response that turns out
+        to carry no header. On a raw-socket VISA resource that is the untested
+        case above.
+        """
+        try:
+            chunk = self._resource.read_raw() if self._streaming else self._resource.read_bytes(max(1, hint))
+        except pyvisa.errors.VisaIOError as e:
+            if getattr(e, "error_code", None) == pyvisa.constants.StatusCode.error_timeout:
+                raise TransportIdle() from e
+            raise
+        if not chunk:
+            raise TransportClosed()
+        return chunk
+
+    def read_raw(self, size: Optional[int] = None, framing: Framing = Framing.AUTO) -> bytes:
         """Read raw bytes from the instrument (e.g. a waveform or screenshot block).
 
         Args:
-            size: Maximum number of bytes to read. None reads until the terminator.
+            size: Exact number of bytes to read. None frames the response as
+                `framing` declares.
+            framing: What the CALLER knows the response to be (see
+                connection.framing.Framing). Ignored when `size` is given.
 
         Returns:
             The raw bytes read from the instrument.
 
         Raises:
             SiglentConnectionError: If not connected
+            SiglentTimeoutError: If the read times out or stalls mid-block
+            CommandError: If BLOCK was declared and no block arrived
         """
-        if not self.is_connected:
-            raise SiglentConnectionError("Not connected to VISA resource")
+        with self.lock:
+            if not self.is_connected:
+                raise SiglentConnectionError("Not connected to VISA resource")
 
-        logger.debug(f"VISA Read Raw: size={size}")
-        if size is None:
-            return self._resource.read_raw()
-        return self._resource.read_bytes(size)
+            logger.debug(f"VISA Read Raw: size={size}, framing={framing.value}")
+            previous_termination = self._resource.read_termination
+            previous_timeout = self._resource.timeout
+            # A 0x0A inside a waveform is data, not a terminator. pyvisa
+            # enforces read_termination for SOCKET/ASRL sessions, so it has to
+            # come off for the duration of a binary read.
+            self._resource.read_termination = None
+            self._streaming = False
+            try:
+                if size is not None:
+                    return self._resource.read_bytes(size)
+                if framing is Framing.STREAM:
+                    self._begin_streaming()
+                result = read_framed(self._read_chunk, framing, context=self.resource_string, on_headerless=self._on_headerless)
+                if result.block_total is not None:
+                    # read_framed stops on the last payload byte, so the
+                    # terminator behind the block is still queued.
+                    return result.data + self._drain_terminator()
+                return result.data
+            except pyvisa.errors.VisaIOError as e:
+                raise self._translate(e, "reading raw") from e
+            except SiglentTimeoutError:
+                # A stalled or empty binary read leaves the session position
+                # unknown, exactly like a line read that timed out.
+                self._desynced = True
+                raise
+            finally:
+                self._resource.read_termination = previous_termination
+                self._resource.timeout = previous_timeout
+                self._streaming = False
+
+    def _drain_terminator(self) -> bytes:
+        """Consume the terminator that follows a completed block -- only that.
+
+        read_framed returns the moment it holds the declared length, which
+        counts the header and the payload and nothing else. The terminator the
+        instrument sends after the block is still queued, and leaving it there
+        is not harmless: it becomes the whole of the NEXT response. Nothing
+        times out when that happens, so _desynced is never set and the
+        resync-before-send cannot catch it either. SocketConnection records
+        the same failure at its own _drain_terminator, which is why it has one.
+
+        Deliberately NOT a copy of the socket's. VISA offers no MSG_PEEK
+        equivalent, so this cannot look without consuming. When the read comes
+        back as something other than terminator bytes, that byte is already
+        eaten, and the only honest response left is to say so: the session is
+        marked out of step and the byte is logged at WARNING, rather than
+        quietly dropped. The trade is deliberate -- leaving the terminator
+        corrupts the very next read EVERY time, while consuming a surplus byte
+        can only happen on a session that is already out of step.
+
+        One byte at a time on purpose: read_bytes(2) is a fixed-length read
+        and would wait out the timeout, then raise, for a terminator run of
+        one -- losing it, which is the exact bug this method exists to avoid.
+
+        THE COST, since the socket's version names it as the whole reason it
+        peeks instead of looping: with the usual one-byte run, the second
+        iteration finds nothing and pays _QUIET_PROBE_TIMEOUT_MS in full. That
+        is on EVERY block read, not only a desynced one, and
+        waveform_transfer performs up to six block reads per capture. The
+        socket avoids it with a single bounded MSG_PEEK; VISA has no peek, so
+        a loop that stops on an idle read is the only option here, and this is
+        what it costs.
+        """
+        drained = b""
+        previous_timeout = self._resource.timeout
+        self._resource.timeout = _QUIET_PROBE_TIMEOUT_MS
+        try:
+            for _ in range(_MAX_TERMINATOR_BYTES):
+                try:
+                    byte = self._resource.read_bytes(1)
+                except pyvisa.errors.VisaIOError as e:
+                    if getattr(e, "error_code", None) != pyvisa.constants.StatusCode.error_timeout:
+                        # Only a TIMEOUT means "nothing queued". Anything else
+                        # is a real fault, and swallowing it here would report
+                        # a dead session as a clean read, with the block that
+                        # did arrive hiding the death. _read_chunk keys on the
+                        # same code for the same reason; read_raw translates
+                        # what this re-raises.
+                        raise
+                    # Normal for a resource whose own read already consumed the
+                    # terminator, and the reason this is not an error.
+                    logger.debug("No terminator queued after the block on %s: %s", self.resource_string, e)
+                    break
+                if not byte:
+                    break
+                if byte not in (b"\r", b"\n"):
+                    self._desynced = True
+                    logger.warning(
+                        "Discarded %r found behind the block on %s: it is not a terminator, and VISA cannot look without consuming. Marking the session out of step.",
+                        byte,
+                        self.resource_string,
+                    )
+                    break
+                drained += byte
+        finally:
+            self._resource.timeout = previous_timeout
+        return drained
 
     def query_binary(self, command: str, max_bytes: int = 1000000) -> bytes:
-        """Send a SCPI query and read binary response.
+        """Send a SCPI query and read a binary response.
 
         Args:
             command: SCPI query command
-            max_bytes: Maximum bytes to read (default: 1MB)
+            max_bytes: Ceiling on the response this will RETURN. It is checked
+                after the response has been read, not before: the framed reader
+                cannot abandon a block part-way, so an oversized block is still
+                transferred AND held in memory before it is rejected. That is a
+                real loss against the old code, which passed max_bytes straight
+                to read_bytes() and so bounded the allocation. It bounded
+                nothing else: it demanded exactly that many bytes, so a 70 kB
+                waveform blocked for the whole timeout and then raised with the
+                data already in hand. A ceiling that cannot stop the transfer
+                is worth less than one that can; a read that never returns the
+                data is worth nothing at all.
 
         Returns:
             Binary response data
 
         Raises:
             SiglentConnectionError: If not connected
-            SiglentTimeoutError: If query times out
+            SiglentTimeoutError: If the query times out
+            CommandError: If the response is larger than max_bytes
         """
-        if not self.is_connected:
-            raise SiglentConnectionError("Not connected to VISA resource")
+        with self.lock:
+            if not self.is_connected:
+                raise SiglentConnectionError("Not connected to VISA resource")
 
-        try:
             logger.debug(f"VISA Binary Query: {command}")
-            self._resource.write(command)
+            self.write(command)
+            response = self.read_raw()
+            if len(response) > max_bytes:
+                raise CommandError(f"Binary response to '{command}' from {self.resource_string} is {len(response)} bytes, over the {max_bytes}-byte ceiling")
 
-            # Read binary data
-            response = self._resource.read_bytes(max_bytes)
             logger.debug(f"VISA Binary Response: {len(response)} bytes")
             return response
 
-        except pyvisa.errors.VisaIOError as e:
-            if "timeout" in str(e).lower():
-                error_msg = f"Timeout on binary query {self.resource_string}: {command}"
-                logger.error(error_msg)
-                raise SiglentTimeoutError(error_msg)
-            else:
-                error_msg = f"VISA binary query error: {e}"
-                logger.error(error_msg)
-                raise SiglentConnectionError(error_msg)
+    def drain_input(self) -> int:
+        """Discard bytes the instrument has already queued; return the count.
+
+        Passive by contract (see BaseConnection.drain_input): short-timeout
+        reads until the session goes quiet, and NOTHING else. In particular it
+        never calls clear() -- a VISA device clear aborts the instrument's
+        pending operation, which is a far larger request than "mop up the
+        terminator behind a block I have already read", and no caller with
+        housekeeping to do should be made to make it. resync() below is the
+        method that may take that action, which is why they are two methods
+        (backend review 2026-07-31 wave 3, whole-branch review: the screenshot
+        path asked for a resync when it wanted a drain, and so issued a device
+        clear on every modern capture over VISA).
+
+        It does not touch `_desynced` either: emptying the buffer is not a
+        claim that the session position is known again.
+        """
+        with self.lock:
+            if not self.is_connected:
+                return 0
+            return self._drain()
+
+    def resync(self) -> int:
+        """Recover a session whose position is unknown; return bytes discarded.
+
+        Called before the next send when a read has been abandoned. The bytes
+        are gone either way -- the alternative is handing them to a caller who
+        asked a different question (backend review 2026-07-31, High-7).
+
+        The ACTIVE counterpart to drain_input(): this one prefers a VISA device
+        clear, the protocol-level way to say "abandon the current transfer".
+        That is exactly why the two are separate verbs -- a caller who only
+        wants queued bytes gone must be able to ask for that without aborting
+        whatever the instrument is in the middle of.
+
+        Two limits, stated plainly:
+
+        - `clear()`'s effect is UNVERIFIED against hardware here. pyvisa is not
+          installed in this environment, so it is known to be CALLED, not known
+          to work.
+        - a device clear reports no byte count, so a successful clear returns 0
+          even when it discarded a full waveform. The return value is a floor,
+          not a measurement, and is only used for a log line.
+        """
+        with self.lock:
+            if not self.is_connected:
+                self._desynced = False
+                return 0
+
+            clear = getattr(self._resource, "clear", None)
+            if callable(clear):
+                try:
+                    clear()
+                except Exception as e:
+                    logger.warning("Device clear failed on %s, draining instead: %s", self.resource_string, e)
+                else:
+                    self._desynced = False
+                    return 0
+            try:
+                return self._drain()
+            finally:
+                self._desynced = False
+
+    def _drain(self) -> int:
+        """Read whole messages until the session goes quiet; count what went.
+
+        The whole of drain_input(), and resync()'s fallback for a resource
+        exposing no clear(). pyvisa documents clear() on MessageBasedResource,
+        so on the resync path this is expected to serve resources and test
+        doubles that do not expose it rather than being the normal route --
+        expected, not confirmed: nothing in this module is checked against a
+        real backend.
+
+        read_raw(), not read_bytes(): there is no length to ask for here, and a
+        fixed-length read would wait out the timeout for bytes that are not
+        coming (see _read_chunk). The count is still a FLOOR -- a message the
+        instrument never terminates times out with what was read so far
+        discarded uncounted -- but the bytes are gone either way, which is the
+        point of a drain. The number only feeds a log line.
+
+        Deliberately does not touch `_desynced`: whether the drain has restored
+        the session is the CALLER's verdict, and only resync() makes it.
+        """
+        discarded = 0
+        previous_timeout = self._resource.timeout
+        previous_termination = self._resource.read_termination
+        self._resource.timeout = _QUIET_PROBE_TIMEOUT_MS
+        self._resource.read_termination = None
+        try:
+            while True:
+                try:
+                    chunk = self._resource.read_raw()
+                except pyvisa.errors.VisaIOError:
+                    break
+                if not chunk:
+                    break
+                discarded += len(chunk)
+        finally:
+            self._resource.timeout = previous_timeout
+            self._resource.read_termination = previous_termination
+        return discarded
 
     def _configure_serial(self) -> None:
         """Configure serial port parameters for ASRL/COM resources.

@@ -3,12 +3,13 @@
 import socket
 import threading
 import time
-from unittest.mock import MagicMock, Mock, call, patch
+from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
 from scpi_control.connection.socket import SocketConnection
 from scpi_control.exceptions import ConnectionError, TimeoutError
+from tests.fake_socket import connected
 
 
 @pytest.fixture
@@ -450,19 +451,28 @@ class TestSocketThreadSafety:
 class TestReadRawIeeeBlock:
     """read_raw(None) must honor the IEEE 488.2 definite-length header."""
 
-    def test_reads_exactly_declared_block_length(self, mock_socket):
+    def test_reads_exactly_declared_block_length(self):
         # "C1:WF DAT2," prefix (11 bytes) + "#9" + 9-digit length (20) + payload
+        #
+        # Task 4 (backend review 2026-07-31, High-7): this used to script
+        # `mock_socket.recv.side_effect = [..., b"\n\n", ...]`, pinning the OLD
+        # `_drain_terminator`'s fixed `recv(2)` -- a MagicMock hands back the
+        # whole `b"\n\n"` chunk to a single call regardless of the size or
+        # MSG_PEEK flag requested, which is exactly the dishonesty the new
+        # peek-and-consume drain cannot tolerate (each byte costs one peek
+        # call and one consuming call). `tests.fake_socket.FakeSocket` buffers
+        # honestly -- it honors requested sizes and never lets MSG_PEEK
+        # consume -- so it can model the terminator arriving as its own
+        # two-byte chunk without over-delivering.
         part1 = b"C1:WF DAT2,#9000000020" + b"A" * 10
         part2 = b"B" * 10
-        mock_socket.recv.side_effect = [part1, part2, b"\n\n", socket.timeout()]
+        conn, fake = connected([part1, part2, b"\n\n"])
 
-        conn = SocketConnection("192.168.1.100")
-        conn.connect()
         data = conn.read_raw()
 
         assert data == part1 + part2 + b"\n\n"
         # The block path must never fall back to the legacy 0.5s idle drain
-        assert call(0.5) not in mock_socket.settimeout.call_args_list
+        assert 0.5 not in fake.timeouts
 
     def test_header_split_across_chunks(self, mock_socket):
         part1 = b"C1:WF DAT2,#"
@@ -505,16 +515,35 @@ class TestReadRawIeeeBlock:
 
         assert conn.read_raw() == blob
 
-    def test_no_extra_recv_when_terminator_arrives_with_payload(self, mock_socket):
-        # Payload and trailing terminator arrive in one chunk: no extra recv
-        blob = b"C1:WF DAT2,#9000000020" + b"A" * 20 + b"\n\n"
-        mock_socket.recv.side_effect = [blob]
+    def test_terminator_already_in_the_buffer_is_still_appended(self):
+        """Payload and trailing terminator sent by the peer as one segment.
 
-        conn = SocketConnection("192.168.1.100")
-        conn.connect()
+        Rewritten for Task 2 (backend review 2026-07-31, High-6): this used
+        to assert `mock_socket.recv.call_count == 1`, pinning the OLD
+        `_parse_block_total` polling loop's behavior of pulling up to
+        `_buffer_size` bytes per recv() -- when the terminator happened to
+        already be in the peer's send buffer, one big recv() swept it up
+        alongside the payload, and the old code special-cased that to skip
+        an unnecessary extra recv(). read_framed() (framing.py) never
+        over-reads: it reads exactly `block_total` bytes -- one byte at a
+        time until the header resolves, then capped to exactly the
+        remainder -- and always leaves the terminator for one separate
+        drain attempt. So "the terminator arrived bundled with the payload"
+        is no longer a distinguishable case for an honest transport, and
+        `mock_socket` (a MagicMock that ignores the requested read size and
+        always hands back a whole scripted chunk) can no longer model this
+        scenario at all -- it made read_framed's single 1-byte request
+        return all 44 bytes at once, so the subsequent terminator-drain
+        recv() call ran past the end of a 1-item side_effect list and raised
+        StopIteration. `tests/fake_socket.FakeSocket` buffers honestly (it
+        only ever returns up to the requested size), so it reproduces the
+        real scenario -- payload and terminator both already sitting in the
+        socket buffer -- without over-delivering.
+        """
+        blob = b"C1:WF DAT2,#9000000020" + b"A" * 20 + b"\n\n"
+        conn, _ = connected([blob])
 
         assert conn.read_raw() == blob
-        assert mock_socket.recv.call_count == 1
 
 
 class TestSocketReadRawTimeout:
@@ -534,25 +563,16 @@ class TestSocketReadRawTimeout:
     def test_block_read_timeout_raises_timeout_and_keeps_session(self, mock_socket):
         """recv raises socket.timeout during block-read; must not kill the session.
 
-        Which layer actually provides this protection: for the size=None path,
-        `_read_ieee_block()`'s own internal `except socket.timeout` handler
-        (socket.py:224-233) converts the raw `socket.timeout` to
-        `SiglentTimeoutError` before it ever reaches `read_raw()`'s try/except.
-        That handler predates this task's fix, so on its own this test does
-        NOT exercise the `except socket.timeout` clause this task added to
-        `read_raw()` (socket.py:194-196) - it was already green before that
-        clause existed.
-
-        The `read_raw()`-level clause is a second, defensive layer: it only
-        fires if a raw `socket.timeout` ever escapes `_read_ieee_block()`
-        uncaught (e.g. a future change to that method's internal handling).
-        Mutation-verified: with `_read_ieee_block()`'s internal timeout
-        handler temporarily neutralized (recv's socket.timeout left to
-        propagate through its outer `except socket.error` re-raise), this
-        test still passed - because `read_raw()`'s clause caught it instead.
-        That confirms the two layers together make the invariant below
-        mutation-proof, even though neither layer alone is exercised in
-        isolation by this single test.
+        Updated by Task 2 (backend review 2026-07-31, High-6): `_read_ieee_block()`
+        no longer catches `socket.timeout` itself -- it delegates to
+        `read_framed()` (scpi_control/connection/framing.py), which drives
+        this connection's `_read_chunk()`. `_read_chunk()` is what now
+        converts a raw `socket.timeout` to `TransportIdle`, and `read_framed()`
+        converts that to `SiglentTimeoutError` before it ever reaches
+        `read_raw()`'s own try/except. So, as before the refactor, this test
+        does NOT on its own exercise the `except socket.timeout` clause
+        `read_raw()` carries as a second, defensive layer for a raw
+        `socket.timeout` that escapes the framing module uncaught.
         """
         mock_socket.recv.side_effect = socket.timeout("timed out")
 
