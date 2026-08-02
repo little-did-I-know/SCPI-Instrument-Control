@@ -64,6 +64,7 @@ EXECUTE = [
     ("waveform_provenance_and_extract.py", None),
     ("synthetic_signals.py", None),
     ("awg_scope_loopback.py", None),
+    ("frequency_response_sweep.py", None),
     ("comparison_report.py", None),
     ("batch_report.py", None),
 ]

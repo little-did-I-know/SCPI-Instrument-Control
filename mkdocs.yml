@@ -121,6 +121,7 @@ nav:
       - Waveform Capture: user-guide/waveform-capture.md
       - Data Provenance: user-guide/data-provenance.md
       - Synthetic Signals: user-guide/synthetic-signals.md
+      - Frequency Response: user-guide/frequency-response.md
       - Measurements: user-guide/measurements.md
       - Trigger Control: user-guide/trigger-control.md
       - Advanced Features: user-guide/advanced-features.md
