@@ -44,6 +44,18 @@ for point in result.usable():
 print(result.cutoff_hz())  # -3 dB corner, interpolated between points
 ```
 
+**Import `sweep` from the package, not from the submodule.** The package
+re-exports the `sweep()` function under the same name as the `sweep`
+submodule it lives in, so `from scpi_control.frequency_response import
+sweep` (above) is the supported form and always gets the function -- but a
+bare `import scpi_control.frequency_response.sweep` binds that same name to
+the function too, not the submodule. Once the package has been imported,
+there is no attribute path from it back to the submodule object. If you
+need the submodule itself (to monkeypatch something inside it in a test,
+say), use `importlib.import_module("scpi_control.frequency_response.sweep")`,
+which always resolves the submodule regardless of what the package's own
+`sweep` attribute currently points to.
+
 `start_hz`/`stop_hz`/`points_per_decade` log-space the sweep for you
 (`log_spaced_frequencies()`, also exported); pass an explicit `frequencies=`
 list instead if you want particular points, e.g. densely spaced around a
@@ -115,17 +127,17 @@ sweep, and the two failure modes are different in their consequences. On the
 RC low-pass this project measures against, holding the scale fixed cost
 0.885 dB of error at 10 kHz -- a small-looking response squeezed into too few
 ADC codes, quietly wrong rather than absent. Earlier in this project's
-development, the same fixed-scale setup at 100 kHz produced a reported gain
-of 0 dB with nothing to flag it -- a plausible-looking number for a point
-that had, in fact, measured nothing. That gap is exactly why `ResponsePoint`
-carries `volts_per_div` and why an unmeasurable point returns
-`excluded_reason` instead of a number today: running that same 100 kHz,
-fixed-1V/div, autorange-disabled case now correctly returns
-`excluded_reason="response below vertical resolution"` rather than a
-number, because the response capture's peak-to-peak comes back at `0.0` V
-(quantized flat) instead of a plausible-looking level. A reader who can see
-the scale a point was measured at, or see that it was refused outright, has
-a chance to catch what a bare number never shows.
+development, the same fixed-scale setup at 100 kHz produced a gain of
+`-inf` dB -- `20 * log10(0)`, from a response that had quantized flat --
+returned as a bare number instead of being caught as an exclusion. That gap
+is exactly why `ResponsePoint` carries `volts_per_div` and why an
+unmeasurable point returns `excluded_reason` instead of a number today:
+running that same 100 kHz, fixed-1 V/div, autorange-disabled case now
+correctly returns `excluded_reason="response below vertical resolution"`
+rather than a number, because the response capture's peak-to-peak comes
+back at `0.0` V (quantized flat) instead of a plausible-looking level. A
+reader who can see the scale a point was measured at, or see that it was
+refused outright, has a chance to catch what a bare number never shows.
 
 ## Exclusion Reasons
 
@@ -202,11 +214,13 @@ measurement of zero gain.
 - More generally, **the mock's fixed horizontal geometry shapes every
   accuracy figure in this section**: 14 divisions, capped at 14,000 points a
   capture, so at 1 MSa/s the capture window never exceeds 14 ms -- only about
-  1.4 cycles at 100 Hz, the low end of the sweep above. A real scope's
-  sample rate follows its timebase instead of staying fixed, which is why
-  the mock is pessimistic (the safe direction) rather than optimistic at
-  both ends of the range, but it also means these figures describe *this*
-  mock's geometry, not a hardware guarantee.
+  1.4 cycles at 100 Hz, the low end of the sweep above. That is a different
+  mechanism from the top-end one above: a fixed point-count cap, not
+  sample-rate-vs-timebase coupling, and nothing here establishes whether real
+  hardware would do better or worse than the mock at the low end -- the
+  "mock is pessimistic" argument is specific to the top of the range. Either
+  way, these figures describe *this* mock's geometry, not a hardware
+  guarantee.
 - **The 1-2-5 vertical and horizontal scale coercion (`round_125_up`,
   behind both `choose_timebase()` and autoranging) is unverified against
   real firmware.** The mock stores whatever scale value it's handed, so
@@ -220,10 +234,7 @@ measurement of zero gain.
   invisible to it. Denser `points_per_decade` narrows the gap; it cannot
   close it to zero.
 - **A capture costs at most two acquisitions per point, three at the very
-  first point** -- see [Autoranging](#autoranging) above. This replaces an
-  earlier, less precise claim of "at most two," which did not account for
-  the response and reference rescales both being able to fire at point
-  zero.
+  first point** -- see [Autoranging](#autoranging) above.
 
 ## See Also
 
