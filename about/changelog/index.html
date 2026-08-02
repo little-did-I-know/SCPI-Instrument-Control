@@ -848,6 +848,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../user-guide/frequency-response/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Frequency Response
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../user-guide/measurements/" class="md-nav__link">
         
   
@@ -6889,6 +6917,7 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 </ul>
 <h3 id="added">Added<a class="headerlink" href="#added" title="Permanent link">&para;</a></h3>
 <ul>
+<li>Frequency response: <code>scpi_control.frequency_response.sweep()</code> steps a function generator across a frequency range, captures a reference and a response channel at each point, and returns gain and phase with the capture geometry behind them. Autoranges the response channel per point, reports an unmeasurable point as <code>None</code> with a stated reason rather than a plausible number, and exports CSV with a metadata header (<code>to_csv</code>) or a Bode plot (<code>plot</code>). See <code>examples/frequency_response_sweep.py</code>. Every accuracy claim is validated against a mock instrument and an analytic RC model — there is no function generator on the development bench, so none of it is hardware-verified.</li>
 <li>Connections: <code>resync()</code> discards anything the instrument left unread and reports the byte count. Called automatically before the next send after a read times out.</li>
 <li>Connections: <code>drain_input()</code> discards bytes the instrument has already queued and reports the count, taking no protocol-level action. Use it for housekeeping after a completed exchange (the terminator behind a screen dump, say); <code>resync()</code> is for recovering a session whose position is unknown, and on VISA it prefers a device clear, which aborts the instrument's pending operation. Both are no-ops on <code>BaseConnection</code>, so existing subclasses keep working unchanged.</li>
 </ul>
