@@ -4,9 +4,9 @@
 generator across a list of frequencies, captures two oscilloscope channels at
 each step, and estimates the gain and phase of whatever sits between them.
 This guide covers the two-channel wiring, `sweep()`, what each `ResponsePoint`
-diagnostic means, autoranging, the exclusion reasons, and the CSV format --
-closing with a clearly-scoped accounting of what has and has not been
-validated.
+diagnostic means, autoranging, the exclusion reasons, the CSV format, and
+plotting -- closing with a clearly-scoped accounting of what has and has not
+been validated.
 
 ## Wiring
 
@@ -195,6 +195,28 @@ An empty numeric field read by either library comes back as `NaN`, not `0`
 or some other plausible-looking value -- an excluded point stays visibly
 missing all the way through, rather than being mistaken for a real
 measurement of zero gain.
+
+## Plotting
+
+`result.plot(title=None)` draws a Bode plot -- gain over phase, both against
+log frequency -- and returns the `matplotlib` `Figure` rather than showing it,
+so the caller decides whether to `savefig()`, display it, or embed it in
+something else:
+
+```python
+figure = result.plot(title="RC low-pass")
+figure.savefig("frequency_response.png")
+```
+
+Excluded points are plotted as a genuine gap, not silently dropped: the
+frequency axis includes every point in `result.points`, but an excluded
+point's gain and phase are plotted as `NaN`, which breaks the line and skips
+the marker at that frequency. Dropping the frequency instead would let
+`semilogx` draw one continuous line straight through the excluded region --
+an interpolated claim where no measurement was made. `plot()` raises
+`ValueError` if there are no usable points at all (nothing to draw). See
+`examples/frequency_response_sweep.py` for a complete example that writes
+both the CSV and the plot.
 
 ## Accuracy and limits
 

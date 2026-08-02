@@ -72,6 +72,10 @@ def main() -> None:
     result.to_csv("frequency_response.csv")
     print("\nWrote frequency_response.csv (metadata header + one row per point)")
 
+    figure = result.plot(title=f"RC low-pass, {CUTOFF_HZ:.0f} Hz corner")
+    figure.savefig("frequency_response.png")
+    print("Wrote frequency_response.png (Bode plot; excluded points would show as gaps, none here)")
+
 
 if __name__ == "__main__":
     main()
