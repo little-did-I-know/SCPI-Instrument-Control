@@ -191,18 +191,25 @@ def _measure_point(scope: Any, collector: DataCollector, settings: SweepSettings
         if chosen is not None and chosen != response.voltage_scale:
             scope.get_channel(settings.response_channel).voltage_scale = chosen
             reference, response = _capture_pair(collector, settings)
-        # The reference is ranged once: the drive amplitude is constant by
-        # construction, so re-ranging it every point spends captures to reach
-        # the same answer.
-        if first and reference is not None:
-            reference_scale = choose_volts_per_div(float(reference.voltage.max() - reference.voltage.min()))
-            if reference_scale is not None and reference_scale != reference.voltage_scale:
-                scope.get_channel(settings.reference_channel).voltage_scale = reference_scale
-                reference, response = _capture_pair(collector, settings)
+
+    # The reference is ranged once: the drive amplitude is constant by
+    # construction, so re-ranging it every point spends captures to reach the
+    # same answer. Deliberately NOT nested inside the response block above: a
+    # response-channel capture failure is normal control flow (capture_single
+    # logs and drops it), and has nothing to do with the reference channel --
+    # nesting this under `response is not None` would silently disable
+    # reference ranging for the rest of the sweep if point 0's response
+    # capture happened to fail.
+    if settings.autorange and first and reference is not None:
+        reference_scale = choose_volts_per_div(float(reference.voltage.max() - reference.voltage.min()))
+        if reference_scale is not None and reference_scale != reference.voltage_scale:
+            scope.get_channel(settings.reference_channel).voltage_scale = reference_scale
+            reference, response = _capture_pair(collector, settings)
 
     if reference is None or response is None:
-        missing = settings.reference_channel if reference is None else settings.response_channel
-        return ResponsePoint(frequency_hz=frequency, gain_db=None, phase_deg=None, excluded_reason=f"capture failed for channel {missing}")
+        missing = [name for name, waveform in ((settings.reference_channel, reference), (settings.response_channel, response)) if waveform is None]
+        reason = f"capture failed for channel {missing[0]}" if len(missing) == 1 else f"capture failed for channels {', '.join(str(channel) for channel in missing)}"
+        return ResponsePoint(frequency_hz=frequency, gain_db=None, phase_deg=None, excluded_reason=reason)
 
     return estimate_point(reference, response, frequency)
 

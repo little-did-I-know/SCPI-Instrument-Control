@@ -1,6 +1,7 @@
 """The per-point loop: ranging, capture, estimation, and what it refuses to invent."""
 
 import csv
+import re
 
 import pytest
 
@@ -285,3 +286,86 @@ def test_amendment_b_reference_is_ranged_only_at_the_first_occurrence(monkeypatc
         awg.disconnect()
 
     assert len(sets) == 1
+
+
+def test_a_response_failure_at_the_first_point_does_not_disable_reference_ranging(monkeypatch):
+    """Review finding 1: the reference-ranging block used to be nested inside
+    `if settings.autorange and response is not None:`. A response-channel
+    capture failure at point 0 -- normal control flow, per capture_single's
+    documented per-channel try/except -- skipped that whole block, including
+    the reference-ranging half, which has nothing to do with the response
+    channel. Since `first` is index-based and true only once, the reference
+    channel would then never get ranged for the rest of the sweep, even after
+    response captures started succeeding again at later points.
+
+    The failure is gated on the AWG's currently-driven frequency (spied at the
+    point sweep() writes it, not read back through SCPI, to avoid any
+    round-trip formatting concerns) rather than a capture-count threshold, so
+    it fails every capture attempt made while point 0 is in progress -- however
+    many that turns out to be -- and none afterward.
+    """
+    scope, awg = _rig()
+    output = awg.get_channel(1)
+    current_frequency = {"value": None}
+    original_frequency_setter = type(output).frequency.fset
+
+    def spy_frequency_setter(self, value):
+        current_frequency["value"] = value
+        original_frequency_setter(self, value)
+
+    monkeypatch.setattr(type(output), "frequency", property(type(output).frequency.fget, spy_frequency_setter))
+
+    original_acquire = scope.waveform.acquire
+
+    def fail_response_only_while_at_the_first_point(channel, *args, **kwargs):
+        if channel == 2 and current_frequency["value"] == 1000.0:
+            raise RuntimeError("simulated capture failure at point 0")
+        return original_acquire(channel, *args, **kwargs)
+
+    scope.waveform.acquire = fail_response_only_while_at_the_first_point
+
+    reference = scope.get_channel(1)
+    sets = []
+    original_setter = Channel.voltage_scale.fset
+
+    def spy_setter(self, value):
+        if self._channel == 1:
+            sets.append(value)
+        original_setter(self, value)
+
+    monkeypatch.setattr(Channel, "voltage_scale", property(Channel.voltage_scale.fget, spy_setter))
+
+    try:
+        result = sweep(scope, awg, reference_channel=1, response_channel=2, frequencies=[1000.0, 2000.0], amplitude_vpp=2.0, settle_s=0.0)
+    finally:
+        scope.disconnect()
+        awg.disconnect()
+
+    assert result.points[0].excluded_reason is not None  # point 0's response capture genuinely failed
+    assert result.points[1].excluded_reason is None  # point 1 measured normally once response recovered
+    assert len(sets) == 1  # the reference was still ranged, despite point 0's response failure
+
+
+def test_both_channels_missing_names_both_channels_in_the_reason():
+    """Review finding 2: when both captures fail, the old code reported only
+    the reference channel (`missing = settings.reference_channel if reference
+    is None else settings.response_channel` never considers the case where
+    both are None) -- incomplete, not fabricated, but a technician debugging
+    would be told only half the truth.
+    """
+    scope, awg = _rig()
+
+    def fail_both_channels(channel, *args, **kwargs):
+        raise RuntimeError("simulated capture failure")
+
+    scope.waveform.acquire = fail_both_channels
+    try:
+        result = sweep(scope, awg, reference_channel=1, response_channel=2, frequencies=[1000.0], amplitude_vpp=2.0, settle_s=0.0)
+    finally:
+        scope.disconnect()
+        awg.disconnect()
+
+    point = result.points[0]
+    assert point.gain_db is None
+    channel_numbers = {int(token) for token in re.findall(r"\d+", point.excluded_reason)}
+    assert channel_numbers == {1, 2}
