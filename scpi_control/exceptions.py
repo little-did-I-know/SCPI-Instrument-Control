@@ -1,5 +1,7 @@
 """Custom exception classes for Siglent oscilloscope control."""
 
+from typing import Any
+
 
 class SiglentError(Exception):
     """Base exception class for all Siglent-related errors."""
@@ -52,6 +54,19 @@ class FeatureNotSupportedError(SiglentError):
     """Raised when an operation is not supported by the connected instrument's dialect."""
 
     pass
+
+
+class FrequencySweepError(SiglentError):
+    """A frequency sweep stopped early; `partial` holds what it had measured.
+
+    Raising bare would throw away every point already captured, which on real
+    hardware can be an hour of bench time. The partial result travels with the
+    exception so a caller can save or inspect it.
+    """
+
+    def __init__(self, message: str, partial: Any = None) -> None:
+        super().__init__(message)
+        self.partial = partial
 
 
 # Backward compatibility aliases (deprecated in 0.3.0)
