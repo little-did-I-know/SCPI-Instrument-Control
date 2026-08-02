@@ -57,12 +57,18 @@ def test_csv_rows_round_trip_through_a_plain_reader(tmp_path):
 
 
 def test_numpy_reads_the_measured_columns(tmp_path):
+    # genfromtxt's names=True consumes the FIRST line as the header, comment or
+    # not, so the metadata block has to be dropped before it. Measured on numpy
+    # 2.4.0, and true even for a single comment line. pandas.read_csv(comment="#")
+    # does handle it unaided; numpy needs this one line of help.
     path = tmp_path / "sweep.csv"
     _result().to_csv(path)
 
-    data = np.genfromtxt(path, delimiter=",", names=True, comments="#")
+    with open(path) as handle:
+        data = np.genfromtxt((line for line in handle if not line.startswith("#")), delimiter=",", names=True)
+
     assert data["frequency_hz"].tolist() == [100.0, 1000.0]
-    assert np.isnan(data["gain_db"][1])
+    assert np.isnan(data["gain_db"][1])  # an empty field reads as NaN, never a sentinel
 
 
 def test_csv_survives_missing_provenance(tmp_path):

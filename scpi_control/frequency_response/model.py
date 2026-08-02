@@ -90,10 +90,12 @@ class FrequencyResponse:
         """Write the points as CSV behind a `#`-commented metadata header.
 
         The header explains where the numbers came from; the rows below it are
-        plain CSV, so numpy.genfromtxt(comments="#") and
-        pandas.read_csv(comment="#") both read the file unaided. An unmeasured
-        gain is an EMPTY field rather than a sentinel -- a reader that treats it
-        as a number gets NaN, not a plausible value.
+        plain CSV. pandas.read_csv(comment="#") reads the file unaided. numpy's
+        genfromtxt does NOT: names=True takes the first line as the header
+        whether or not it is a comment, so drop the `#` lines first (a generator
+        filtering them, or skip_header=). An unmeasured gain is an EMPTY field
+        rather than a sentinel -- a reader that treats it as a number gets NaN,
+        not a plausible value.
         """
         with open(path, "w", newline="") as handle:
             for line in self._metadata_lines():
