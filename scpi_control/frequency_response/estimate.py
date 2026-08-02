@@ -69,7 +69,12 @@ def _off_screen(waveform: WaveformData) -> bool:
     if waveform.voltage_scale is None:
         return False
     limit = SCREEN_HALF_DIVISIONS * waveform.voltage_scale
-    excursion = np.abs(np.asarray(waveform.voltage, dtype=float) - waveform.voltage_offset)
+    # Screen centre is at -voltage_offset, not +voltage_offset: both decode
+    # paths subtract voltage_offset from the scaled codes (waveform_transfer.py
+    # legacy ~212, modern ~811), so a sample AT screen centre has
+    # voltage == -voltage_offset. Excursion from centre is therefore
+    # |voltage - (-voltage_offset)| == |voltage + voltage_offset|.
+    excursion = np.abs(np.asarray(waveform.voltage, dtype=float) + waveform.voltage_offset)
     return int(np.count_nonzero(excursion >= limit)) >= _MIN_RAIL_SAMPLES
 
 

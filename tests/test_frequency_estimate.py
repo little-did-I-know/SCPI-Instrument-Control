@@ -89,6 +89,27 @@ def test_a_response_beyond_four_divisions_is_excluded():
     assert "divisions" in point.excluded_reason
 
 
+def test_an_off_screen_response_with_nonzero_offset_is_excluded():
+    # Screen centre is at -voltage_offset, not +voltage_offset (both decode
+    # paths in waveform_transfer.py subtract the offset from scaled codes).
+    # With voltage_scale=1.0 V/div and voltage_offset=+2.0 V, a response
+    # riding on a +3.0 V DC bias sits at 3.0 - (-2.0) = 5.0 divisions from
+    # centre -- off the +/-4 division screen -- even though |3.0 - 2.0| == 1.0
+    # division would wrongly call it on screen. Using the SIGN-INVERTED
+    # (buggy) formula here would also under-report a genuinely on-screen
+    # trace as off-screen for a negative bias; this case exercises the
+    # over-permissive direction, which is the one that fabricates a number.
+    frequency = 1000.0
+    times = _times()
+    reference = _waveform(np.cos(2 * np.pi * frequency * times))
+    response = _waveform(3.0 + 0.1 * np.cos(2 * np.pi * frequency * times), channel=2, voltage_scale=1.0, voltage_offset=2.0)
+
+    point = estimate_point(reference, response, frequency)
+
+    assert point.gain_db is None
+    assert "divisions" in point.excluded_reason
+
+
 def test_a_clipped_off_screen_response_names_clipping_not_the_floor():
     # A hard square wave at +/-1.0 V on a 0.2 V/div scale is +/-5 divisions:
     # off the screen. It also has exactly 2 distinct values, same as a
