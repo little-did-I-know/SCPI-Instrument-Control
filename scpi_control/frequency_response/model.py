@@ -5,9 +5,11 @@ how many cycles were in the window or what scale the capture used has no way to
 judge whether a number is trustworthy.
 """
 
+import csv
 import math
 from dataclasses import dataclass, field
-from typing import List, Optional, Tuple
+from pathlib import Path
+from typing import Any, List, Optional, Tuple, Union
 
 from scpi_control.provenance import AcquisitionProvenance
 
@@ -46,6 +48,9 @@ class SweepSettings:
     autorange: bool
 
 
+_CSV_COLUMNS = ("frequency_hz", "gain_db", "phase_deg", "reference_vpp", "response_vpp", "cycles_in_window", "samples_per_cycle", "volts_per_div", "excluded_reason")
+
+
 @dataclass
 class FrequencyResponse:
     """The points a sweep measured, plus the settings and provenance behind them."""
@@ -80,3 +85,51 @@ class FrequencyResponse:
                 log_later = math.log10(later.frequency_hz)
                 return 10.0 ** (log_earlier + fraction * (log_later - log_earlier))
         return None
+
+    def to_csv(self, path: Union[str, "Path"]) -> None:
+        """Write the points as CSV behind a `#`-commented metadata header.
+
+        The header explains where the numbers came from; the rows below it are
+        plain CSV, so numpy.genfromtxt(comments="#") and
+        pandas.read_csv(comment="#") both read the file unaided. An unmeasured
+        gain is an EMPTY field rather than a sentinel -- a reader that treats it
+        as a number gets NaN, not a plausible value.
+        """
+        with open(path, "w", newline="") as handle:
+            for line in self._metadata_lines():
+                handle.write(f"# {line}\n")
+            writer = csv.writer(handle)
+            writer.writerow(_CSV_COLUMNS)
+            for point in self.points:
+                writer.writerow(
+                    [
+                        point.frequency_hz,
+                        "" if point.gain_db is None else point.gain_db,
+                        "" if point.phase_deg is None else point.phase_deg,
+                        point.reference_vpp,
+                        point.response_vpp,
+                        point.cycles_in_window,
+                        point.samples_per_cycle,
+                        "" if point.volts_per_div is None else point.volts_per_div,
+                        point.excluded_reason or "",
+                    ]
+                )
+
+    def _metadata_lines(self) -> List[str]:
+        instrument = getattr(self.provenance, "instrument", None)
+        if instrument is None:
+            identity, firmware = "unknown", "unknown"
+        else:
+            identity = " ".join(part for part in (instrument.manufacturer, instrument.model, instrument.serial) if part) or "unknown"
+            firmware = instrument.firmware or "unknown"
+        settings = self.settings
+        return [
+            "SCPI-Instrument-Control frequency response sweep",
+            f"instrument: {identity}",
+            f"firmware: {firmware}",
+            f"library_version: {getattr(self.provenance, 'library_version', None) or 'unknown'}",
+            f"acquired_at: {getattr(self.provenance, 'acquired_at', None) or 'unknown'}",
+            f"reference_channel: {settings.reference_channel}, response_channel: {settings.response_channel}, awg_channel: {settings.awg_channel}",
+            f"amplitude_vpp: {settings.amplitude_vpp}, settle_s: {settings.settle_s}, autorange: {settings.autorange}",
+            f"points_requested: {len(settings.frequencies)}, points_measured: {len(self.usable())}",
+        ]
