@@ -1,4 +1,4 @@
-"""The Bode plot: magnitude over phase, log frequency, excluded points absent."""
+"""The Bode plot: magnitude over phase, log frequency, excluded points shown as gaps."""
 
 import math
 
@@ -6,6 +6,7 @@ import matplotlib
 
 matplotlib.use("Agg")  # No display in CI; must precede any pyplot import.
 
+import matplotlib.pyplot as plt
 import pytest
 
 from scpi_control.frequency_response.model import FrequencyResponse, ResponsePoint, SweepSettings
@@ -34,20 +35,36 @@ def test_plot_draws_magnitude_and_phase_on_log_axes():
     result = _result([_rc_point(f) for f in (100.0, 1000.0, 10000.0)])
 
     figure = result.plot()
+    try:
+        magnitude, phase = figure.axes
+        assert magnitude.get_xscale() == "log"
+        assert phase.get_xscale() == "log"
+        assert magnitude.lines[0].get_xdata().tolist() == [100.0, 1000.0, 10000.0]
+        assert phase.lines[0].get_ydata()[1] == pytest.approx(-45.0, abs=0.1)
+    finally:
+        plt.close(figure)
 
-    magnitude, phase = figure.axes
-    assert magnitude.get_xscale() == "log"
-    assert phase.get_xscale() == "log"
-    assert magnitude.lines[0].get_xdata().tolist() == [100.0, 1000.0, 10000.0]
-    assert phase.lines[0].get_ydata()[1] == pytest.approx(-45.0, abs=0.1)
 
-
-def test_plot_omits_excluded_points():
+def test_plot_shows_a_gap_at_excluded_points():
+    # Excluded points must be a real gap in the trace (a NaN, breaking the
+    # line and skipping the marker), not silently omitted: omitting the
+    # frequency lets semilogx draw one continuous line straight through the
+    # excluded region, which is an interpolated claim where no measurement
+    # exists.
     points = [_rc_point(100.0), ResponsePoint(frequency_hz=1000.0, gain_db=None, phase_deg=None, excluded_reason="response clipped"), _rc_point(10000.0)]
 
     figure = _result(points).plot()
-
-    assert figure.axes[0].lines[0].get_xdata().tolist() == [100.0, 10000.0]
+    try:
+        magnitude, phase = figure.axes
+        assert magnitude.lines[0].get_xdata().tolist() == [100.0, 1000.0, 10000.0]
+        gains = magnitude.lines[0].get_ydata()
+        assert math.isnan(gains[1])
+        assert not math.isnan(gains[0])
+        assert not math.isnan(gains[2])
+        phases = phase.lines[0].get_ydata()
+        assert math.isnan(phases[1])
+    finally:
+        plt.close(figure)
 
 
 def test_plot_refuses_when_nothing_is_measurable():

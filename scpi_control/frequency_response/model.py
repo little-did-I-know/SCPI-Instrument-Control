@@ -70,8 +70,16 @@ class FrequencyResponse:
         passband lies inside the swept range. Interpolation is linear in
         log-frequency against dB, so the answer can be no more precise than the
         point spacing. Returns None if the response never crosses.
+
+        `usable()` is sorted by frequency before walking it: `points` (and
+        `frequencies=`) is a documented public input with no ordering
+        requirement, and walking it in caller-supplied order silently answers
+        a different question for an unordered sweep. Sorting means the two
+        points bracketing the crossing may not be adjacent in `self.points`
+        -- interpolation can span an excluded point sitting between them in
+        frequency.
         """
-        usable = self.usable()
+        usable = sorted(self.usable(), key=lambda point: point.frequency_hz)
         if len(usable) < 2:
             return None
         threshold = max(point.gain_db for point in usable) + level_db
@@ -89,22 +97,27 @@ class FrequencyResponse:
     def plot(self, title: Optional[str] = None) -> Any:
         """Magnitude over phase against log frequency; returns the Figure.
 
-        Excluded points are omitted rather than drawn at zero: a gap in the
-        trace is honest about a measurement that was not made, while a plotted
-        zero is a claim.
+        Excluded points are plotted as NaN rather than omitted: matplotlib
+        breaks the line and skips the marker at a NaN, leaving a real gap at
+        that frequency. Omitting the point outright would let semilogx draw
+        one continuous line straight through the excluded region -- an
+        interpolated claim where no measurement exists. A gap is honest
+        about a measurement that was not made; a plotted zero (or an
+        unbroken line across the hole) is a claim.
         """
         import matplotlib.pyplot as plt  # Imported here so the module stays usable headless.
 
-        usable = self.usable()
-        if not usable:
+        if not self.usable():
             raise ValueError("Cannot plot a frequency response with no usable points")
 
-        frequencies = [point.frequency_hz for point in usable]
+        frequencies = [point.frequency_hz for point in self.points]
+        gains = [float("nan") if point.gain_db is None else point.gain_db for point in self.points]
+        phases = [float("nan") if point.phase_deg is None else point.phase_deg for point in self.points]
         figure, (magnitude_axis, phase_axis) = plt.subplots(2, 1, sharex=True, figsize=(8, 6))
-        magnitude_axis.semilogx(frequencies, [point.gain_db for point in usable], marker="o")
+        magnitude_axis.semilogx(frequencies, gains, marker="o")
         magnitude_axis.set_ylabel("Gain (dB)")
         magnitude_axis.grid(True, which="both", alpha=0.3)
-        phase_axis.semilogx(frequencies, [point.phase_deg for point in usable], marker="o")
+        phase_axis.semilogx(frequencies, phases, marker="o")
         phase_axis.set_ylabel("Phase (degrees)")
         phase_axis.set_xlabel("Frequency (Hz)")
         phase_axis.grid(True, which="both", alpha=0.3)
@@ -124,7 +137,7 @@ class FrequencyResponse:
         rather than a sentinel -- a reader that treats it as a number gets NaN,
         not a plausible value.
         """
-        with open(path, "w", newline="") as handle:
+        with open(path, "w", newline="", encoding="utf-8") as handle:
             for line in self._metadata_lines():
                 handle.write(f"# {line}\n")
             writer = csv.writer(handle)

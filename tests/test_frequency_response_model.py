@@ -62,5 +62,40 @@ def test_cutoff_hz_is_none_when_the_response_never_crosses():
     assert FrequencyResponse(settings=_settings(), points=flat).cutoff_hz() is None
 
 
+def _rc_point(frequency_hz, cutoff_hz=1000.0):
+    ratio = frequency_hz / cutoff_hz
+    return ResponsePoint(
+        frequency_hz=frequency_hz,
+        gain_db=-10 * math.log10(1 + ratio**2),
+        phase_deg=-math.degrees(math.atan(ratio)),
+        reference_vpp=2.0,
+        response_vpp=2.0 / math.sqrt(1 + ratio**2),
+        cycles_in_window=14.0,
+        samples_per_cycle=1000.0,
+        volts_per_div=0.5,
+    )
+
+
+def test_cutoff_hz_is_order_independent():
+    # points/frequencies= is a documented public input with no ordering
+    # requirement (the guide invites callers to pass an explicit frequencies=
+    # list). Walking self.points in caller-supplied order rather than sorted
+    # by frequency answers a different question for an unordered sweep --
+    # shuffled and descending must find the SAME crossing as ascending, not
+    # a different (or no) one.
+    frequencies = [100.0, 200.0, 500.0, 1000.0, 2000.0, 5000.0, 10000.0]
+    ascending = [_rc_point(f) for f in frequencies]
+    shuffled = [_rc_point(f) for f in (100.0, 10000.0, 1000.0, 200.0, 500.0, 2000.0, 5000.0)]
+    descending = [_rc_point(f) for f in reversed(frequencies)]
+
+    ascending_cutoff = FrequencyResponse(settings=_settings(), points=ascending).cutoff_hz()
+    shuffled_cutoff = FrequencyResponse(settings=_settings(), points=shuffled).cutoff_hz()
+    descending_cutoff = FrequencyResponse(settings=_settings(), points=descending).cutoff_hz()
+
+    assert ascending_cutoff is not None
+    assert shuffled_cutoff == pytest.approx(ascending_cutoff)
+    assert descending_cutoff == pytest.approx(ascending_cutoff)
+
+
 def test_cutoff_hz_is_none_without_two_usable_points():
     assert FrequencyResponse(settings=_settings(), points=[]).cutoff_hz() is None

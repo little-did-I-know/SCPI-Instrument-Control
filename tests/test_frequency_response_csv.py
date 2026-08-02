@@ -3,7 +3,6 @@
 import csv
 
 import numpy as np
-import pytest
 
 from scpi_control.frequency_response.model import FrequencyResponse, ResponsePoint, SweepSettings
 from scpi_control.provenance import AcquisitionProvenance, InstrumentInfo
@@ -69,6 +68,30 @@ def test_numpy_reads_the_measured_columns(tmp_path):
 
     assert data["frequency_hz"].tolist() == [100.0, 1000.0]
     assert np.isnan(data["gain_db"][1])  # an empty field reads as NaN, never a sentinel
+
+
+def test_csv_is_written_as_utf8_not_the_locale_encoding(tmp_path):
+    # Two of the real exclusion reasons are non-ASCII: an em dash
+    # ("reference below vertical resolution — source connected?") and a
+    # plus-minus sign ("response reaches beyond ±4 divisions ..."). On a
+    # cp1252 locale, writing without an explicit encoding produces a file
+    # pandas.read_csv (which defaults to utf-8) cannot decode. This test
+    # reads the file back with an EXPLICIT encoding="utf-8" -- reading with
+    # path.read_text() would use the same locale encoding it was written
+    # with and could not catch a locale mismatch either way.
+    settings = SweepSettings(reference_channel=1, response_channel=2, awg_channel=1, frequencies=(100.0, 1000.0), amplitude_vpp=2.0, settle_s=0.05, autorange=True)
+    points = [
+        ResponsePoint(frequency_hz=100.0, gain_db=None, phase_deg=None, excluded_reason="reference below vertical resolution — source connected?"),
+        ResponsePoint(frequency_hz=1000.0, gain_db=None, phase_deg=None, excluded_reason="response reaches beyond ±4 divisions (clipped or off screen)"),
+    ]
+    path = tmp_path / "sweep.csv"
+    FrequencyResponse(settings=settings, points=points).to_csv(path)
+
+    with open(path, newline="", encoding="utf-8") as handle:
+        rows = list(csv.DictReader(line for line in handle if not line.startswith("#")))
+
+    assert rows[0]["excluded_reason"] == "reference below vertical resolution — source connected?"
+    assert rows[1]["excluded_reason"] == "response reaches beyond ±4 divisions (clipped or off screen)"
 
 
 def test_csv_survives_missing_provenance(tmp_path):
