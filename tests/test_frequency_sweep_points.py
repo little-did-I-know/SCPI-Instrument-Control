@@ -1,6 +1,7 @@
 """The per-point loop: ranging, capture, estimation, and what it refuses to invent."""
 
 import csv
+import logging
 import re
 
 import pytest
@@ -11,6 +12,7 @@ from scpi_control.channel import Channel
 from scpi_control.connection import MockConnection
 from scpi_control.connection.mock.loopback import AwgLoopback
 from scpi_control.dut import RCLowPass
+from scpi_control.frequency_response.ranging import MIN_SAMPLES_PER_CYCLE
 from scpi_control.frequency_response.sweep import sweep
 from scpi_control.function_generator import FunctionGenerator
 from scpi_control.oscilloscope import Oscilloscope
@@ -115,6 +117,32 @@ def test_provenance_is_recorded_once():
 
     assert result.provenance is not None
     assert result.provenance.library_version
+
+
+def test_a_coarse_point_warns_but_a_normal_point_does_not(caplog):
+    # 1e6 Sa/s / 60 kHz is ~16.7 samples/cycle, below MIN_SAMPLES_PER_CYCLE
+    # (20.0): genuinely coarse. 1e6 Sa/s / 1000 Hz (CUTOFF_HZ) is 1000
+    # samples/cycle: not coarse. Both points still measure a gain (RC
+    # attenuation at 60x the corner is not enough to hit the floor with
+    # autoranging on), so this isolates the warning from the exclusion path.
+    scope, awg = _rig()
+    try:
+        with caplog.at_level(logging.WARNING, logger="scpi_control.frequency_response.sweep"):
+            result = sweep(scope, awg, reference_channel=1, response_channel=2, frequencies=[CUTOFF_HZ, 60000.0], amplitude_vpp=2.0, settle_s=0.0)
+    finally:
+        scope.disconnect()
+        awg.disconnect()
+
+    normal_point, coarse_point = result.points
+    assert normal_point.gain_db is not None
+    assert normal_point.samples_per_cycle >= MIN_SAMPLES_PER_CYCLE
+    assert coarse_point.gain_db is not None
+    assert coarse_point.samples_per_cycle < MIN_SAMPLES_PER_CYCLE
+
+    coarse_warnings = [record for record in caplog.records if "coarse" in record.getMessage()]
+    assert len(coarse_warnings) == 1
+    assert "60000.0" in coarse_warnings[0].getMessage()
+    assert str(normal_point.frequency_hz) not in coarse_warnings[0].getMessage()
 
 
 def test_a_timeout_aborts_with_the_points_so_far(monkeypatch):
