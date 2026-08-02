@@ -133,3 +133,20 @@ def test_trigger_wait_collector_waits_for_stop(monkeypatch):
     assert connection.waveform_requests == [1]
     assert "ARM" in connection.writes
     assert connection.queries.count("SAST?") >= 1
+
+
+def test_from_scope_adopts_a_connected_scope(monkeypatch):
+    """A caller holding an Oscilloscope can reuse capture_single without a second connection."""
+    from scpi_control.oscilloscope import Oscilloscope
+
+    scope = Oscilloscope("mock", connection=MockConnection("mock", channel_states={1: True}, trigger_status=["Stop"]))
+    scope.connect()
+    try:
+        collector = DataCollector.from_scope(scope)
+        assert collector.scope is scope
+        # capture_single refuses when _connected is False, so adoption must set it.
+        fake_time = FakeTime()
+        monkeypatch.setattr("scpi_control.automation.time", fake_time)
+        assert collector.capture_single([1])[1] is not None
+    finally:
+        scope.disconnect()

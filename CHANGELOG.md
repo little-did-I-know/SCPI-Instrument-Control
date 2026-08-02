@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Frequency response: `scpi_control.frequency_response.sweep()` steps a function generator across a frequency range, captures a reference and a response channel at each point, and returns gain and phase with the capture geometry behind them. Autoranges the response channel per point, reports an unmeasurable point as `None` with a stated reason rather than a plausible number, and exports CSV with a metadata header (`to_csv`) or a Bode plot (`plot`). See `examples/frequency_response_sweep.py`. Every accuracy claim is validated against a mock instrument and an analytic RC model — there is no function generator on the development bench, so none of it is hardware-verified.
 - Connections: `resync()` discards anything the instrument left unread and reports the byte count. Called automatically before the next send after a read times out.
 - Connections: `drain_input()` discards bytes the instrument has already queued and reports the count, taking no protocol-level action. Use it for housekeeping after a completed exchange (the terminator behind a screen dump, say); `resync()` is for recovering a session whose position is unknown, and on VISA it prefers a device clear, which aborts the instrument's pending operation. Both are no-ops on `BaseConnection`, so existing subclasses keep working unchanged.
 
