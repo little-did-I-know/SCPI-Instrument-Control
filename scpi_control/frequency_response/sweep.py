@@ -176,7 +176,7 @@ def sweep(
 
 def _capture_pair(collector: DataCollector, settings: SweepSettings) -> Tuple[Optional[WaveformData], Optional[WaveformData]]:
     """One acquisition, both channels. Missing keys are normal: capture_single
-    logs and drops a channel whose read failed (automation.py:215-222)."""
+    logs and drops a channel whose read failed (automation.py:229-237)."""
     captures = collector.capture_single([settings.reference_channel, settings.response_channel])
     return captures.get(settings.reference_channel), captures.get(settings.response_channel)
 
