@@ -86,6 +86,33 @@ class FrequencyResponse:
                 return 10.0 ** (log_earlier + fraction * (log_later - log_earlier))
         return None
 
+    def plot(self, title: Optional[str] = None) -> Any:
+        """Magnitude over phase against log frequency; returns the Figure.
+
+        Excluded points are omitted rather than drawn at zero: a gap in the
+        trace is honest about a measurement that was not made, while a plotted
+        zero is a claim.
+        """
+        import matplotlib.pyplot as plt  # Imported here so the module stays usable headless.
+
+        usable = self.usable()
+        if not usable:
+            raise ValueError("Cannot plot a frequency response with no usable points")
+
+        frequencies = [point.frequency_hz for point in usable]
+        figure, (magnitude_axis, phase_axis) = plt.subplots(2, 1, sharex=True, figsize=(8, 6))
+        magnitude_axis.semilogx(frequencies, [point.gain_db for point in usable], marker="o")
+        magnitude_axis.set_ylabel("Gain (dB)")
+        magnitude_axis.grid(True, which="both", alpha=0.3)
+        phase_axis.semilogx(frequencies, [point.phase_deg for point in usable], marker="o")
+        phase_axis.set_ylabel("Phase (degrees)")
+        phase_axis.set_xlabel("Frequency (Hz)")
+        phase_axis.grid(True, which="both", alpha=0.3)
+        if title:
+            magnitude_axis.set_title(title)
+        figure.tight_layout()
+        return figure
+
     def to_csv(self, path: Union[str, "Path"]) -> None:
         """Write the points as CSV behind a `#`-commented metadata header.
 
