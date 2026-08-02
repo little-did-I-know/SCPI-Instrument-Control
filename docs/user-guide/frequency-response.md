@@ -99,8 +99,10 @@ for the current scale is unreadable, and one that's too large is clipped.
    the same answer every time.
 
 Chosen scales are rounded onto the 1-2-5 sequence (`0.1, 0.2, 0.5, 1.0, 2.0,
-...` V/div), the same sequence real oscilloscope firmware coerces vertical
-(and horizontal) settings onto.
+...` V/div) -- the sequence real oscilloscope firmware is believed to coerce
+vertical (and horizontal) settings onto, though that belief itself is
+unverified against real firmware (see [Accuracy and
+limits](#accuracy-and-limits)).
 
 That makes the **capture cost of a point at most two acquisitions -- both
 channels together each time -- and at most three at the first point**: the
@@ -115,11 +117,15 @@ RC low-pass this project measures against, holding the scale fixed cost
 ADC codes, quietly wrong rather than absent. Earlier in this project's
 development, the same fixed-scale setup at 100 kHz produced a reported gain
 of 0 dB with nothing to flag it -- a plausible-looking number for a point
-that had, in fact, measured nothing. That silent failure is exactly why
-`ResponsePoint` carries `volts_per_div` and why an unmeasurable point now
-returns `excluded_reason` instead of a number: a reader who can see the
-scale a point was measured at, or see that it was refused outright, has a
-chance to catch what a bare number never shows.
+that had, in fact, measured nothing. That gap is exactly why `ResponsePoint`
+carries `volts_per_div` and why an unmeasurable point returns
+`excluded_reason` instead of a number today: running that same 100 kHz,
+fixed-1V/div, autorange-disabled case now correctly returns
+`excluded_reason="response below vertical resolution"` rather than a
+number, because the response capture's peak-to-peak comes back at `0.0` V
+(quantized flat) instead of a plausible-looking level. A reader who can see
+the scale a point was measured at, or see that it was refused outright, has
+a chance to catch what a bare number never shows.
 
 ## Exclusion Reasons
 
@@ -130,8 +136,8 @@ of the following. `gain_db`/`phase_deg` are `None` in every case.
 | --- | --- | --- |
 | `capture failed for channel {N}` / `capture failed for channels {a, b}` | The scope did not return usable data for that channel on that acquisition (link error, timeout, etc.). | Check the connection/log for the underlying error. A single isolated occurrence may be transient; the sweep continues past it. Persistent failures on one channel usually mean it isn't actually enabled or connected. |
 | `reference below vertical resolution — source connected?` | The reference channel's capture is at or below the quantization floor. | Check that the generator is actually connected to the reference channel and that `amplitude_vpp` matches what you expect the generator to output. Because the reference is only autoranged once, at the very first point, a wrong amplitude assumption here can affect the whole sweep. |
-| `response reaches beyond ±4 divisions (clipped or off screen)` | The response left the visible vertical range (clipped or drawn past the graticule) even after autoranging. | Check whether the DUT has more gain than expected, or lower `amplitude_vpp`. Autoranging only attempts one rescale per point, so a DUT with a very large, frequency-dependent gain swing can still outrun it at some points. |
-| `response below vertical resolution` | The response is too small to resolve on the scale autoranging chose. | Expected deep in a filter's stopband, far past the corner -- there may simply be very little signal left to measure. If it happens close to or before where you expect the passband, check wiring and DUT assumptions; a single autorange attempt may not be enough for a very sharp roll-off, and denser `points_per_decade` near the corner can help. |
+| `response reaches beyond ±4 divisions (clipped or off screen)` | The response left the visible vertical range (clipped or drawn past the graticule) on the scale it was captured at, with no autorange left to try (either it's disabled, or it already tried once and the result still didn't fit). | Check whether the DUT has more gain than expected, or lower `amplitude_vpp`. If autoranging is enabled, remember it attempts only one rescale per point, so a DUT with a very large, frequency-dependent gain swing can still outrun it at some points. |
+| `response below vertical resolution` | The response is too small to resolve on the scale it was captured at (again, with no further autorange available). | Expected deep in a filter's stopband, far past the corner -- there may simply be very little signal left to measure. If it happens close to or before where you expect the passband, check wiring and DUT assumptions; a single autorange attempt may not be enough for a very sharp roll-off, and denser `points_per_decade` near the corner can help. |
 | `reference carries no energy at the drive frequency` | The reference passed the floor/off-screen checks, but the single-frequency estimate at the drive tone came back exactly zero. | Rare; usually means the generator isn't actually outputting the requested frequency. Verify the AWG connection and that its output is enabled. |
 | `response carries no energy at the drive frequency` | Same as above, for the response channel. | Same as above. |
 
