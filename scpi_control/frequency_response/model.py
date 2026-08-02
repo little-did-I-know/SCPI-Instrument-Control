@@ -21,10 +21,10 @@ class ResponsePoint:
     frequency_hz: float
     gain_db: Optional[float] = None
     phase_deg: Optional[float] = None
-    reference_vpp: float = 0.0
-    response_vpp: float = 0.0
-    cycles_in_window: float = 0.0
-    samples_per_cycle: float = 0.0
+    reference_vpp: Optional[float] = None
+    response_vpp: Optional[float] = None
+    cycles_in_window: Optional[float] = None
+    samples_per_cycle: Optional[float] = None
     volts_per_div: Optional[float] = None
     excluded_reason: Optional[str] = None
 
@@ -135,10 +135,10 @@ class FrequencyResponse:
                         point.frequency_hz,
                         "" if point.gain_db is None else point.gain_db,
                         "" if point.phase_deg is None else point.phase_deg,
-                        point.reference_vpp,
-                        point.response_vpp,
-                        point.cycles_in_window,
-                        point.samples_per_cycle,
+                        "" if point.reference_vpp is None else point.reference_vpp,
+                        "" if point.response_vpp is None else point.response_vpp,
+                        "" if point.cycles_in_window is None else point.cycles_in_window,
+                        "" if point.samples_per_cycle is None else point.samples_per_cycle,
                         "" if point.volts_per_div is None else point.volts_per_div,
                         point.excluded_reason or "",
                     ]

@@ -11,7 +11,11 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from scpi_control import exceptions
 from scpi_control.automation import DataCollector
+from scpi_control.frequency_response.estimate import estimate_point
 from scpi_control.frequency_response.model import FrequencyResponse, ResponsePoint, SweepSettings
+from scpi_control.frequency_response.ranging import MIN_SAMPLES_PER_CYCLE, choose_timebase, choose_volts_per_div
+from scpi_control.provenance import AcquisitionProvenance
+from scpi_control.waveform import WaveformData
 
 logger = logging.getLogger(__name__)
 
@@ -147,12 +151,16 @@ def sweep(
         output.amplitude = amplitude_vpp
         output.enabled = True
 
-        for frequency in resolved:
+        for index, frequency in enumerate(resolved):
             output.frequency = frequency
             if settle_s > 0:
                 time.sleep(settle_s)
-            point = _measure_point(scope, collector, settings, frequency, first=frequency == resolved[0])
+            point = _measure_point(scope, collector, settings, frequency, first=(index == 0))
             result.points.append(point)
+            if result.provenance is None:
+                result.provenance = _first_provenance(collector, settings)
+            if point.gain_db is not None and point.samples_per_cycle < MIN_SAMPLES_PER_CYCLE:
+                logger.warning("Point at %.1f Hz has only %.1f samples per cycle; its phase is coarse", point.frequency_hz, point.samples_per_cycle)
             if on_point is not None:
                 on_point(point)
     except exceptions.SiglentError as error:
@@ -166,6 +174,44 @@ def sweep(
     return result
 
 
+def _capture_pair(collector: DataCollector, settings: SweepSettings) -> Tuple[Optional[WaveformData], Optional[WaveformData]]:
+    """One acquisition, both channels. Missing keys are normal: capture_single
+    logs and drops a channel whose read failed (automation.py:215-222)."""
+    captures = collector.capture_single([settings.reference_channel, settings.response_channel])
+    return captures.get(settings.reference_channel), captures.get(settings.response_channel)
+
+
 def _measure_point(scope: Any, collector: DataCollector, settings: SweepSettings, frequency: float, first: bool) -> ResponsePoint:
-    """Placeholder until Task 8: records the frequency and nothing else."""
-    return ResponsePoint(frequency_hz=frequency, gain_db=None, phase_deg=None, excluded_reason="measurement not implemented")
+    """Range for `frequency`, capture both channels, and estimate one point."""
+    scope.timebase = choose_timebase(frequency)
+    reference, response = _capture_pair(collector, settings)
+
+    if settings.autorange and response is not None:
+        chosen = choose_volts_per_div(float(response.voltage.max() - response.voltage.min()))
+        if chosen is not None and chosen != response.voltage_scale:
+            scope.get_channel(settings.response_channel).voltage_scale = chosen
+            reference, response = _capture_pair(collector, settings)
+        # The reference is ranged once: the drive amplitude is constant by
+        # construction, so re-ranging it every point spends captures to reach
+        # the same answer.
+        if first and reference is not None:
+            reference_scale = choose_volts_per_div(float(reference.voltage.max() - reference.voltage.min()))
+            if reference_scale is not None and reference_scale != reference.voltage_scale:
+                scope.get_channel(settings.reference_channel).voltage_scale = reference_scale
+                reference, response = _capture_pair(collector, settings)
+
+    if reference is None or response is None:
+        missing = settings.reference_channel if reference is None else settings.response_channel
+        return ResponsePoint(frequency_hz=frequency, gain_db=None, phase_deg=None, excluded_reason=f"capture failed for channel {missing}")
+
+    return estimate_point(reference, response, frequency)
+
+
+def _first_provenance(collector: DataCollector, settings: SweepSettings) -> Optional[Any]:
+    """Snapshot the scope once. Instrument identity does not change mid-sweep,
+    and the settings that do are already on each ResponsePoint."""
+    try:
+        return AcquisitionProvenance.from_scope(collector.scope, channels=[settings.reference_channel, settings.response_channel])
+    except Exception as error:  # noqa: BLE001 - provenance is a record, not a requirement
+        logger.warning("Could not record provenance for the sweep: %s", error)
+        return None
