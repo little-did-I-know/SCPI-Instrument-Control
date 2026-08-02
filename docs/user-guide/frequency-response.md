@@ -44,18 +44,6 @@ for point in result.usable():
 print(result.cutoff_hz())  # -3 dB corner, interpolated between points
 ```
 
-**Import `sweep` from the package, not from the submodule.** The package
-re-exports the `sweep()` function under the same name as the `sweep`
-submodule it lives in, so `from scpi_control.frequency_response import
-sweep` (above) is the supported form and always gets the function -- but a
-bare `import scpi_control.frequency_response.sweep` binds that same name to
-the function too, not the submodule. Once the package has been imported,
-there is no attribute path from it back to the submodule object. If you
-need the submodule itself (to monkeypatch something inside it in a test,
-say), use `importlib.import_module("scpi_control.frequency_response.sweep")`,
-which always resolves the submodule regardless of what the package's own
-`sweep` attribute currently points to.
-
 `start_hz`/`stop_hz`/`points_per_decade` log-space the sweep for you
 (`log_spaced_frequencies()`, also exported); pass an explicit `frequencies=`
 list instead if you want particular points, e.g. densely spaced around a

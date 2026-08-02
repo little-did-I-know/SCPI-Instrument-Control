@@ -17,7 +17,7 @@ import pytest
 from scpi_control.connection import MockConnection
 from scpi_control.connection.mock.loopback import AwgLoopback
 from scpi_control.dut import RCLowPass
-from scpi_control.frequency_response.sweep import sweep
+from scpi_control.frequency_response.orchestrate import sweep
 from scpi_control.function_generator import FunctionGenerator
 from scpi_control.oscilloscope import Oscilloscope
 

@@ -1,12 +1,10 @@
 """Sweep setup: what it rejects, what it drives, what it puts back."""
 
-import importlib
-
 import pytest
 
 from scpi_control import exceptions
 from scpi_control.connection import MockConnection
-from scpi_control.frequency_response.sweep import log_spaced_frequencies, sweep
+from scpi_control.frequency_response.orchestrate import log_spaced_frequencies, sweep
 from scpi_control.function_generator import FunctionGenerator
 from scpi_control.oscilloscope import Oscilloscope
 
@@ -95,16 +93,7 @@ def test_the_awg_is_restored_even_when_the_sweep_raises(rig, monkeypatch):
     def explode(*args, **kwargs):
         raise exceptions.SiglentTimeoutError("acquisition never completed")
 
-    # A plain string target ("scpi_control.frequency_response.sweep._measure_point")
-    # resolves ambiguously as of Task 10: the package's __init__ re-exports the
-    # sweep() FUNCTION under the same name as the sweep submodule, so pytest's
-    # dotted-path resolution finds that function via getattr on the package
-    # before it ever falls back to importing the submodule, and setattr on a
-    # function object silently does nothing useful here. importlib.import_module
-    # always returns the actual submodule from sys.modules, sidestepping the
-    # shadowed package attribute entirely.
-    sweep_module = importlib.import_module("scpi_control.frequency_response.sweep")
-    monkeypatch.setattr(sweep_module, "_measure_point", explode)
+    monkeypatch.setattr("scpi_control.frequency_response.orchestrate._measure_point", explode)
 
     with pytest.raises(exceptions.FrequencySweepError):
         sweep(scope, awg, reference_channel=1, response_channel=2, frequencies=[1000.0], settle_s=0.0)

@@ -13,7 +13,7 @@ from scpi_control.connection import MockConnection
 from scpi_control.connection.mock.loopback import AwgLoopback
 from scpi_control.dut import RCLowPass
 from scpi_control.frequency_response.ranging import MIN_SAMPLES_PER_CYCLE
-from scpi_control.frequency_response.sweep import sweep
+from scpi_control.frequency_response.orchestrate import sweep
 from scpi_control.function_generator import FunctionGenerator
 from scpi_control.oscilloscope import Oscilloscope
 
@@ -127,7 +127,7 @@ def test_a_coarse_point_warns_but_a_normal_point_does_not(caplog):
     # autoranging on), so this isolates the warning from the exclusion path.
     scope, awg = _rig()
     try:
-        with caplog.at_level(logging.WARNING, logger="scpi_control.frequency_response.sweep"):
+        with caplog.at_level(logging.WARNING, logger="scpi_control.frequency_response.orchestrate"):
             result = sweep(scope, awg, reference_channel=1, response_channel=2, frequencies=[CUTOFF_HZ, 60000.0], amplitude_vpp=2.0, settle_s=0.0)
     finally:
         scope.disconnect()
