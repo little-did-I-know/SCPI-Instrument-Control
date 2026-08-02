@@ -1,5 +1,7 @@
 """Table tests for the 1-2-5 ranging choices (scpi_control/frequency_response/ranging.py)."""
 
+import math
+
 import pytest
 
 from scpi_control import exceptions
@@ -31,6 +33,23 @@ def test_round_125_up_lands_on_the_sequence(value, expected):
 def test_round_125_up_rejects_non_positive(bad):
     with pytest.raises(exceptions.InvalidParameterError):
         round_125_up(bad)
+
+
+def test_round_125_up_guards_mantissa_tolerance_at_decade_boundaries():
+    """Guard that _MANTISSA_TOLERANCE protects against log10 rounding errors.
+
+    The parametrized table test cases all have exact decade boundaries by
+    platform luck (math.log10(0.001) is exactly -3.0). This case uses
+    math.nextafter to force a mantissa just barely over a step boundary,
+    which would fail if _MANTISSA_TOLERANCE were removed or flipped. This
+    deterministically exercises the tolerance regardless of platform libm
+    quirks.
+    """
+    # Input just barely over 1000.0 should round to 1000.0 (the step),
+    # not jump to 2000.0, because the tolerance allows the mantissa
+    # to match the step even with floating-point rounding.
+    value = math.nextafter(1000.0, math.inf)
+    assert round_125_up(value) == pytest.approx(1000.0, rel=1e-9)
 
 
 @pytest.mark.parametrize(
