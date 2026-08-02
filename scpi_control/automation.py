@@ -89,6 +89,20 @@ class DataCollector:
         self.scope = Oscilloscope(host, port, timeout, connection=connection, dialect=dialect)
         self._connected = False
 
+    @classmethod
+    def from_scope(cls, scope: Oscilloscope) -> "DataCollector":
+        """Wrap an Oscilloscope the caller already owns and connected.
+
+        __init__ builds its own Oscilloscope from a host, which leaves no way to
+        reuse capture_single's arm-and-wait logic against an existing session.
+        The scope's lifetime stays with the caller: this does not connect, and
+        disconnect() on the result would close a session it did not open.
+        """
+        collector = cls.__new__(cls)
+        collector.scope = scope
+        collector._connected = True
+        return collector
+
     def connect(self) -> None:
         """Connect to the oscilloscope."""
         self.scope.connect()
