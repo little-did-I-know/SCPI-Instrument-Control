@@ -76,10 +76,13 @@ def _off_screen(waveform: WaveformData) -> bool:
 def _exclusion(reference: WaveformData, response: WaveformData) -> Optional[str]:
     if _at_floor(reference):
         return "reference below vertical resolution — source connected?"
-    if _at_floor(response):
-        return "response below vertical resolution"
+    # Clipping is tested before the floor rule: a hard-clipped, flat-topped
+    # trace also collapses to very few distinct values, so if the floor check
+    # ran first it would misreport an overdriven signal as "no signal".
     if _off_screen(response):
         return f"response reaches beyond ±{SCREEN_HALF_DIVISIONS:.0f} divisions (clipped or off screen)"
+    if _at_floor(response):
+        return "response below vertical resolution"
     return None
 
 

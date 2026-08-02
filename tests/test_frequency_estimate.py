@@ -89,7 +89,49 @@ def test_a_response_beyond_four_divisions_is_excluded():
     assert "divisions" in point.excluded_reason
 
 
+def test_a_clipped_off_screen_response_names_clipping_not_the_floor():
+    # A hard square wave at +/-1.0 V on a 0.2 V/div scale is +/-5 divisions:
+    # off the screen. It also has exactly 2 distinct values, same as a
+    # flat-topped/clipped trace -- which is exactly the combination where a
+    # floor-check-before-clip-check ordering misreports "below vertical
+    # resolution" for what is actually an overdriven, saturated signal.
+    frequency = 1000.0
+    times = _times()
+    reference = _waveform(np.cos(2 * np.pi * frequency * times))
+    half = SAMPLES // 2
+    response = _waveform(np.concatenate([np.full(half, 1.0), np.full(SAMPLES - half, -1.0)]), channel=2, voltage_scale=0.2)
+
+    point = estimate_point(reference, response, frequency)
+
+    assert point.gain_db is None
+    assert "divisions" in point.excluded_reason
+    assert "below vertical resolution" not in point.excluded_reason
+
+
 def test_a_reference_at_the_floor_names_the_source():
+    frequency = 1000.0
+    times = _times()
+    # 1e-4 Vpp on the default 0.5 V/div scale is 0.0004 divisions: under
+    # MIN_DIVISIONS, but genuinely non-zero, so tone_at(reference, ...) is not
+    # bit-exact zero. This isolates the _at_floor(reference) branch of
+    # _exclusion from the belt-and-braces zero-tone fallback in
+    # estimate_point, which a bit-exact-zero reference would also satisfy.
+    reference = _waveform(1e-4 * np.cos(2 * np.pi * frequency * times))
+    response = _waveform(np.cos(2 * np.pi * frequency * times), channel=2)
+
+    point = estimate_point(reference, response, frequency)
+
+    assert point.gain_db is None
+    assert point.excluded_reason == "reference below vertical resolution — source connected?"
+
+
+def test_an_exactly_zero_reference_is_also_excluded():
+    # A bit-exact-zero reference is the degenerate case the belt-and-braces
+    # check in estimate_point exists for (dividing by a zero tone would
+    # otherwise produce inf rather than an honest exclusion). In practice
+    # _at_floor(reference) catches this first -- an all-zero trace collapses
+    # to a single distinct value -- so this is kept as its own test to keep
+    # that guard covered without conflating it with the floor-message test above.
     frequency = 1000.0
     times = _times()
     reference = _waveform(np.zeros(SAMPLES))
@@ -98,7 +140,7 @@ def test_a_reference_at_the_floor_names_the_source():
     point = estimate_point(reference, response, frequency)
 
     assert point.gain_db is None
-    assert "reference" in point.excluded_reason
+    assert point.phase_deg is None
 
 
 def test_a_coarsely_sampled_point_is_kept_but_flagged():
