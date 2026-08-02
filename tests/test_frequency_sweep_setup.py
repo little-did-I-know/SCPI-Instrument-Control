@@ -25,6 +25,19 @@ def test_log_spacing_is_inclusive_and_logarithmic():
     assert frequencies == pytest.approx([100.0, 316.227766, 1000.0, 3162.27766, 10000.0], rel=1e-6)
 
 
+def test_a_narrow_range_clamps_to_the_endpoints_instead_of_dividing_by_zero():
+    # decades = log10(101/100) ~= 0.00432; at 1 point/decade,
+    # round(0.00432) == 0, which used to divide by a count of zero and raise
+    # ZeroDivisionError instead of returning a legitimate narrow-range answer.
+    frequencies = log_spaced_frequencies(100.0, 101.0, points_per_decade=1)
+    assert frequencies == pytest.approx([100.0, 101.0])
+
+
+def test_the_narrow_range_clamp_does_not_disturb_normal_spacing():
+    frequencies = log_spaced_frequencies(100.0, 10000.0, points_per_decade=2)
+    assert frequencies == pytest.approx([100.0, 316.227766, 1000.0, 3162.27766, 10000.0], rel=1e-6)
+
+
 @pytest.mark.parametrize(
     "kwargs,message",
     [

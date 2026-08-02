@@ -25,7 +25,12 @@ def log_spaced_frequencies(start_hz: float, stop_hz: float, points_per_decade: i
     if points_per_decade < 1:
         raise exceptions.InvalidParameterError(f"points_per_decade must be at least 1, not {points_per_decade!r}")
     decades = math.log10(stop_hz / start_hz)
-    count = int(round(decades * points_per_decade))
+    # Below one point per decade of span, the requested density rounds to
+    # zero (e.g. 100-101 Hz at 1 point/decade: decades ~= 0.00432). Clamp
+    # rather than reject: a narrow sweep is a legitimate request -- zooming
+    # into a resonance, say -- and count=1 yields [start_hz, stop_hz], the
+    # honest minimum answer to "sweep from here to there".
+    count = max(int(round(decades * points_per_decade)), 1)
     return [start_hz * 10 ** (index * decades / count) for index in range(count + 1)]
 
 
