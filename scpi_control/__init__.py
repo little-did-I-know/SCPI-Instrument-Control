@@ -34,6 +34,7 @@ from scpi_control.oscilloscope import Oscilloscope
 # Power supply support (stable as of v0.5.0)
 from scpi_control.power_supply import PowerSupply
 from scpi_control.psu_data_logger import PSUDataLogger, TimedPSULogger
+from scpi_control.psu_models import PSUCapability
 
 # Function generator support (new in v0.6.0, stable in v1.0.0)
 from scpi_control.function_generator import FunctionGenerator
@@ -63,6 +64,7 @@ __all__ = [
     "CommandError",
     # Power supply features
     "PowerSupply",
+    "PSUCapability",
     "PSUDataLogger",
     "TimedPSULogger",
     # Function generator features

@@ -428,18 +428,25 @@ class TestAdvancedFeatures:
             _ = output.ocp_level
 
     def test_ovp_generic_support(self):
-        """Test OVP on generic PSU (SCPI-99 standard supports it)."""
+        """Test OVP on generic PSU (honesty gate: no uncitable subsystems).
+
+        Generic SCPI-99 without a registry entry must not advertise OVP/OCP
+        (VOLT:PROT, CURR:PROT) -- the same uncitable fallback the SPD3303X
+        registry entry explicitly rejects (audit H18 / backend review
+        2026-07-31 High-3). A generic PSU that really has OVP/OCP belongs in
+        PSU_MODEL_REGISTRY with citations.
+        """
         conn = MockConnection(psu_mode=True, psu_idn="Generic,PSU-1000,SERIAL,1.0")
         psu = PowerSupply("mock", connection=conn)
         psu.connect()
 
-        # Generic SCPI-99 PSUs support OVP/OCP (VOLT:PROT, CURR:PROT)
-        assert psu.model_capability.has_ovp is True
-        assert psu.model_capability.has_ocp is True
+        # Unregistered generic PSU is now honest: has no protection subsystem
+        assert psu.model_capability.has_ovp is False
+        assert psu.model_capability.has_ocp is False
 
-        # Should work without error
-        psu.output1.ovp_level = 25.0
-        assert isinstance(psu.output1.ovp_level, float)
+        # OVP/OCP calls now raise NotImplementedError (honesty guard)
+        with pytest.raises(NotImplementedError):
+            psu.output1.ovp_level = 25.0
 
     def test_timer_enable(self, siglent_psu):
         """Test timer enable/disable."""
