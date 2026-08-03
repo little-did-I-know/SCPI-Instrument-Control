@@ -9,6 +9,7 @@ from typing import Any, Dict, List, Optional
 
 from scpi_control import exceptions
 from scpi_control.analysis import FFTAnalyzer
+from scpi_control.capabilities import ScopeCapabilities, build_scope_capabilities
 from scpi_control.channel import Channel
 from scpi_control.connection import BaseConnection, SocketConnection
 from scpi_control.connection.framing import Framing
@@ -113,6 +114,7 @@ class Oscilloscope:
         # Model capability and SCPI commands (populated after connection)
         self.model_capability: Optional[ModelCapability] = None
         self._scpi_commands: Optional[SCPICommandSet] = None
+        self._capabilities: Optional[ScopeCapabilities] = None
 
         # Device information (populated after connection)
         self._device_info: Optional[Dict[str, str]] = None
@@ -200,6 +202,7 @@ class Oscilloscope:
             self.dialect = self._dialect_override or getattr(self.model_capability, "dialect", "legacy")
             self._scpi_commands = SCPICommandSet(self.dialect, self.model_capability.scpi_variant)
             logger.info(f"Using SCPI dialect: {self.dialect} (variant: {self.model_capability.scpi_variant})")
+            self._capabilities = build_scope_capabilities(self._scpi_commands, self.model_capability)
 
             # Per-dialect connect-time setup (e.g. response-header suppression)
             for setup_command in CONNECT_SETUP.get(self.dialect, []):
@@ -233,6 +236,7 @@ class Oscilloscope:
         self._device_info = None
         self.model_capability = None
         self._scpi_commands = None
+        self._capabilities = None
         self.dialect = None
 
         # Remove dynamically created channels
@@ -565,6 +569,19 @@ class Oscilloscope:
         if self.model_capability is None:
             return []
         return list(range(1, self.model_capability.num_channels + 1))
+
+    @property
+    def capabilities(self) -> ScopeCapabilities:
+        """Derived capabilities of the CONNECTED scope (dialect-resolved).
+
+        Raises:
+            SiglentConnectionError: before connect()/after disconnect() --
+                capabilities depend on the resolved dialect; guessing would
+                fabricate support claims.
+        """
+        if self._capabilities is None:
+            raise exceptions.SiglentConnectionError("Not connected: capabilities depend on the resolved dialect -- call connect() first.")
+        return self._capabilities
 
     def get_channel(self, channel_num: int) -> Optional[Channel]:
         """Get channel object by number.

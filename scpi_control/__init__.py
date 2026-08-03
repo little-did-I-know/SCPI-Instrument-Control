@@ -27,6 +27,7 @@ For automated test report generation:
 
 __version__ = "6.0.0"
 
+from scpi_control.capabilities import ScopeCapabilities
 from scpi_control.exceptions import CommandError, SiglentConnectionError, SiglentError, SiglentTimeoutError
 from scpi_control.oscilloscope import Oscilloscope
 
@@ -55,6 +56,7 @@ from scpi_control.vocabulary import (
 __all__ = [
     # Core features
     "Oscilloscope",
+    "ScopeCapabilities",
     "SiglentError",
     "SiglentConnectionError",
     "SiglentTimeoutError",
