@@ -12,6 +12,7 @@ import numpy as np
 from scpi_control import exceptions
 from scpi_control.connection.mock.helpers import _build_ieee_block, _build_ieee_block_9digit, _format_nr3, _format_scientific, _format_si_sample_rate
 from scpi_control.connection.mock import synth as mock_synth
+from scpi_control.scpi_commands import wire_coupling_tokens, wire_trigger_coupling_tokens, wire_trigger_mode_tokens, wire_trigger_slope_tokens
 
 # Canonical PAVA? measurement values for the legacy dialect (mirrors real
 # hardware where PAVA? is legacy-only; the modern dialect has no equivalent).
@@ -130,7 +131,14 @@ def handle_write(conn, command: str) -> bool:
             conn._voltage_offsets[ch] = value
             return True
         if match := re.match(r":CHANnel(\d+):COUPling\s+(\w+)", command, re.IGNORECASE):
-            conn._channel_coupling[int(match.group(1))] = match.group(2).upper()
+            token = match.group(2).upper()
+            if token not in wire_coupling_tokens("modern"):
+                # Measured on real hardware 2026-07-31 for :TRIGger:TYPE and
+                # :CHANnel:PROBe: an undocumented token queues -224 and leaves
+                # the setting unchanged. Same contract here.
+                conn.push_error(-224, "Illegal parameter value")
+                return True
+            conn._channel_coupling[int(match.group(1))] = token
             return True
         # :CHANnel:PROBe -- guide p.57. Two documented argument forms:
         # "VALue,<ratio>" (<ratio> in NR3, documented range [1E-6, 1E6]) and
@@ -204,8 +212,12 @@ def handle_write(conn, command: str) -> bool:
             conn.simple_items.clear()  # p.367
             return True
         if match := re.match(r":TRIGger:MODE\s+(\w+)", command, re.IGNORECASE):
+            token = match.group(1).upper()
+            if token not in wire_trigger_mode_tokens("modern"):
+                conn.push_error(-224, "Illegal parameter value")
+                return True
             conn.trigger_mode = match.group(1)  # stored as wire token, e.g. "NORMal" (guide p.482)
-            if match.group(1).upper() == "SINGLE" and len(conn.trigger_status) <= 1:
+            if token == "SINGLE" and len(conn.trigger_status) <= 1:
                 # Status vocabulary matches real hardware: Ready while armed, Stop when done (same rule as the legacy ARM handler)
                 conn.trigger_status = ["Ready", "Stop"]
             return True
@@ -235,9 +247,17 @@ def handle_write(conn, command: str) -> bool:
             conn.trigger_level[1] = value
             return True
         if match := re.match(r":TRIGger:EDGE:SLOPe\s+(\w+)", command, re.IGNORECASE):
+            token = match.group(1).upper()
+            if token not in wire_trigger_slope_tokens("modern"):
+                conn.push_error(-224, "Illegal parameter value")
+                return True
             conn.trigger_slope = match.group(1)  # wire token, e.g. "RISing" (guide p.494)
             return True
         if match := re.match(r":TRIGger:EDGE:COUPling\s+(\w+)", command, re.IGNORECASE):
+            token = match.group(1).upper()
+            if token not in wire_trigger_coupling_tokens("modern"):
+                conn.push_error(-224, "Illegal parameter value")
+                return True
             conn.trigger_coupling = match.group(1)
             return True
         # Waveform transfer-parameter scalars (Task 17, audit H9; guide
@@ -297,7 +317,11 @@ def handle_write(conn, command: str) -> bool:
         conn._channel_enabled[channel] = match.group(2).upper() == "ON"
         return True
     elif match := re.match(r"C(\d+):CPL\s+(\w+)", command, re.IGNORECASE):
-        conn._channel_coupling[int(match.group(1))] = match.group(2).upper()
+        token = match.group(2).upper()
+        if token not in wire_coupling_tokens("legacy"):
+            conn.push_error(-224, "Illegal parameter value")
+            return True
+        conn._channel_coupling[int(match.group(1))] = token
         return True
     elif match := re.match(r"C(\d+):ATTN\s+(.+)", command, re.IGNORECASE):
         # ATTENUATION (ATTN) -- RC01020-E01C p.22 (task 14, audit L3).
@@ -328,7 +352,11 @@ def handle_write(conn, command: str) -> bool:
         conn.trigger_slope = match.group(2).upper()
         return True
     elif match := re.match(r"C(\d+):TRCP\s+(\w+)", command, re.IGNORECASE):
-        conn.trigger_coupling = match.group(2).upper()
+        token = match.group(2).upper()
+        if token not in wire_trigger_coupling_tokens("legacy"):
+            conn.push_error(-224, "Illegal parameter value")
+            return True
+        conn.trigger_coupling = token
         return True
     elif command.upper() == "ARM":
         # Simulate an acquisition that will eventually stop when no custom sequence is provided.
