@@ -40,6 +40,18 @@ from scpi_control.function_generator import FunctionGenerator
 # Data acquisition / Data logger support (new in v1.1.0)
 from scpi_control.data_logger import DataLogger
 
+# Typed vocabulary
+from scpi_control.vocabulary import (
+    BandwidthLimit,
+    Coupling,
+    TrackingMode,
+    TriggerCoupling,
+    TriggerMode,
+    TriggerSlope,
+    TriggerSource,
+    TriggerType,
+)
+
 __all__ = [
     # Core features
     "Oscilloscope",
@@ -55,4 +67,13 @@ __all__ = [
     "FunctionGenerator",
     # Data acquisition features
     "DataLogger",
+    # Typed vocabulary
+    "Coupling",
+    "TriggerMode",
+    "TriggerSlope",
+    "TriggerCoupling",
+    "TriggerType",
+    "TriggerSource",
+    "BandwidthLimit",
+    "TrackingMode",
 ]

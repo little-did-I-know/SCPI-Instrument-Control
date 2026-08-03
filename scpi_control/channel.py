@@ -12,8 +12,7 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-CouplingType = Literal["DC", "AC", "GND"]
-BandwidthLimitType = Literal["OFF", "ON", "FULL"]
+from scpi_control.vocabulary import BandwidthLimitType, CouplingType  # noqa: F401 -- re-exported for back-compat
 
 
 class Channel:

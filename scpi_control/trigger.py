@@ -22,10 +22,12 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-TriggerModeType = Literal["AUTO", "NORM", "NORMAL", "SINGLE", "STOP"]
-TriggerTypeType = Literal["EDGE", "SLEW", "GLIT", "INTV", "RUNT", "PATTERN"]
-TriggerSlopeType = Literal["POS", "NEG", "WINDOW"]
-TriggerCouplingType = Literal["DC", "AC", "HFREJ", "LFREJ"]
+from scpi_control.vocabulary import (  # noqa: F401 -- re-exported for back-compat
+    TriggerCouplingType,
+    TriggerModeType,
+    TriggerSlopeType,
+    TriggerTypeType,
+)
 
 
 class Trigger:
