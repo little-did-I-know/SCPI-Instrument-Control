@@ -224,7 +224,7 @@ class Trigger:
         else:
             current_source = self.source
             self._scope.write(self._cmd("set_trigger_select", type=wire, src=current_source))
-        logger.info(f"Trigger type set to {trig_type}")
+        logger.info(f"Trigger type set to {str(getattr(trig_type, 'value', trig_type)).upper()}")
 
     def set_edge_trigger(self, source: str = "C1", slope: str = "POS") -> None:
         """Configure edge trigger.
@@ -330,7 +330,9 @@ class Trigger:
         """Get trigger coupling.
 
         Returns:
-            Coupling: 'DC', 'HFREJ', 'LFREJ', or 'NOISEREJ' (Tektronix only)
+            Coupling: 'DC', 'AC', 'HFREJ', 'LFREJ'. Unmapped instrument states
+            (e.g. 'NOISEREJ' set from Tektronix front panel) pass through uppercased
+            as read-only; such states cannot be set via this API.
         """
         if not is_flat_trigger(self._dialect):
             return trigger_coupling_from_wire(self._dialect, self._scope.query(self._cmd("get_trigger_coupling")))
@@ -342,9 +344,9 @@ class Trigger:
         """Set trigger coupling.
 
         Args:
-            coupling: 'DC', 'AC', 'HFREJ' (high freq reject), 'LFREJ' (low freq reject), or
-                     'NOISEREJ' (Tektronix only). Note: Tektronix does not support AC coupling
-                     (TBS p.151 / MSO2 p.2-661) and will raise FeatureNotSupportedError if attempted.
+            coupling: 'DC', 'AC', 'HFREJ' (high freq reject), 'LFREJ' (low freq reject).
+                     Note: Tektronix does not support AC coupling (TBS p.151 / MSO2 p.2-661)
+                     and will raise FeatureNotSupportedError if attempted.
         """
         wire = trigger_coupling_to_wire(self._dialect, coupling)
         if not is_flat_trigger(self._dialect):
@@ -352,7 +354,7 @@ class Trigger:
         else:
             source = self.source
             self._scope.write(self._cmd("set_trigger_coupling", src=source, coupling=wire))
-        # getattr-unwrap: str() of a (str, Enum) member is "TriggerCoupling.HFREJ" on Py<3.12
+        # getattr-unwrap: str() of a (str, Enum) mixin member is "TriggerCoupling.HFREJ", not "HFREJ"
         logger.info(f"Trigger coupling set to {str(getattr(coupling, 'value', coupling)).upper()}")
 
     # NOTE: TRIG_DELAY is legacy-only and actually controls trigger delay, not holdoff (AUDIT M4); routing deferred to a trigger-rework follow-up.
