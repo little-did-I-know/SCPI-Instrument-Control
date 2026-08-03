@@ -340,7 +340,11 @@ def handle_write(conn, command: str) -> bool:
             conn.bandwidth_limits[int(pairs[i][1:])] = pairs[i + 1].upper()
         return True
     elif command.upper().startswith("TRIG_MODE "):
-        conn.trigger_mode = command.split(" ", 1)[1].upper()
+        token = command.split(" ", 1)[1].upper()
+        if token not in wire_trigger_mode_tokens("legacy"):
+            conn.push_error(-224, "Illegal parameter value")
+            return True
+        conn.trigger_mode = token
         return True
     elif command.upper().startswith("TRIG_SELECT "):
         _, params = command.split(" ", 1)
@@ -349,7 +353,11 @@ def handle_write(conn, command: str) -> bool:
         conn.trigger_source = source.strip().upper()
         return True
     elif match := re.match(r"C(\d+):TRSL\s+(\w+)", command, re.IGNORECASE):
-        conn.trigger_slope = match.group(2).upper()
+        token = match.group(2).upper()
+        if token not in wire_trigger_slope_tokens("legacy"):
+            conn.push_error(-224, "Illegal parameter value")
+            return True
+        conn.trigger_slope = token
         return True
     elif match := re.match(r"C(\d+):TRCP\s+(\w+)", command, re.IGNORECASE):
         token = match.group(2).upper()

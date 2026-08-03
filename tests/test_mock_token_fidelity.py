@@ -49,3 +49,49 @@ def test_mock_acceptance_derives_from_the_shared_table(monkeypatch):
     assert conn.error_queue == []
     conn.write(":CHANnel1:COUPling DC")  # the OLD token is now foreign
     assert conn.error_queue == [(-224, "Illegal parameter value")]
+
+
+def test_mock_rejects_an_undocumented_legacy_trigger_mode():
+    scope, conn = make_scope(LEGACY_IDN)
+    scope.trigger.mode = "AUTO"  # known-good baseline
+    conn.write("TRIG_MODE BOGUS")  # bypass driver validation
+    assert conn.error_queue == [(-224, "Illegal parameter value")]
+    assert scope.trigger.mode == "AUTO"  # state unchanged
+
+
+def test_mock_rejects_an_undocumented_legacy_trigger_slope():
+    scope, conn = make_scope(LEGACY_IDN)
+    scope.trigger.slope = "POS"  # known-good baseline
+    conn.write("C1:TRSL BOGUS")  # bypass driver validation
+    assert conn.error_queue == [(-224, "Illegal parameter value")]
+    assert scope.trigger.slope == "POS"  # state unchanged
+
+
+def test_mock_accepts_every_legacy_trigger_mode_the_driver_sends_via_trig_mode():
+    # STOP is excluded: the driver's mode setter diverts it to the separate
+    # bare "STOP" command (self._cmd("stop")), never to TRIG_MODE, so it
+    # never reaches this guard -- AUTO/NORM/SINGLE are the tokens TRIG_MODE
+    # actually carries for the legacy dialect.
+    scope, conn = make_scope(LEGACY_IDN)
+    for mode in sorted(sc.supported_trigger_modes("legacy") - {"STOP"}):
+        scope.trigger.mode = mode
+        assert scope.trigger.mode == mode
+        assert conn.error_queue == []
+
+
+def test_mock_accepts_every_legacy_trigger_slope_the_driver_can_send():
+    scope, conn = make_scope(LEGACY_IDN)
+    for slope in sorted(sc.supported_trigger_slopes("legacy")):
+        scope.trigger.slope = slope
+        assert scope.trigger.slope == slope
+        assert conn.error_queue == []
+
+
+def test_legacy_run_sends_trig_mode_auto_without_error():
+    # run() is the OTHER call site that writes TRIG_MODE AUTO directly
+    # (scpi_commands.py's legacy "run" template), not through Trigger.mode --
+    # confirm the guard doesn't clip it.
+    scope, conn = make_scope(LEGACY_IDN)
+    scope.run()
+    assert "TRIG_MODE AUTO" in conn.writes
+    assert conn.error_queue == []
