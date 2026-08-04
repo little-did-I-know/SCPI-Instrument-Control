@@ -114,3 +114,37 @@ class TestFrozenCapabilities:
 
         with pytest.raises(dataclasses.FrozenInstanceError):
             PSU_MODEL_REGISTRY["SPD3303X"].has_ovp = True
+
+
+def test_no_model_other_than_spd3303x_ch3_restricts_any_output():
+    """Default-True flags must not have leaked a restriction into another model.
+
+    This is the most likely way this change goes wrong: a flag defaulting the
+    wrong way, or a copy-paste into the wrong registry entry, would silently
+    start raising for models nobody meant to touch.
+    """
+    from scpi_control.psu_models import PSU_MODEL_REGISTRY
+
+    for model_name, capability in PSU_MODEL_REGISTRY.items():
+        for spec in capability.output_specs:
+            restricted = not all(
+                [
+                    spec.programmable,
+                    spec.measurable,
+                    spec.switchable,
+                    spec.state_readable,
+                    spec.supports_timer,
+                    spec.supports_waveform,
+                ]
+            )
+            expected = model_name in ("SPD3303X", "SPD3303X-E") and spec.output_num == 3
+            assert restricted == expected, f"{model_name} output {spec.output_num} restriction changed unexpectedly"
+
+
+def test_generic_fallback_output_is_unrestricted():
+    from scpi_control.psu_models import create_generic_psu_capability
+
+    capability = create_generic_psu_capability("Acme,PSU-1,SN,1.0")
+    spec = capability.output_specs[0]
+    assert spec.programmable and spec.measurable and spec.switchable
+    assert spec.state_readable and spec.supports_timer and spec.supports_waveform

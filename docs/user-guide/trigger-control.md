@@ -185,6 +185,10 @@ scope.trigger.source = "EX5"   # 5V external input (if available)
         raise RuntimeError("this scope has no usable external trigger input")
     ```
 
+    `EX`/`EX5` also have a documented trigger-*level* command on legacy and
+    LeCroy dialects, but not on Tektronix — see
+    [Setting Trigger Level](#setting-trigger-level).
+
 ### Line Trigger
 
 Trigger on AC line frequency (50/60 Hz):
@@ -199,6 +203,14 @@ scope.trigger.source = "LINE"
 - Debugging AC-powered equipment
 - Viewing signals synchronized with mains frequency
 - Eliminating jitter from line-powered sources
+
+!!! note "Line trigger has no threshold to set"
+
+    `scope.trigger.level` raises `FeatureNotSupportedError` for `LINE` on
+    legacy, LeCroy, and Tektronix dialects — a mains-referenced trigger has no
+    voltage threshold. See
+    [Setting Trigger Level](#setting-trigger-level) for the full picture,
+    including modern's exception to this.
 
 ## Trigger Level and Slope
 
@@ -223,6 +235,35 @@ print(f"Current trigger level: {level}V")
 # Set level for specific channel
 scope.trigger.set_level(1, 1.0)  # Channel 1, 1V threshold
 ```
+
+!!! warning "Not every trigger source has a settable level"
+
+    `scope.trigger.level` reads or writes the threshold for the **current**
+    trigger source, and not every dialect documents a level command for every
+    source:
+
+    - **`LINE`** has no threshold on legacy, LeCroy, and Tektronix dialects —
+      a mains-referenced trigger has nothing to set. Modern's
+      `:TRIGger:EDGE:LEVel` command takes no source argument at all, so it
+      does not gate `LINE` (or anything else); reading/writing the level
+      while the source is `LINE` succeeds there but is not meaningful.
+    - **`EX`/`EX5`** (external input) work on legacy and LeCroy dialects
+      (`<trig_source>:TRig_LeVel`). Tektronix has no external-input level
+      command in the 4/5/6 MSO manual, so `EX` has no citable form there.
+
+    `scope.capabilities.trigger_level_sources` reports exactly which sources
+    have a documented level command for the connected dialect. Setting or
+    getting the level for a source outside that set now raises
+    `FeatureNotSupportedError` (also a `NotImplementedError`, so existing
+    `except NotImplementedError` handlers keep working) instead of silently
+    returning a fabricated `0.0`:
+
+    ```python
+    if "LINE" in scope.capabilities.trigger_level_sources:
+        scope.trigger.level = 0.0
+    else:
+        print("This dialect has no settable level for the current source")
+    ```
 
 ### Setting Trigger Slope
 

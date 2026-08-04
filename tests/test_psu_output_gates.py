@@ -1,11 +1,16 @@
 """SPD3303X CH3 gates (capability-honesty Task 3)."""
 
+import csv
+import sys
+from unittest.mock import patch
+
 import pytest
 
 from scpi_control import exceptions
 from scpi_control.connection.mock import MockConnection
 from scpi_control.power_supply import PowerSupply
 from scpi_control.power_supply_output import PowerSupplyOutput
+from scpi_control.psu_data_logger import PSUDataLogger
 from scpi_control.psu_models import OutputSpec
 
 SPD3303X_IDN = "Siglent Technologies,SPD3303X,SPD00001130025,1.01.01.01.02,V3.0"
@@ -160,3 +165,103 @@ class TestMockRefusesUndocumentedCh3Commands:
         # silently dropped -- CH3 is already a key in psu_outputs by
         # default, so a bypassed write would land here.
         assert get_state(conn) == pytest.approx(5.0 if "VOLT" in command else 1.0)
+
+
+class TestGuiPanelSkipsUnmeasurableOutput:
+    """psu_control.py's poll loop must consult the capability flags instead
+    of calling measure_*()/get_mode() on CH3 and swallowing the resulting
+    FeatureNotSupportedError in its blanket except (Task 8)."""
+
+    @pytest.fixture(scope="class")
+    def qapp(self):
+        pytest.importorskip("PyQt6")
+        from PyQt6.QtWidgets import QApplication
+
+        app = QApplication.instance() or QApplication(sys.argv)
+        yield app
+
+    def test_update_measurements_makes_no_measurement_call_for_ch3(self, qapp):
+        from scpi_control.gui.widgets.psu_control import PSUControl
+
+        psu, _ = make_psu()
+        panel = PSUControl()
+        panel.set_psu(psu)
+
+        with patch.object(PowerSupplyOutput, "measure_voltage", return_value=1.0) as mv, patch.object(
+            PowerSupplyOutput, "measure_current", return_value=0.5
+        ) as mi, patch.object(PowerSupplyOutput, "measure_power", return_value=0.5) as mp, patch.object(PowerSupplyOutput, "get_mode", return_value="CV") as mm:
+            panel._update_measurements()
+
+        # CH1/CH2 are measurable, so the loop must still reach them.
+        assert mv.call_count == 2
+        assert mi.call_count == 2
+        assert mp.call_count == 2
+        assert mm.call_count == 2
+
+        ch3_widgets = panel.output_widgets[3]
+        assert ch3_widgets["voltage_display"].text() == "--- V"
+        assert ch3_widgets["current_display"].text() == "--- A"
+        assert ch3_widgets["power_display"].text() == "--- W"
+        assert ch3_widgets["mode_display"].text() == "---"
+
+
+class TestDataLoggerSkipsUnmeasurableOutput:
+    """psu_data_logger.py must consult the same capability flags instead of
+    writing fabricated ERROR rows for CH3's blanket-except failures (Task 8)."""
+
+    def test_ch3_columns_are_empty_not_error(self, tmp_path):
+        psu, _ = make_psu()
+        path = tmp_path / "psu_log.csv"
+        with patch.object(PowerSupplyOutput, "measure_voltage", return_value=1.0), patch.object(
+            PowerSupplyOutput, "measure_current", return_value=0.5
+        ), patch.object(PowerSupplyOutput, "measure_power", return_value=0.5), patch.object(PowerSupplyOutput, "get_mode", return_value="CV"):
+            data_logger = PSUDataLogger(psu, str(path))
+            data_logger.start()
+            data_logger.log_measurement()
+            data_logger.stop()
+
+        with open(path, newline="") as f:
+            rows = list(csv.reader(f))
+
+        header, row = rows[0], rows[1]
+        ch3_start = header.index("output3_voltage_V")
+        ch3_fields = row[ch3_start : ch3_start + 5]
+        assert ch3_fields == ["", "", "", "", ""]
+        assert "ERROR" not in row
+
+        # CH1/CH2 are unaffected -- still real measurements, positionally
+        # stable columns.
+        ch1_start = header.index("output1_voltage_V")
+        assert row[ch1_start : ch1_start + 5] == ["1.000000", "0.500000", "0.500000", "CV", "False"]
+
+    def test_columns_stay_positionally_stable_with_ch3_present(self, tmp_path):
+        # The header must still list all five CH3 columns even though they
+        # will always be blank -- dropping columns would shift CH1/CH2 out of
+        # position for any consumer indexing by column number.
+        psu, _ = make_psu()
+        path = tmp_path / "psu_log.csv"
+        data_logger = PSUDataLogger(psu, str(path))
+        data_logger.start()
+        data_logger.stop()
+
+        with open(path, newline="") as f:
+            header = next(csv.reader(f))
+
+        assert header == [
+            "timestamp",
+            "output1_voltage_V",
+            "output1_current_A",
+            "output1_power_W",
+            "output1_mode",
+            "output1_enabled",
+            "output2_voltage_V",
+            "output2_current_A",
+            "output2_power_W",
+            "output2_mode",
+            "output2_enabled",
+            "output3_voltage_V",
+            "output3_current_A",
+            "output3_power_W",
+            "output3_mode",
+            "output3_enabled",
+        ]
