@@ -1104,7 +1104,7 @@ def supported_trigger_sources(dialect: str) -> frozenset:
 #           <trig_source> = {C1, C2, C3, C4, EX, EX5}. No LINE: a line trigger
 #           has no threshold to set.
 #   lecroy  same flat TRLV form, cited MAUI p.7-33 on the command template.
-#   modern  EN11G p.493 -- :TRIGger:EDGE:LEVel takes NO source argument, so
+#   modern  EN11G p.492 -- :TRIGger:EDGE:LEVel takes NO source argument, so
 #           every source is listed; restricting it would invent a limit.
 #   tek     TRIGger:A:LEVel:CH<x> only (also :D<x>/:MATH/:REF<x>); the 4/5/6
 #           MSO manual documents no AUX form, so the external input has no
