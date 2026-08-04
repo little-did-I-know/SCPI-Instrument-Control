@@ -1,4 +1,4 @@
-"""Model capability definitions for SCPI-controlled power supplies.
+﻿"""Model capability definitions for SCPI-controlled power supplies.
 
 Supports generic SCPI-99 power supplies and Siglent SPD series models.
 """
@@ -11,23 +11,37 @@ from typing import List, Optional
 logger = logging.getLogger(__name__)
 
 
-@dataclass
+@dataclass(frozen=True)
 class OutputSpec:
-    """Specification for a single power supply output."""
+    """Specification for a single power supply output.
 
-    output_num: int  # Output number (1, 2, 3, etc.)
+    The six capability flags record what the model's programming manual
+    documents for THIS output. They all default True, so every model that
+    does not set them keeps its existing behaviour; only an output the
+    manual restricts sets one False. Frozen because PowerSupply.capabilities
+    hands back the shared registry object: a caller flipping a flag would
+    change behaviour for every instance in the process.
+    """
+
+    output_num: int  # Output number (1, 2, etc.)
     max_voltage: float  # Maximum voltage in volts
     max_current: float  # Maximum current in amps
     max_power: float  # Maximum power in watts
     voltage_resolution: float  # Voltage resolution in volts
     current_resolution: float  # Current resolution in amps
+    programmable: bool = True  # Voltage/current setpoints can be set and queried
+    measurable: bool = True  # MEASure: voltage/current/power, and CV/CC mode
+    switchable: bool = True  # Output can be turned on/off
+    state_readable: bool = True  # Output on/off state can be read back
+    supports_timer: bool = True  # Timer subsystem covers this output
+    supports_waveform: bool = True  # Waveform display covers this output
 
     def __str__(self) -> str:
         """String representation of output spec."""
         return f"Output{self.output_num}: {self.max_voltage}V/{self.max_current}A ({self.max_power}W)"
 
 
-@dataclass
+@dataclass(frozen=True)
 class PSUCapability:
     """Defines capabilities and features for a specific power supply model.
 
@@ -62,7 +76,29 @@ PSU_MODEL_REGISTRY = {
         output_specs=[
             OutputSpec(1, 30.0, 3.0, 90.0, 0.001, 0.001),
             OutputSpec(2, 30.0, 3.0, 90.0, 0.001, 0.001),
-            OutputSpec(3, 5.0, 3.0, 15.0, 0.01, 0.001),  # Fixed 5V output
+            # CH3 is the DIP-switch-selected fixed rail (2.5V/3.3V/5V, 3.2A --
+            # QS0503X-E01B p.21). There is no SCPI path to its setpoints:
+            # VOLTage/CURRent are [{CH1|CH2}:] only (p.39), MEASure is
+            # [{CH1|CH2}] only (p.38), TIMEr is {CH1|CH2} (p.41) and
+            # OUTPut:WAVE is {CH1|CH2} (p.40). p.42's SYSTem:STATus? bit table
+            # defines CH1/CH2 CV/CC and on/off bits only -- there is no CH3
+            # state bit, which is why reading output3.enabled used to hang.
+            # OUTPut {CH1|CH2|CH3},{ON|OFF} (p.40) DOES cover CH3, so it stays
+            # switchable.
+            OutputSpec(
+                3,
+                5.0,
+                3.0,
+                15.0,
+                0.01,
+                0.001,
+                programmable=False,
+                measurable=False,
+                switchable=True,
+                state_readable=False,
+                supports_timer=False,
+                supports_waveform=False,
+            ),
         ],
         # QS0503X-E01B p.36 lists the full SPD3303X command set; it has no
         # protection subsystem, so OVP/OCP calls never armed anything on
@@ -82,7 +118,29 @@ PSU_MODEL_REGISTRY = {
         output_specs=[
             OutputSpec(1, 30.0, 3.0, 90.0, 0.001, 0.001),
             OutputSpec(2, 30.0, 3.0, 90.0, 0.001, 0.001),
-            OutputSpec(3, 5.0, 3.0, 15.0, 0.01, 0.001),
+            # CH3 is the DIP-switch-selected fixed rail (2.5V/3.3V/5V, 3.2A --
+            # QS0503X-E01B p.21). There is no SCPI path to its setpoints:
+            # VOLTage/CURRent are [{CH1|CH2}:] only (p.39), MEASure is
+            # [{CH1|CH2}] only (p.38), TIMEr is {CH1|CH2} (p.41) and
+            # OUTPut:WAVE is {CH1|CH2} (p.40). p.42's SYSTem:STATus? bit table
+            # defines CH1/CH2 CV/CC and on/off bits only -- there is no CH3
+            # state bit, which is why reading output3.enabled used to hang.
+            # OUTPut {CH1|CH2|CH3},{ON|OFF} (p.40) DOES cover CH3, so it stays
+            # switchable.
+            OutputSpec(
+                3,
+                5.0,
+                3.0,
+                15.0,
+                0.01,
+                0.001,
+                programmable=False,
+                measurable=False,
+                switchable=True,
+                state_readable=False,
+                supports_timer=False,
+                supports_waveform=False,
+            ),
         ],
         # QS0503X-E01B p.36 lists the full SPD3303X command set; it has no
         # protection subsystem, so OVP/OCP calls never armed anything on

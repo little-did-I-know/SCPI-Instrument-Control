@@ -1,5 +1,6 @@
-"""PSU capabilities and tracking vocabulary (typed-instrument-api Task 7)."""
+﻿"""PSU capabilities and tracking vocabulary (typed-instrument-api Task 7)."""
 
+import dataclasses
 import pytest
 
 from scpi_control import exceptions
@@ -63,3 +64,53 @@ class TestTrackingVocabulary:
         assert isinstance(exc_info.value, exceptions.InvalidParameterError)
         assert exc_info.value.parameter == "tracking mode"
         assert exc_info.value.model == "SPD3303X"
+
+
+class TestOutputCapabilityFlags:
+    def test_flags_default_to_true_so_existing_models_are_unchanged(self):
+        from scpi_control.psu_models import OutputSpec
+
+        spec = OutputSpec(1, 30.0, 3.0, 90.0, 0.001, 0.001)
+        assert spec.programmable and spec.measurable and spec.switchable
+        assert spec.state_readable and spec.supports_timer and spec.supports_waveform
+
+    def test_spd3303x_ch3_is_switchable_but_nothing_else(self):
+        from scpi_control.psu_models import PSU_MODEL_REGISTRY
+
+        # QS0503X-E01B: OUTPut {CH1|CH2|CH3} p.40 -- CH3 IS switchable.
+        # VOLTage/CURRent p.39, MEASure p.38, TIMEr p.41, OUTPut:WAVE p.40 are
+        # all CH1|CH2 only, and p.42's status bitmap has no CH3 state bit.
+        for model in ("SPD3303X", "SPD3303X-E"):
+            ch3 = PSU_MODEL_REGISTRY[model].output_specs[2]
+            assert ch3.output_num == 3
+            assert ch3.switchable is True
+            assert ch3.programmable is False
+            assert ch3.measurable is False
+            assert ch3.state_readable is False
+            assert ch3.supports_timer is False
+            assert ch3.supports_waveform is False
+
+    def test_ch1_and_ch2_keep_every_capability(self):
+        from scpi_control.psu_models import PSU_MODEL_REGISTRY
+
+        for model in ("SPD3303X", "SPD3303X-E"):
+            for index in (0, 1):
+                spec = PSU_MODEL_REGISTRY[model].output_specs[index]
+                assert spec.programmable and spec.measurable and spec.switchable
+                assert spec.state_readable and spec.supports_timer and spec.supports_waveform
+
+
+class TestFrozenCapabilities:
+    def test_output_spec_rejects_mutation(self):
+        from scpi_control.psu_models import PSU_MODEL_REGISTRY
+
+        # psu.capabilities hands back the shared registry singleton; a caller
+        # flipping a flag would re-enable the silent no-op process-wide.
+        with pytest.raises(dataclasses.FrozenInstanceError):
+            PSU_MODEL_REGISTRY["SPD3303X"].output_specs[2].programmable = True
+
+    def test_psu_capability_rejects_mutation(self):
+        from scpi_control.psu_models import PSU_MODEL_REGISTRY
+
+        with pytest.raises(dataclasses.FrozenInstanceError):
+            PSU_MODEL_REGISTRY["SPD3303X"].has_ovp = True
