@@ -12,13 +12,13 @@
         <meta name="author" content="Robin Mumm">
       
       
-        <link rel="canonical" href="https://little-did-I-know.github.io/SCPI-Instrument-Control/development/PROJECT_STRUCTURE/">
+        <link rel="canonical" href="https://little-did-I-know.github.io/SCPI-Instrument-Control/api/vocabulary/">
       
       
-        <link rel="prev" href="../EXPERIMENTAL_FEATURES/">
+        <link rel="prev" href="../oscilloscope/">
       
       
-        <link rel="next" href="../../about/changelog/">
+        <link rel="next" href="../capabilities/">
       
       
         
@@ -29,7 +29,7 @@
     
     
       
-        <title>Detailed Project Structure - SCPI Instrument Control</title>
+        <title>Vocabulary - SCPI Instrument Control</title>
       
     
     
@@ -82,7 +82,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#project-structure" class="md-skip">
+        <a href="#vocabulary" class="md-skip">
           Skip to content
         </a>
       
@@ -122,7 +122,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Detailed Project Structure
+              Vocabulary
             
           </span>
         </div>
@@ -346,11 +346,13 @@
   
   
   
+    
+  
   
     
     
-      <li class="md-tabs__item">
-        <a href="../../api/oscilloscope/" class="md-tabs__link">
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../oscilloscope/" class="md-tabs__link">
           
   
   
@@ -386,13 +388,11 @@
   
   
   
-    
-  
   
     
     
-      <li class="md-tabs__item md-tabs__item--active">
-        <a href="../contributing/" class="md-tabs__link">
+      <li class="md-tabs__item">
+        <a href="../../development/contributing/" class="md-tabs__link">
           
   
   
@@ -1623,28 +1623,31 @@
       
   
   
+    
   
   
+  
     
     
     
     
+      
+        
+        
       
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
       
         
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" checked>
         
           
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
-        
-          
-          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="">
             
   
   
@@ -1662,7 +1665,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_7">
             <span class="md-nav__icon md-icon"></span>
             
@@ -1680,7 +1683,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/oscilloscope/" class="md-nav__link">
+      <a href="../oscilloscope/" class="md-nav__link">
         
   
   
@@ -1705,10 +1708,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../../api/vocabulary/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Vocabulary
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -1724,6 +1754,81 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#scpi_control.vocabulary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-module"></code>&nbsp;vocabulary
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#scpi_control.vocabulary.Coupling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;Coupling
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#scpi_control.vocabulary.TriggerType" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;TriggerType
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#scpi_control.vocabulary.normalize_token" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;normalize_token
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#see-also" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        See Also
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -1736,7 +1841,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/capabilities/" class="md-nav__link">
+      <a href="../capabilities/" class="md-nav__link">
         
   
   
@@ -1764,7 +1869,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/channel/" class="md-nav__link">
+      <a href="../channel/" class="md-nav__link">
         
   
   
@@ -1792,7 +1897,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/trigger/" class="md-nav__link">
+      <a href="../trigger/" class="md-nav__link">
         
   
   
@@ -1820,7 +1925,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/waveform/" class="md-nav__link">
+      <a href="../waveform/" class="md-nav__link">
         
   
   
@@ -1848,7 +1953,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/signal_synth/" class="md-nav__link">
+      <a href="../signal_synth/" class="md-nav__link">
         
   
   
@@ -1876,7 +1981,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/waveform_io/" class="md-nav__link">
+      <a href="../waveform_io/" class="md-nav__link">
         
   
   
@@ -1904,7 +2009,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/comparison/" class="md-nav__link">
+      <a href="../comparison/" class="md-nav__link">
         
   
   
@@ -1932,7 +2037,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/provenance/" class="md-nav__link">
+      <a href="../provenance/" class="md-nav__link">
         
   
   
@@ -1960,7 +2065,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/scpi_extract/" class="md-nav__link">
+      <a href="../scpi_extract/" class="md-nav__link">
         
   
   
@@ -1988,7 +2093,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/measurement/" class="md-nav__link">
+      <a href="../measurement/" class="md-nav__link">
         
   
   
@@ -2016,7 +2121,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/analysis/" class="md-nav__link">
+      <a href="../analysis/" class="md-nav__link">
         
   
   
@@ -2044,7 +2149,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/automation/" class="md-nav__link">
+      <a href="../automation/" class="md-nav__link">
         
   
   
@@ -2072,7 +2177,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/connection_socket/" class="md-nav__link">
+      <a href="../connection_socket/" class="md-nav__link">
         
   
   
@@ -2100,7 +2205,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/exceptions/" class="md-nav__link">
+      <a href="../exceptions/" class="md-nav__link">
         
   
   
@@ -2128,7 +2233,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/models/" class="md-nav__link">
+      <a href="../models/" class="md-nav__link">
         
   
   
@@ -2156,7 +2261,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/vector_graphics/" class="md-nav__link">
+      <a href="../vector_graphics/" class="md-nav__link">
         
   
   
@@ -2184,7 +2289,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/screen_capture/" class="md-nav__link">
+      <a href="../screen_capture/" class="md-nav__link">
         
   
   
@@ -2212,7 +2317,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/reference_waveform/" class="md-nav__link">
+      <a href="../reference_waveform/" class="md-nav__link">
         
   
   
@@ -2240,7 +2345,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/math_channel/" class="md-nav__link">
+      <a href="../math_channel/" class="md-nav__link">
         
   
   
@@ -2268,7 +2373,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/function_generator/" class="md-nav__link">
+      <a href="../function_generator/" class="md-nav__link">
         
   
   
@@ -2296,7 +2401,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/awg_output/" class="md-nav__link">
+      <a href="../awg_output/" class="md-nav__link">
         
   
   
@@ -2324,7 +2429,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/power_supply/" class="md-nav__link">
+      <a href="../power_supply/" class="md-nav__link">
         
   
   
@@ -2352,7 +2457,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/power_supply_output/" class="md-nav__link">
+      <a href="../power_supply_output/" class="md-nav__link">
         
   
   
@@ -2380,7 +2485,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/data_logger/" class="md-nav__link">
+      <a href="../data_logger/" class="md-nav__link">
         
   
   
@@ -2408,7 +2513,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/psu_data_logger/" class="md-nav__link">
+      <a href="../psu_data_logger/" class="md-nav__link">
         
   
   
@@ -2436,7 +2541,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/protocol_decode/" class="md-nav__link">
+      <a href="../protocol_decode/" class="md-nav__link">
         
   
   
@@ -2470,10 +2575,13 @@
       
       
         
+          
+          
+        
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
       
         
         
@@ -2482,7 +2590,7 @@
         <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_29" >
         
           
-          <label class="md-nav__link" for="__nav_7_29" id="__nav_7_29_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_7_29" id="__nav_7_29_label" tabindex="">
             
   
   
@@ -2518,7 +2626,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/server_sessions/" class="md-nav__link">
+      <a href="../server_sessions/" class="md-nav__link">
         
   
   
@@ -2546,7 +2654,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/server_recorder/" class="md-nav__link">
+      <a href="../server_recorder/" class="md-nav__link">
         
   
   
@@ -2574,7 +2682,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/server_compute/" class="md-nav__link">
+      <a href="../server_compute/" class="md-nav__link">
         
   
   
@@ -2602,7 +2710,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/server_discovery/" class="md-nav__link">
+      <a href="../server_discovery/" class="md-nav__link">
         
   
   
@@ -2638,7 +2746,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/gui/" class="md-nav__link">
+      <a href="../gui/" class="md-nav__link">
         
   
   
@@ -2815,31 +2923,28 @@
       
   
   
-    
   
   
-  
     
     
     
     
-      
-        
-        
       
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" checked>
         
           
-          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="">
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
             
   
   
@@ -2857,7 +2962,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_9">
             <span class="md-nav__icon md-icon"></span>
             
@@ -2875,7 +2980,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../contributing/" class="md-nav__link">
+      <a href="../../development/contributing/" class="md-nav__link">
         
   
   
@@ -2903,7 +3008,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../building/" class="md-nav__link">
+      <a href="../../development/building/" class="md-nav__link">
         
   
   
@@ -2931,7 +3036,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../structure/" class="md-nav__link">
+      <a href="../../development/structure/" class="md-nav__link">
         
   
   
@@ -2959,7 +3064,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../testing/" class="md-nav__link">
+      <a href="../../development/testing/" class="md-nav__link">
         
   
   
@@ -2984,31 +3089,28 @@
                 
   
   
-    
   
   
-  
     
     
     
     
       
       
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
         
           
-          
         
-      
-    
-    
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
-      
-        
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9_5" checked>
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_9_5" >
         
           
-          <label class="md-nav__link" for="__nav_9_5" id="__nav_9_5_label" tabindex="">
+          <label class="md-nav__link" for="__nav_9_5" id="__nav_9_5_label" tabindex="0">
             
   
   
@@ -3026,7 +3128,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_9_5_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_9_5_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_9_5">
             <span class="md-nav__icon md-icon"></span>
             
@@ -3044,7 +3146,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../PRE_COMMIT_CHECKS/" class="md-nav__link">
+      <a href="../../development/PRE_COMMIT_CHECKS/" class="md-nav__link">
         
   
   
@@ -3072,7 +3174,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../BUILDING_EXECUTABLES/" class="md-nav__link">
+      <a href="../../development/BUILDING_EXECUTABLES/" class="md-nav__link">
         
   
   
@@ -3100,7 +3202,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../CODE_SIGNING/" class="md-nav__link">
+      <a href="../../development/CODE_SIGNING/" class="md-nav__link">
         
   
   
@@ -3128,7 +3230,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../ICON_SETUP/" class="md-nav__link">
+      <a href="../../development/ICON_SETUP/" class="md-nav__link">
         
   
   
@@ -3156,7 +3258,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../PYPI_DEPLOYMENT/" class="md-nav__link">
+      <a href="../../development/PYPI_DEPLOYMENT/" class="md-nav__link">
         
   
   
@@ -3184,7 +3286,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../VERSION_BUMPING/" class="md-nav__link">
+      <a href="../../development/VERSION_BUMPING/" class="md-nav__link">
         
   
   
@@ -3212,7 +3314,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../TESTING_BUILD_WORKFLOW/" class="md-nav__link">
+      <a href="../../development/TESTING_BUILD_WORKFLOW/" class="md-nav__link">
         
   
   
@@ -3240,7 +3342,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../EXPERIMENTAL_FEATURES/" class="md-nav__link">
+      <a href="../../development/EXPERIMENTAL_FEATURES/" class="md-nav__link">
         
   
   
@@ -3265,37 +3367,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Detailed Project Structure
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../../development/PROJECT_STRUCTURE/" class="md-nav__link">
         
   
   
@@ -3311,259 +3386,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#directory-layout" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Directory Layout
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#what-gets-installed" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        What Gets Installed
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#directory-purposes" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Directory Purposes
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Directory Purposes">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#siglent" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        siglent/
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#tests" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        tests/
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#scripts" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        scripts/
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#docs" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        docs/
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#examples" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        examples/
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#build-artifacts" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Build Artifacts
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Build Artifacts">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#dist" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        dist/
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#siglent_oscilloscopeegg-info" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Siglent_Oscilloscope.egg-info/
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#version-control" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Version Control
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Version Control">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#gitignore" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        .gitignore
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#git" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        .git/
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#package-configuration" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Package Configuration
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Package Configuration">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#pyprojecttoml" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        pyproject.toml
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#manifestin" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        MANIFEST.in
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#development-workflow" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Development Workflow
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#migration-from-old-structure" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Migration from Old Structure
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -3756,10 +3578,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#directory-layout" class="md-nav__link">
+  <a href="#scpi_control.vocabulary" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Directory Layout
+        <code class="doc-symbol doc-symbol-toc doc-symbol-module"></code>&nbsp;vocabulary
       
     </span>
   </a>
@@ -3767,10 +3589,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#what-gets-installed" class="md-nav__link">
+  <a href="#scpi_control.vocabulary.Coupling" class="md-nav__link">
     <span class="md-ellipsis">
       
-        What Gets Installed
+        <code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;Coupling
       
     </span>
   </a>
@@ -3778,199 +3600,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#directory-purposes" class="md-nav__link">
+  <a href="#scpi_control.vocabulary.TriggerType" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Directory Purposes
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Directory Purposes">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#siglent" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        siglent/
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#tests" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        tests/
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#scripts" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        scripts/
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#docs" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        docs/
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#examples" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        examples/
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#build-artifacts" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Build Artifacts
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Build Artifacts">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#dist" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        dist/
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#siglent_oscilloscopeegg-info" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Siglent_Oscilloscope.egg-info/
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#version-control" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Version Control
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Version Control">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#gitignore" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        .gitignore
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#git" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        .git/
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#package-configuration" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Package Configuration
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Package Configuration">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#pyprojecttoml" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        pyproject.toml
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#manifestin" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        MANIFEST.in
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#development-workflow" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Development Workflow
+        <code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;TriggerType
       
     </span>
   </a>
@@ -3978,10 +3611,21 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#migration-from-old-structure" class="md-nav__link">
+  <a href="#scpi_control.vocabulary.normalize_token" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Migration from Old Structure
+        <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;normalize_token
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#see-also" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        See Also
       
     </span>
   </a>
@@ -4008,199 +3652,234 @@
   
 
 
-<h1 id="project-structure">Project Structure<a class="headerlink" href="#project-structure" title="Permanent link">&para;</a></h1>
-<p>This document describes the organization of the SCPI Instrument Control project.</p>
-<h2 id="directory-layout">Directory Layout<a class="headerlink" href="#directory-layout" title="Permanent link">&para;</a></h2>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>Siglent/
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>├── siglent/                 # Main package (installed)
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>│   ├── __init__.py
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>│   ├── oscilloscope.py     # Main API
-</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>│   ├── channel.py          # Channel control
-</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>│   ├── trigger.py          # Trigger settings
-</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>│   ├── waveform.py         # Waveform data structures
-</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>│   ├── measurement.py      # Measurement functions
-</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>│   ├── connection/         # Connection backends
-</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>│   ├── gui/                # GUI application
-</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>│   └── protocol_decoders/  # Protocol decoders
-</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>│
-</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>├── tests/                   # Test suite (not installed)
-</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>│   ├── test_imports.py
-</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>│   ├── test_gui_initialization.py
-</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>│   ├── test_protocol_decoders.py
-</span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>│   └── ...
-</span><span id="__span-0-18"><a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>│
-</span><span id="__span-0-19"><a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a>├── scripts/                 # Development utilities (not installed)
-</span><span id="__span-0-20"><a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a>│   ├── run_debug.py        # Debug GUI launcher
-</span><span id="__span-0-21"><a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a>│   ├── run_debug.bat       # Windows launcher
-</span><span id="__span-0-22"><a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a>│   └── capture_screenshots.py
-</span><span id="__span-0-23"><a id="__codelineno-0-23" name="__codelineno-0-23" href="#__codelineno-0-23"></a>│
-</span><span id="__span-0-24"><a id="__codelineno-0-24" name="__codelineno-0-24" href="#__codelineno-0-24"></a>├── docs/                    # Documentation
-</span><span id="__span-0-25"><a id="__codelineno-0-25" name="__codelineno-0-25" href="#__codelineno-0-25"></a>│   ├── images/             # Screenshots (installed)
-</span><span id="__span-0-26"><a id="__codelineno-0-26" name="__codelineno-0-26" href="#__codelineno-0-26"></a>│   ├── development/        # Dev docs (not installed)
-</span><span id="__span-0-27"><a id="__codelineno-0-27" name="__codelineno-0-27" href="#__codelineno-0-27"></a>│   │   ├── PYPI_DEPLOYMENT.md
-</span><span id="__span-0-28"><a id="__codelineno-0-28" name="__codelineno-0-28" href="#__codelineno-0-28"></a>│   │   └── PROJECT_STRUCTURE.md
-</span><span id="__span-0-29"><a id="__codelineno-0-29" name="__codelineno-0-29" href="#__codelineno-0-29"></a>│   ├── SCREENSHOT_GUIDE.md     # Development guide
-</span><span id="__span-0-30"><a id="__codelineno-0-30" name="__codelineno-0-30" href="#__codelineno-0-30"></a>│   └── SDS800XHD_Series_ProgrammingGuide_EN11G.pdf  # Scope manual
-</span><span id="__span-0-31"><a id="__codelineno-0-31" name="__codelineno-0-31" href="#__codelineno-0-31"></a>│
-</span><span id="__span-0-32"><a id="__codelineno-0-32" name="__codelineno-0-32" href="#__codelineno-0-32"></a>├── examples/                # Example scripts (installed)
-</span><span id="__span-0-33"><a id="__codelineno-0-33" name="__codelineno-0-33" href="#__codelineno-0-33"></a>│   ├── basic_usage.py
-</span><span id="__span-0-34"><a id="__codelineno-0-34" name="__codelineno-0-34" href="#__codelineno-0-34"></a>│   ├── measurements.py
-</span><span id="__span-0-35"><a id="__codelineno-0-35" name="__codelineno-0-35" href="#__codelineno-0-35"></a>│   ├── live_plot.py
-</span><span id="__span-0-36"><a id="__codelineno-0-36" name="__codelineno-0-36" href="#__codelineno-0-36"></a>│   └── ...
-</span><span id="__span-0-37"><a id="__codelineno-0-37" name="__codelineno-0-37" href="#__codelineno-0-37"></a>│
-</span><span id="__span-0-38"><a id="__codelineno-0-38" name="__codelineno-0-38" href="#__codelineno-0-38"></a>├── dist/                    # Built packages (git ignored)
-</span><span id="__span-0-39"><a id="__codelineno-0-39" name="__codelineno-0-39" href="#__codelineno-0-39"></a>│   ├── siglent_oscilloscope-0.2.0.tar.gz
-</span><span id="__span-0-40"><a id="__codelineno-0-40" name="__codelineno-0-40" href="#__codelineno-0-40"></a>│   └── siglent_oscilloscope-0.2.0-py3-none-any.whl
-</span><span id="__span-0-41"><a id="__codelineno-0-41" name="__codelineno-0-41" href="#__codelineno-0-41"></a>│
-</span><span id="__span-0-42"><a id="__codelineno-0-42" name="__codelineno-0-42" href="#__codelineno-0-42"></a>├── README.md                # Main documentation (installed)
-</span><span id="__span-0-43"><a id="__codelineno-0-43" name="__codelineno-0-43" href="#__codelineno-0-43"></a>├── CHANGELOG.md             # Version history (installed)
-</span><span id="__span-0-44"><a id="__codelineno-0-44" name="__codelineno-0-44" href="#__codelineno-0-44"></a>├── LICENSE                  # MIT license (installed)
-</span><span id="__span-0-45"><a id="__codelineno-0-45" name="__codelineno-0-45" href="#__codelineno-0-45"></a>├── pyproject.toml           # Package metadata
-</span><span id="__span-0-46"><a id="__codelineno-0-46" name="__codelineno-0-46" href="#__codelineno-0-46"></a>└── MANIFEST.in              # Package inclusion rules
+<h1 id="vocabulary">Vocabulary<a class="headerlink" href="#vocabulary" title="Permanent link">&para;</a></h1>
+<p>String-compatible enums for token-valued parameters (coupling, trigger mode/slope/source/coupling/type, bandwidth limit, tracking mode) -- enums in, strings out</p>
+
+
+<div class="doc doc-object doc-module">
+
+
+
+<a id="scpi_control.vocabulary"></a>
+    <div class="doc doc-contents first">
+
+        <p>Public, string-compatible vocabulary for token-valued instrument parameters.</p>
+<p>Every enum subclasses (str, Enum) with name == value, so members compare and
+hash equal to the plain canonical strings the API has always spoken:
+Coupling.DC == "DC". Setters accept either form; getters keep returning plain
+strings (spec: "enums in, strings out").</p>
+<p>This module is deliberately leaf-level: it imports nothing from the driver or
+command-table modules, so those can import it without cycles. Which tokens a
+CONNECTED dialect supports is the command layer's knowledge (scpi_commands.py
+token maps); the enums here are the union vocabulary.</p>
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="scpi_control.vocabulary.Coupling" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>            <span class="doc doc-object-name doc-class-name">Coupling</span>
+
+
+<a href="#scpi_control.vocabulary.Coupling" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="str">str</span></code>, <code><span title="enum.Enum">Enum</span></code></p>
+
+
+
+        <p>Channel coupling. Wire mapping is per-dialect (legacy speaks D1M/A1M).</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="scpi_control.vocabulary.TriggerType" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>            <span class="doc doc-object-name doc-class-name">TriggerType</span>
+
+
+<a href="#scpi_control.vocabulary.TriggerType" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="str">str</span></code>, <code><span title="enum.Enum">Enum</span></code></p>
+
+
+
+        <p>Public trigger-type vocabulary (MAUI-descended naming: SLEW = slope
+trigger, GLIT = pulse/glitch trigger).</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="scpi_control.vocabulary.normalize_token" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <span class="doc doc-object-name doc-function-name">normalize_token</span>
+
+
+<a href="#scpi_control.vocabulary.normalize_token" class="headerlink" title="Permanent link">&para;</a></h2>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">normalize_token</span><span class="p">(</span><span class="n">value</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Enum</span><span class="p">],</span> <span class="o">*</span><span class="p">,</span> <span class="n">parameter</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">valid</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span> <span class="n">aliases</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">dialect</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">model</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span>
 </span></code></pre></div>
-<h2 id="what-gets-installed">What Gets Installed<a class="headerlink" href="#what-gets-installed" title="Permanent link">&para;</a></h2>
-<p>When users install the package via <code>pip install SCPI-Instrument-Control</code>, they get:</p>
-<p><strong>Code:</strong></p>
+
+    <div class="doc doc-contents ">
+
+        <p>Uppercase, alias-fold, and validate a token; return the canonical string.</p>
+<p>Raises InvalidParameterError (also a ValueError) carrying the parameter
+name, the offending value, and the valid options for THIS instrument.</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>scpi_control/vocabulary.py</code></summary>
+              <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-93"> 93</a></span>
+<span class="normal"><a href="#__codelineno-0-94"> 94</a></span>
+<span class="normal"><a href="#__codelineno-0-95"> 95</a></span>
+<span class="normal"><a href="#__codelineno-0-96"> 96</a></span>
+<span class="normal"><a href="#__codelineno-0-97"> 97</a></span>
+<span class="normal"><a href="#__codelineno-0-98"> 98</a></span>
+<span class="normal"><a href="#__codelineno-0-99"> 99</a></span>
+<span class="normal"><a href="#__codelineno-0-100">100</a></span>
+<span class="normal"><a href="#__codelineno-0-101">101</a></span>
+<span class="normal"><a href="#__codelineno-0-102">102</a></span>
+<span class="normal"><a href="#__codelineno-0-103">103</a></span>
+<span class="normal"><a href="#__codelineno-0-104">104</a></span>
+<span class="normal"><a href="#__codelineno-0-105">105</a></span>
+<span class="normal"><a href="#__codelineno-0-106">106</a></span>
+<span class="normal"><a href="#__codelineno-0-107">107</a></span>
+<span class="normal"><a href="#__codelineno-0-108">108</a></span>
+<span class="normal"><a href="#__codelineno-0-109">109</a></span>
+<span class="normal"><a href="#__codelineno-0-110">110</a></span>
+<span class="normal"><a href="#__codelineno-0-111">111</a></span>
+<span class="normal"><a href="#__codelineno-0-112">112</a></span>
+<span class="normal"><a href="#__codelineno-0-113">113</a></span>
+<span class="normal"><a href="#__codelineno-0-114">114</a></span>
+<span class="normal"><a href="#__codelineno-0-115">115</a></span>
+<span class="normal"><a href="#__codelineno-0-116">116</a></span>
+<span class="normal"><a href="#__codelineno-0-117">117</a></span>
+<span class="normal"><a href="#__codelineno-0-118">118</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-93"><a id="__codelineno-0-93" name="__codelineno-0-93"></a><span class="k">def</span><span class="w"> </span><span class="nf">normalize_token</span><span class="p">(</span>
+</span><span id="__span-0-94"><a id="__codelineno-0-94" name="__codelineno-0-94"></a>    <span class="n">value</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Enum</span><span class="p">],</span>
+</span><span id="__span-0-95"><a id="__codelineno-0-95" name="__codelineno-0-95"></a>    <span class="o">*</span><span class="p">,</span>
+</span><span id="__span-0-96"><a id="__codelineno-0-96" name="__codelineno-0-96"></a>    <span class="n">parameter</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+</span><span id="__span-0-97"><a id="__codelineno-0-97" name="__codelineno-0-97"></a>    <span class="n">valid</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span>
+</span><span id="__span-0-98"><a id="__codelineno-0-98" name="__codelineno-0-98"></a>    <span class="n">aliases</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-99"><a id="__codelineno-0-99" name="__codelineno-0-99"></a>    <span class="n">dialect</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-100"><a id="__codelineno-0-100" name="__codelineno-0-100"></a>    <span class="n">model</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-101"><a id="__codelineno-0-101" name="__codelineno-0-101"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+</span><span id="__span-0-102"><a id="__codelineno-0-102" name="__codelineno-0-102"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Uppercase, alias-fold, and validate a token; return the canonical string.</span>
+</span><span id="__span-0-103"><a id="__codelineno-0-103" name="__codelineno-0-103"></a>
+</span><span id="__span-0-104"><a id="__codelineno-0-104" name="__codelineno-0-104"></a><span class="sd">    Raises InvalidParameterError (also a ValueError) carrying the parameter</span>
+</span><span id="__span-0-105"><a id="__codelineno-0-105" name="__codelineno-0-105"></a><span class="sd">    name, the offending value, and the valid options for THIS instrument.</span>
+</span><span id="__span-0-106"><a id="__codelineno-0-106" name="__codelineno-0-106"></a><span class="sd">    &quot;&quot;&quot;</span>
+</span><span id="__span-0-107"><a id="__codelineno-0-107" name="__codelineno-0-107"></a>    <span class="c1"># Unwrap enum members explicitly: on Python &lt; 3.12, str() of a (str, Enum)</span>
+</span><span id="__span-0-108"><a id="__codelineno-0-108" name="__codelineno-0-108"></a>    <span class="c1"># member is &quot;Coupling.DC&quot;, not &quot;DC&quot; -- .value is the canonical string.</span>
+</span><span id="__span-0-109"><a id="__codelineno-0-109" name="__codelineno-0-109"></a>    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">Enum</span><span class="p">):</span>
+</span><span id="__span-0-110"><a id="__codelineno-0-110" name="__codelineno-0-110"></a>        <span class="n">value</span> <span class="o">=</span> <span class="n">value</span><span class="o">.</span><span class="n">value</span>
+</span><span id="__span-0-111"><a id="__codelineno-0-111" name="__codelineno-0-111"></a>    <span class="n">original</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+</span><span id="__span-0-112"><a id="__codelineno-0-112" name="__codelineno-0-112"></a>    <span class="n">token</span> <span class="o">=</span> <span class="n">original</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span><span class="o">.</span><span class="n">upper</span><span class="p">()</span>
+</span><span id="__span-0-113"><a id="__codelineno-0-113" name="__codelineno-0-113"></a>    <span class="k">if</span> <span class="n">aliases</span><span class="p">:</span>
+</span><span id="__span-0-114"><a id="__codelineno-0-114" name="__codelineno-0-114"></a>        <span class="n">token</span> <span class="o">=</span> <span class="n">aliases</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">token</span><span class="p">,</span> <span class="n">token</span><span class="p">)</span>
+</span><span id="__span-0-115"><a id="__codelineno-0-115" name="__codelineno-0-115"></a>    <span class="n">valid_set</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">valid</span><span class="p">)</span>
+</span><span id="__span-0-116"><a id="__codelineno-0-116" name="__codelineno-0-116"></a>    <span class="k">if</span> <span class="n">token</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">valid_set</span><span class="p">:</span>
+</span><span id="__span-0-117"><a id="__codelineno-0-117" name="__codelineno-0-117"></a>        <span class="k">raise</span> <span class="n">exceptions</span><span class="o">.</span><span class="n">InvalidParameterError</span><span class="p">(</span><span class="n">parameter</span><span class="o">=</span><span class="n">parameter</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="n">original</span><span class="p">,</span> <span class="n">valid_options</span><span class="o">=</span><span class="n">valid_set</span><span class="p">,</span> <span class="n">dialect</span><span class="o">=</span><span class="n">dialect</span><span class="p">,</span> <span class="n">model</span><span class="o">=</span><span class="n">model</span><span class="p">)</span>
+</span><span id="__span-0-118"><a id="__codelineno-0-118" name="__codelineno-0-118"></a>    <span class="k">return</span> <span class="n">token</span>
+</span></code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div><h2 id="see-also">See Also<a class="headerlink" href="#see-also" title="Permanent link">&para;</a></h2>
 <ul>
-<li><code>siglent/</code> - Complete package with all modules</li>
-<li><code>examples/</code> - Example scripts to get started</li>
+<li><a href="../oscilloscope/">Oscilloscope</a> - Main oscilloscope control class for SCPI communication</li>
+<li><a href="../capabilities/">Scope Capabilities</a> - Derived, dialect-resolved capabilities of a connected oscilloscope (scope.capabilities)</li>
+<li><a href="../channel/">Channel</a> - Channel configuration and control</li>
+<li><a href="../trigger/">Trigger</a> - Trigger configuration and modes</li>
 </ul>
-<p><strong>Documentation:</strong></p>
-<ul>
-<li><code>README.md</code> - Main documentation</li>
-<li><code>CHANGELOG.md</code> - Version history</li>
-<li><code>docs/images/</code> - GUI screenshots</li>
-<li><code>docs/SDS800XHD_Series_ProgrammingGuide_EN11G.pdf</code> - Scope manual</li>
-</ul>
-<p><strong>Not Installed:</strong></p>
-<ul>
-<li><code>tests/</code> - Test suite (for development only)</li>
-<li><code>scripts/</code> - Development utilities</li>
-<li><code>docs/development/</code> - Build and deployment documentation</li>
-</ul>
-<h2 id="directory-purposes">Directory Purposes<a class="headerlink" href="#directory-purposes" title="Permanent link">&para;</a></h2>
-<h3 id="siglent">siglent/<a class="headerlink" href="#siglent" title="Permanent link">&para;</a></h3>
-<p>The main package containing all the production code. This is what gets imported when users run <code>import scpi_control</code>.</p>
-<p><strong>Key modules:</strong></p>
-<ul>
-<li><code>oscilloscope.py</code> - Main <code>Oscilloscope</code> class</li>
-<li><code>channel.py</code> - Channel configuration</li>
-<li><code>trigger.py</code> - Trigger settings</li>
-<li><code>waveform.py</code> - Waveform data handling</li>
-<li><code>measurement.py</code> - Measurement functions</li>
-<li><code>gui/</code> - PyQt6 GUI application</li>
-<li><code>connection/</code> - Connection backends (socket, mock)</li>
-<li><code>protocol_decoders/</code> - I2C, SPI, UART decoders</li>
-</ul>
-<h3 id="tests">tests/<a class="headerlink" href="#tests" title="Permanent link">&para;</a></h3>
-<p>Automated test suite using pytest. Run with <code>pytest tests/</code> from the project root.</p>
-<p><strong>Test categories:</strong></p>
-<ul>
-<li>Import tests - Verify all modules can be imported</li>
-<li>GUI initialization tests - Catch AttributeError and widget creation issues</li>
-<li>Protocol decoder tests - Verify decoder functionality</li>
-<li>Math operations tests - Test waveform math functions</li>
-<li>Live view tests - Test real-time plotting</li>
-</ul>
-<p>See <code>tests/README.md</code> for testing instructions.</p>
-<h3 id="scripts">scripts/<a class="headerlink" href="#scripts" title="Permanent link">&para;</a></h3>
-<p>Development and debugging utilities. Not installed with the package.</p>
-<p><strong>Scripts:</strong></p>
-<ul>
-<li><code>run_debug.py</code> - Launch GUI with debug logging</li>
-<li><code>run_debug.bat</code> - Windows convenience launcher</li>
-<li><code>capture_screenshots.py</code> - Automated screenshot capture for docs</li>
-</ul>
-<p>See <code>scripts/README.md</code> for details.</p>
-<h3 id="docs">docs/<a class="headerlink" href="#docs" title="Permanent link">&para;</a></h3>
-<p>Project documentation, split into user-facing and developer-facing content.</p>
-<p><strong>User Documentation (installed):</strong></p>
-<ul>
-<li><code>images/</code> - GUI screenshots for README</li>
-<li><code>SDS800XHD_Series_ProgrammingGuide_EN11G.pdf</code> - Oscilloscope reference</li>
-</ul>
-<p><strong>Developer Documentation (not installed):</strong></p>
-<ul>
-<li><code>development/PYPI_DEPLOYMENT.md</code> - PyPI deployment guide</li>
-<li><code>development/PROJECT_STRUCTURE.md</code> - This file</li>
-<li><code>SCREENSHOT_GUIDE.md</code> - Screenshot capture guide</li>
-</ul>
-<h3 id="examples">examples/<a class="headerlink" href="#examples" title="Permanent link">&para;</a></h3>
-<p>Example scripts demonstrating package features. These are installed with the package so users can easily get started.</p>
-<p><strong>Examples:</strong></p>
-<ul>
-<li><code>basic_usage.py</code> - Connect and capture waveforms</li>
-<li><code>measurements.py</code> - Automated measurements</li>
-<li><code>live_plot.py</code> - Real-time waveform display</li>
-<li><code>batch_capture.py</code> - Capture multiple waveforms</li>
-<li>And more...</li>
-</ul>
-<h2 id="build-artifacts">Build Artifacts<a class="headerlink" href="#build-artifacts" title="Permanent link">&para;</a></h2>
-<h3 id="dist">dist/<a class="headerlink" href="#dist" title="Permanent link">&para;</a></h3>
-<p>Contains built packages created by <code>python -m build</code>:</p>
-<ul>
-<li><code>.tar.gz</code> - Source distribution</li>
-<li><code>.whl</code> - Wheel (binary) distribution</li>
-</ul>
-<p>These are uploaded to PyPI for distribution.</p>
-<h3 id="siglent_oscilloscopeegg-info">Siglent_Oscilloscope.egg-info/<a class="headerlink" href="#siglent_oscilloscopeegg-info" title="Permanent link">&para;</a></h3>
-<p>Metadata directory created during build. Git ignored.</p>
-<h2 id="version-control">Version Control<a class="headerlink" href="#version-control" title="Permanent link">&para;</a></h2>
-<h3 id="gitignore">.gitignore<a class="headerlink" href="#gitignore" title="Permanent link">&para;</a></h3>
-<p>Excludes:</p>
-<ul>
-<li>Python cache files (<code>__pycache__</code>, <code>*.pyc</code>)</li>
-<li>Virtual environments (<code>.venv/</code>, <code>venv/</code>)</li>
-<li>Build artifacts (<code>dist/</code>, <code>build/</code>, <code>*.egg-info</code>)</li>
-<li>IDE files (<code>.vscode/</code>, <code>.idea/</code>)</li>
-<li>Test outputs (<code>.pytest_cache/</code>, <code>.coverage</code>)</li>
-<li>Development data files (<code>*.log</code>, <code>*.dat</code>, <code>*.csv</code>)</li>
-</ul>
-<h3 id="git">.git/<a class="headerlink" href="#git" title="Permanent link">&para;</a></h3>
-<p>Git repository data. The main branch is <code>main</code>.</p>
-<h2 id="package-configuration">Package Configuration<a class="headerlink" href="#package-configuration" title="Permanent link">&para;</a></h2>
-<h3 id="pyprojecttoml">pyproject.toml<a class="headerlink" href="#pyprojecttoml" title="Permanent link">&para;</a></h3>
-<p>Modern Python package metadata and build configuration:</p>
-<ul>
-<li>Package name, version, description</li>
-<li>Dependencies (core and optional <code>[gui]</code> extras)</li>
-<li>Entry points (<code>siglent-gui</code> command)</li>
-<li>Build system (setuptools)</li>
-</ul>
-<h3 id="manifestin">MANIFEST.in<a class="headerlink" href="#manifestin" title="Permanent link">&para;</a></h3>
-<p>Controls what files are included in source distributions:</p>
-<ul>
-<li><strong>Include:</strong> README, CHANGELOG, LICENSE, docs, examples</li>
-<li><strong>Exclude:</strong> tests, scripts, development docs, build artifacts</li>
-</ul>
-<h2 id="development-workflow">Development Workflow<a class="headerlink" href="#development-workflow" title="Permanent link">&para;</a></h2>
-<ol>
-<li><strong>Make changes</strong> to code in <code>siglent/</code></li>
-<li><strong>Add tests</strong> in <code>tests/</code></li>
-<li><strong>Run tests:</strong> <code>pytest tests/</code></li>
-<li><strong>Update docs</strong> in <code>docs/</code> and <code>README.md</code></li>
-<li><strong>Update <code>CHANGELOG.md</code></strong> with changes</li>
-<li><strong>Build package:</strong> <code>python -m build</code></li>
-<li><strong>Check package:</strong> <code>twine check dist/*</code></li>
-<li><strong>Test install:</strong></li>
-<li>Bash/WSL: <code>pip install dist/*.whl</code></li>
-<li>PowerShell: run <code>python -m pip install --upgrade pip</code> first, then <code>python -m pip install (Get-ChildItem dist\*.whl)</code> so globbing resolves the wheel path</li>
-<li>cmd.exe: <code>for %f in (dist\*.whl) do python -m pip install --upgrade pip "%f"</code></li>
-<li><strong>Deploy to PyPI:</strong> <code>twine upload dist/*</code></li>
-</ol>
-<p>See <code>docs/development/PYPI_DEPLOYMENT.md</code> for detailed instructions.</p>
-<h2 id="migration-from-old-structure">Migration from Old Structure<a class="headerlink" href="#migration-from-old-structure" title="Permanent link">&para;</a></h2>
-<p>The project was reorganized in v0.2.0 to follow Python packaging best practices:</p>
-<p><strong>Changes:</strong></p>
-<ul>
-<li>Created <code>tests/</code> directory for all test files</li>
-<li>Created <code>scripts/</code> directory for development utilities</li>
-<li>Consolidated all docs into <code>docs/</code> directory</li>
-<li>Moved build/deployment docs to <code>docs/development/</code></li>
-<li>Updated MANIFEST.in to exclude development-only files</li>
-<li>Updated .gitignore for cleaner repository</li>
-</ul>
-<p>This structure matches the conventions used by most PyPI packages and makes it clear what's for users vs. developers.</p>
 
 
 

@@ -1846,6 +1846,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../../api/vocabulary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Vocabulary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/capabilities/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scope Capabilities
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../api/channel/" class="md-nav__link">
         
   
@@ -2561,10 +2617,10 @@
         
           
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_27" >
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_29" >
         
           
-          <label class="md-nav__link" for="__nav_7_27" id="__nav_7_27_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_7_29" id="__nav_7_29_label" tabindex="0">
             
   
   
@@ -2582,8 +2638,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_27_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_7_27">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_29_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_29">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -3891,6 +3947,11 @@ dialect lacks a command, calling the corresponding property or method raises
 <td>Trigger holdoff</td>
 <td>legacy, tektronix</td>
 <td>On legacy, the wire command (<code>TRIG_DELAY</code>) is really <em>trigger delay</em>, not holdoff — an existing honesty note kept as-is pending a trigger-rework follow-up. Modern has no holdoff command at all. LeCroy holdoff lives in <code>TRIG_SELECT HT/HV</code>, a different shape not yet implemented (follow-up).</td>
+</tr>
+<tr>
+<td><code>AC</code> trigger coupling</td>
+<td>legacy, modern, lecroy</td>
+<td>Not supported on Tektronix: neither the TBS1000C (<code>DC</code>|<code>HFRej</code>|<code>LFRej</code>|<code>NOISErej</code>, TBS p.151) nor the 2 Series MSO (<code>DC</code>|<code>HFRej</code>|<code>LFRej</code>|<code>NOISErej</code>, MSO2 p.2-661) command set has an AC trigger-coupling token. Setting <code>scope.trigger.coupling = "AC"</code> (or <code>TriggerCoupling.AC</code>) on a Tektronix-dialect scope raises <code>FeatureNotSupportedError</code>; check <code>scope.capabilities.trigger_couplings</code> before setting it if the connected dialect isn't known ahead of time.</td>
 </tr>
 <tr>
 <td><code>GND</code> channel coupling</td>

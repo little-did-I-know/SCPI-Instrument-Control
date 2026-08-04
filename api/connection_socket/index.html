@@ -1711,6 +1711,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../vocabulary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Vocabulary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../capabilities/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scope Capabilities
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../channel/" class="md-nav__link">
         
   
@@ -2603,10 +2659,10 @@
         
           
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_27" >
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_29" >
         
           
-          <label class="md-nav__link" for="__nav_7_27" id="__nav_7_27_label" tabindex="">
+          <label class="md-nav__link" for="__nav_7_29" id="__nav_7_29_label" tabindex="">
             
   
   
@@ -2624,8 +2680,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_27_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_7_27">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_29_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_29">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -4213,7 +4269,7 @@
 </span><span id="__span-0-95"><a id="__codelineno-0-95" name="__codelineno-0-95"></a>            <span class="k">try</span><span class="p">:</span>
 </span><span id="__span-0-96"><a id="__codelineno-0-96" name="__codelineno-0-96"></a>                <span class="n">encoded_cmd</span> <span class="o">=</span> <span class="n">command</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="s2">&quot;ascii&quot;</span><span class="p">)</span>
 </span><span id="__span-0-97"><a id="__codelineno-0-97" name="__codelineno-0-97"></a>            <span class="k">except</span> <span class="ne">UnicodeEncodeError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
-</span><span id="__span-0-98"><a id="__codelineno-0-98" name="__codelineno-0-98"></a>                <span class="k">raise</span> <span class="n">exceptions</span><span class="o">.</span><span class="n">CommandError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;SCPI command contains non-ASCII characters: </span><span class="si">{</span><span class="n">command</span><span class="si">!r}</span><span class="s2">&quot;</span><span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="nn">e</span>
+</span><span id="__span-0-98"><a id="__codelineno-0-98" name="__codelineno-0-98"></a>                <span class="k">raise</span> <span class="n">exceptions</span><span class="o">.</span><span class="n">CommandError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;SCPI command contains non-ASCII characters: </span><span class="si">{</span><span class="n">command</span><span class="si">!r}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">command</span><span class="o">=</span><span class="n">command</span><span class="o">.</span><span class="n">strip</span><span class="p">())</span> <span class="kn">from</span><span class="w"> </span><span class="nn">e</span>
 </span><span id="__span-0-99"><a id="__codelineno-0-99" name="__codelineno-0-99"></a>
 </span><span id="__span-0-100"><a id="__codelineno-0-100" name="__codelineno-0-100"></a>            <span class="bp">self</span><span class="o">.</span><span class="n">_socket</span><span class="o">.</span><span class="n">sendall</span><span class="p">(</span><span class="n">encoded_cmd</span><span class="p">)</span>
 </span><span id="__span-0-101"><a id="__codelineno-0-101" name="__codelineno-0-101"></a>        <span class="k">except</span> <span class="n">socket</span><span class="o">.</span><span class="n">timeout</span><span class="p">:</span>
