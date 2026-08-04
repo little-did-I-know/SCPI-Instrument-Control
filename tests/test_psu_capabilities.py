@@ -1,4 +1,4 @@
-﻿"""PSU capabilities and tracking vocabulary (typed-instrument-api Task 7)."""
+"""PSU capabilities and tracking vocabulary (typed-instrument-api Task 7)."""
 
 import dataclasses
 import pytest

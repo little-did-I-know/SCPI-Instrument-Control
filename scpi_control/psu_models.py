@@ -1,4 +1,4 @@
-﻿"""Model capability definitions for SCPI-controlled power supplies.
+"""Model capability definitions for SCPI-controlled power supplies.
 
 Supports generic SCPI-99 power supplies and Siglent SPD series models.
 """

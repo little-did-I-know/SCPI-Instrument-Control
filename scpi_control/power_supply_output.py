@@ -5,7 +5,7 @@ Represents a single power supply output with voltage, current, and enable contro
 
 import logging
 import re
-from typing import TYPE_CHECKING, Dict, Optional
+from typing import TYPE_CHECKING, Any, Dict, Optional
 
 from scpi_control import exceptions
 from scpi_control.psu_scpi_commands import decode_spd_status
@@ -149,6 +149,11 @@ class PowerSupplyOutput:
             key = f"ch{self._output_num}_output"
             if key in state:
                 return state[key]
+            # Fall through for an output that IS state_readable but whose
+            # channel decode_spd_status doesn't cover -- unlike CH3 (gated
+            # out above `_require`, since p.42's bitmap has no CH3 bit at
+            # all), this serves a model/output whose status word omits a bit
+            # for a channel the manual otherwise documents as readable.
 
         cmd = self._psu._get_command("get_output", ch=self._output_num)
         response = self._psu.query(cmd)
@@ -411,7 +416,7 @@ class PowerSupplyOutput:
         except ValueError as exc:
             raise exceptions.CommandError(f"Unparseable PSU response: {response!r}", command=command) from exc
 
-    def get_configuration(self) -> Dict[str, any]:
+    def get_configuration(self) -> Dict[str, Any]:
         """Summarize this output, omitting anything the model cannot report.
 
         Diagnostic aggregate: an unsupported field is left OUT rather than
@@ -419,7 +424,7 @@ class PowerSupplyOutput:
         which fields the model documents, so a caller can tell an absent
         reading from an unsupported one.
         """
-        config: Dict[str, any] = {
+        config: Dict[str, Any] = {
             "output": self._output_num,
             "max_voltage": self._spec.max_voltage,
             "max_current": self._spec.max_current,

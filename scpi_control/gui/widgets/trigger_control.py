@@ -163,8 +163,12 @@ class TriggerControl(QWidget):
             self.widgets["mode"].setCurrentText(self.scope.trigger.mode)
             self.widgets["source"].setCurrentText(self.scope.trigger.source)
             self.widgets["slope"].setCurrentText(self.scope.trigger.slope)
-            self.widgets["level"].setValue(self.scope.trigger.level)
             self.widgets["coupling"].setCurrentText(self.scope.trigger.coupling)
+
+            try:
+                self.widgets["level"].setValue(self.scope.trigger.level)
+            except Exception:
+                pass  # Level might not be available for this trigger source
 
             try:
                 holdoff = self.scope.trigger.holdoff

@@ -184,12 +184,18 @@ class PSUControl(QWidget):
                     widgets["current"].setMaximum(spec.max_current)
                     widgets["current"].setSingleStep(spec.current_resolution * 10)
 
-                    # Read and set current values
+                    # Read and set current values, honoring the same
+                    # capability flags the measurement poll loop checks
+                    # (_update_measurements): a fixed rail like an
+                    # SPD3303X's CH3 has no documented setpoint or state
+                    # query, so calling one raises FeatureNotSupportedError.
                     try:
                         output = getattr(psu, f"output{output_num}")
-                        widgets["voltage"].setValue(output.voltage)
-                        widgets["current"].setValue(output.current)
-                        widgets["enable"].setChecked(output.enabled)
+                        if spec.programmable:
+                            widgets["voltage"].setValue(output.voltage)
+                            widgets["current"].setValue(output.current)
+                        if spec.state_readable:
+                            widgets["enable"].setChecked(output.enabled)
                     except Exception as e:
                         logger.error(f"Failed to read output {output_num} state: {e}")
                 else:

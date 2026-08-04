@@ -167,6 +167,87 @@ class TestMockRefusesUndocumentedCh3Commands:
         assert get_state(conn) == pytest.approx(5.0 if "VOLT" in command else 1.0)
 
 
+class TestMockRefusesUndocumentedCh3Queries:
+    """The QUERY handlers must model a real instrument's silence, not invent
+    a plausible number after queuing the error (final fix wave, Task 5): a
+    real SPD3303X never answers an undocumented CH3 setpoint/measurement
+    query at all, so returning "0.000" after push_error() contradicted the
+    honesty gate the rest of this branch enforces."""
+
+    @pytest.mark.parametrize(
+        "query",
+        [
+            "CH3:VOLT?",
+            "CH3:CURR?",
+            "MEASure:VOLTage? CH3",
+            "MEASure:CURRent? CH3",
+            "MEASure:POWer? CH3",
+        ],
+    )
+    def test_undocumented_ch3_queries_time_out_after_queuing_the_error(self, query):
+        _, conn = make_psu()
+        conn.error_queue.clear()
+        with pytest.raises(exceptions.TimeoutError):
+            conn.query(query)
+        assert conn.error_queue == [(-224, "Illegal parameter value")]
+
+    @pytest.mark.parametrize("query", ["CH1:VOLT?", "CH2:CURR?", "MEASure:VOLTage? CH1"])
+    def test_documented_ch1_ch2_queries_still_answer(self, query):
+        _, conn = make_psu()
+        conn.error_queue.clear()
+        response = conn.query(query)
+        assert conn.error_queue == []
+        assert response  # a real numeric response, not a timeout
+
+
+class TestSetPsuSkipsUnsupportedCh3Reads:
+    """set_psu() must consult the same capability flags as the poll loop
+    (_update_measurements) instead of call-and-catching every output's
+    voltage/current/enabled inside one try that logs a blanket ERROR (final
+    fix wave, Task 4). On an SPD3303X the first CH3 read used to raise,
+    which both logged a spurious ERROR and left CH3's enable checkbox
+    unsynced."""
+
+    @pytest.fixture(scope="class")
+    def qapp(self):
+        pytest.importorskip("PyQt6")
+        from PyQt6.QtWidgets import QApplication
+
+        app = QApplication.instance() or QApplication(sys.argv)
+        yield app
+
+    def test_connecting_does_not_log_an_error_and_ch1_still_syncs(self, qapp):
+        from scpi_control.gui.widgets import psu_control as psu_control_module
+        from scpi_control.gui.widgets.psu_control import PSUControl
+
+        psu, conn = make_psu()
+        # Give CH1 a known state via the wire so the read-back can be checked.
+        conn.write("CH1:VOLTage 5.0")
+        conn.write("CH1:CURRent 1.0")
+        conn.write("OUTPut CH1,ON")
+
+        panel = PSUControl()
+        try:
+            with patch.object(psu_control_module.logger, "error") as mock_error:
+                panel.set_psu(psu)
+            mock_error.assert_not_called()
+
+            ch1_widgets = panel.output_widgets[1]
+            assert ch1_widgets["voltage"].value() == pytest.approx(5.0)
+            assert ch1_widgets["current"].value() == pytest.approx(1.0)
+            assert ch1_widgets["enable"].isChecked() is True
+
+            # CH3 is neither programmable nor state_readable -- set_psu()
+            # must not attempt those reads, so the widgets stay at their
+            # construction defaults rather than raising.
+            ch3_widgets = panel.output_widgets[3]
+            assert ch3_widgets["voltage"].value() == pytest.approx(0.0)
+            assert ch3_widgets["enable"].isChecked() is False
+        finally:
+            if panel.update_timer:
+                panel.update_timer.stop()
+
+
 class TestGuiPanelSkipsUnmeasurableOutput:
     """psu_control.py's poll loop must consult the capability flags instead
     of calling measure_*()/get_mode() on CH3 and swallowing the resulting

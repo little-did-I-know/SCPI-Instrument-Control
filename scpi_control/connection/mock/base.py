@@ -898,7 +898,7 @@ class MockConnection(BaseConnection):
                 ch = int(match.group(2))
                 if prefix == "CH" and ch not in _SPD_SETPOINT_CHANNELS:
                     self.push_error(-224, "Illegal parameter value")
-                    return "0.000"
+                    raise exceptions.TimeoutError(f"MockConnection has no response for query: {command!r}")
                 if ch in self.psu_outputs:
                     return f"{self.psu_outputs[ch]['voltage']:.3f}"
                 return "0.000"
@@ -909,7 +909,7 @@ class MockConnection(BaseConnection):
                 ch = int(match.group(2))
                 if prefix == "CH" and ch not in _SPD_SETPOINT_CHANNELS:
                     self.push_error(-224, "Illegal parameter value")
-                    return "0.000"
+                    raise exceptions.TimeoutError(f"MockConnection has no response for query: {command!r}")
                 if ch in self.psu_outputs:
                     return f"{self.psu_outputs[ch]['current']:.3f}"
                 return "0.000"
@@ -944,7 +944,7 @@ class MockConnection(BaseConnection):
                 ch = int(match.group(1))
                 if ch not in _SPD_SETPOINT_CHANNELS:
                     self.push_error(-224, "Illegal parameter value")
-                    return "0.000"
+                    raise exceptions.TimeoutError(f"MockConnection has no response for query: {command!r}")
                 if ch in self.psu_outputs:
                     v = self.psu_outputs[ch]["voltage"]
                     # Add small noise to measurement (0-2mV)
@@ -956,7 +956,7 @@ class MockConnection(BaseConnection):
                 ch = int(match.group(1))
                 if ch not in _SPD_SETPOINT_CHANNELS:
                     self.push_error(-224, "Illegal parameter value")
-                    return "0.000"
+                    raise exceptions.TimeoutError(f"MockConnection has no response for query: {command!r}")
                 if ch in self.psu_outputs:
                     i = self.psu_outputs[ch]["current"]
                     # Add small noise to measurement (0-2mA)
@@ -968,7 +968,7 @@ class MockConnection(BaseConnection):
                 ch = int(match.group(1))
                 if ch not in _SPD_SETPOINT_CHANNELS:
                     self.push_error(-224, "Illegal parameter value")
-                    return "0.000"
+                    raise exceptions.TimeoutError(f"MockConnection has no response for query: {command!r}")
                 if ch in self.psu_outputs:
                     v = self.psu_outputs[ch]["voltage"]
                     i = self.psu_outputs[ch]["current"]

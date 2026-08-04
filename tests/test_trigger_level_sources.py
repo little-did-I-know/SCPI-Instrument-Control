@@ -1,5 +1,7 @@
 """Trigger level per source, per dialect (capability-honesty Task 6)."""
 
+import sys
+
 import pytest
 
 from scpi_control import exceptions
@@ -148,6 +150,53 @@ class TestMockHandlesExternalTriggerLevel:
         conn.write("EX:TRLV 2.5")
         assert conn.query("C1:TRLV?").strip() == "5.00E-01V"
         assert conn.query("EX:TRLV?").strip() == "2.50E+00V"
+
+
+class TestTriggerControlWidgetSurvivesAnUngatedLevel:
+    """A LINE source raises FeatureNotSupportedError out of trigger.level.
+    Before the final fix wave, trigger_control.py's _refresh_trigger_settings
+    read level inside the same try as every other widget, so that raise
+    stopped the coupling combo (and everything after it) from ever updating
+    -- a genuine regression versus the pre-branch fabricated-0.0 behaviour,
+    where coupling always updated correctly."""
+
+    @pytest.fixture(scope="class")
+    def qapp(self):
+        pytest.importorskip("PyQt6")
+        from PyQt6.QtWidgets import QApplication
+
+        app = QApplication.instance() or QApplication(sys.argv)
+        yield app
+
+    def test_coupling_still_updates_when_level_is_unavailable(self, qapp):
+        from scpi_control.gui.widgets.trigger_control import TriggerControl
+
+        class FakeTrigger:
+            mode = "AUTO"
+            source = "LINE"
+            slope = "NEG"
+            coupling = "AC"
+            holdoff = 0.0
+
+            @property
+            def level(self):
+                raise exceptions.FeatureNotSupportedError("no level command for LINE")
+
+        scope = make_dialect_scope("legacy")
+        scope.trigger = FakeTrigger()
+
+        panel = TriggerControl()
+        panel.set_scope(scope)  # must not raise
+
+        # The regression: coupling (and mode/source/slope, read before level)
+        # must reflect the instrument, not the widget's construction default.
+        assert panel.widgets["mode"].currentText() == "AUTO"
+        assert panel.widgets["source"].currentText() == "LINE"
+        assert panel.widgets["slope"].currentText() == "NEG"
+        assert panel.widgets["coupling"].currentText() == "AC"
+        # Level has nothing to show; it simply keeps its prior value rather
+        # than raising past the rest of the refresh (same pattern as holdoff).
+        assert panel.widgets["level"].value() == pytest.approx(0.0)
 
 
 class TestLecroyMockHandlesExternalTriggerLevel:
