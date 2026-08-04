@@ -653,9 +653,9 @@ current_level = scope.trigger.level
 scope.trigger.level = current_level * 1.2
 
 # Or use trigger coupling to filter noise
-scope.trigger.coupling = "AC"      # Remove DC
+scope.trigger.coupling = "AC"      # Remove DC (raises on Tektronix -- see above)
 # or
-scope.trigger.coupling = "HFREJ"   # Remove HF noise
+scope.trigger.coupling = "HFREJ"   # Remove HF noise (available on every dialect)
 ```
 
 ### Missing Intermittent Events
