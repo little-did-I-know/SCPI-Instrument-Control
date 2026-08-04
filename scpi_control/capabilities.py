@@ -16,6 +16,7 @@ from scpi_control.scpi_commands import (
     supported_couplings,
     supported_measurement_types,
     supported_trigger_couplings,
+    supported_trigger_level_sources,
     supported_trigger_modes,
     supported_trigger_slopes,
     supported_trigger_sources,
@@ -40,6 +41,7 @@ class ScopeCapabilities:
     trigger_slopes: frozenset
     trigger_couplings: frozenset
     trigger_sources: frozenset
+    trigger_level_sources: frozenset
     channel_couplings: frozenset
     measurement_types: frozenset
     has_trigger_holdoff: bool
@@ -75,6 +77,7 @@ def build_scope_capabilities(commands: SCPICommandSet, model: ModelCapability) -
         trigger_slopes=supported_trigger_slopes(dialect),
         trigger_couplings=supported_trigger_couplings(dialect),
         trigger_sources=supported_trigger_sources(dialect),
+        trigger_level_sources=supported_trigger_level_sources(dialect),
         channel_couplings=supported_couplings(dialect),
         measurement_types=measurement_types,
         has_trigger_holdoff=commands.has_command("set_trigger_holdoff"),
