@@ -4125,11 +4125,15 @@ callers must keep catching it.</p>
 
     <div class="doc doc-contents ">
             <p class="doc doc-class-bases">
-              Bases: <code><a class="autorefs autorefs-internal" title="            SiglentError (scpi_control.exceptions.SiglentError)" href="#scpi_control.exceptions.SiglentError">SiglentError</a></code></p>
+              Bases: <code><a class="autorefs autorefs-internal" title="            SiglentError (scpi_control.exceptions.SiglentError)" href="#scpi_control.exceptions.SiglentError">SiglentError</a></code>, <code><span title="NotImplementedError">NotImplementedError</span></code></p>
 
 
 
-        <p>Raised when an operation is not supported by the connected instrument's dialect.</p>
+        <p>Raised when an operation is not supported by the connected instrument.</p>
+<p>Also a NotImplementedError: the PSU capability gates historically raised
+bare NotImplementedError, and pre-existing <code>except NotImplementedError</code>
+callers must keep catching them. (Same dual-base rationale as
+InvalidParameterError, which is also a ValueError.)</p>
 
 
 
@@ -4175,11 +4179,11 @@ exception so a caller can save or inspect it.</p>
 
                   <details class="mkdocstrings-source">
                     <summary>Source code in <code>scpi_control/exceptions.py</code></summary>
-                    <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-97">97</a></span>
-<span class="normal"><a href="#__codelineno-0-98">98</a></span>
-<span class="normal"><a href="#__codelineno-0-99">99</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-97"><a id="__codelineno-0-97" name="__codelineno-0-97"></a><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">message</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">partial</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="__span-0-98"><a id="__codelineno-0-98" name="__codelineno-0-98"></a>    <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">message</span><span class="p">)</span>
-</span><span id="__span-0-99"><a id="__codelineno-0-99" name="__codelineno-0-99"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">partial</span> <span class="o">=</span> <span class="n">partial</span>
+                    <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-103">103</a></span>
+<span class="normal"><a href="#__codelineno-0-104">104</a></span>
+<span class="normal"><a href="#__codelineno-0-105">105</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-103"><a id="__codelineno-0-103" name="__codelineno-0-103"></a><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">message</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">partial</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="__span-0-104"><a id="__codelineno-0-104" name="__codelineno-0-104"></a>    <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">message</span><span class="p">)</span>
+</span><span id="__span-0-105"><a id="__codelineno-0-105" name="__codelineno-0-105"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">partial</span> <span class="o">=</span> <span class="n">partial</span>
 </span></code></pre></div></td></tr></table></div>
                   </details>
 
