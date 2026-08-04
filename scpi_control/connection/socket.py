@@ -95,7 +95,7 @@ class SocketConnection(BaseConnection):
                 try:
                     encoded_cmd = command.encode("ascii")
                 except UnicodeEncodeError as e:
-                    raise exceptions.CommandError(f"SCPI command contains non-ASCII characters: {command!r}") from e
+                    raise exceptions.CommandError(f"SCPI command contains non-ASCII characters: {command!r}", command=command.strip()) from e
 
                 self._socket.sendall(encoded_cmd)
             except socket.timeout:

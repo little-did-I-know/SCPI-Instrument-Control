@@ -248,7 +248,7 @@ class VISAConnection(BaseConnection):
         try:
             command.encode("ascii")
         except UnicodeEncodeError as e:
-            raise CommandError(f"SCPI command contains non-ASCII characters: {command!r}") from e
+            raise CommandError(f"SCPI command contains non-ASCII characters: {command!r}", command=command) from e
 
     def write(self, command: str) -> None:
         """Send a SCPI command to the instrument.
@@ -581,7 +581,7 @@ class VISAConnection(BaseConnection):
             self.write(command)
             response = self.read_raw()
             if len(response) > max_bytes:
-                raise CommandError(f"Binary response to '{command}' from {self.resource_string} is {len(response)} bytes, over the {max_bytes}-byte ceiling")
+                raise CommandError(f"Binary response to '{command}' from {self.resource_string} is {len(response)} bytes, over the {max_bytes}-byte ceiling", command=command)
 
             logger.debug(f"VISA Binary Response: {len(response)} bytes")
             return response

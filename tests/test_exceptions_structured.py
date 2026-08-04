@@ -52,3 +52,29 @@ class TestCommandError:
     def test_measurement_unavailable_subclass_unaffected(self):
         err = exceptions.MeasurementUnavailableError("****")
         assert isinstance(err, exceptions.CommandError) and str(err) == "****"
+
+
+class TestCommandErrorContextAdoption:
+    def test_psu_parse_failure_names_the_command(self):
+        from unittest.mock import Mock
+
+        from scpi_control.power_supply_output import PowerSupplyOutput
+        from scpi_control.psu_models import OutputSpec
+
+        psu = Mock()
+        psu._get_command.return_value = "MEASure:VOLTage? CH1"
+        psu.query.return_value = "garbage!"
+        output = PowerSupplyOutput(psu, OutputSpec(1, 30.0, 3.0, 90.0, 0.001, 0.001))
+        with pytest.raises(exceptions.CommandError) as exc_info:
+            output.measure_voltage()
+        assert exc_info.value.command == "MEASure:VOLTage? CH1"
+
+    def test_socket_non_ascii_write_names_the_command(self):
+        from scpi_control.connection.socket import SocketConnection
+
+        conn = SocketConnection("192.0.2.1", 5025, 1.0)
+        conn._connected = True   # reach the encode step without I/O
+        conn._socket = object()
+        with pytest.raises(exceptions.CommandError) as exc_info:
+            conn.write("IDNé?")
+        assert exc_info.value.command == "IDNé?"
