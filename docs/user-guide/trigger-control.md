@@ -141,6 +141,19 @@ scope.trigger.source = "C4"
 scope.trigger.set_source(1)
 ```
 
+!!! warning "A channel must be switched on before it can be the trigger source"
+
+    Selecting a channel that is currently off does **not** raise. On an
+    SDS824X HD the scope accepts the write, queues no error, and silently
+    triggers on `LINE` instead — so the acquisition is real but synchronized
+    to mains rather than to your signal.
+
+    ```python
+    scope.channel2.enable()        # do this first
+    scope.trigger.source = "C2"
+    assert scope.trigger.source == "C2"   # read back when it matters
+    ```
+
 ### External Trigger
 
 Trigger from external BNC input:
@@ -150,6 +163,27 @@ Trigger from external BNC input:
 scope.trigger.source = "EX"    # Main external input
 scope.trigger.source = "EX5"   # 5V external input (if available)
 ```
+
+!!! warning "Not every scope has an external trigger input"
+
+    `scope.capabilities.trigger_sources` reports what the **driver** can send
+    for the dialect — it is not a promise about the attached model's front
+    panel, which SCPI gives no way to interrogate.
+
+    Measured on an SDS824X HD (modern dialect) on 2026-08-04, with **no error
+    queued** in any case: `EX` is silently coerced to `LINE` (that model has no
+    external input), and `EX5` never takes at all — it is a no-op when the
+    current source is a channel, and lands on the highest enabled channel when
+    the current source is `LINE`. Other modern-dialect scopes, such as the
+    SDS2000X+, do have a working external input.
+
+    Read the value back if your measurement depends on it:
+
+    ```python
+    scope.trigger.source = "EX"
+    if scope.trigger.source != "EX":
+        raise RuntimeError("this scope has no usable external trigger input")
+    ```
 
 ### Line Trigger
 

@@ -1075,6 +1075,24 @@ def supported_trigger_sources(dialect: str) -> frozenset:
     # diverges INSIDE the tek_mso variant, so it is gated dialect-wide -- see
     # channel_token's comment). Other dialects pass EX/EX5/LINE through today;
     # this reports what the driver will actually send, not a hardware promise.
+    #
+    # That distinction is not theoretical. Measured on an SDS824X HD (modern,
+    # firmware 3.8.12.1.1.3.6) on 2026-08-04:
+    #   - EX  is silently coerced to LINE. That model has no external trigger
+    #     input; the scope accepts the write, queues NO error, and triggers on
+    #     mains instead.
+    #   - EX5 never round-trips: from C1/C2/C3 it is a silent no-op, and from
+    #     LINE it lands on the highest ENABLED channel.
+    #   - C2/C3/C4 are coerced to LINE while that channel is switched OFF, and
+    #     round-trip correctly once it is on.
+    # None of the three queues an error, and this scope's SYST:ERR? is
+    # otherwise well behaved (a bogus token does queue -224), so the silence is
+    # deliberate coercion rather than a missing error queue.
+    #
+    # The set is deliberately NOT restricted for it: "no EX input" is a MODEL
+    # fact, and other modern-dialect scopes (e.g. SDS2000X+) do have one, so
+    # a dialect-wide cut would under-report them. Callers that need certainty
+    # must read the source back -- see Trigger.source's docstring.
     if dialect == "tektronix":
         return frozenset({"C1", "C2", "C3", "C4", "EX"})
     return _PUBLIC_TRIGGER_SOURCES
@@ -1089,24 +1107,62 @@ def supported_badge_types(dialect: str) -> frozenset:
 
 
 # ---- Wire-token accessors (mock fidelity) ----------------------------------
-# Uppercased wire tokens per dialect, derived from the tables AT CALL TIME so
-# a mutated table moves the mock and the driver together (Task 8 guards this).
+# Per-dialect wire tokens, derived from the tables AT CALL TIME so a mutated
+# table moves the mock and the driver together (Task 8 guards this).
+#
+# Each token comes in two forms. The *_spellings accessors map the UPPERCASED
+# token to the table's canonical mixed-case spelling ("RISING" -> "RISing");
+# the *_tokens accessors are just their key sets, for membership checks. A
+# real SDS824X HD answers a query with the canonical spelling no matter what
+# casing the write used -- ":TRIGger:EDGE:SLOPe rising", "RISING" and "RiSiNg"
+# all read back "RISing" (measured 2026-08-04) -- so a faithful mock stores the
+# spelling, not the bytes it was sent.
+
+
+def _wire_spellings(table, dialect: str, extra=()) -> Dict[str, str]:
+    spellings = {t.upper(): t for t in table.get(dialect, {}).values()}
+    for token in extra:
+        spellings.setdefault(token.upper(), token)
+    return spellings
+
+
+def wire_coupling_spellings(dialect: str) -> Dict[str, str]:
+    return _wire_spellings(_COUPLING_TO_WIRE, dialect)
+
+
+def wire_trigger_mode_spellings(dialect: str) -> Dict[str, str]:
+    # :TRIGger:MODE FTRIG is the modern force-trigger write (p.482-484); it has
+    # no public token, so it is not in _MODE_TO_WIRE.
+    extra = ("FTRIG",) if dialect == "modern" else ()
+    return _wire_spellings(_MODE_TO_WIRE, dialect, extra)
+
+
+def wire_trigger_slope_spellings(dialect: str) -> Dict[str, str]:
+    return _wire_spellings(_SLOPE_TO_WIRE, dialect)
+
+
+def wire_trigger_coupling_spellings(dialect: str) -> Dict[str, str]:
+    return _wire_spellings(_TRIGGER_COUPLING_TO_WIRE, dialect)
+
+
+def wire_trigger_type_spellings(dialect: str) -> Dict[str, str]:
+    # Only the types this API can SET. A scope also accepts front-panel-only
+    # types (VIDeo, DROPout, ...) that no public token maps to, so the mock
+    # keeps its own wider enum and overlays this for the shared ones.
+    return _wire_spellings(_TRIGGER_TYPE_TO_WIRE, dialect)
 
 
 def wire_coupling_tokens(dialect: str) -> frozenset:
-    return frozenset(t.upper() for t in _COUPLING_TO_WIRE.get(dialect, {}).values())
+    return frozenset(wire_coupling_spellings(dialect))
 
 
 def wire_trigger_mode_tokens(dialect: str) -> frozenset:
-    tokens = {t.upper() for t in _MODE_TO_WIRE.get(dialect, {}).values()}
-    if dialect == "modern":
-        tokens.add("FTRIG")  # :TRIGger:MODE FTRIG is the modern force-trigger write (p.482-484)
-    return frozenset(tokens)
+    return frozenset(wire_trigger_mode_spellings(dialect))
 
 
 def wire_trigger_slope_tokens(dialect: str) -> frozenset:
-    return frozenset(t.upper() for t in _SLOPE_TO_WIRE.get(dialect, {}).values())
+    return frozenset(wire_trigger_slope_spellings(dialect))
 
 
 def wire_trigger_coupling_tokens(dialect: str) -> frozenset:
-    return frozenset(t.upper() for t in _TRIGGER_COUPLING_TO_WIRE.get(dialect, {}).values())
+    return frozenset(wire_trigger_coupling_spellings(dialect))

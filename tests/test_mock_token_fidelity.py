@@ -95,3 +95,41 @@ def test_legacy_run_sends_trig_mode_auto_without_error():
     scope.run()
     assert "TRIG_MODE AUTO" in conn.writes
     assert conn.error_queue == []
+
+
+# --- Echo casing (measured on the real SDS824X HD, 2026-08-04) --------------
+# The scope answers a trigger-token query with its OWN canonical mixed-case
+# spelling, whatever casing the write used: ":TRIGger:TYPE slope", "SLOPE" and
+# "sLoPe" all read back as "SLOPe". Same for :TRIGger:MODE ("NORMal") and
+# :TRIGger:EDGE:SLOPe ("RISing"). The mock used to store the sent casing on
+# MODE/SLOPe/COUPling and force-uppercase it on TYPE -- neither matches.
+
+
+@pytest.mark.parametrize(
+    "command, query, sent, canonical",
+    [
+        (":TRIGger:TYPE", ":TRIGger:TYPE?", "slope", "SLOPe"),
+        (":TRIGger:TYPE", ":TRIGger:TYPE?", "SLOPE", "SLOPe"),
+        (":TRIGger:TYPE", ":TRIGger:TYPE?", "InTeRvAl", "INTerval"),
+        (":TRIGger:MODE", ":TRIGger:MODE?", "normal", "NORMal"),
+        (":TRIGger:MODE", ":TRIGger:MODE?", "NORMAL", "NORMal"),
+        (":TRIGger:EDGE:SLOPe", ":TRIGger:EDGE:SLOPe?", "rising", "RISing"),
+        (":TRIGger:EDGE:SLOPe", ":TRIGger:EDGE:SLOPe?", "ALTERNATE", "ALTernate"),
+        (":TRIGger:EDGE:COUPling", ":TRIGger:EDGE:COUPling?", "hfreject", "HFREJect"),
+    ],
+)
+def test_mock_echoes_the_canonical_spelling_not_the_sent_casing(command, query, sent, canonical):
+    scope, conn = make_scope(MODERN_IDN)
+    conn.write(f"{command} {sent}")
+    assert conn.error_queue == []
+    assert conn.query(query) == canonical
+
+
+def test_canonical_echo_derives_from_the_shared_table(monkeypatch):
+    # MUTATION GUARD: the canonical spelling must come from the same table the
+    # driver writes from, not a private copy inside the mock.
+    scope, conn = make_scope(MODERN_IDN)
+    monkeypatch.setitem(sc._SLOPE_TO_WIRE["modern"], "POS", "RiSiNgX")
+    conn.write(":TRIGger:EDGE:SLOPe risingx")
+    assert conn.error_queue == []
+    assert conn.query(":TRIGger:EDGE:SLOPe?") == "RiSiNgX"

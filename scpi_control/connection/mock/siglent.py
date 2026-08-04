@@ -12,7 +12,16 @@ import numpy as np
 from scpi_control import exceptions
 from scpi_control.connection.mock.helpers import _build_ieee_block, _build_ieee_block_9digit, _format_nr3, _format_scientific, _format_si_sample_rate
 from scpi_control.connection.mock import synth as mock_synth
-from scpi_control.scpi_commands import wire_coupling_tokens, wire_trigger_coupling_tokens, wire_trigger_mode_tokens, wire_trigger_slope_tokens
+from scpi_control.scpi_commands import (
+    wire_coupling_tokens,
+    wire_trigger_coupling_spellings,
+    wire_trigger_coupling_tokens,
+    wire_trigger_mode_spellings,
+    wire_trigger_mode_tokens,
+    wire_trigger_slope_spellings,
+    wire_trigger_slope_tokens,
+    wire_trigger_type_spellings,
+)
 
 # Canonical PAVA? measurement values for the legacy dialect (mirrors real
 # hardware where PAVA? is legacy-only; the modern dialect has no equivalent).
@@ -71,40 +80,53 @@ _MOCK_SIMPLE_VALUES: Dict[str, str] = {
     "DUTY": "5.000E+01",
 }
 
-# Full :TRIGger:TYPE enum, uppercased, verbatim from SDS800X HD guide EN11G
-# p.485: {EDGE|PULSE|SLOPe|INTerval|PATTern|RUNT|WINDow|DROPout|VIDeo|
-# QUALified|NEDGe|DELay|SHOLd|IIC|SPI|UART|LIN|CAN|FLEXray|CANFd|IIS|M1553|
-# SENT|A429}. Used to validate the write handler below instead of accepting
+# Full :TRIGger:TYPE enum, canonical spellings verbatim from SDS800X HD guide
+# EN11G p.485. Used to validate the write handler below instead of accepting
 # any word (measured on hardware 2026-07-31: an invalid token queues -224 and
 # leaves the trigger type unchanged).
-_MODERN_TRIGGER_TYPES = frozenset(
-    {
+#
+# The spellings -- not just the uppercased tokens -- matter because the scope
+# answers :TRIGger:TYPE? with its own canonical casing regardless of what the
+# write sent (measured on an SDS824X HD 2026-08-04: "slope", "SLOPE" and
+# "sLoPe" all read back "SLOPe").
+_MODERN_TRIGGER_TYPE_SPELLINGS: Dict[str, str] = {
+    token.upper(): token
+    for token in (
         "EDGE",
         "PULSE",
-        "SLOPE",
-        "INTERVAL",
-        "PATTERN",
+        "SLOPe",
+        "INTerval",
+        "PATTern",
         "RUNT",
-        "WINDOW",
-        "DROPOUT",
-        "VIDEO",
-        "QUALIFIED",
-        "NEDGE",
-        "DELAY",
-        "SHOLD",
+        "WINDow",
+        "DROPout",
+        "VIDeo",
+        "QUALified",
+        "NEDGe",
+        "DELay",
+        "SHOLd",
         "IIC",
         "SPI",
         "UART",
         "LIN",
         "CAN",
-        "FLEXRAY",
-        "CANFD",
+        "FLEXray",
+        "CANFd",
         "IIS",
         "M1553",
         "SENT",
         "A429",
-    }
-)
+    )
+}
+
+
+def _modern_trigger_type_spellings() -> Dict[str, str]:
+    """Guide enum, overlaid with the driver's table AT CALL TIME.
+
+    Call-time derivation is what lets the mutation guards prove the mock and
+    the driver share one table (see wire_trigger_type_spellings).
+    """
+    return {**_MODERN_TRIGGER_TYPE_SPELLINGS, **wire_trigger_type_spellings("modern")}
 
 
 def handle_write(conn, command: str) -> bool:
@@ -213,10 +235,11 @@ def handle_write(conn, command: str) -> bool:
             return True
         if match := re.match(r":TRIGger:MODE\s+(\w+)", command, re.IGNORECASE):
             token = match.group(1).upper()
-            if token not in wire_trigger_mode_tokens("modern"):
+            spellings = wire_trigger_mode_spellings("modern")
+            if token not in spellings:
                 conn.push_error(-224, "Illegal parameter value")
                 return True
-            conn.trigger_mode = match.group(1)  # stored as wire token, e.g. "NORMal" (guide p.482)
+            conn.trigger_mode = spellings[token]  # canonical wire token, e.g. "NORMal" (guide p.482)
             if token == "SINGLE" and len(conn.trigger_status) <= 1:
                 # Status vocabulary matches real hardware: Ready while armed, Stop when done (same rule as the legacy ARM handler)
                 conn.trigger_status = ["Ready", "Stop"]
@@ -230,10 +253,11 @@ def handle_write(conn, command: str) -> bool:
             return True
         if match := re.match(r":TRIGger:TYPE\s+(\w+)", command, re.IGNORECASE):
             token = match.group(1).upper()
-            if token not in _MODERN_TRIGGER_TYPES:
+            spellings = _modern_trigger_type_spellings()
+            if token not in spellings:
                 conn.push_error(-224, "Illegal parameter value")
                 return True  # consumed, ignored, error queued
-            conn.trigger_type = token
+            conn.trigger_type = spellings[token]  # canonical wire token, e.g. "SLOPe" (guide p.485)
             return True
         if match := re.match(r":TRIGger:EDGE:SOURce\s+(\w+)", command, re.IGNORECASE):
             conn.trigger_source = match.group(1).upper()
@@ -248,17 +272,19 @@ def handle_write(conn, command: str) -> bool:
             return True
         if match := re.match(r":TRIGger:EDGE:SLOPe\s+(\w+)", command, re.IGNORECASE):
             token = match.group(1).upper()
-            if token not in wire_trigger_slope_tokens("modern"):
+            spellings = wire_trigger_slope_spellings("modern")
+            if token not in spellings:
                 conn.push_error(-224, "Illegal parameter value")
                 return True
-            conn.trigger_slope = match.group(1)  # wire token, e.g. "RISing" (guide p.494)
+            conn.trigger_slope = spellings[token]  # canonical wire token, e.g. "RISing" (guide p.494)
             return True
         if match := re.match(r":TRIGger:EDGE:COUPling\s+(\w+)", command, re.IGNORECASE):
             token = match.group(1).upper()
-            if token not in wire_trigger_coupling_tokens("modern"):
+            spellings = wire_trigger_coupling_spellings("modern")
+            if token not in spellings:
                 conn.push_error(-224, "Illegal parameter value")
                 return True
-            conn.trigger_coupling = match.group(1)
+            conn.trigger_coupling = spellings[token]  # canonical wire token, e.g. "HFREJect" (guide p.486)
             return True
         # Waveform transfer-parameter scalars (Task 17, audit H9; guide
         # pp.749-752). SOURce stores the bare source token verbatim (e.g.

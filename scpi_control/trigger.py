@@ -170,6 +170,22 @@ class Trigger:
 
         Args:
             channel: Source channel ('C1', 'C2', 'C3', 'C4', 'EX', 'EX5', 'LINE') or channel number
+
+        Warning:
+            A scope may silently COERCE this rather than reject it, so a write
+            that raises nothing is not proof the source took. Measured on an
+            SDS824X HD (modern) 2026-08-04, with no error queued in any case:
+
+            - Selecting a channel that is switched OFF lands on ``LINE``. Turn
+              the channel on first (``scope.channel2.enable()``).
+            - ``EX`` lands on ``LINE`` -- that model has no external trigger
+              input, though other modern-dialect scopes do.
+            - ``EX5`` never takes: it is a no-op from a channel source, and
+              lands on the highest enabled channel from ``LINE``.
+
+            ``scope.capabilities.trigger_sources`` reports what the DRIVER can
+            send for the dialect, not what the attached model physically has.
+            When it matters, read ``scope.trigger.source`` back and compare.
         """
         channel = self._normalize_source(channel)
         channel = normalize_token(channel, parameter="trigger source", valid=_PUBLIC_TRIGGER_SOURCES, dialect=self._dialect)
