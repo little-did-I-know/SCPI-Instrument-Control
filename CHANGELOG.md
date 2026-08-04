@@ -19,12 +19,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Sockets: a response cut short by the peer now raises `SiglentConnectionError` instead of being returned as a successful short read. A truncated measurement or screenshot was previously indistinguishable from a complete one.
 - Sockets: a non-ASCII byte in a text response now raises `SiglentConnectionError` instead of `UnicodeDecodeError`. Code catching `ValueError` around `read()`/`query()` was silently swallowing it and must catch the transport error instead.
 - VISA: `is_connected` now requires a successful `connect()`. A connection that failed after opening the resource previously reported itself connected.
+- Power supply: unrecognized PSU models no longer advertise OVP/OCP support (`has_ovp`/`has_ocp` are now `False` in the generic fallback). Code that set `ovp_level`/`ocp_level` on an unlisted model now gets `NotImplementedError` instead of a command the instrument silently discards. Migration: if your PSU genuinely has a protection subsystem, add it to `PSU_MODEL_REGISTRY` with manual citations.
+- Oscilloscope: `trigger.coupling = "AC"` on the tektronix dialect now raises `FeatureNotSupportedError` — the Tek edge-trigger coupling vocabulary (`DC|HFRej|LFRej|NOISErej`, TBS1000C PM p.151 / MSO2 PM p.2-661) has no AC token; the old code sent one anyway.
 
 ### Added
 
 - Frequency response: `scpi_control.frequency_response.sweep()` steps a function generator across a frequency range, captures a reference and a response channel at each point, and returns gain and phase with the capture geometry behind them. Autoranges the response channel per point, reports an unmeasurable point as `None` with a stated reason rather than a plausible number, and exports CSV with a metadata header (`to_csv`) or a Bode plot (`plot`). See `examples/frequency_response_sweep.py`. Every accuracy claim is validated against a mock instrument and an analytic RC model — there is no function generator on the development bench, so none of it is hardware-verified.
 - Connections: `resync()` discards anything the instrument left unread and reports the byte count. Called automatically before the next send after a read times out.
 - Connections: `drain_input()` discards bytes the instrument has already queued and reports the count, taking no protocol-level action. Use it for housekeeping after a completed exchange (the terminator behind a screen dump, say); `resync()` is for recovering a session whose position is unknown, and on VISA it prefers a device clear, which aborts the instrument's pending operation. Both are no-ops on `BaseConnection`, so existing subclasses keep working unchanged.
+- Typed vocabulary: `Coupling`, `TriggerMode`, `TriggerSlope`, `TriggerCoupling`, `TriggerType`, `TriggerSource`, `BandwidthLimit`, `TrackingMode` — string-compatible enums accepted by every token-valued setter (plain strings still work; getters still return strings).
+- Capability discovery: `scope.capabilities` (derived from the connected dialect's command tables) and `psu.capabilities` (the detected model's registry profile) for ask-before-call feature checks.
+- Structured errors: `InvalidParameterError` (now also a `ValueError`) carries `parameter`/`value`/`valid_options`/`dialect`/`model`; `CommandError` carries the sent `command` where available.
+
+### Changed
+
+- Invalid token-valued parameters are rejected locally, before anything reaches the wire, with the connected dialect's valid options in the message.
+- The mock scopes now reject undocumented wire tokens (queueing `-224` like the real SDS824X HD) instead of accepting any word, with accept-sets derived from the same tables the drivers use.
 
 ### Fixed
 
