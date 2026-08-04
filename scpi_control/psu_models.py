@@ -216,8 +216,13 @@ def create_generic_psu_capability(idn_string: str) -> PSUCapability:
         manufacturer=manufacturer,
         num_outputs=1,  # Conservative default
         output_specs=[OutputSpec(1, 30.0, 3.0, 90.0, 0.001, 0.001)],  # Typical lab PSU specs
-        has_ovp=True,  # Most PSUs have OVP
-        has_ocp=True,  # Most PSUs have OCP
+        # HONESTY GATE: an unrecognized model must not advertise a protection
+        # subsystem nobody can cite -- the generic SOUR{ch}:VOLT:PROT fallback
+        # is exactly the uncitable path the SPD registry entries gate with
+        # has_ovp=False (audit H18 / backend review 2026-07-31 High-3). A model
+        # that really has OVP/OCP belongs in PSU_MODEL_REGISTRY with citations.
+        has_ovp=False,
+        has_ocp=False,
         has_timer=False,  # Conservative - don't assume
         has_waveform=False,  # Advanced feature - don't assume
         has_tracking=False,  # Advanced feature - don't assume

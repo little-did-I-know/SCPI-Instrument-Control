@@ -98,9 +98,9 @@ def get_related_modules(module_name: str, all_modules: List[Dict]) -> List[Dict]
         List of related module dicts.
     """
     relationships = {
-        "oscilloscope": ["channel", "trigger", "waveform", "measurement", "exceptions"],
-        "channel": ["oscilloscope", "trigger"],
-        "trigger": ["oscilloscope", "channel"],
+        "oscilloscope": ["channel", "trigger", "waveform", "measurement", "capabilities", "vocabulary", "exceptions"],
+        "channel": ["oscilloscope", "trigger", "vocabulary"],
+        "trigger": ["oscilloscope", "channel", "vocabulary"],
         "waveform": ["oscilloscope", "channel", "analysis"],
         "measurement": ["oscilloscope", "waveform"],
         "analysis": ["waveform"],
@@ -112,6 +112,8 @@ def get_related_modules(module_name: str, all_modules: List[Dict]) -> List[Dict]
         "screen_capture": ["oscilloscope"],
         "reference_waveform": ["oscilloscope", "waveform"],
         "math_channel": ["oscilloscope", "waveform"],
+        "vocabulary": ["oscilloscope", "channel", "trigger", "capabilities"],
+        "capabilities": ["oscilloscope", "vocabulary", "models"],
     }
 
     related_names = relationships.get(module_name, [])

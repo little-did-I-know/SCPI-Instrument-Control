@@ -5,7 +5,7 @@ Represents a single power supply output with voltage, current, and enable contro
 
 import logging
 import re
-from typing import TYPE_CHECKING, Dict
+from typing import TYPE_CHECKING, Dict, Optional
 
 from scpi_control import exceptions
 from scpi_control.psu_scpi_commands import decode_spd_status
@@ -49,7 +49,7 @@ class PowerSupplyOutput:
         """
         cmd = self._psu._get_command("get_voltage", ch=self._output_num)
         response = self._psu.query(cmd)
-        return self._parse_float(response)
+        return self._parse_float(response, cmd)
 
     @voltage.setter
     def voltage(self, volts: float) -> None:
@@ -87,7 +87,7 @@ class PowerSupplyOutput:
         """
         cmd = self._psu._get_command("get_current", ch=self._output_num)
         response = self._psu.query(cmd)
-        return self._parse_float(response)
+        return self._parse_float(response, cmd)
 
     @current.setter
     def current(self, amps: float) -> None:
@@ -174,7 +174,7 @@ class PowerSupplyOutput:
         """
         cmd = self._psu._get_command("measure_voltage", ch=self._output_num)
         response = self._psu.query(cmd)
-        return self._parse_float(response)
+        return self._parse_float(response, cmd)
 
     def measure_current(self) -> float:
         """Measure actual output current in amps.
@@ -184,7 +184,7 @@ class PowerSupplyOutput:
         """
         cmd = self._psu._get_command("measure_current", ch=self._output_num)
         response = self._psu.query(cmd)
-        return self._parse_float(response)
+        return self._parse_float(response, cmd)
 
     def measure_power(self) -> float:
         """Measure actual output power in watts.
@@ -194,7 +194,7 @@ class PowerSupplyOutput:
         """
         cmd = self._psu._get_command("measure_power", ch=self._output_num)
         response = self._psu.query(cmd)
-        return self._parse_float(response)
+        return self._parse_float(response, cmd)
 
     def get_mode(self) -> str:
         """Get current operating mode.
@@ -231,7 +231,7 @@ class PowerSupplyOutput:
 
         cmd = self._psu._get_command("get_voltage_limit", ch=self._output_num)
         response = self._psu.query(cmd)
-        return self._parse_float(response)
+        return self._parse_float(response, cmd)
 
     @ovp_level.setter
     def ovp_level(self, volts: float) -> None:
@@ -265,7 +265,7 @@ class PowerSupplyOutput:
 
         cmd = self._psu._get_command("get_current_limit", ch=self._output_num)
         response = self._psu.query(cmd)
-        return self._parse_float(response)
+        return self._parse_float(response, cmd)
 
     @ocp_level.setter
     def ocp_level(self, amps: float) -> None:
@@ -360,7 +360,7 @@ class PowerSupplyOutput:
 
     # --- Helper Methods ---
 
-    def _parse_float(self, response: str) -> float:
+    def _parse_float(self, response: str, command: Optional[str] = None) -> float:
         """Parse float value from SCPI response.
 
         Handles various response formats:
@@ -370,6 +370,7 @@ class PowerSupplyOutput:
 
         Args:
             response: SCPI response string
+            command: SCPI command that was sent (for error reporting)
 
         Returns:
             Parsed float value
@@ -388,7 +389,7 @@ class PowerSupplyOutput:
         try:
             return float(response)
         except ValueError as exc:
-            raise exceptions.CommandError(f"Unparseable PSU response: {response!r}") from exc
+            raise exceptions.CommandError(f"Unparseable PSU response: {response!r}", command=command) from exc
 
     def get_configuration(self) -> Dict[str, any]:
         """Get all output configuration parameters.

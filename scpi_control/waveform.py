@@ -303,7 +303,7 @@ class Waveform:
                     logger.debug(f"Parsed {quantity}: {value} {unit}")
                     return value
                 except ValueError as exc:
-                    raise exceptions.CommandError(self._format_scope_error(f"Invalid {quantity} response: '{response}'", command)) from exc
+                    raise exceptions.CommandError(self._format_scope_error(f"Invalid {quantity} response: '{response}'", command), command=command) from exc
 
         # Bare-NR3 dialects return a numeric value with no unit suffix at
         # all: modern Siglent (:CHANnel:SCALe?, :CHANnel:OFFSet?,
@@ -321,7 +321,7 @@ class Waveform:
                 pass
 
         expected = " or ".join(expected_units)
-        raise exceptions.CommandError(self._format_scope_error(f"Invalid {quantity} response: '{response}' (expected units: {expected})", command))
+        raise exceptions.CommandError(self._format_scope_error(f"Invalid {quantity} response: '{response}' (expected units: {expected})", command), command=command)
 
     def get_waveform_preamble(self, channel: int) -> dict:
         """Get waveform preamble information.

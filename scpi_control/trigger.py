@@ -1,10 +1,12 @@
 """Trigger configuration and control for Siglent oscilloscopes."""
 
 import logging
-from typing import TYPE_CHECKING, Literal, Optional, Union
+from typing import TYPE_CHECKING, Optional, Union
 
 from scpi_control import exceptions
 from scpi_control.scpi_commands import (
+    _MODE_ALIASES,
+    _PUBLIC_TRIGGER_SOURCES,
     channel_token,
     is_flat_trigger,
     mode_from_wire,
@@ -13,19 +15,29 @@ from scpi_control.scpi_commands import (
     slope_from_wire,
     slope_to_wire,
     source_from_wire,
+    supported_trigger_modes,
+    trigger_coupling_from_wire,
+    trigger_coupling_to_wire,
     trigger_type_from_wire,
     trigger_type_to_wire,
+)
+from scpi_control.vocabulary import (  # noqa: F401 -- re-exported for back-compat
+    TriggerCoupling,
+    TriggerCouplingType,
+    TriggerMode,
+    TriggerModeType,
+    TriggerSlope,
+    TriggerSlopeType,
+    TriggerSource,
+    TriggerType,
+    TriggerTypeType,
+    normalize_token,
 )
 
 if TYPE_CHECKING:
     from scpi_control.oscilloscope import Oscilloscope
 
 logger = logging.getLogger(__name__)
-
-TriggerModeType = Literal["AUTO", "NORM", "NORMAL", "SINGLE", "STOP"]
-TriggerTypeType = Literal["EDGE", "SLEW", "GLIT", "INTV", "RUNT", "PATTERN"]
-TriggerSlopeType = Literal["POS", "NEG", "WINDOW"]
-TriggerCouplingType = Literal["DC", "AC", "HFREJ", "LFREJ"]
 
 
 class Trigger:
@@ -85,19 +97,19 @@ class Trigger:
         return mode_from_wire(self._dialect, response)
 
     @mode.setter
-    def mode(self, mode: TriggerModeType) -> None:
+    def mode(self, mode: Union[TriggerMode, TriggerModeType]) -> None:
         """Set trigger mode.
 
         Args:
             mode: Trigger mode - 'AUTO', 'NORM'/'NORMAL', 'SINGLE', or 'STOP'
         """
-        mode = mode.upper()
-        # Normalize NORMAL to NORM
-        if mode == "NORMAL":
-            mode = "NORM"
-
-        if mode not in ["AUTO", "NORM", "SINGLE", "STOP"]:
-            raise exceptions.InvalidParameterError(f"Invalid trigger mode: {mode}. Must be AUTO, NORM, SINGLE, or STOP.")
+        mode = normalize_token(
+            mode,
+            parameter="trigger mode",
+            valid=supported_trigger_modes(self._dialect),
+            aliases=_MODE_ALIASES,
+            dialect=self._dialect,
+        )
 
         if mode == "STOP":
             self._scope.write(self._cmd("stop"))
@@ -111,7 +123,7 @@ class Trigger:
             self._scope.write(self._cmd("set_trigger_mode", mode=mode_to_wire(self._dialect, mode)))
         logger.info(f"Trigger mode set to {mode}")
 
-    def set_mode(self, mode: TriggerModeType) -> None:
+    def set_mode(self, mode: Union[TriggerMode, TriggerModeType]) -> None:
         """Set trigger mode (alias for mode property setter)."""
         self.mode = mode
 
@@ -153,17 +165,30 @@ class Trigger:
         return "UNKNOWN"
 
     @source.setter
-    def source(self, channel: Union[int, str]) -> None:
+    def source(self, channel: Union[int, str, TriggerSource]) -> None:
         """Set trigger source channel.
 
         Args:
             channel: Source channel ('C1', 'C2', 'C3', 'C4', 'EX', 'EX5', 'LINE') or channel number
+
+        Warning:
+            A scope may silently COERCE this rather than reject it, so a write
+            that raises nothing is not proof the source took. Measured on an
+            SDS824X HD (modern) 2026-08-04, with no error queued in any case:
+
+            - Selecting a channel that is switched OFF lands on ``LINE``. Turn
+              the channel on first (``scope.channel2.enable()``).
+            - ``EX`` lands on ``LINE`` -- that model has no external trigger
+              input, though other modern-dialect scopes do.
+            - ``EX5`` never takes: it is a no-op from a channel source, and
+              lands on the highest enabled channel from ``LINE``.
+
+            ``scope.capabilities.trigger_sources`` reports what the DRIVER can
+            send for the dialect, not what the attached model physically has.
+            When it matters, read ``scope.trigger.source`` back and compare.
         """
         channel = self._normalize_source(channel)
-        valid_sources = ["C1", "C2", "C3", "C4", "EX", "EX5", "LINE"]
-
-        if channel not in valid_sources:
-            raise exceptions.InvalidParameterError(f"Invalid trigger source: {channel}. Must be one of {valid_sources}.")
+        channel = normalize_token(channel, parameter="trigger source", valid=_PUBLIC_TRIGGER_SOURCES, dialect=self._dialect)
 
         if not is_flat_trigger(self._dialect):
             self._scope.write(self._cmd("set_trigger_source", src=channel_token(self._dialect, channel)))
@@ -199,7 +224,7 @@ class Trigger:
         return "EDGE"
 
     @trigger_type.setter
-    def trigger_type(self, trig_type: TriggerTypeType) -> None:
+    def trigger_type(self, trig_type: Union[TriggerType, TriggerTypeType]) -> None:
         """Set trigger type.
 
         Args:
@@ -215,7 +240,7 @@ class Trigger:
         else:
             current_source = self.source
             self._scope.write(self._cmd("set_trigger_select", type=wire, src=current_source))
-        logger.info(f"Trigger type set to {trig_type}")
+        logger.info(f"Trigger type set to {str(getattr(trig_type, 'value', trig_type)).upper()}")
 
     def set_edge_trigger(self, source: str = "C1", slope: str = "POS") -> None:
         """Configure edge trigger.
@@ -296,7 +321,7 @@ class Trigger:
         return slope_from_wire(self._dialect, self._scope.query(self._cmd("get_trigger_slope", src=source)))
 
     @slope.setter
-    def slope(self, slope: TriggerSlopeType) -> None:
+    def slope(self, slope: Union[TriggerSlope, TriggerSlopeType]) -> None:
         """Set trigger slope.
 
         Args:
@@ -321,42 +346,32 @@ class Trigger:
         """Get trigger coupling.
 
         Returns:
-            Coupling: 'DC', 'AC', 'HFREJ', 'LFREJ'
+            Coupling: 'DC', 'AC', 'HFREJ', 'LFREJ'. Unmapped instrument states
+            (e.g. 'NOISEREJ' set from Tektronix front panel) pass through uppercased
+            as read-only; such states cannot be set via this API.
         """
         if not is_flat_trigger(self._dialect):
-            token = self._scope.query(self._cmd("get_trigger_coupling")).strip().upper()
-            if self._dialect == "modern":
-                # Reverse of the setter's HFREJ->HFREJect mapping (guide p.486)
-                return {"HFREJECT": "HFREJ", "LFREJECT": "LFREJ"}.get(token, token)
-            # tektronix wire tokens (HFRej/LFRej) already match the public
-            # vocabulary uppercased -- TBS p.151 / MSO2 p.2-661
-            return token
+            return trigger_coupling_from_wire(self._dialect, self._scope.query(self._cmd("get_trigger_coupling")))
         source = self.source
-        return self._scope.query(self._cmd("get_trigger_coupling", src=source)).strip().split()[-1].upper()
+        return trigger_coupling_from_wire(self._dialect, self._scope.query(self._cmd("get_trigger_coupling", src=source)))
 
     @coupling.setter
-    def coupling(self, coupling: TriggerCouplingType) -> None:
+    def coupling(self, coupling: Union[TriggerCoupling, TriggerCouplingType]) -> None:
         """Set trigger coupling.
 
         Args:
-            coupling: 'DC', 'AC', 'HFREJ' (high freq reject), 'LFREJ' (low freq reject)
+            coupling: 'DC', 'AC', 'HFREJ' (high freq reject), 'LFREJ' (low freq reject).
+                     Note: Tektronix does not support AC coupling (TBS p.151 / MSO2 p.2-661)
+                     and will raise FeatureNotSupportedError if attempted.
         """
-        coupling = coupling.upper()
-        if coupling not in ["DC", "AC", "HFREJ", "LFREJ"]:
-            raise exceptions.InvalidParameterError(f"Invalid trigger coupling: {coupling}. Must be DC, AC, HFREJ, or LFREJ.")
-
+        wire = trigger_coupling_to_wire(self._dialect, coupling)
         if not is_flat_trigger(self._dialect):
-            if self._dialect == "modern":
-                # Modern wire tokens spell out the reject modes (guide p.486)
-                wire = {"HFREJ": "HFREJect", "LFREJ": "LFREJect"}.get(coupling, coupling)
-            else:
-                # tektronix wire tokens: DC|HFRej|LFRej|NOISErej -- TBS p.151 / MSO2 p.2-661
-                wire = {"HFREJ": "HFRej", "LFREJ": "LFRej"}.get(coupling, coupling)
             self._scope.write(self._cmd("set_trigger_coupling", coupling=wire))
         else:
             source = self.source
-            self._scope.write(self._cmd("set_trigger_coupling", src=source, coupling=coupling))
-        logger.info(f"Trigger coupling set to {coupling}")
+            self._scope.write(self._cmd("set_trigger_coupling", src=source, coupling=wire))
+        # getattr-unwrap: str() of a (str, Enum) mixin member is "TriggerCoupling.HFREJ", not "HFREJ"
+        logger.info(f"Trigger coupling set to {str(getattr(coupling, 'value', coupling)).upper()}")
 
     # NOTE: TRIG_DELAY is legacy-only and actually controls trigger delay, not holdoff (AUDIT M4); routing deferred to a trigger-rework follow-up.
     @property

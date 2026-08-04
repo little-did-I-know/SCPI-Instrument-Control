@@ -22,9 +22,20 @@ class SiglentTimeoutError(SiglentError):
 
 
 class CommandError(SiglentError):
-    """Raised when a SCPI command fails or returns an error."""
+    """Raised when a SCPI command fails or returns an error.
 
-    pass
+    Optional structured context (all default to None): `command` is the string
+    actually sent on the wire, `dialect`/`model` identify the instrument, and
+    `instrument_error` carries the instrument's own error-queue text where the
+    failing path already read it.
+    """
+
+    def __init__(self, message="", *, command=None, dialect=None, model=None, instrument_error=None):
+        self.command = command
+        self.dialect = dialect
+        self.model = model
+        self.instrument_error = instrument_error
+        super().__init__(message)
 
 
 class MeasurementUnavailableError(CommandError):
@@ -44,10 +55,29 @@ class MeasurementUnavailableError(CommandError):
     pass
 
 
-class InvalidParameterError(SiglentError):
-    """Raised when invalid parameters are provided."""
+class InvalidParameterError(SiglentError, ValueError):
+    """Raised when invalid parameters are provided.
 
-    pass
+    Also a ValueError: validation paths that historically raised bare
+    ValueError now raise this class, and pre-existing `except ValueError`
+    callers must keep catching it.
+    """
+
+    def __init__(self, message=None, *, parameter=None, value=None, valid_options=None, dialect=None, model=None):
+        self.parameter = parameter
+        self.value = value
+        self.valid_options = sorted(valid_options) if valid_options is not None else None
+        self.dialect = dialect
+        self.model = model
+        if message is None:
+            parts = [f"Invalid {parameter or 'parameter'}: {value!r}."]
+            if self.valid_options:
+                parts.append(f"Valid: {', '.join(str(v) for v in self.valid_options)}.")
+            context = ", ".join(p for p in (dialect, model) if p)
+            if context:
+                parts.append(f"({context})")
+            message = " ".join(parts)
+        super().__init__(message)
 
 
 class FeatureNotSupportedError(SiglentError):

@@ -20,13 +20,14 @@ Feedback:
 """
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 from scpi_control import exceptions
 from scpi_control.connection import BaseConnection, SocketConnection
 from scpi_control.power_supply_output import PowerSupplyOutput
 from scpi_control.psu_models import PSUCapability, detect_psu_from_idn
 from scpi_control.psu_scpi_commands import PSUSCPICommandSet
+from scpi_control.vocabulary import TrackingMode, TrackingModeType, normalize_token
 
 logger = logging.getLogger(__name__)
 
@@ -261,7 +262,7 @@ class PowerSupply:
         return response.strip().upper()
 
     @tracking_mode.setter
-    def tracking_mode(self, mode: str) -> None:
+    def tracking_mode(self, mode: Union[TrackingMode, TrackingModeType]) -> None:
         """Set tracking mode for multi-output PSUs.
 
         Args:
@@ -274,10 +275,12 @@ class PowerSupply:
         if not self.model_capability.has_tracking:
             raise NotImplementedError(f"Tracking mode not supported on {self.model_capability.model_name}")
 
-        mode = mode.upper()
-        valid_modes = ["INDEPENDENT", "SERIES", "PARALLEL"]
-        if mode not in valid_modes:
-            raise ValueError(f"Invalid tracking mode: {mode}. Must be one of {valid_modes}")
+        mode = normalize_token(
+            mode,
+            parameter="tracking mode",
+            valid={"INDEPENDENT", "SERIES", "PARALLEL"},
+            model=self.model_capability.model_name,
+        )
 
         cmd = self._get_command("set_tracking", mode=mode)
         self.write(cmd)
@@ -310,6 +313,19 @@ class PowerSupply:
             None if not connected
         """
         return self._device_info
+
+    @property
+    def capabilities(self) -> PSUCapability:
+        """The detected model's capability profile (registry-honest).
+
+        Raises:
+            SiglentConnectionError: before connect() -- capabilities are
+                detected from *IDN?, so there is nothing honest to report
+                until the instrument has identified itself.
+        """
+        if self.model_capability is None:
+            raise exceptions.SiglentConnectionError("Not connected: capabilities are detected from *IDN? -- call connect() first.")
+        return self.model_capability
 
     def _parse_idn(self, idn: str) -> Dict[str, str]:
         """Parse *IDN? response into dictionary.

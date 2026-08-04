@@ -1,19 +1,17 @@
 """Channel configuration and control for Siglent oscilloscopes."""
 
 import logging
-from typing import TYPE_CHECKING, Literal, Optional
+from typing import TYPE_CHECKING, Optional, Union
 
 from scpi_control import exceptions
 from scpi_control.models import validate_channel
 from scpi_control.scpi_commands import coupling_from_wire, coupling_to_wire, probe_from_wire, probe_to_wire
+from scpi_control.vocabulary import BandwidthLimit, BandwidthLimitType, Coupling, CouplingType, normalize_token  # noqa: F401 -- re-exported for back-compat
 
 if TYPE_CHECKING:
     from scpi_control.oscilloscope import Oscilloscope
 
 logger = logging.getLogger(__name__)
-
-CouplingType = Literal["DC", "AC", "GND"]
-BandwidthLimitType = Literal["OFF", "ON", "FULL"]
 
 
 class Channel:
@@ -84,17 +82,16 @@ class Channel:
         return coupling_from_wire(self._dialect, self._scope.query(self._cmd("get_coupling", ch=self._channel)))
 
     @coupling.setter
-    def coupling(self, mode: CouplingType) -> None:
+    def coupling(self, mode: Union[Coupling, CouplingType]) -> None:
         """Set channel coupling mode.
 
         Args:
             mode: Coupling mode - 'DC', 'AC', or 'GND'
         """
-        mode = mode.upper()
-        if mode not in ["DC", "AC", "GND"]:
-            raise exceptions.InvalidParameterError(f"Invalid coupling mode: {mode}. Must be DC, AC, or GND.")
-        self._scope.write(self._cmd("set_coupling", ch=self._channel, coupling=coupling_to_wire(self._dialect, mode)))
-        logger.info(f"Channel {self._channel} coupling set to {mode}")
+        wire = coupling_to_wire(self._dialect, mode)  # validates: InvalidParameterError / FeatureNotSupportedError
+        self._scope.write(self._cmd("set_coupling", ch=self._channel, coupling=wire))
+        # getattr-unwrap: str() of a (str, Enum) member is "Coupling.DC" on Py<3.12
+        logger.info(f"Channel {self._channel} coupling set to {str(getattr(mode, 'value', mode)).upper()}")
 
     @property
     def voltage_scale(self) -> float:
@@ -242,15 +239,14 @@ class Channel:
         return response
 
     @bandwidth_limit.setter
-    def bandwidth_limit(self, limit: BandwidthLimitType) -> None:
+    def bandwidth_limit(self, limit: Union[BandwidthLimit, BandwidthLimitType]) -> None:
         """Set bandwidth limit.
 
         Args:
             limit: 'ON' to enable 20MHz limit, 'OFF' or 'FULL' for full bandwidth
         """
-        limit = limit.upper()
-        if limit not in ["ON", "OFF", "FULL"]:
-            raise exceptions.InvalidParameterError(f"Invalid bandwidth limit: {limit}. Must be ON, OFF, or FULL.")
+        limit_orig = limit  # preserve original for logging
+        limit = normalize_token(limit, parameter="bandwidth limit", valid={"ON", "OFF", "FULL"}, dialect=self._dialect)
         if self._dialect == "modern":
             wire = "FULL" if limit in ("OFF", "FULL") else "20M"
         elif self._dialect == "tektronix":
@@ -271,7 +267,8 @@ class Channel:
         else:
             wire = "OFF" if limit == "FULL" else limit
         self._scope.write(self._cmd("set_bandwidth_limit", ch=self._channel, limit=wire))
-        logger.info(f"Channel {self._channel} bandwidth limit set to {limit}")
+        # getattr-unwrap: str() of a (str, Enum) member is "BandwidthLimit.ON" on Py<3.12
+        logger.info(f"Channel {self._channel} bandwidth limit set to {str(getattr(limit_orig, 'value', limit_orig)).upper()}")
 
     @property
     def unit(self) -> str:

@@ -629,6 +629,7 @@ class SCPICommandSet:
 # cannot express that public token -> FeatureNotSupportedError.
 
 from scpi_control import exceptions
+from scpi_control.vocabulary import normalize_token
 
 # Dialects whose trigger commands are per-source-prefixed (C1:TRLV ...) rather
 # than global (:TRIGger:EDGE:LEVel ...). These also have a STOP trigger-mode
@@ -646,6 +647,7 @@ def is_flat_trigger(dialect: str) -> bool:
     return dialect in FLAT_TRIGGER_DIALECTS
 
 
+_MODE_ALIASES = {"NORMAL": "NORM"}
 _MODE_TO_WIRE = {
     "legacy": {"AUTO": "AUTO", "NORM": "NORM", "SINGLE": "SINGLE", "STOP": "STOP"},
     "modern": {"AUTO": "AUTO", "NORM": "NORMal", "SINGLE": "SINGle"},
@@ -740,6 +742,41 @@ _COUPLING_FROM_WIRE = {
     "lecroy": {"D1M": "DC", "A1M": "AC", "D50": "DC", "A50": "AC", "GND": "GND"},
 }
 
+# Trigger coupling. Distinct vocabulary from channel coupling: the reject
+# modes exist here and GND does not. Wire spellings, verbatim from the maps
+# that previously lived inline in trigger.py's setter/getter:
+#   modern spells the reject modes out (SDS800X HD guide p.486)
+#   tektronix is DC|HFRej|LFRej|NOISErej (TBS p.151 / MSO2 p.2-661) -- note NO
+#     AC token: public AC gates as FeatureNotSupportedError (the old inline
+#     setter passed AC through unmapped, i.e. sent an undocumented token)
+#   legacy/lecroy TRCP speaks the public tokens directly (MAUI p.7-30)
+_PUBLIC_TRIGGER_COUPLINGS = frozenset({"DC", "AC", "HFREJ", "LFREJ"})
+_TRIGGER_COUPLING_TO_WIRE = {
+    "legacy": {"DC": "DC", "AC": "AC", "HFREJ": "HFREJ", "LFREJ": "LFREJ"},
+    "modern": {"DC": "DC", "AC": "AC", "HFREJ": "HFREJect", "LFREJ": "LFREJect"},
+    "tektronix": {"DC": "DC", "HFREJ": "HFRej", "LFREJ": "LFRej"},
+    "lecroy": {"DC": "DC", "AC": "AC", "HFREJ": "HFREJ", "LFREJ": "LFREJ"},
+}
+_TRIGGER_COUPLING_FROM_WIRE = {
+    "legacy": {"DC": "DC", "AC": "AC", "HFREJ": "HFREJ", "LFREJ": "LFREJ"},
+    "modern": {"DC": "DC", "AC": "AC", "HFREJECT": "HFREJ", "LFREJECT": "LFREJ"},
+    "tektronix": {"DC": "DC", "HFREJ": "HFREJ", "LFREJ": "LFREJ"},
+    "lecroy": {"DC": "DC", "AC": "AC", "HFREJ": "HFREJ", "LFREJ": "LFREJ"},
+}
+
+
+def trigger_coupling_to_wire(dialect: str, coupling: str) -> str:
+    return _to_wire(_TRIGGER_COUPLING_TO_WIRE, _PUBLIC_TRIGGER_COUPLINGS, dialect, coupling, "trigger coupling")
+
+
+def trigger_coupling_from_wire(dialect: str, raw: str) -> str:
+    # A scope can sit in a coupling this API cannot set (tek NOISErej via the
+    # front panel); reads pass unmapped tokens through uppercased, mirroring
+    # trigger_type_from_wire.
+    token = _last_token(raw)
+    return _TRIGGER_COUPLING_FROM_WIRE.get(dialect, {}).get(token, token)
+
+
 _PUBLIC_MODES = {"AUTO", "NORM", "SINGLE", "STOP"}
 _PUBLIC_SLOPES = {"POS", "NEG", "WINDOW"}
 _PUBLIC_COUPLINGS = {"DC", "AC", "GND"}
@@ -755,14 +792,13 @@ def _last_token(raw: str) -> str:
     return raw.strip().split()[-1].upper() if raw.strip() else ""
 
 
-def _to_wire(table, public_values, dialect: str, token: str, what: str) -> str:
-    token = token.upper()
-    if token not in public_values:
-        raise ValueError(f"Invalid {what}: {token}. Must be one of {sorted(public_values)}.")
+def _to_wire(table, public_values, dialect: str, token: str, what: str, aliases=None) -> str:
+    canonical = normalize_token(token, parameter=what, valid=public_values, aliases=aliases, dialect=dialect)
     try:
-        return table[dialect][token]
+        return table[dialect][canonical]
     except KeyError:
-        raise exceptions.FeatureNotSupportedError(f"{what} {token} is not supported on the {dialect} dialect")
+        supported = ", ".join(sorted(table.get(dialect, {})))
+        raise exceptions.FeatureNotSupportedError(f"{what} {canonical} is not supported on the {dialect} dialect (supported: {supported})")
 
 
 def _from_wire(table, dialect: str, raw: str, what: str) -> str:
@@ -883,7 +919,7 @@ def mode_to_wire(dialect: str, mode: str) -> str:
     STOP is only a wire mode on flat-trigger dialects; global-style dialects
     implement it via their stop command, and callers handle it before converting.
     """
-    return _to_wire(_MODE_TO_WIRE, _PUBLIC_MODES, dialect, mode, "trigger mode")
+    return _to_wire(_MODE_TO_WIRE, _PUBLIC_MODES, dialect, mode, "trigger mode", aliases=_MODE_ALIASES)
 
 
 def mode_from_wire(dialect: str, raw: str) -> str:
@@ -997,3 +1033,136 @@ def probe_from_wire(dialect: str, raw: str) -> float:
     if dialect == "tektronix":
         return 1.0 / value if value else 0.0
     return value
+
+
+_PUBLIC_TRIGGER_SOURCES = frozenset({"C1", "C2", "C3", "C4", "EX", "EX5", "LINE"})
+
+
+# ---- Public support-set accessors (capability layer + setters) -------------
+# Each returns the PUBLIC tokens the dialect can express, derived from the
+# same tables the converters use -- the single source of truth.
+
+
+def supported_trigger_modes(dialect: str) -> frozenset:
+    # STOP is universal via each dialect's stop command, and tek SINGLE is a
+    # stop-after command sequence -- both handled in trigger.py's mode setter,
+    # so they are real capabilities even where the wire map lacks the token.
+    modes = set(_MODE_TO_WIRE.get(dialect, {}))
+    modes.add("STOP")
+    if dialect == "tektronix":
+        modes.add("SINGLE")
+    return frozenset(modes)
+
+
+def supported_trigger_types(dialect: str) -> frozenset:
+    return frozenset(_TRIGGER_TYPE_TO_WIRE.get(dialect, {}))
+
+
+def supported_trigger_slopes(dialect: str) -> frozenset:
+    return frozenset(_SLOPE_TO_WIRE.get(dialect, {}))
+
+
+def supported_trigger_couplings(dialect: str) -> frozenset:
+    return frozenset(_TRIGGER_COUPLING_TO_WIRE.get(dialect, {}))
+
+
+def supported_couplings(dialect: str) -> frozenset:
+    return frozenset(_COUPLING_TO_WIRE.get(dialect, {}))
+
+
+def supported_trigger_sources(dialect: str) -> frozenset:
+    # channel_token gates the tek gaps (EX5 has no token on any family; LINE
+    # diverges INSIDE the tek_mso variant, so it is gated dialect-wide -- see
+    # channel_token's comment). Other dialects pass EX/EX5/LINE through today;
+    # this reports what the driver will actually send, not a hardware promise.
+    #
+    # That distinction is not theoretical. Measured on an SDS824X HD (modern,
+    # firmware 3.8.12.1.1.3.6) on 2026-08-04:
+    #   - EX  is silently coerced to LINE. That model has no external trigger
+    #     input; the scope accepts the write, queues NO error, and triggers on
+    #     mains instead.
+    #   - EX5 never round-trips: from C1/C2/C3 it is a silent no-op, and from
+    #     LINE it lands on the highest ENABLED channel.
+    #   - C2/C3/C4 are coerced to LINE while that channel is switched OFF, and
+    #     round-trip correctly once it is on.
+    # None of the three queues an error, and this scope's SYST:ERR? is
+    # otherwise well behaved (a bogus token does queue -224), so the silence is
+    # deliberate coercion rather than a missing error queue.
+    #
+    # The set is deliberately NOT restricted for it: "no EX input" is a MODEL
+    # fact, and other modern-dialect scopes (e.g. SDS2000X+) do have one, so
+    # a dialect-wide cut would under-report them. Callers that need certainty
+    # must read the source back -- see Trigger.source's docstring.
+    if dialect == "tektronix":
+        return frozenset({"C1", "C2", "C3", "C4", "EX"})
+    return _PUBLIC_TRIGGER_SOURCES
+
+
+def supported_measurement_types(dialect: str) -> frozenset:
+    return frozenset(_MEASUREMENT_TO_WIRE.get(dialect, {}))
+
+
+def supported_badge_types(dialect: str) -> frozenset:
+    return frozenset(_BADGE_TYPE_TO_WIRE.get(dialect, {}))
+
+
+# ---- Wire-token accessors (mock fidelity) ----------------------------------
+# Per-dialect wire tokens, derived from the tables AT CALL TIME so a mutated
+# table moves the mock and the driver together (Task 8 guards this).
+#
+# Each token comes in two forms. The *_spellings accessors map the UPPERCASED
+# token to the table's canonical mixed-case spelling ("RISING" -> "RISing");
+# the *_tokens accessors are just their key sets, for membership checks. A
+# real SDS824X HD answers a query with the canonical spelling no matter what
+# casing the write used -- ":TRIGger:EDGE:SLOPe rising", "RISING" and "RiSiNg"
+# all read back "RISing" (measured 2026-08-04) -- so a faithful mock stores the
+# spelling, not the bytes it was sent.
+
+
+def _wire_spellings(table, dialect: str, extra=()) -> Dict[str, str]:
+    spellings = {t.upper(): t for t in table.get(dialect, {}).values()}
+    for token in extra:
+        spellings.setdefault(token.upper(), token)
+    return spellings
+
+
+def wire_coupling_spellings(dialect: str) -> Dict[str, str]:
+    return _wire_spellings(_COUPLING_TO_WIRE, dialect)
+
+
+def wire_trigger_mode_spellings(dialect: str) -> Dict[str, str]:
+    # :TRIGger:MODE FTRIG is the modern force-trigger write (p.482-484); it has
+    # no public token, so it is not in _MODE_TO_WIRE.
+    extra = ("FTRIG",) if dialect == "modern" else ()
+    return _wire_spellings(_MODE_TO_WIRE, dialect, extra)
+
+
+def wire_trigger_slope_spellings(dialect: str) -> Dict[str, str]:
+    return _wire_spellings(_SLOPE_TO_WIRE, dialect)
+
+
+def wire_trigger_coupling_spellings(dialect: str) -> Dict[str, str]:
+    return _wire_spellings(_TRIGGER_COUPLING_TO_WIRE, dialect)
+
+
+def wire_trigger_type_spellings(dialect: str) -> Dict[str, str]:
+    # Only the types this API can SET. A scope also accepts front-panel-only
+    # types (VIDeo, DROPout, ...) that no public token maps to, so the mock
+    # keeps its own wider enum and overlays this for the shared ones.
+    return _wire_spellings(_TRIGGER_TYPE_TO_WIRE, dialect)
+
+
+def wire_coupling_tokens(dialect: str) -> frozenset:
+    return frozenset(wire_coupling_spellings(dialect))
+
+
+def wire_trigger_mode_tokens(dialect: str) -> frozenset:
+    return frozenset(wire_trigger_mode_spellings(dialect))
+
+
+def wire_trigger_slope_tokens(dialect: str) -> frozenset:
+    return frozenset(wire_trigger_slope_spellings(dialect))
+
+
+def wire_trigger_coupling_tokens(dialect: str) -> frozenset:
+    return frozenset(wire_trigger_coupling_spellings(dialect))

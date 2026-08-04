@@ -9,6 +9,7 @@ from typing import Optional
 
 from scpi_control.connection.mock import synth as mock_synth
 from scpi_control.connection.mock.helpers import _build_ieee_block, _format_nr3
+from scpi_control.scpi_commands import wire_coupling_tokens, wire_trigger_coupling_tokens, wire_trigger_mode_tokens, wire_trigger_slope_tokens
 
 # Immediate-measurement values mirror _MOCK_PAVA_VALUES semantically (same
 # synthetic 1 kHz, 2 Vpp signal) but keyed by Tek IMMed type names.
@@ -79,7 +80,11 @@ def handle_write(conn, command: str) -> bool:
         conn._voltage_offsets[ch] = value
         return True
     if match := re.match(r"CH(\d+):COUPLING\s+(\w+)", upper):
-        conn._channel_coupling[int(match.group(1))] = match.group(2)
+        token = match.group(2)
+        if token not in wire_coupling_tokens("tektronix"):
+            conn.push_error(-224, "Illegal parameter value")
+            return True
+        conn._channel_coupling[int(match.group(1))] = token
         return True
     if match := re.match(r"CH(\d+):PROBE:GAIN\s+(.+)", upper):
         ch = int(match.group(1))
@@ -110,7 +115,11 @@ def handle_write(conn, command: str) -> bool:
     if re.match(r"HORIZONTAL:DELAY:TIME\s+", upper):
         return True
     if match := re.match(r"TRIGGER:A:MODE\s+(\w+)", upper):
-        conn.trigger_mode = match.group(1)
+        token = match.group(1)
+        if token not in wire_trigger_mode_tokens("tektronix"):
+            conn.push_error(-224, "Illegal parameter value")
+            return True
+        conn.trigger_mode = token
         return True
     if match := re.match(r"ACQUIRE:STOPAFTER\s+(\w+)", upper):
         conn.tek_stop_after = match.group(1)
@@ -142,10 +151,18 @@ def handle_write(conn, command: str) -> bool:
         conn.trigger_level[ch] = value
         return True
     if match := re.match(r"TRIGGER:A:EDGE:SLOPE\s+(\w+)", upper):
-        conn.trigger_slope = match.group(1)
+        token = match.group(1)
+        if token not in wire_trigger_slope_tokens("tektronix"):
+            conn.push_error(-224, "Illegal parameter value")
+            return True
+        conn.trigger_slope = token
         return True
     if match := re.match(r"TRIGGER:A:EDGE:COUPLING\s+(\w+)", upper):
-        conn.trigger_coupling = match.group(1)
+        token = match.group(1)
+        if token not in wire_trigger_coupling_tokens("tektronix"):
+            conn.push_error(-224, "Illegal parameter value")
+            return True
+        conn.trigger_coupling = token
         return True
     if match := re.match(r"TRIGGER:A:HOLDOFF:TIME\s+(.+)", upper):
         value = float(match.group(1))

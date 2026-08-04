@@ -27,12 +27,14 @@ For automated test report generation:
 
 __version__ = "6.0.0"
 
+from scpi_control.capabilities import ScopeCapabilities
 from scpi_control.exceptions import CommandError, SiglentConnectionError, SiglentError, SiglentTimeoutError
 from scpi_control.oscilloscope import Oscilloscope
 
 # Power supply support (stable as of v0.5.0)
 from scpi_control.power_supply import PowerSupply
 from scpi_control.psu_data_logger import PSUDataLogger, TimedPSULogger
+from scpi_control.psu_models import PSUCapability
 
 # Function generator support (new in v0.6.0, stable in v1.0.0)
 from scpi_control.function_generator import FunctionGenerator
@@ -40,19 +42,42 @@ from scpi_control.function_generator import FunctionGenerator
 # Data acquisition / Data logger support (new in v1.1.0)
 from scpi_control.data_logger import DataLogger
 
+# Typed vocabulary
+from scpi_control.vocabulary import (
+    BandwidthLimit,
+    Coupling,
+    TrackingMode,
+    TriggerCoupling,
+    TriggerMode,
+    TriggerSlope,
+    TriggerSource,
+    TriggerType,
+)
+
 __all__ = [
     # Core features
     "Oscilloscope",
+    "ScopeCapabilities",
     "SiglentError",
     "SiglentConnectionError",
     "SiglentTimeoutError",
     "CommandError",
     # Power supply features
     "PowerSupply",
+    "PSUCapability",
     "PSUDataLogger",
     "TimedPSULogger",
     # Function generator features
     "FunctionGenerator",
     # Data acquisition features
     "DataLogger",
+    # Typed vocabulary
+    "Coupling",
+    "TriggerMode",
+    "TriggerSlope",
+    "TriggerCoupling",
+    "TriggerType",
+    "TriggerSource",
+    "BandwidthLimit",
+    "TrackingMode",
 ]

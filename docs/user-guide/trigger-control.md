@@ -141,6 +141,19 @@ scope.trigger.source = "C4"
 scope.trigger.set_source(1)
 ```
 
+!!! warning "A channel must be switched on before it can be the trigger source"
+
+    Selecting a channel that is currently off does **not** raise. On an
+    SDS824X HD the scope accepts the write, queues no error, and silently
+    triggers on `LINE` instead — so the acquisition is real but synchronized
+    to mains rather than to your signal.
+
+    ```python
+    scope.channel2.enable()        # do this first
+    scope.trigger.source = "C2"
+    assert scope.trigger.source == "C2"   # read back when it matters
+    ```
+
 ### External Trigger
 
 Trigger from external BNC input:
@@ -150,6 +163,27 @@ Trigger from external BNC input:
 scope.trigger.source = "EX"    # Main external input
 scope.trigger.source = "EX5"   # 5V external input (if available)
 ```
+
+!!! warning "Not every scope has an external trigger input"
+
+    `scope.capabilities.trigger_sources` reports what the **driver** can send
+    for the dialect — it is not a promise about the attached model's front
+    panel, which SCPI gives no way to interrogate.
+
+    Measured on an SDS824X HD (modern dialect) on 2026-08-04, with **no error
+    queued** in any case: `EX` is silently coerced to `LINE` (that model has no
+    external input), and `EX5` never takes at all — it is a no-op when the
+    current source is a channel, and lands on the highest enabled channel when
+    the current source is `LINE`. Other modern-dialect scopes, such as the
+    SDS2000X+, do have a working external input.
+
+    Read the value back if your measurement depends on it:
+
+    ```python
+    scope.trigger.source = "EX"
+    if scope.trigger.source != "EX":
+        raise RuntimeError("this scope has no usable external trigger input")
+    ```
 
 ### Line Trigger
 
@@ -545,9 +579,15 @@ scope.trigger.coupling = "HFREJ"
 scope.trigger.coupling = "LFREJ"
 ```
 
-Allowed values are `DC`, `AC`, `HFREJ`, and `LFREJ`. The property is
-dialect-aware — it works identically whether the connected scope speaks the
-legacy or modern command set. See [SCPI Dialects](scpi-dialects.md) for how
+Allowed values are `DC`, `AC`, `HFREJ`, and `LFREJ` — also available as the
+`TriggerCoupling` enum (`from scpi_control import TriggerCoupling`); plain
+strings work too. The property is dialect-aware — it works identically
+whether the connected scope speaks the legacy, modern, or LeCroy command set.
+**Tektronix does not support `AC` trigger coupling** (neither the TBS1000C
+nor the 2/4/5/6 Series MSO command set has an AC trigger-coupling token);
+setting it on a Tektronix-dialect scope raises `FeatureNotSupportedError`.
+Check `scope.capabilities.trigger_couplings` before setting it if you need to
+support multiple dialects. See [SCPI Dialects](scpi-dialects.md) for how
 that translation works.
 
 ## Trigger Holdoff
@@ -613,9 +653,9 @@ current_level = scope.trigger.level
 scope.trigger.level = current_level * 1.2
 
 # Or use trigger coupling to filter noise
-scope.trigger.coupling = "AC"      # Remove DC
+scope.trigger.coupling = "AC"      # Remove DC (raises on Tektronix -- see above)
 # or
-scope.trigger.coupling = "HFREJ"   # Remove HF noise
+scope.trigger.coupling = "HFREJ"   # Remove HF noise (available on every dialect)
 ```
 
 ### Missing Intermittent Events

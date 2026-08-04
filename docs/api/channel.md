@@ -18,4 +18,5 @@ Channel configuration and control
 ## See Also
 
 - [Oscilloscope](oscilloscope.md) - Main oscilloscope control class for SCPI communication
+- [Vocabulary](vocabulary.md) - String-compatible enums for token-valued parameters (coupling, trigger mode/slope/source/coupling/type, bandwidth limit, tracking mode) -- enums in, strings out
 - [Trigger](trigger.md) - Trigger configuration and modes
