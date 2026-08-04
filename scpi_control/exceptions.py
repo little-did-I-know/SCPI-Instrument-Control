@@ -80,8 +80,14 @@ class InvalidParameterError(SiglentError, ValueError):
         super().__init__(message)
 
 
-class FeatureNotSupportedError(SiglentError):
-    """Raised when an operation is not supported by the connected instrument's dialect."""
+class FeatureNotSupportedError(SiglentError, NotImplementedError):
+    """Raised when an operation is not supported by the connected instrument.
+
+    Also a NotImplementedError: the PSU capability gates historically raised
+    bare NotImplementedError, and pre-existing `except NotImplementedError`
+    callers must keep catching them. (Same dual-base rationale as
+    InvalidParameterError, which is also a ValueError.)
+    """
 
     pass
 

@@ -224,10 +224,10 @@ class PowerSupplyOutput:
             OVP level in volts
 
         Raises:
-            NotImplementedError: If OVP is not supported by this model
+            FeatureNotSupportedError: If OVP is not supported by this model
         """
         if not self._psu.model_capability.has_ovp:
-            raise NotImplementedError(f"Over-voltage protection not supported on {self._psu.model_capability.model_name}")
+            raise exceptions.FeatureNotSupportedError(f"Over-voltage protection not supported on {self._psu.model_capability.model_name}")
 
         cmd = self._psu._get_command("get_voltage_limit", ch=self._output_num)
         response = self._psu.query(cmd)
@@ -241,10 +241,10 @@ class PowerSupplyOutput:
             volts: OVP level in volts
 
         Raises:
-            NotImplementedError: If OVP is not supported by this model
+            FeatureNotSupportedError: If OVP is not supported by this model
         """
         if not self._psu.model_capability.has_ovp:
-            raise NotImplementedError(f"Over-voltage protection not supported on {self._psu.model_capability.model_name}")
+            raise exceptions.FeatureNotSupportedError(f"Over-voltage protection not supported on {self._psu.model_capability.model_name}")
 
         cmd = self._psu._get_command("set_voltage_limit", ch=self._output_num, limit=volts)
         self._psu.write(cmd)
@@ -258,10 +258,10 @@ class PowerSupplyOutput:
             OCP level in amps
 
         Raises:
-            NotImplementedError: If OCP is not supported by this model
+            FeatureNotSupportedError: If OCP is not supported by this model
         """
         if not self._psu.model_capability.has_ocp:
-            raise NotImplementedError(f"Over-current protection not supported on {self._psu.model_capability.model_name}")
+            raise exceptions.FeatureNotSupportedError(f"Over-current protection not supported on {self._psu.model_capability.model_name}")
 
         cmd = self._psu._get_command("get_current_limit", ch=self._output_num)
         response = self._psu.query(cmd)
@@ -275,10 +275,10 @@ class PowerSupplyOutput:
             amps: OCP level in amps
 
         Raises:
-            NotImplementedError: If OCP is not supported by this model
+            FeatureNotSupportedError: If OCP is not supported by this model
         """
         if not self._psu.model_capability.has_ocp:
-            raise NotImplementedError(f"Over-current protection not supported on {self._psu.model_capability.model_name}")
+            raise exceptions.FeatureNotSupportedError(f"Over-current protection not supported on {self._psu.model_capability.model_name}")
 
         cmd = self._psu._get_command("set_current_limit", ch=self._output_num, limit=amps)
         self._psu.write(cmd)
@@ -294,10 +294,10 @@ class PowerSupplyOutput:
             True if timer is enabled, False otherwise
 
         Raises:
-            NotImplementedError: If timer is not supported by this model
+            FeatureNotSupportedError: If timer is not supported by this model
         """
         if not self._psu.model_capability.has_timer:
-            raise NotImplementedError(f"Timer not supported on {self._psu.model_capability.model_name}")
+            raise exceptions.FeatureNotSupportedError(f"Timer not supported on {self._psu.model_capability.model_name}")
 
         cmd = self._psu._get_command("get_timer_enable", ch=self._output_num)
         response = self._psu.query(cmd)
@@ -311,10 +311,10 @@ class PowerSupplyOutput:
             state: True to enable timer, False to disable
 
         Raises:
-            NotImplementedError: If timer is not supported by this model
+            FeatureNotSupportedError: If timer is not supported by this model
         """
         if not self._psu.model_capability.has_timer:
-            raise NotImplementedError(f"Timer not supported on {self._psu.model_capability.model_name}")
+            raise exceptions.FeatureNotSupportedError(f"Timer not supported on {self._psu.model_capability.model_name}")
 
         state_str = "ON" if state else "OFF"
         cmd = self._psu._get_command("set_timer_enable", ch=self._output_num, state=state_str)
@@ -331,10 +331,10 @@ class PowerSupplyOutput:
             True if waveform is enabled, False otherwise
 
         Raises:
-            NotImplementedError: If waveform generation is not supported
+            FeatureNotSupportedError: If waveform generation is not supported
         """
         if not self._psu.model_capability.has_waveform:
-            raise NotImplementedError(f"Waveform generation not supported on {self._psu.model_capability.model_name}")
+            raise exceptions.FeatureNotSupportedError(f"Waveform generation not supported on {self._psu.model_capability.model_name}")
 
         cmd = self._psu._get_command("get_wave_enable", ch=self._output_num)
         response = self._psu.query(cmd)
@@ -348,10 +348,10 @@ class PowerSupplyOutput:
             state: True to enable waveform, False to disable
 
         Raises:
-            NotImplementedError: If waveform generation is not supported
+            FeatureNotSupportedError: If waveform generation is not supported
         """
         if not self._psu.model_capability.has_waveform:
-            raise NotImplementedError(f"Waveform generation not supported on {self._psu.model_capability.model_name}")
+            raise exceptions.FeatureNotSupportedError(f"Waveform generation not supported on {self._psu.model_capability.model_name}")
 
         state_str = "ON" if state else "OFF"
         cmd = self._psu._get_command("set_wave_enable", ch=self._output_num, state=state_str)
