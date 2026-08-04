@@ -32,6 +32,11 @@ _PERSONALITIES = {
 # query, audit H19) keeps answering the same shape it always has.
 _TRACKING_NUMERIC_TO_WORD = {"0": "INDEPENDENT", "1": "SERIES", "2": "PARALLEL"}
 
+# QS0503X-E01B: the SPD3303X setpoint, measurement, timer and waveform
+# subsystems are [{CH1|CH2}] only (pp.38-41), and p.42's status bitmap has no
+# CH3 bit. Only OUTPut {CH1|CH2|CH3},{ON|OFF} (p.40) covers the fixed rail.
+_SPD_SETPOINT_CHANNELS = frozenset({1, 2})
+
 
 class MockConnection(BaseConnection):
     """Mock connection that returns deterministic SCPI responses.
@@ -382,9 +387,20 @@ class MockConnection(BaseConnection):
             # error queued. `(.+)` (matching the scope handlers' own convention
             # elsewhere in this file) hands the full token to float() so
             # reject_if_invalid actually sees what was sent.
-            if match := re.match(r"(?:CH|SOUR)(\d+):VOLT\s+(.+)", command, re.IGNORECASE):
-                ch = int(match.group(1))
-                voltage = float(match.group(2))
+            # I3: the mnemonic itself was hard-coded to the short form
+            # ("VOLT" only); the long form ("VOLTage") a real instrument also
+            # accepts fell through unmatched, so an undocumented-channel write
+            # spelled that way was silently unqueued rather than rejected.
+            if match := re.match(r"(CH|SOUR)(\d+):VOLT(?:AGE)?\s+(.+)", command, re.IGNORECASE):
+                prefix = match.group(1).upper()
+                ch = int(match.group(2))
+                voltage = float(match.group(3))
+                # QS0503X-E01B p.39: the Siglent CH<n>: setpoint form is
+                # {CH1|CH2} only. The generic SOUR<n>: spelling belongs to
+                # other PSUs and is not restricted here.
+                if prefix == "CH" and ch not in _SPD_SETPOINT_CHANNELS:
+                    self.push_error(-224, "Illegal parameter value")
+                    return
                 # A voltage setpoint of 0.0 (output at rest) is legitimate --
                 # power_supply_output.py's own validation allows
                 # `0 <= volts <= max_voltage` -- so it is gated on non_negative
@@ -397,9 +413,17 @@ class MockConnection(BaseConnection):
                 return
 
             # Current setting: CH1:CURR 2.0 (Siglent) or SOUR1:CURR 2.0 (generic)
-            if match := re.match(r"(?:CH|SOUR)(\d+):CURR\s+(.+)", command, re.IGNORECASE):
-                ch = int(match.group(1))
-                current = float(match.group(2))
+            # I3: same long-form gap as the voltage handler above ("CURRent").
+            if match := re.match(r"(CH|SOUR)(\d+):CURR(?:ENT)?\s+(.+)", command, re.IGNORECASE):
+                prefix = match.group(1).upper()
+                ch = int(match.group(2))
+                current = float(match.group(3))
+                # QS0503X-E01B p.39: same CH-only restriction as the voltage
+                # setpoint handler above; the generic SOUR<n>: spelling is
+                # unrestricted.
+                if prefix == "CH" and ch not in _SPD_SETPOINT_CHANNELS:
+                    self.push_error(-224, "Illegal parameter value")
+                    return
                 # A current limit of 0.0 is legitimate for the same reason as
                 # voltage above, so it is gated on non_negative rather than
                 # positive (I2).
@@ -428,6 +452,9 @@ class MockConnection(BaseConnection):
             # Timer enable: TIMEr CH1,ON
             if match := re.match(r"TIME(?:R)?\s+CH(\d+),(ON|OFF)", command, re.IGNORECASE):
                 ch = int(match.group(1))
+                if ch not in _SPD_SETPOINT_CHANNELS:
+                    self.push_error(-224, "Illegal parameter value")
+                    return
                 enabled = match.group(2).upper() == "ON"
                 self.psu_timer_enabled[ch] = enabled
                 return
@@ -435,6 +462,9 @@ class MockConnection(BaseConnection):
             # Waveform display enable: OUTPut:WAVE CH1,ON (QS0503X-E01B p.40)
             if match := re.match(r"OUTP(?:UT)?:WAVE\s+CH(\d+),(ON|OFF)", command, re.IGNORECASE):
                 ch = int(match.group(1))
+                if ch not in _SPD_SETPOINT_CHANNELS:
+                    self.push_error(-224, "Illegal parameter value")
+                    return
                 enabled = match.group(2).upper() == "ON"
                 self.psu_waveform_enabled[ch] = enabled
                 return
@@ -858,15 +888,23 @@ class MockConnection(BaseConnection):
         # Power supply queries
         if self.psu_mode:
             # Voltage queries: CH1:VOLT? (Siglent) or SOUR1:VOLT? (generic)
-            if match := re.match(r"(?:CH|SOUR)(\d+):VOLT\?", upper):
-                ch = int(match.group(1))
+            if match := re.match(r"(CH|SOUR)(\d+):VOLT\?", upper):
+                prefix = match.group(1)
+                ch = int(match.group(2))
+                if prefix == "CH" and ch not in _SPD_SETPOINT_CHANNELS:
+                    self.push_error(-224, "Illegal parameter value")
+                    return "0.000"
                 if ch in self.psu_outputs:
                     return f"{self.psu_outputs[ch]['voltage']:.3f}"
                 return "0.000"
 
             # Current queries: CH1:CURR? (Siglent) or SOUR1:CURR? (generic)
-            if match := re.match(r"(?:CH|SOUR)(\d+):CURR\?", upper):
-                ch = int(match.group(1))
+            if match := re.match(r"(CH|SOUR)(\d+):CURR\?", upper):
+                prefix = match.group(1)
+                ch = int(match.group(2))
+                if prefix == "CH" and ch not in _SPD_SETPOINT_CHANNELS:
+                    self.push_error(-224, "Illegal parameter value")
+                    return "0.000"
                 if ch in self.psu_outputs:
                     return f"{self.psu_outputs[ch]['current']:.3f}"
                 return "0.000"
@@ -899,6 +937,9 @@ class MockConnection(BaseConnection):
             # argument, not fused to the keyword -- audit H6)
             if match := re.match(r"MEAS(?:URE)?:VOLT(?:AGE)?\?\s*CH(\d+)", upper):
                 ch = int(match.group(1))
+                if ch not in _SPD_SETPOINT_CHANNELS:
+                    self.push_error(-224, "Illegal parameter value")
+                    return "0.000"
                 if ch in self.psu_outputs:
                     v = self.psu_outputs[ch]["voltage"]
                     # Add small noise to measurement (0-2mV)
@@ -908,6 +949,9 @@ class MockConnection(BaseConnection):
 
             if match := re.match(r"MEAS(?:URE)?:CURR(?:ENT)?\?\s*CH(\d+)", upper):
                 ch = int(match.group(1))
+                if ch not in _SPD_SETPOINT_CHANNELS:
+                    self.push_error(-224, "Illegal parameter value")
+                    return "0.000"
                 if ch in self.psu_outputs:
                     i = self.psu_outputs[ch]["current"]
                     # Add small noise to measurement (0-2mA)
@@ -917,6 +961,9 @@ class MockConnection(BaseConnection):
 
             if match := re.match(r"MEAS(?:URE)?:POW(?:ER)?\?\s*CH(\d+)", upper):
                 ch = int(match.group(1))
+                if ch not in _SPD_SETPOINT_CHANNELS:
+                    self.push_error(-224, "Illegal parameter value")
+                    return "0.000"
                 if ch in self.psu_outputs:
                     v = self.psu_outputs[ch]["voltage"]
                     i = self.psu_outputs[ch]["current"]

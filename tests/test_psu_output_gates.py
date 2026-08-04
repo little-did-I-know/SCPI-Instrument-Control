@@ -103,3 +103,34 @@ class TestGetConfigurationDegrades:
         psu, _ = make_psu()
         config = psu.output1.get_configuration()
         assert "voltage_setpoint" in config and "measured_voltage" in config
+
+
+class TestMockRefusesUndocumentedCh3Commands:
+    """Without this the gate is untested: the driver simply stops sending, and
+    nothing proves the firmware would have refused."""
+
+    @pytest.mark.parametrize("command", [
+        "CH3:VOLTage 3.3",
+        "CH3:CURRent 1.0",
+        "TIMEr CH3,ON",
+        "OUTPut:WAVE CH3,ON",
+    ])
+    def test_undocumented_ch3_writes_queue_minus_224(self, command):
+        _, conn = make_psu()
+        conn.error_queue.clear()
+        conn.write(command)  # bypass the driver gate
+        assert conn.error_queue == [(-224, "Illegal parameter value")]
+
+    def test_output_switching_on_ch3_is_accepted(self):
+        # QS0503X-E01B p.40 documents CH3 here, so the mock must NOT reject it.
+        _, conn = make_psu()
+        conn.error_queue.clear()
+        conn.write("OUTPut CH3,ON")
+        assert conn.error_queue == []
+
+    @pytest.mark.parametrize("command", ["CH1:VOLTage 5.0", "CH2:CURRent 1.0", "TIMEr CH1,ON"])
+    def test_documented_ch1_ch2_commands_still_accepted(self, command):
+        _, conn = make_psu()
+        conn.error_queue.clear()
+        conn.write(command)
+        assert conn.error_queue == []
