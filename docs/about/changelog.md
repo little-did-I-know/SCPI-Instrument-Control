@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.0.0] - 2026-08-04
+
 ### ⚠️ Breaking Changes
 
 - PSU: `ovp_level`/`ocp_level` on SPD1305X/SPD1168X now raise `NotImplementedError` instead of silently sending a command the firmware discards. No SPD1000X programming manual documents a SCPI protection subsystem; set protection on the front panel. (Same honesty gate the SPD3303X received in v5.0.0.)
