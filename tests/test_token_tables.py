@@ -97,7 +97,7 @@ class TestTriggerLevelSources:
             assert sc.supported_trigger_level_sources(dialect) == frozenset({"C1", "C2", "C3", "C4", "EX", "EX5"})
 
     def test_modern_is_unrestricted_because_the_command_takes_no_source(self):
-        # EN11G p.492: :TRIGger:EDGE:LEVel <level_value> -- no source argument,
+        # EN11G p.493: :TRIGger:EDGE:LEVel <level_value> -- no source argument,
         # so restricting it would invent a limit the manual does not state.
         assert sc.supported_trigger_level_sources("modern") == frozenset({"C1", "C2", "C3", "C4", "EX", "EX5", "LINE"})
 
