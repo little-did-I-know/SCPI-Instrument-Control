@@ -147,6 +147,8 @@ nav:
       - API Reference: report-generator/api-reference.md
   - API Reference:
       - Oscilloscope: api/oscilloscope.md
+      - Vocabulary: api/vocabulary.md
+      - Scope Capabilities: api/capabilities.md
       - Channel: api/channel.md
       - Trigger: api/trigger.md
       - Waveform: api/waveform.md

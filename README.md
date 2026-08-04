@@ -724,10 +724,15 @@ scope.reset()         # Reset to defaults
 
 ### Channels
 
+Token-valued settings (coupling, trigger mode/slope/source/coupling, bandwidth
+limit, ...) accept either the plain string shown below or the matching
+string-compatible enum from `scpi_control` (`Coupling.DC == "DC"`) — both
+forms work everywhere; pick whichever reads better in your code.
+
 ```python
 # Channel configuration (channels 1-4)
 scope.channel1.enable()
-scope.channel1.coupling = "DC"  # DC, AC, or GND
+scope.channel1.coupling = "DC"  # DC, AC, or GND -- or Coupling.DC
 scope.channel1.voltage_scale = 1.0  # Volts/division
 scope.channel1.voltage_offset = 0.0  # Volts
 scope.channel1.probe_ratio = 10.0  # 10X probe
@@ -740,11 +745,13 @@ config = scope.channel1.get_configuration()
 ### Trigger
 
 ```python
+from scpi_control import TriggerMode, TriggerSlope
+
 # Trigger configuration
-scope.trigger.mode = "NORMAL"  # AUTO, NORM, SINGLE, STOP
+scope.trigger.mode = TriggerMode.NORM  # AUTO, NORM, SINGLE, STOP -- enum or string
 scope.trigger.source = "C1"  # C1, C2, C3, C4, EX, LINE
 scope.trigger.level = 0.0  # Trigger level in volts
-scope.trigger.slope = "POS"  # POS (rising) or NEG (falling)
+scope.trigger.slope = TriggerSlope.POS  # POS (rising) or NEG (falling)
 
 # Edge trigger setup
 scope.trigger.set_edge_trigger(source="C1", slope="POS")
@@ -752,6 +759,10 @@ scope.trigger.set_edge_trigger(source="C1", slope="POS")
 # Trigger actions
 scope.trigger.single()  # Single trigger
 scope.trigger.force()   # Force trigger
+
+# Ask before calling: what can this scope's dialect express?
+caps = scope.capabilities
+print(caps.trigger_types, caps.channel_couplings)
 ```
 
 ### Waveform Acquisition

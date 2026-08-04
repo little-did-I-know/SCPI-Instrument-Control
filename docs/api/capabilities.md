@@ -1,8 +1,8 @@
-# Trigger
+# Scope Capabilities
 
-Trigger configuration and modes
+Derived, dialect-resolved capabilities of a connected oscilloscope (scope.capabilities)
 
-::: scpi_control.trigger
+::: scpi_control.capabilities
     options:
       show_root_heading: false
       show_source: true
@@ -19,4 +19,4 @@ Trigger configuration and modes
 
 - [Oscilloscope](oscilloscope.md) - Main oscilloscope control class for SCPI communication
 - [Vocabulary](vocabulary.md) - String-compatible enums for token-valued parameters (coupling, trigger mode/slope/source/coupling/type, bandwidth limit, tracking mode) -- enums in, strings out
-- [Channel](channel.md) - Channel configuration and control
+- [Models](models.md) - Oscilloscope model capabilities and registry

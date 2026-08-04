@@ -53,7 +53,7 @@ echoed to the console, frequency/Vpp measurements on Channel 1, and a summary
 of each enabled channel's configuration. No files are written.
 """
 
-from scpi_control import Oscilloscope
+from scpi_control import Coupling, Oscilloscope, TriggerMode, TriggerSlope
 
 # Replace with your oscilloscope's IP address
 SCOPE_IP = "192.168.1.100"
@@ -75,10 +75,15 @@ def main():
             print(f"Serial: {scope.device_info['serial']}")
             print(f"Firmware: {scope.device_info['firmware']}")
 
+        # Ask before calling: what can this scope's dialect express?
+        caps = scope.capabilities
+        print(f"Trigger types on this scope: {sorted(caps.trigger_types)}")
+        print(f"Channel couplings: {sorted(caps.channel_couplings)}")
+
         # Configure channel 1
         print("\nConfiguring Channel 1...")
         scope.channel1.enable()
-        scope.channel1.coupling = "DC"
+        scope.channel1.coupling = Coupling.DC
         scope.channel1.voltage_scale = 1.0  # 1V/div
         scope.channel1.voltage_offset = 0.0
         scope.channel1.probe_ratio = 10.0  # 10X probe
@@ -86,10 +91,10 @@ def main():
 
         # Configure trigger
         print("\nConfiguring Trigger...")
-        scope.trigger.mode = "AUTO"
-        scope.trigger.source = "C1"
+        scope.trigger.mode = TriggerMode.AUTO
+        scope.trigger.source = "C1"  # Plain strings work too -- enums are optional sugar
         scope.trigger.level = 0.0  # Trigger at 0V
-        scope.trigger.slope = "POS"  # Rising edge
+        scope.trigger.slope = TriggerSlope.POS  # Rising edge
         print(f"Trigger configured: {scope.trigger}")
 
         # Start acquisition

@@ -545,9 +545,15 @@ scope.trigger.coupling = "HFREJ"
 scope.trigger.coupling = "LFREJ"
 ```
 
-Allowed values are `DC`, `AC`, `HFREJ`, and `LFREJ`. The property is
-dialect-aware — it works identically whether the connected scope speaks the
-legacy or modern command set. See [SCPI Dialects](scpi-dialects.md) for how
+Allowed values are `DC`, `AC`, `HFREJ`, and `LFREJ` — also available as the
+`TriggerCoupling` enum (`from scpi_control import TriggerCoupling`); plain
+strings work too. The property is dialect-aware — it works identically
+whether the connected scope speaks the legacy, modern, or LeCroy command set.
+**Tektronix does not support `AC` trigger coupling** (neither the TBS1000C
+nor the 2/4/5/6 Series MSO command set has an AC trigger-coupling token);
+setting it on a Tektronix-dialect scope raises `FeatureNotSupportedError`.
+Check `scope.capabilities.trigger_couplings` before setting it if you need to
+support multiple dialects. See [SCPI Dialects](scpi-dialects.md) for how
 that translation works.
 
 ## Trigger Holdoff

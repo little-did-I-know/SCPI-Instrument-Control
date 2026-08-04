@@ -17,6 +17,8 @@ Main oscilloscope control class for SCPI communication
 
 ## See Also
 
+- [Vocabulary](vocabulary.md) - String-compatible enums for token-valued parameters (coupling, trigger mode/slope/source/coupling/type, bandwidth limit, tracking mode) -- enums in, strings out
+- [Scope Capabilities](capabilities.md) - Derived, dialect-resolved capabilities of a connected oscilloscope (scope.capabilities)
 - [Channel](channel.md) - Channel configuration and control
 - [Trigger](trigger.md) - Trigger configuration and modes
 - [Waveform](waveform.md) - Waveform acquisition and data handling
