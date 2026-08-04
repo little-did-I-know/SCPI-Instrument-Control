@@ -5,7 +5,7 @@ Represents a single power supply output with voltage, current, and enable contro
 
 import logging
 import re
-from typing import TYPE_CHECKING, Dict, Optional
+from typing import TYPE_CHECKING, Any, Dict, Optional
 
 from scpi_control import exceptions
 from scpi_control.psu_scpi_commands import decode_spd_status
@@ -38,6 +38,16 @@ class PowerSupplyOutput:
         if not 1 <= self._output_num <= 3:
             raise exceptions.InvalidParameterError(f"Invalid output number: {self._output_num}. Must be 1-3.")
 
+    def _require(self, flag: str, what: str) -> None:
+        """Raise unless this output's spec documents `what` as supported.
+
+        The flags come from the model's programming manual (see OutputSpec);
+        an output the manual does not cover must fail loudly rather than send
+        a command the firmware silently discards.
+        """
+        if not getattr(self._spec, flag, True):
+            raise exceptions.FeatureNotSupportedError(f"{what} is not supported on output {self._output_num} of {self._psu.model_capability.model_name}")
+
     # --- Voltage Control ---
 
     @property
@@ -47,6 +57,7 @@ class PowerSupplyOutput:
         Returns:
             Voltage setpoint in volts
         """
+        self._require("programmable", "Voltage setpoint control")
         cmd = self._psu._get_command("get_voltage", ch=self._output_num)
         response = self._psu.query(cmd)
         return self._parse_float(response, cmd)
@@ -61,6 +72,7 @@ class PowerSupplyOutput:
         Raises:
             InvalidParameterError: If voltage exceeds maximum for this output
         """
+        self._require("programmable", "Voltage setpoint control")
         if not 0 <= volts <= self._spec.max_voltage:
             raise exceptions.InvalidParameterError(f"Voltage {volts}V exceeds maximum {self._spec.max_voltage}V " f"for output {self._output_num}")
 
@@ -85,6 +97,7 @@ class PowerSupplyOutput:
         Returns:
             Current limit in amps
         """
+        self._require("programmable", "Current setpoint control")
         cmd = self._psu._get_command("get_current", ch=self._output_num)
         response = self._psu.query(cmd)
         return self._parse_float(response, cmd)
@@ -99,6 +112,7 @@ class PowerSupplyOutput:
         Raises:
             InvalidParameterError: If current exceeds maximum for this output
         """
+        self._require("programmable", "Current setpoint control")
         if not 0 <= amps <= self._spec.max_current:
             raise exceptions.InvalidParameterError(f"Current {amps}A exceeds maximum {self._spec.max_current}A " f"for output {self._output_num}")
 
@@ -123,6 +137,7 @@ class PowerSupplyOutput:
         Returns:
             True if output is enabled, False otherwise
         """
+        self._require("state_readable", "Output state read-back")
         scpi_commands = self._psu._scpi_commands
         if scpi_commands is not None and scpi_commands.supports_command("get_status"):
             # QS0503X-E01B p.36/p.40-41: the SPD3303X has no output-state
@@ -134,10 +149,11 @@ class PowerSupplyOutput:
             key = f"ch{self._output_num}_output"
             if key in state:
                 return state[key]
-            # No documented status bit covers this channel (e.g. SPD3303X's
-            # fixed CH3 -- p.42's bit table only defines CH1/CH2). Fall
-            # through to the generic query below for lack of anything better
-            # documented for it.
+            # Fall through for an output that IS state_readable but whose
+            # channel decode_spd_status doesn't cover -- unlike CH3 (gated
+            # out above `_require`, since p.42's bitmap has no CH3 bit at
+            # all), this serves a model/output whose status word omits a bit
+            # for a channel the manual otherwise documents as readable.
 
         cmd = self._psu._get_command("get_output", ch=self._output_num)
         response = self._psu.query(cmd)
@@ -151,6 +167,7 @@ class PowerSupplyOutput:
         Args:
             state: True to enable output, False to disable
         """
+        self._require("switchable", "Output switching")
         state_str = "ON" if state else "OFF"
         cmd = self._psu._get_command("set_output", ch=self._output_num, state=state_str)
         self._psu.write(cmd)
@@ -172,6 +189,7 @@ class PowerSupplyOutput:
         Returns:
             Actual output voltage in volts
         """
+        self._require("measurable", "Measurement")
         cmd = self._psu._get_command("measure_voltage", ch=self._output_num)
         response = self._psu.query(cmd)
         return self._parse_float(response, cmd)
@@ -182,6 +200,7 @@ class PowerSupplyOutput:
         Returns:
             Actual output current in amps
         """
+        self._require("measurable", "Measurement")
         cmd = self._psu._get_command("measure_current", ch=self._output_num)
         response = self._psu.query(cmd)
         return self._parse_float(response, cmd)
@@ -192,6 +211,7 @@ class PowerSupplyOutput:
         Returns:
             Actual output power in watts
         """
+        self._require("measurable", "Measurement")
         cmd = self._psu._get_command("measure_power", ch=self._output_num)
         response = self._psu.query(cmd)
         return self._parse_float(response, cmd)
@@ -206,6 +226,7 @@ class PowerSupplyOutput:
             Not all power supplies support mode query. May raise an exception
             if the command is not supported.
         """
+        self._require("measurable", "Operating-mode read-back")
         try:
             cmd = self._psu._get_command("get_output_mode", ch=self._output_num)
             response = self._psu.query(cmd)
@@ -224,10 +245,10 @@ class PowerSupplyOutput:
             OVP level in volts
 
         Raises:
-            NotImplementedError: If OVP is not supported by this model
+            FeatureNotSupportedError: If OVP is not supported by this model
         """
         if not self._psu.model_capability.has_ovp:
-            raise NotImplementedError(f"Over-voltage protection not supported on {self._psu.model_capability.model_name}")
+            raise exceptions.FeatureNotSupportedError(f"Over-voltage protection not supported on {self._psu.model_capability.model_name}")
 
         cmd = self._psu._get_command("get_voltage_limit", ch=self._output_num)
         response = self._psu.query(cmd)
@@ -241,10 +262,10 @@ class PowerSupplyOutput:
             volts: OVP level in volts
 
         Raises:
-            NotImplementedError: If OVP is not supported by this model
+            FeatureNotSupportedError: If OVP is not supported by this model
         """
         if not self._psu.model_capability.has_ovp:
-            raise NotImplementedError(f"Over-voltage protection not supported on {self._psu.model_capability.model_name}")
+            raise exceptions.FeatureNotSupportedError(f"Over-voltage protection not supported on {self._psu.model_capability.model_name}")
 
         cmd = self._psu._get_command("set_voltage_limit", ch=self._output_num, limit=volts)
         self._psu.write(cmd)
@@ -258,10 +279,10 @@ class PowerSupplyOutput:
             OCP level in amps
 
         Raises:
-            NotImplementedError: If OCP is not supported by this model
+            FeatureNotSupportedError: If OCP is not supported by this model
         """
         if not self._psu.model_capability.has_ocp:
-            raise NotImplementedError(f"Over-current protection not supported on {self._psu.model_capability.model_name}")
+            raise exceptions.FeatureNotSupportedError(f"Over-current protection not supported on {self._psu.model_capability.model_name}")
 
         cmd = self._psu._get_command("get_current_limit", ch=self._output_num)
         response = self._psu.query(cmd)
@@ -275,10 +296,10 @@ class PowerSupplyOutput:
             amps: OCP level in amps
 
         Raises:
-            NotImplementedError: If OCP is not supported by this model
+            FeatureNotSupportedError: If OCP is not supported by this model
         """
         if not self._psu.model_capability.has_ocp:
-            raise NotImplementedError(f"Over-current protection not supported on {self._psu.model_capability.model_name}")
+            raise exceptions.FeatureNotSupportedError(f"Over-current protection not supported on {self._psu.model_capability.model_name}")
 
         cmd = self._psu._get_command("set_current_limit", ch=self._output_num, limit=amps)
         self._psu.write(cmd)
@@ -294,10 +315,11 @@ class PowerSupplyOutput:
             True if timer is enabled, False otherwise
 
         Raises:
-            NotImplementedError: If timer is not supported by this model
+            FeatureNotSupportedError: If timer is not supported by this model
         """
         if not self._psu.model_capability.has_timer:
-            raise NotImplementedError(f"Timer not supported on {self._psu.model_capability.model_name}")
+            raise exceptions.FeatureNotSupportedError(f"Timer not supported on {self._psu.model_capability.model_name}")
+        self._require("supports_timer", "Timer control")
 
         cmd = self._psu._get_command("get_timer_enable", ch=self._output_num)
         response = self._psu.query(cmd)
@@ -311,10 +333,11 @@ class PowerSupplyOutput:
             state: True to enable timer, False to disable
 
         Raises:
-            NotImplementedError: If timer is not supported by this model
+            FeatureNotSupportedError: If timer is not supported by this model
         """
         if not self._psu.model_capability.has_timer:
-            raise NotImplementedError(f"Timer not supported on {self._psu.model_capability.model_name}")
+            raise exceptions.FeatureNotSupportedError(f"Timer not supported on {self._psu.model_capability.model_name}")
+        self._require("supports_timer", "Timer control")
 
         state_str = "ON" if state else "OFF"
         cmd = self._psu._get_command("set_timer_enable", ch=self._output_num, state=state_str)
@@ -331,10 +354,11 @@ class PowerSupplyOutput:
             True if waveform is enabled, False otherwise
 
         Raises:
-            NotImplementedError: If waveform generation is not supported
+            FeatureNotSupportedError: If waveform generation is not supported
         """
         if not self._psu.model_capability.has_waveform:
-            raise NotImplementedError(f"Waveform generation not supported on {self._psu.model_capability.model_name}")
+            raise exceptions.FeatureNotSupportedError(f"Waveform generation not supported on {self._psu.model_capability.model_name}")
+        self._require("supports_waveform", "Waveform display control")
 
         cmd = self._psu._get_command("get_wave_enable", ch=self._output_num)
         response = self._psu.query(cmd)
@@ -348,10 +372,11 @@ class PowerSupplyOutput:
             state: True to enable waveform, False to disable
 
         Raises:
-            NotImplementedError: If waveform generation is not supported
+            FeatureNotSupportedError: If waveform generation is not supported
         """
         if not self._psu.model_capability.has_waveform:
-            raise NotImplementedError(f"Waveform generation not supported on {self._psu.model_capability.model_name}")
+            raise exceptions.FeatureNotSupportedError(f"Waveform generation not supported on {self._psu.model_capability.model_name}")
+        self._require("supports_waveform", "Waveform display control")
 
         state_str = "ON" if state else "OFF"
         cmd = self._psu._get_command("set_wave_enable", ch=self._output_num, state=state_str)
@@ -391,37 +416,51 @@ class PowerSupplyOutput:
         except ValueError as exc:
             raise exceptions.CommandError(f"Unparseable PSU response: {response!r}", command=command) from exc
 
-    def get_configuration(self) -> Dict[str, any]:
-        """Get all output configuration parameters.
+    def get_configuration(self) -> Dict[str, Any]:
+        """Summarize this output, omitting anything the model cannot report.
 
-        Returns:
-            Dictionary with all output settings
+        Diagnostic aggregate: an unsupported field is left OUT rather than
+        raising or being filled with a plausible number. `capabilities` says
+        which fields the model documents, so a caller can tell an absent
+        reading from an unsupported one.
         """
-        config = {
+        config: Dict[str, Any] = {
             "output": self._output_num,
-            "enabled": self.enabled,
-            "voltage_setpoint": self.voltage,
-            "current_limit": self.current,
             "max_voltage": self._spec.max_voltage,
             "max_current": self._spec.max_current,
             "max_power": self._spec.max_power,
+            "capabilities": {
+                "programmable": self._spec.programmable,
+                "measurable": self._spec.measurable,
+                "switchable": self._spec.switchable,
+                "state_readable": self._spec.state_readable,
+                "supports_timer": self._spec.supports_timer,
+                "supports_waveform": self._spec.supports_waveform,
+            },
         }
-
-        # Add measurements
-        try:
-            config["measured_voltage"] = self.measure_voltage()
-            config["measured_current"] = self.measure_current()
-            config["measured_power"] = self.measure_power()
-            config["mode"] = self.get_mode()
-        except Exception as e:
-            logger.warning(f"Failed to get measurements: {e}")
-
+        if self._spec.programmable:
+            config["voltage_setpoint"] = self.voltage
+            config["current_limit"] = self.current
+        if self._spec.state_readable:
+            config["enabled"] = self.enabled
+        if self._spec.measurable:
+            try:
+                config["measured_voltage"] = self.measure_voltage()
+                config["measured_current"] = self.measure_current()
+                config["measured_power"] = self.measure_power()
+                config["mode"] = self.get_mode()
+            except Exception as e:
+                logger.warning(f"Failed to get measurements: {e}")
+        if self._psu.model_capability.has_ovp:
+            config["ovp_level"] = self.ovp_level
+        if self._psu.model_capability.has_ocp:
+            config["ocp_level"] = self.ocp_level
         return config
 
     def __repr__(self) -> str:
         """String representation."""
         try:
             config = self.get_configuration()
-            return f"Output{self._output_num}(" f"enabled={config['enabled']}, " f"V={config['voltage_setpoint']}V, " f"I={config['current_limit']}A)"
+            return f"Output{self._output_num}(" f"enabled={config.get('enabled')}, " f"V={config.get('voltage_setpoint')}V, " f"I={config.get('current_limit')}A)"
         except Exception:
             return f"Output{self._output_num}"

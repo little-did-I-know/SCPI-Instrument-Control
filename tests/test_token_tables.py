@@ -87,3 +87,25 @@ class TestWireTokenAccessors:
         # mock and driver share one table.
         monkeypatch.setitem(sc._COUPLING_TO_WIRE["modern"], "DC", "DCX")
         assert "DCX" in sc.wire_coupling_tokens("modern")
+
+
+class TestTriggerLevelSources:
+    def test_flat_dialects_include_the_external_inputs(self):
+        # RC01020-E01C p.128: <trig_source> = {C1, C2, C3, C4, EX, EX5}.
+        # LeCroy TRLV is cited MAUI p.7-33 in the same table.
+        for dialect in ("legacy", "lecroy"):
+            assert sc.supported_trigger_level_sources(dialect) == frozenset({"C1", "C2", "C3", "C4", "EX", "EX5"})
+
+    def test_modern_is_unrestricted_because_the_command_takes_no_source(self):
+        # EN11G p.493: :TRIGger:EDGE:LEVel <level_value> -- no source argument,
+        # so restricting it would invent a limit the manual does not state.
+        assert sc.supported_trigger_level_sources("modern") == frozenset({"C1", "C2", "C3", "C4", "EX", "EX5", "LINE"})
+
+    def test_tektronix_is_channels_only(self):
+        # The 4/5/6 MSO manual documents TRIGger:A:LEVel:CH<x> (and D/MATH/REF)
+        # but no AUX form, so an external source has no citable level command.
+        assert sc.supported_trigger_level_sources("tektronix") == frozenset({"C1", "C2", "C3", "C4"})
+
+    def test_line_is_never_a_level_source_on_a_flat_dialect(self):
+        for dialect in ("legacy", "lecroy"):
+            assert "LINE" not in sc.supported_trigger_level_sources(dialect)

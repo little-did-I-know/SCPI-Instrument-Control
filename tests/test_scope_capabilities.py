@@ -71,3 +71,8 @@ def test_capabilities_are_immutable():
     scope, _ = make_scope(MODERN_IDN)
     with pytest.raises(dataclasses.FrozenInstanceError):
         scope.capabilities.dialect = "legacy"
+
+
+def test_capabilities_report_trigger_level_sources():
+    scope, _ = make_scope(MODERN_IDN)
+    assert "EX" in scope.capabilities.trigger_level_sources

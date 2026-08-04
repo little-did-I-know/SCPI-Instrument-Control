@@ -21,6 +21,14 @@ class PSUDataLogger:
 
     Records voltage, current, power, and mode for all outputs at regular intervals.
 
+    The CSV header is fixed once at `start()`, so every row has the same five
+    columns per output regardless of what that output supports. An output the
+    model's manual does not document a reading for (e.g. the SPD3303X's CH3,
+    which has no MEASure form) gets empty fields, not fabricated numbers --
+    that is different from `ERROR`, which means a *supported* reading failed
+    at query time. Check `psu.model_capability.output_specs` if you need to
+    tell "this column is always blank" from "something went wrong".
+
     Example:
         >>> psu = PowerSupply('192.168.1.200')
         >>> psu.connect()
@@ -112,28 +120,35 @@ class PSUDataLogger:
 
         for output_num in outputs_to_log:
             output = getattr(self.psu, f"output{output_num}")
+            spec = self.psu.model_capability.output_specs[output_num - 1]
 
-            try:
-                voltage = output.measure_voltage()
-                current = output.measure_current()
-                power = output.measure_power()
-                mode = output.get_mode()
-                enabled = output.enabled
+            if spec.measurable:
+                try:
+                    voltage = output.measure_voltage()
+                    current = output.measure_current()
+                    power = output.measure_power()
+                    mode = output.get_mode()
+                    fields = [f"{voltage:.6f}", f"{current:.6f}", f"{power:.6f}", mode]
+                except Exception as e:
+                    logger.error(f"Failed to measure output {output_num}: {e}")
+                    # Write placeholder values on error -- a real failure to
+                    # query a supported output, distinct from a documented gap.
+                    fields = ["ERROR", "ERROR", "ERROR", "ERROR"]
+            else:
+                # Not documented for this output (e.g. SPD3303X CH3) -- leave
+                # the columns blank rather than fabricate or claim an error.
+                fields = ["", "", "", ""]
 
-                row.extend(
-                    [
-                        f"{voltage:.6f}",
-                        f"{current:.6f}",
-                        f"{power:.6f}",
-                        mode,
-                        str(enabled),
-                    ]
-                )
+            if spec.state_readable:
+                try:
+                    fields.append(str(output.enabled))
+                except Exception as e:
+                    logger.error(f"Failed to read output {output_num} enabled state: {e}")
+                    fields.append("ERROR")
+            else:
+                fields.append("")
 
-            except Exception as e:
-                logger.error(f"Failed to measure output {output_num}: {e}")
-                # Write placeholder values on error
-                row.extend(["ERROR", "ERROR", "ERROR", "ERROR", "ERROR"])
+            row.extend(fields)
 
         self._writer.writerow(row)
         self._file.flush()

@@ -394,10 +394,12 @@ def read_psu_outputs(psu: PowerSupply, measure: bool = True) -> List[Dict[str, A
 
     Every field is read through _safe, so a query the model does not implement
     or a timeout yields None rather than a fabricated value. ``enabled`` in
-    particular MUST NOT default to False: an SPD3303X's CH3 has no documented
-    status bit and falls through to an OUTP3? that the model does not answer,
-    so a False default would render an energised output as a confident "off".
-    None means "unknown", and the UI is required to show it as unknown.
+    particular MUST NOT default to False: an SPD3303X's CH3 is gated behind
+    the `state_readable` capability flag (p.42's status bitmap has no CH3
+    state bit) and raises `FeatureNotSupportedError` before any query is
+    sent, so a False default would render an energised output as a confident
+    "off". None means "unknown", and the UI is required to show it as
+    unknown.
     """
     outputs = []
     for n in psu.supported_outputs:

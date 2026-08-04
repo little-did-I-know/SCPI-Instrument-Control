@@ -184,12 +184,18 @@ class PSUControl(QWidget):
                     widgets["current"].setMaximum(spec.max_current)
                     widgets["current"].setSingleStep(spec.current_resolution * 10)
 
-                    # Read and set current values
+                    # Read and set current values, honoring the same
+                    # capability flags the measurement poll loop checks
+                    # (_update_measurements): a fixed rail like an
+                    # SPD3303X's CH3 has no documented setpoint or state
+                    # query, so calling one raises FeatureNotSupportedError.
                     try:
                         output = getattr(psu, f"output{output_num}")
-                        widgets["voltage"].setValue(output.voltage)
-                        widgets["current"].setValue(output.current)
-                        widgets["enable"].setChecked(output.enabled)
+                        if spec.programmable:
+                            widgets["voltage"].setValue(output.voltage)
+                            widgets["current"].setValue(output.current)
+                        if spec.state_readable:
+                            widgets["enable"].setChecked(output.enabled)
                     except Exception as e:
                         logger.error(f"Failed to read output {output_num} state: {e}")
                 else:
@@ -222,28 +228,35 @@ class PSUControl(QWidget):
             try:
                 output = getattr(self.psu, f"output{output_num}")
                 widgets = self.output_widgets[output_num]
+                spec = self.psu.model_capability.output_specs[output_num - 1]
 
-                # Read measurements
-                v = output.measure_voltage()
-                i = output.measure_current()
-                p = output.measure_power()
+                if spec.measurable:
+                    # Read measurements
+                    v = output.measure_voltage()
+                    i = output.measure_current()
+                    p = output.measure_power()
 
-                # Update displays
-                widgets["voltage_display"].setText(f"{v:.3f} V")
-                widgets["current_display"].setText(f"{i:.3f} A")
-                widgets["power_display"].setText(f"{p:.2f} W")
+                    # Update displays
+                    widgets["voltage_display"].setText(f"{v:.3f} V")
+                    widgets["current_display"].setText(f"{i:.3f} A")
+                    widgets["power_display"].setText(f"{p:.2f} W")
 
-                # Update mode
-                try:
-                    mode = output.get_mode()
-                    widgets["mode_display"].setText(mode)
+                    # Update mode
+                    try:
+                        mode = output.get_mode()
+                        widgets["mode_display"].setText(mode)
 
-                    # Color code based on mode
-                    if "CV" in mode.upper():
-                        widgets["mode_display"].setStyleSheet("font-weight: bold; color: #00FF00;")  # Green for CV
-                    elif "CC" in mode.upper():
-                        widgets["mode_display"].setStyleSheet("font-weight: bold; color: #FFA500;")  # Orange for CC
-                except Exception:
+                        # Color code based on mode
+                        if "CV" in mode.upper():
+                            widgets["mode_display"].setStyleSheet("font-weight: bold; color: #00FF00;")  # Green for CV
+                        elif "CC" in mode.upper():
+                            widgets["mode_display"].setStyleSheet("font-weight: bold; color: #FFA500;")  # Orange for CC
+                    except Exception:
+                        widgets["mode_display"].setText("---")
+                else:
+                    # Fixed rail: no MEASure form covers it (QS0503X-E01B p.38).
+                    for key, unit in (("voltage_display", "V"), ("current_display", "A"), ("power_display", "W")):
+                        widgets[key].setText(f"--- {unit}")
                     widgets["mode_display"].setText("---")
 
             except Exception as e:

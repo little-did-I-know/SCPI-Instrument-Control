@@ -97,12 +97,22 @@ def multi_output_example():
     psu.output2.current = 1.5
     psu.output2.enable()
 
-    psu.output3.voltage = 3.3
-    psu.output3.current = 3.0
+    # CH3 is the fixed auxiliary rail. Its voltage is selected by the DIP
+    # switch on the front panel (2.5V / 3.3V / 5V -- QS0503X-E01B p.21), and
+    # the SPD3303X command set has no way to set or measure it: VOLTage and
+    # CURRent are [{CH1|CH2}:] only (p.39) and MEASure is [{CH1|CH2}] (p.38).
+    # Setting output3.voltage now raises FeatureNotSupportedError rather than
+    # sending a command the firmware discards. Switching it on IS documented
+    # (OUTPut {CH1|CH2|CH3},{ON|OFF}, p.40):
     psu.output3.enable()
 
-    # Read all measurements
+    # Read all measurements. CH3 has no MEASure form (QS0503X-E01B p.38), so
+    # skip it rather than let measure_voltage() raise FeatureNotSupportedError.
     for output_num in [1, 2, 3]:
+        spec = psu.model_capability.output_specs[output_num - 1]
+        if not spec.measurable:
+            print(f"Output {output_num}: measurement not supported (fixed rail)")
+            continue
         output = getattr(psu, f"output{output_num}")
         v = output.measure_voltage()
         i = output.measure_current()

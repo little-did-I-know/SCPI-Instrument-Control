@@ -252,10 +252,10 @@ class PowerSupply:
             Tracking mode: 'INDEPENDENT', 'SERIES', or 'PARALLEL'
 
         Raises:
-            NotImplementedError: If tracking is not supported by this model
+            FeatureNotSupportedError: If tracking is not supported by this model
         """
         if not self.model_capability.has_tracking:
-            raise NotImplementedError(f"Tracking mode not supported on {self.model_capability.model_name}")
+            raise exceptions.FeatureNotSupportedError(f"Tracking mode not supported on {self.model_capability.model_name}")
 
         cmd = self._get_command("get_tracking")
         response = self.query(cmd)
@@ -269,11 +269,11 @@ class PowerSupply:
             mode: Tracking mode - 'INDEPENDENT', 'SERIES', or 'PARALLEL'
 
         Raises:
-            NotImplementedError: If tracking is not supported by this model
+            FeatureNotSupportedError: If tracking is not supported by this model
             ValueError: If mode is invalid
         """
         if not self.model_capability.has_tracking:
-            raise NotImplementedError(f"Tracking mode not supported on {self.model_capability.model_name}")
+            raise exceptions.FeatureNotSupportedError(f"Tracking mode not supported on {self.model_capability.model_name}")
 
         mode = normalize_token(
             mode,

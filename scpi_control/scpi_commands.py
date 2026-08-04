@@ -1098,6 +1098,29 @@ def supported_trigger_sources(dialect: str) -> frozenset:
     return _PUBLIC_TRIGGER_SOURCES
 
 
+# Which sources have a documented trigger-LEVEL command. This is a different
+# question from which sources can be SELECTED (supported_trigger_sources):
+#   legacy  RC01020-E01C p.128 -- <trig_source>: TRig_LeVel <trig_level>,
+#           <trig_source> = {C1, C2, C3, C4, EX, EX5}. No LINE: a line trigger
+#           has no threshold to set.
+#   lecroy  same flat TRLV form, cited MAUI p.7-33 on the command template.
+#   modern  EN11G p.493 -- :TRIGger:EDGE:LEVel takes NO source argument, so
+#           every source is listed; restricting it would invent a limit.
+#   tek     TRIGger:A:LEVel:CH<x> only (also :D<x>/:MATH/:REF<x>); the 4/5/6
+#           MSO manual documents no AUX form, so the external input has no
+#           citable level command on this dialect.
+_TRIGGER_LEVEL_SOURCES = {
+    "legacy": frozenset({"C1", "C2", "C3", "C4", "EX", "EX5"}),
+    "lecroy": frozenset({"C1", "C2", "C3", "C4", "EX", "EX5"}),
+    "modern": frozenset({"C1", "C2", "C3", "C4", "EX", "EX5", "LINE"}),
+    "tektronix": frozenset({"C1", "C2", "C3", "C4"}),
+}
+
+
+def supported_trigger_level_sources(dialect: str) -> frozenset:
+    return _TRIGGER_LEVEL_SOURCES.get(dialect, frozenset())
+
+
 def supported_measurement_types(dialect: str) -> frozenset:
     return frozenset(_MEASUREMENT_TO_WIRE.get(dialect, {}))
 

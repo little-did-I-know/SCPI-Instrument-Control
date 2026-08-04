@@ -44,6 +44,8 @@ def handle_query(conn, command: str) -> Optional[str]:
         return "ON" if conn._channel_enabled.get(int(match.group(1)), True) else "OFF"
     if match := re.match(r"C(\d+):CPL\?", upper):
         return conn._channel_coupling.get(int(match.group(1)), "D1M")
+    if match := re.match(r"(EX5|EX):TRLV\?", upper):
+        return _format_nr3(conn.external_trigger_level.get(match.group(1), 0.0))
     if match := re.match(r"C(\d+):TRLV\?", upper):
         return _format_nr3(conn.trigger_level.get(int(match.group(1)), 0.0))
     if re.match(r"C(\d+):TRSL\?", upper):
