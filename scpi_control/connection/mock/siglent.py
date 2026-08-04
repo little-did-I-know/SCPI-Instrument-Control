@@ -398,6 +398,14 @@ def handle_write(conn, command: str) -> bool:
         if len(conn.trigger_status) <= 1:
             conn.trigger_status = ["Ready", "Stop"]
         return True
+    elif match := re.match(r"(EX5|EX):TRLV\s+(.+)", command, re.IGNORECASE):
+        source = match.group(1).upper()
+        value = float(match.group(2))
+        # RC01020-E01C p.128: <trig_source> = {C1, C2, C3, C4, EX, EX5}.
+        if conn.reject_if_invalid(value, name="TRLV", positive=False):
+            return True
+        conn.external_trigger_level[source] = value
+        return True
     elif match := re.match(r"C(\d+):TRLV\s+(.+)", command, re.IGNORECASE):
         channel = int(match.group(1))
         value = float(match.group(2))
@@ -577,6 +585,9 @@ def handle_query(conn, command: str) -> Optional[str]:
             # getter strips the header before parsing the pairs.
             pairs = ",".join(f"C{ch},{conn.bandwidth_limits.get(ch, 'OFF')}" for ch in sorted(conn._channel_enabled))
             return f"BWL {pairs}"
+
+        if match := re.match(r"(EX5|EX):TRLV\?", command, re.IGNORECASE):
+            return _format_scientific(conn.external_trigger_level.get(match.group(1).upper(), 0.0), "V")
 
         if match := re.match(r"C(\d+):TRLV\?", command, re.IGNORECASE):
             channel = int(match.group(1))

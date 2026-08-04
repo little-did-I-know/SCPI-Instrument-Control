@@ -3,8 +3,26 @@
 import pytest
 
 from scpi_control import exceptions
+from scpi_control.connection.mock import MockConnection
+from scpi_control.oscilloscope import Oscilloscope
 from scpi_control.trigger import Trigger
 from tests.dialect_helpers import make_dialect_scope
+from tests.test_dialect_connect import LEGACY_IDN
+from tests.test_mock_dialects import LECROY_IDN
+
+
+def make_legacy_scope():
+    conn = MockConnection("mock", idn=LEGACY_IDN)
+    scope = Oscilloscope("mock", connection=conn)
+    scope.connect()
+    return scope, conn
+
+
+def make_lecroy_scope():
+    conn = MockConnection("mock", idn=LECROY_IDN)
+    scope = Oscilloscope("mock", connection=conn)
+    scope.connect()
+    return scope, conn
 
 
 def trigger_with_source(dialect, source):
@@ -103,3 +121,56 @@ class TestGetConfigurationDegradesGracefully:
         assert config["slope"] == "POS"
         assert config["coupling"] == "DC"
         assert config["holdoff"] == pytest.approx(0.0)
+
+
+class TestMockHandlesExternalTriggerLevel:
+    @pytest.mark.parametrize("source", ["EX", "EX5"])
+    def test_external_level_round_trips_through_the_mock(self, source):
+        # _format_scientific(1.5, "V") == "1.50E+00V" -- the same shape the
+        # channel handler returns, so one driver parser handles both.
+        scope, conn = make_legacy_scope()
+        conn.error_queue.clear()
+        conn.write(f"{source}:TRLV 1.5")
+        assert conn.error_queue == []
+        assert conn.query(f"{source}:TRLV?").strip() == "1.50E+00V"
+
+    def test_ex5_is_not_swallowed_by_the_ex_pattern(self):
+        # "EX5" must be tried before "EX", or EX matches and leaves a stray 5.
+        scope, conn = make_legacy_scope()
+        conn.write("EX:TRLV 1.0")
+        conn.write("EX5:TRLV 2.0")
+        assert conn.query("EX:TRLV?").strip() == "1.00E+00V"
+        assert conn.query("EX5:TRLV?").strip() == "2.00E+00V"
+
+    def test_channel_levels_are_independent_of_the_external_ones(self):
+        scope, conn = make_legacy_scope()
+        conn.write("C1:TRLV 0.5")
+        conn.write("EX:TRLV 2.5")
+        assert conn.query("C1:TRLV?").strip() == "5.00E-01V"
+        assert conn.query("EX:TRLV?").strip() == "2.50E+00V"
+
+
+class TestLecroyMockHandlesExternalTriggerLevel:
+    # LeCroy's mock answers CHDR OFF: bare values, no unit suffix
+    # (_format_nr3), unlike the legacy Siglent chain's "V"-suffixed replies.
+    @pytest.mark.parametrize("source", ["EX", "EX5"])
+    def test_external_level_round_trips_through_the_mock(self, source):
+        scope, conn = make_lecroy_scope()
+        conn.error_queue.clear()
+        conn.write(f"{source}:TRLV 1.5")
+        assert conn.error_queue == []
+        assert conn.query(f"{source}:TRLV?").strip() == "1.50E+00"
+
+    def test_ex5_is_not_swallowed_by_the_ex_pattern(self):
+        scope, conn = make_lecroy_scope()
+        conn.write("EX:TRLV 1.0")
+        conn.write("EX5:TRLV 2.0")
+        assert conn.query("EX:TRLV?").strip() == "1.00E+00"
+        assert conn.query("EX5:TRLV?").strip() == "2.00E+00"
+
+    def test_channel_levels_are_independent_of_the_external_ones(self):
+        scope, conn = make_lecroy_scope()
+        conn.write("C1:TRLV 0.5")
+        conn.write("EX:TRLV 2.5")
+        assert conn.query("C1:TRLV?").strip() == "5.00E-01"
+        assert conn.query("EX:TRLV?").strip() == "2.50E+00"

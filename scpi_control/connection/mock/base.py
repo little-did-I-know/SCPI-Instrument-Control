@@ -201,6 +201,11 @@ class MockConnection(BaseConnection):
             self.trigger_slope = "POS"
         self.trigger_coupling = "DC"
         self.trigger_level: Dict[int, float] = {ch: 0.0 for ch in channels}
+        # The external trigger inputs have their own levels, kept apart from
+        # the channel-keyed dict above so waveform synthesis and the other
+        # dialects keep their integer keys (RC01020-E01C p.128 lists EX and
+        # EX5 as trigger-level sources alongside C1-C4).
+        self.external_trigger_level: Dict[str, float] = {"EX": 0.0, "EX5": 0.0}
         self.trigger_status: List[str] = trigger_status[:] if trigger_status else ["Stop"]
 
         # Modern :MEASure:SIMPle state (guide p.335-373). measure() on the modern
