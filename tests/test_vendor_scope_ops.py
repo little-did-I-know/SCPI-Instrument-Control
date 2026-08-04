@@ -342,14 +342,15 @@ def test_tek_trigger_level_getter_queries_source_channel(tek_scope):
     assert tek_scope.query.call_args_list[-1].args[0] == "TRIGger:A:LEVel:CH3?"
 
 
-def test_tek_trigger_level_getter_non_channel_source_returns_zero(tek_scope):
+def test_tek_trigger_level_getter_non_channel_source_raises(tek_scope):
     from scpi_control.trigger import Trigger
 
     trig = Trigger(tek_scope)
     # A non-channel source (external AUX/LINE) has no per-channel trigger level;
-    # the getter guards and returns 0.0 without issuing a level query.
+    # the getter now gates and raises instead of fabricating 0.0.
     tek_scope.query.return_value = "AUX"
-    assert trig.level == 0.0
+    with pytest.raises(exceptions.FeatureNotSupportedError):
+        trig.level
     assert not any("LEVel" in c.args[0] for c in tek_scope.query.call_args_list)
 
 

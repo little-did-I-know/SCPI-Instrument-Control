@@ -15,6 +15,7 @@ from scpi_control.scpi_commands import (
     slope_from_wire,
     slope_to_wire,
     source_from_wire,
+    supported_trigger_level_sources,
     supported_trigger_modes,
     trigger_coupling_from_wire,
     trigger_coupling_to_wire,
@@ -258,25 +259,39 @@ class Trigger:
         self.slope = slope
         logger.info(f"Edge trigger configured: source={source}, slope={slope}")
 
+    def _require_level_source(self, source: str) -> str:
+        """Raise unless `source` has a documented trigger-level command here.
+
+        A scope can be triggering on a source whose threshold this dialect
+        offers no way to read or set (LINE everywhere, the external input on
+        Tektronix). Returning a fabricated 0.0 for those, as this used to,
+        makes an unset level indistinguishable from a real one.
+        """
+        if source not in supported_trigger_level_sources(self._dialect):
+            raise exceptions.FeatureNotSupportedError(f"Trigger level is not available for source {source} on the {self._dialect} dialect")
+        return source
+
     @property
     def level(self) -> float:
         """Get trigger level voltage.
 
         Returns:
             Trigger level in volts
+
+        Raises:
+            FeatureNotSupportedError: The current trigger source has no
+                documented level command on this dialect -- LINE on every
+                dialect, and the external input on tektronix (no AUX form
+                in the 4/5/6 MSO manual). EX/EX5 are supported on
+                legacy/lecroy (RC01020-E01C p.128 / MAUI p.7-33).
         """
         if not is_flat_trigger(self._dialect):
             if self._dialect == "tektronix":
-                source = self.source  # public token like "C3"
-                if not source.startswith("C") or not source[1:].isdigit():
-                    logger.warning(f"Cannot get trigger level for source {source}")
-                    return 0.0
+                source = self._require_level_source(self.source)
                 return self._parse_float_response(self._scope.query(self._cmd("get_trigger_level", ch=int(source[1:]))))
             return self._parse_float_response(self._scope.query(self._cmd("get_trigger_level")))
-        source = self.source
-        if source.startswith("C"):
-            return self._parse_float_response(self._scope.query(self._cmd("get_trigger_level", src=source)))
-        return 0.0
+        source = self._require_level_source(self.source)
+        return self._parse_float_response(self._scope.query(self._cmd("get_trigger_level", src=source)))
 
     @level.setter
     def level(self, voltage: float) -> None:
@@ -284,27 +299,37 @@ class Trigger:
 
         Args:
             voltage: Trigger level in volts
+
+        Raises:
+            FeatureNotSupportedError: The current trigger source has no
+                documented level command on this dialect -- LINE on every
+                dialect, and the external input on tektronix (no AUX form
+                in the 4/5/6 MSO manual). EX/EX5 are supported on
+                legacy/lecroy (RC01020-E01C p.128 / MAUI p.7-33). Raised
+                before anything is written to the wire.
         """
         if not is_flat_trigger(self._dialect):
             if self._dialect == "tektronix":
-                source = self.source  # public token like "C3"
-                if not source.startswith("C") or not source[1:].isdigit():
-                    logger.warning(f"Cannot set trigger level for source {source}")
-                    return
+                source = self._require_level_source(self.source)
                 self._scope.write(self._cmd("set_trigger_level", ch=int(source[1:]), level=voltage))
             else:
                 self._scope.write(self._cmd("set_trigger_level", level=voltage))
             logger.info(f"Trigger level set to {voltage}V")
             return
-        source = self.source
-        if source.startswith("C"):
-            self._scope.write(self._cmd("set_trigger_level", src=source, level=voltage))
-            logger.info(f"Trigger level set to {voltage}V on {source}")
-        else:
-            logger.warning(f"Cannot set trigger level for source {source}")
+        source = self._require_level_source(self.source)
+        self._scope.write(self._cmd("set_trigger_level", src=source, level=voltage))
+        logger.info(f"Trigger level set to {voltage}V on {source}")
 
     def set_level(self, channel: Union[int, str], voltage: float) -> None:
-        """Convenience wrapper to set trigger level for a specific channel."""
+        """Convenience wrapper to set trigger level for a specific channel.
+
+        Note:
+            This sets the source and then the level. A source write can be
+            silently coerced by the instrument -- selecting a switched-off
+            channel or an absent external input lands somewhere else with no
+            error queued -- so this is not proof the scope is triggering where
+            you asked. See the trigger source documentation.
+        """
         self.source = channel
         self.level = voltage
 
