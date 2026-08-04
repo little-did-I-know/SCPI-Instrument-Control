@@ -109,17 +109,24 @@ class TestMockRefusesUndocumentedCh3Commands:
     """Without this the gate is untested: the driver simply stops sending, and
     nothing proves the firmware would have refused."""
 
-    @pytest.mark.parametrize("command", [
-        "CH3:VOLTage 3.3",
-        "CH3:CURRent 1.0",
-        "TIMEr CH3,ON",
-        "OUTPut:WAVE CH3,ON",
+    @pytest.mark.parametrize("command,get_state,baseline", [
+        # Baselines read from MockConnection.__init__ (mock/base.py:263-271):
+        # psu_outputs[3] = {"voltage": 0.0, "current": 0.0, "enabled": False},
+        # psu_timer_enabled[3] = False, psu_waveform_enabled[3] = False.
+        ("CH3:VOLTage 3.3", lambda conn: conn.psu_outputs[3]["voltage"], 0.0),
+        ("CH3:CURRent 1.0", lambda conn: conn.psu_outputs[3]["current"], 0.0),
+        ("TIMEr CH3,ON", lambda conn: conn.psu_timer_enabled[3], False),
+        ("OUTPut:WAVE CH3,ON", lambda conn: conn.psu_waveform_enabled[3], False),
     ])
-    def test_undocumented_ch3_writes_queue_minus_224(self, command):
+    def test_undocumented_ch3_writes_queue_minus_224(self, command, get_state, baseline):
         _, conn = make_psu()
         conn.error_queue.clear()
         conn.write(command)  # bypass the driver gate
         assert conn.error_queue == [(-224, "Illegal parameter value")]
+        # The established mock contract is "error queued, state unchanged,
+        # command consumed" -- a bypassed guard that both wrote the value
+        # AND queued an error would still pass an error_queue-only check.
+        assert get_state(conn) == baseline
 
     def test_output_switching_on_ch3_is_accepted(self):
         # QS0503X-E01B p.40 documents CH3 here, so the mock must NOT reject it.
@@ -134,3 +141,22 @@ class TestMockRefusesUndocumentedCh3Commands:
         conn.error_queue.clear()
         conn.write(command)
         assert conn.error_queue == []
+
+    @pytest.mark.parametrize("command,get_state", [
+        # A generic multi-output PSU is not an SPD3303X: the guard only
+        # fires when the matched prefix is CH, so SOUR<n>: must stay
+        # unrestricted for any channel number, including out-of-range ones
+        # for the SPD3303X specifically (mock/base.py capture-and-compare
+        # `prefix == "CH"` guard).
+        ("SOUR3:VOLT 5.0", lambda conn: conn.psu_outputs[3]["voltage"]),
+        ("SOUR3:CURR 1.0", lambda conn: conn.psu_outputs[3]["current"]),
+    ])
+    def test_generic_source_spelling_on_ch3_is_not_rejected(self, command, get_state):
+        _, conn = make_psu()
+        conn.error_queue.clear()
+        conn.write(command)
+        assert conn.error_queue == []
+        # Also confirm it's genuinely accepted (state changed), not just
+        # silently dropped -- CH3 is already a key in psu_outputs by
+        # default, so a bypassed write would land here.
+        assert get_state(conn) == pytest.approx(5.0 if "VOLT" in command else 1.0)
