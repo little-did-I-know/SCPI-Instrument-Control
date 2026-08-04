@@ -263,9 +263,10 @@ class Trigger:
         """Raise unless `source` has a documented trigger-level command here.
 
         A scope can be triggering on a source whose threshold this dialect
-        offers no way to read or set (LINE everywhere, the external input on
-        Tektronix). Returning a fabricated 0.0 for those, as this used to,
-        makes an unset level indistinguishable from a real one.
+        offers no way to read or set (LINE on legacy/lecroy/tektronix, the
+        external input on tektronix -- modern gates nothing here). Returning
+        a fabricated 0.0 for those, as this used to, makes an unset level
+        indistinguishable from a real one.
         """
         if source not in supported_trigger_level_sources(self._dialect):
             raise exceptions.FeatureNotSupportedError(f"Trigger level is not available for source {source} on the {self._dialect} dialect")
@@ -280,10 +281,12 @@ class Trigger:
 
         Raises:
             FeatureNotSupportedError: The current trigger source has no
-                documented level command on this dialect -- LINE on every
-                dialect, and the external input on tektronix (no AUX form
-                in the 4/5/6 MSO manual). EX/EX5 are supported on
-                legacy/lecroy (RC01020-E01C p.128 / MAUI p.7-33).
+                documented level command on this dialect -- LINE on
+                legacy/lecroy/tektronix, and the external input on tektronix
+                (no AUX form in the 4/5/6 MSO manual). EX/EX5 are supported
+                on legacy/lecroy (RC01020-E01C p.128 / MAUI p.7-33). Modern's
+                :TRIGger:EDGE:LEVel (EN11G p.493) takes no source argument,
+                so nothing gates there -- LINE included.
         """
         if not is_flat_trigger(self._dialect):
             if self._dialect == "tektronix":
@@ -302,11 +305,13 @@ class Trigger:
 
         Raises:
             FeatureNotSupportedError: The current trigger source has no
-                documented level command on this dialect -- LINE on every
-                dialect, and the external input on tektronix (no AUX form
-                in the 4/5/6 MSO manual). EX/EX5 are supported on
-                legacy/lecroy (RC01020-E01C p.128 / MAUI p.7-33). Raised
-                before anything is written to the wire.
+                documented level command on this dialect -- LINE on
+                legacy/lecroy/tektronix, and the external input on tektronix
+                (no AUX form in the 4/5/6 MSO manual). EX/EX5 are supported
+                on legacy/lecroy (RC01020-E01C p.128 / MAUI p.7-33). Modern's
+                :TRIGger:EDGE:LEVel (EN11G p.493) takes no source argument,
+                so nothing gates there -- LINE included. Raised before
+                anything is written to the wire.
         """
         if not is_flat_trigger(self._dialect):
             if self._dialect == "tektronix":
@@ -438,10 +443,13 @@ class Trigger:
             "mode": self.mode,
             "type": self.trigger_type,
             "source": self.source,
-            "level": self.level,
             "slope": self.slope,
             "coupling": self.coupling,
         }
+        try:
+            config["level"] = self.level
+        except exceptions.FeatureNotSupportedError:
+            config["level"] = None
         try:
             config["holdoff"] = self.holdoff
         except exceptions.FeatureNotSupportedError:

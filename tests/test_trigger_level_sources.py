@@ -30,6 +30,10 @@ class TestFlatDialectsGainTheExternalInputs:
         scope, trigger = trigger_with_source(dialect, "EX")
         scope.query.side_effect = ["EDGE,SR,EX,HT,OFF", "1.50E+00"]
         assert trigger.level == pytest.approx(1.5)
+        # Pin the wire form: a driver that wrongly queried C1:TRLV? would
+        # still return a number here, so the value alone doesn't prove it
+        # asked about the right source.
+        assert scope.query.call_args_list[-1].args[0] == "EX:TRLV?"
 
 
 class TestLineHasNoLevel:
@@ -73,3 +77,29 @@ class TestModernIsUnchanged:
         scope.query.return_value = source
         Trigger(scope).level = 0.5
         assert any(":TRIGger:EDGE:LEVel" in str(c) for c in scope.write.call_args_list)
+
+
+class TestGetConfigurationDegradesGracefully:
+    def test_line_source_omits_level_but_keeps_the_rest(self):
+        # get_configuration() must not let one ungated field (level) take the
+        # whole trigger dump down -- mode/type/source/slope/coupling/holdoff
+        # should still report even when the source has no level command.
+        scope = make_dialect_scope("legacy")
+        responses = {
+            "TRIG_MODE?": "AUTO",
+            "TRIG_SELECT?": "EDGE,SR,LINE,HT,OFF",
+            "LINE:TRSL?": "POS",
+            "LINE:TRCP?": "DC",
+            "TRIG_DELAY?": "TRIG_DELAY 0.0E+00S",
+        }
+        scope.query.side_effect = lambda cmd: responses[cmd]
+
+        config = Trigger(scope).get_configuration()
+
+        assert config["level"] is None
+        assert config["mode"] == "AUTO"
+        assert config["type"] == "EDGE"
+        assert config["source"] == "LINE"
+        assert config["slope"] == "POS"
+        assert config["coupling"] == "DC"
+        assert config["holdoff"] == pytest.approx(0.0)
