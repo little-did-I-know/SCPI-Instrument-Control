@@ -2,7 +2,7 @@
 
 import pytest
 
-from scpi_control import PowerSupply
+from scpi_control import PowerSupply, exceptions
 from scpi_control.connection.mock import MockConnection
 from scpi_control.psu_models import OutputSpec, PSUCapability, create_generic_psu_capability, detect_psu_from_idn
 from scpi_control.psu_scpi_commands import PSUSCPICommandSet
@@ -243,9 +243,9 @@ class TestPowerSupplyOutput:
 
         config = mock_psu.output1.get_configuration()
 
-        assert config["output"] == 1
-        assert config["voltage_setpoint"] == 5.0
-        assert config["current_limit"] == 1.0
+        assert config["output_num"] == 1
+        assert config["voltage"] == 5.0
+        assert config["current"] == 1.0
         assert config["enabled"] is True
         assert config["max_voltage"] == 30.0
         assert config["max_current"] == 3.0
@@ -263,7 +263,13 @@ class TestPowerSupplyOperations:
         return psu
 
     def test_all_outputs_off(self, mock_psu):
-        """Test safety all-off feature."""
+        """Test safety all-off feature.
+
+        CH3 is switchable (OUTPut CH3,{ON|OFF} is documented) but not
+        state_readable (no status bit covers it -- QS0503X-E01B p.42), so its
+        enabled *setter* still works while the getter raises
+        FeatureNotSupportedError rather than hanging on real hardware.
+        """
         # Enable all outputs
         mock_psu.output1.enabled = True
         mock_psu.output2.enabled = True
@@ -272,22 +278,28 @@ class TestPowerSupplyOperations:
         # All off
         mock_psu.all_outputs_off()
 
-        # All should be disabled
+        # CH1/CH2 state is readable and should confirm disabled.
         assert mock_psu.output1.enabled is False
         assert mock_psu.output2.enabled is False
-        assert mock_psu.output3.enabled is False
+        # CH3 state is not readable -- the getter must raise, not fabricate.
+        with pytest.raises(exceptions.FeatureNotSupportedError):
+            mock_psu.output3.enabled
 
     def test_multiple_outputs(self, mock_psu):
-        """Test controlling multiple outputs independently."""
+        """Test controlling multiple outputs independently.
+
+        CH3 is a DIP-switch-selected fixed rail with no SCPI path to its
+        setpoints (QS0503X-E01B p.39), so voltage control must raise there.
+        """
         # Set different voltages on each output
         mock_psu.output1.voltage = 5.0
         mock_psu.output2.voltage = 12.0
-        mock_psu.output3.voltage = 3.3
 
         # Verify they're independent
         assert mock_psu.output1.voltage == 5.0
         assert mock_psu.output2.voltage == 12.0
-        assert mock_psu.output3.voltage == 3.3
+        with pytest.raises(exceptions.FeatureNotSupportedError):
+            mock_psu.output3.voltage = 3.3
 
     def test_typical_workflow(self, mock_psu):
         """Test typical PSU usage workflow."""
