@@ -243,9 +243,9 @@ class TestPowerSupplyOutput:
 
         config = mock_psu.output1.get_configuration()
 
-        assert config["output_num"] == 1
-        assert config["voltage"] == 5.0
-        assert config["current"] == 1.0
+        assert config["output"] == 1
+        assert config["voltage_setpoint"] == 5.0
+        assert config["current_limit"] == 1.0
         assert config["enabled"] is True
         assert config["max_voltage"] == 30.0
         assert config["max_current"] == 3.0
@@ -284,6 +284,12 @@ class TestPowerSupplyOperations:
         # CH3 state is not readable -- the getter must raise, not fabricate.
         with pytest.raises(exceptions.FeatureNotSupportedError):
             mock_psu.output3.enabled
+        # ...but all_outputs_off() must still have reached CH3 on the wire:
+        # its disable() call goes through the switchable-gated setter, which
+        # the getter check above cannot prove (all_outputs_off() swallows
+        # exceptions per-output, so a skipped or failing CH3 would otherwise
+        # go unnoticed here).
+        assert any("CH3" in c and "OFF" in c.upper() for c in mock_psu._connection.command_log)
 
     def test_multiple_outputs(self, mock_psu):
         """Test controlling multiple outputs independently.

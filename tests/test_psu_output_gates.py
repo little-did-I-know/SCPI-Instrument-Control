@@ -5,6 +5,8 @@ import pytest
 from scpi_control import exceptions
 from scpi_control.connection.mock import MockConnection
 from scpi_control.power_supply import PowerSupply
+from scpi_control.power_supply_output import PowerSupplyOutput
+from scpi_control.psu_models import OutputSpec
 
 SPD3303X_IDN = "Siglent Technologies,SPD3303X,SPD00001130025,1.01.01.01.02,V3.0"
 
@@ -60,6 +62,21 @@ class TestCh3StillSwitchable:
         assert any("CH3" in c and "OFF" in c.upper() for c in conn.command_log)
 
 
+class TestEnabledSetterIsActuallyGated:
+    def test_switchable_false_blocks_the_setter_before_the_wire(self):
+        # TestCh3StillSwitchable proves the setter works when switchable is
+        # True; this proves it is actually gated, by using an output whose
+        # spec turns switchable OFF (a hypothetical output, not CH3, so this
+        # can't be satisfied by any other flag CH3 happens to have set).
+        psu, conn = make_psu()
+        spec = OutputSpec(1, 30.0, 3.0, 90.0, 0.001, 0.001, switchable=False)
+        output = PowerSupplyOutput(psu, spec)
+        conn.command_log.clear()
+        with pytest.raises(exceptions.FeatureNotSupportedError):
+            output.enabled = True
+        assert conn.command_log == []
+
+
 class TestOtherOutputsUnaffected:
     def test_ch1_and_ch2_are_untouched(self):
         psu, _ = make_psu()
@@ -74,9 +91,9 @@ class TestGetConfigurationDegrades:
     def test_ch3_configuration_reports_what_it_can_without_raising(self):
         psu, _ = make_psu()
         config = psu.output3.get_configuration()
-        assert config["output_num"] == 3
+        assert config["output"] == 3
         # Unsupported readings are absent, not fabricated:
-        assert "voltage" not in config
+        assert "voltage_setpoint" not in config
         assert "measured_voltage" not in config
         # ...and the flags explain why:
         assert config["capabilities"]["programmable"] is False
@@ -85,4 +102,4 @@ class TestGetConfigurationDegrades:
     def test_ch1_configuration_still_has_the_full_set(self):
         psu, _ = make_psu()
         config = psu.output1.get_configuration()
-        assert "voltage" in config and "measured_voltage" in config
+        assert "voltage_setpoint" in config and "measured_voltage" in config

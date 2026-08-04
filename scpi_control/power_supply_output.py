@@ -420,7 +420,7 @@ class PowerSupplyOutput:
         reading from an unsupported one.
         """
         config: Dict[str, any] = {
-            "output_num": self._output_num,
+            "output": self._output_num,
             "max_voltage": self._spec.max_voltage,
             "max_current": self._spec.max_current,
             "max_power": self._spec.max_power,
@@ -434,15 +434,18 @@ class PowerSupplyOutput:
             },
         }
         if self._spec.programmable:
-            config["voltage"] = self.voltage
-            config["current"] = self.current
+            config["voltage_setpoint"] = self.voltage
+            config["current_limit"] = self.current
         if self._spec.state_readable:
             config["enabled"] = self.enabled
         if self._spec.measurable:
-            config["measured_voltage"] = self.measure_voltage()
-            config["measured_current"] = self.measure_current()
-            config["measured_power"] = self.measure_power()
-            config["mode"] = self.get_mode()
+            try:
+                config["measured_voltage"] = self.measure_voltage()
+                config["measured_current"] = self.measure_current()
+                config["measured_power"] = self.measure_power()
+                config["mode"] = self.get_mode()
+            except Exception as e:
+                logger.warning(f"Failed to get measurements: {e}")
         if self._psu.model_capability.has_ovp:
             config["ovp_level"] = self.ovp_level
         if self._psu.model_capability.has_ocp:
@@ -453,6 +456,6 @@ class PowerSupplyOutput:
         """String representation."""
         try:
             config = self.get_configuration()
-            return f"Output{self._output_num}(" f"enabled={config.get('enabled')}, " f"V={config.get('voltage')}V, " f"I={config.get('current')}A)"
+            return f"Output{self._output_num}(" f"enabled={config.get('enabled')}, " f"V={config.get('voltage_setpoint')}V, " f"I={config.get('current_limit')}A)"
         except Exception:
             return f"Output{self._output_num}"
