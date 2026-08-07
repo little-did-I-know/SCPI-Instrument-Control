@@ -136,7 +136,7 @@ Launch the GUI with:
 siglent-gui
 ```
 
-![Main Window](images/main_window.png)
+![The desktop application showing two live channels](images/gui-live-view.png)
 
 ## Documentation Structure
 

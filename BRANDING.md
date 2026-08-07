@@ -37,19 +37,24 @@ The social preview image is what appears when your repository is shared on socia
 
 **How to set it up:**
 
-1. Go to your repository: https://github.com/little-did-I-know/Siglent-Oscilloscope
+1. Go to your repository: https://github.com/little-did-I-know/SCPI-Instrument-Control
 2. Click on **Settings** (⚙️ gear icon in the top menu)
 3. Scroll down to the **Social preview** section
 4. Click **Edit**
 5. Click **Upload an image**
-6. Upload `resources/Test Equipment.png`
+6. Upload `docs/images/social-preview.png`
 7. Click **Save**
 
 **Image Requirements:**
 - ✅ Minimum size: 640×320px
 - ✅ Maximum size: 2MB
 - ✅ Recommended: 1280×640px (2:1 aspect ratio)
-- ✅ Your image: 794 KB (within limits)
+- ✅ `docs/images/social-preview.png`: 1280×640, 44 KB (purpose-built for this slot)
+
+> Use `docs/images/social-preview.png`, not `resources/Test Equipment.png` — the
+> latter is 1024×1024, so GitHub crops it to 2:1 and loses most of the image.
+> The waveform on the card is a real capture from the built-in mock scope.
+> Regenerate it with `python scripts/media/make_social_preview.py`.
 
 **What it looks like:**
 When someone shares your repo link, they'll see:

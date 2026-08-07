@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Docs: `docs/images/social-preview.png`, a purpose-built 1280×640 GitHub social-preview card. Links shared to Reddit/HN/X/Discord previously rendered the default GitHub card. Upload it under **Settings → Social preview**; `BRANDING.md` has the steps (it used to point at `resources/Test Equipment.png`, which is 1024×1024 and gets cropped to 2:1).
+- Docs: `docs/images/mock-demo.gif`, a terminal demo of a hardware-free capture, and `docs/images/gui-live-view.png` / `gui-fft.png`, desktop-GUI screenshots showing live traces instead of an empty window.
+- `scripts/media/` — generators for all of the above, each driving the real library against the built-in mock so the images cannot drift from the code. The demo GIF's printed output is captured by executing the snippet rather than typed by hand.
+
+### Changed
+
+- README rewritten as a showcase, 1008 → ~280 lines. The GUI manual, the inline API reference, the v1.0.0 migration guide, and the maintainer build/publish steps are now linked to their existing homes on the docs site (`docs/gui/`, `docs/user-guide/`, `docs/about/changelog.md`, `docs/development/`) rather than duplicated. The four things that lived *only* in the README — the supported-instrument list, the CLI table, the GUI's Power Supply and Data Logger tabs, and the interactive-tutorial link — are kept.
+- README now leads with a runnable hardware-free example. The previous quick start needed an instrument at `192.168.1.100` before it did anything.
+- Docs landing page uses the live-trace GUI screenshot instead of the disconnected one.
+
+### Fixed
+
+- README no longer claims CAN and LIN protocol decoding. Only `I2CDecoder`, `SPIDecoder`, and `UARTDecoder` exist, and decoding is done in software — the CAN/LIN entries in `supported_decode_types` describe what the *instrument* can decode, which the library never drives.
+- README no longer presents `channel_controls.png` as a distinct "Channel Controls" screenshot; it was byte-identical to `main_window.png`. That file and the orphaned `01_main_window.png` (also byte-identical) are removed.
+
+### Known issues
+
+- The mock answers `:MEASure` queries with fixed constants (Peak-to-Peak `2.000 V`, RMS `707 mV`) that do not track the waveform it synthesizes — a capture of a 3.28 Vpp square wave still measures 2.000 V. Waveform *samples* are state-coupled; measurement queries are not. No Measurements-tab screenshot is shipped for this reason.
+
 ## [7.0.0] - 2026-08-04
 
 ### ⚠️ Breaking Changes
