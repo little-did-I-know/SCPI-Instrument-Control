@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.0.1] - 2026-08-07
+
 ### Added
 
 - Docs: `docs/images/social-preview.png`, a purpose-built 1280×640 GitHub social-preview card. Links shared to Reddit/HN/X/Discord previously rendered the default GitHub card. Upload it under **Settings → Social preview**; `BRANDING.md` has the steps (it used to point at `resources/Test Equipment.png`, which is 1024×1024 and gets cropped to 2:1).
@@ -15,7 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- README rewritten as a showcase, 1008 → ~280 lines. The GUI manual, the inline API reference, the v1.0.0 migration guide, and the maintainer build/publish steps are now linked to their existing homes on the docs site (`docs/gui/`, `docs/user-guide/`, `docs/about/changelog.md`, `docs/development/`) rather than duplicated. The four things that lived *only* in the README — the supported-instrument list, the CLI table, the GUI's Power Supply and Data Logger tabs, and the interactive-tutorial link — are kept.
+- README rewritten as a showcase, 1008 → 269 lines. The GUI manual, the inline API reference, the v1.0.0 migration guide, and the maintainer build/publish steps are now linked to their existing homes on the docs site (`docs/gui/`, `docs/user-guide/`, `docs/about/changelog.md`, `docs/development/`) rather than duplicated. The four things that lived *only* in the README — the supported-instrument list, the CLI table, the GUI's Power Supply and Data Logger tabs, and the interactive-tutorial link — are kept.
 - README now leads with a runnable hardware-free example. The previous quick start needed an instrument at `192.168.1.100` before it did anything.
 - Docs landing page uses the live-trace GUI screenshot instead of the disconnected one.
 
