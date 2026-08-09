@@ -9,13 +9,6 @@ Requirements: none by default -- runs against the built-in mock scope. Pass
 Expected output: connection/device info, channel and trigger configuration
 echoed to the console, frequency/Vpp measurements on Channel 1, and a summary
 of each enabled channel's configuration. No files are written.
-
-Mock limitation: the built-in mock's legacy dialect doesn't implement the
-C1:UNIT? query that get_configuration() uses internally, so the final
-"Channel Configurations" summary prints nothing when run against the mock
-(the per-channel lookup raises and is silently skipped, same as it would be
-against real hardware missing that query) -- against a real oscilloscope
-this section lists each enabled channel's scale/coupling/offset.
 """
 
 import argparse
@@ -107,9 +100,6 @@ def main():
                     print(f"  Channel {i}: {config['voltage_scale']}V/div, " f"{config['coupling']}, offset={config['voltage_offset']}V")
             except Exception:
                 pass
-
-    except Exception as e:
-        print(f"\nError: {e}")
 
     finally:
         # Disconnect
