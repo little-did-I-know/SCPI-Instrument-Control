@@ -88,6 +88,7 @@ EXECUTE = [
     ("reference_waveforms.py", None),
     ("screen_capture_example.py", None),
     ("measurement_badges_example.py", None),
+    ("protocol_decoding.py", None),
 ]
 
 _TIMEOUTS = {"report_ai_qa.py": 240}
