@@ -8,13 +8,16 @@ Supported models:
 - SDG2000X series (SDG2042X, SDG2082X, SDG2122X, etc.)
 - Generic SCPI-compliant arbitrary waveform generators
 
-Requirements:
-- Function generator connected to network
-- IP address configured on generator
-- Default SCPI port: 5025
+Requirements: none by default -- runs against the built-in mock AWG. Pass
+--host <ip> to drive a real function generator on the network (default
+SCPI port: 5025).
+
+Expected output: log lines narrating each waveform demo (sine, square,
+pulse, ramp, channel synchronization, manual configuration) and the final
+"all outputs off" safety step. No files are written.
 
 Usage:
-    python function_generator_basic.py --ip 192.168.1.100
+    python function_generator_basic.py --host 192.168.1.100
 """
 
 import argparse
@@ -22,23 +25,31 @@ import logging
 import time
 
 from scpi_control import FunctionGenerator
+from scpi_control.connection import MockConnection
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 
+def _connect(host):
+    """Return a mock connection for --host mock, or None to use a real socket."""
+    if host != "mock":
+        return None
+    return MockConnection("mock", awg_mode=True)
+
+
 def main():
     """Main function to demonstrate AWG control."""
     parser = argparse.ArgumentParser(description="Control Siglent Function Generator")
-    parser.add_argument("--ip", type=str, default="192.168.1.100", help="Function generator IP address")
+    parser.add_argument("--host", type=str, default="mock", help="Function generator hostname/IP, or 'mock' for the built-in mock AWG (default: mock)")
     parser.add_argument("--port", type=int, default=5025, help="SCPI port (default: 5025)")
     args = parser.parse_args()
 
-    logger.info(f"Connecting to function generator at {args.ip}:{args.port}")
+    logger.info(f"Connecting to function generator at {args.host}:{args.port}")
 
     # Using context manager for automatic connection/disconnection
-    with FunctionGenerator(args.ip, port=args.port) as awg:
+    with FunctionGenerator(args.host, port=args.port, connection=_connect(args.host)) as awg:
         # Get device info
         logger.info(f"Connected to: {awg.identify()}")
         logger.info(f"Model: {awg.model_capability.model_name}")

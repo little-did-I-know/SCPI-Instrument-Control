@@ -78,6 +78,9 @@ EXECUTE = [
     ("measurements.py", None),
     ("advanced_analysis.py", None),
     ("live_plot.py", None),
+    ("function_generator_basic.py", None),
+    ("psu_basic_control.py", None),
+    ("data_logger_basic.py", None),
 ]
 
 _TIMEOUTS = {"report_ai_qa.py": 240}

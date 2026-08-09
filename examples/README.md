@@ -49,14 +49,14 @@ pip install "SCPI-Instrument-Control"
 
 | File | What it shows | Requirements |
 | --- | --- | --- |
-| `function_generator_basic.py` | Basic control of Siglent SDG-series function generators over Ethernet/LAN. | Function generator on the network |
+| `function_generator_basic.py` | Basic control of Siglent SDG-series function generators over Ethernet/LAN. | None — runs on the built-in mock; `--host <ip>` for real hardware |
 | `vector_graphics_xy_mode.py` | Using the oscilloscope as a vector display: generating X/Y waveform data for shapes, saving waveform files for an AWG, and animating via rotation/transforms. | `SCPI-Instrument-Control[fun]`, external AWG/DAC feeding the scope's channels |
 
 ## Power Supply
 
 | File | What it shows | Requirements |
 | --- | --- | --- |
-| `psu_basic_control.py` | Controlling a SCPI power supply (Siglent SPD series or generic SCPI-99) over Ethernet/LAN. | Power supply on the network |
+| `psu_basic_control.py` | Controlling a SCPI power supply (Siglent SPD series or generic SCPI-99) over Ethernet/LAN. | None — runs on the built-in mock; `--host <ip>` for real hardware |
 | `psu_advanced_features.py` | Advanced PSU features: CSV data logging, tracking modes (series/parallel), timer functionality, waveform generation, and OVP/OCP protection. | Core install only (no hardware — uses a mock connection) |
 | `psu_usb_connection.py` | Connecting to a power supply via USB/GPIB/Serial/TCP-IP using `VISAConnection`. | `SCPI-Instrument-Control[usb]`, PSU reachable via USB-TMC/GPIB/Serial/VXI-11 |
 | `psu_gui_test.py` | Testing the PSU control GUI against a mock connection, with no physical hardware required. | `SCPI-Instrument-Control[gui]` |
@@ -65,7 +65,7 @@ pip install "SCPI-Instrument-Control"
 
 | File | What it shows | Requirements |
 | --- | --- | --- |
-| `data_logger_basic.py` | Basic usage of the `DataLogger` class for DAQ/switch units (e.g. Keysight 34970A/DAQ970A style). | DAQ instrument on the network |
+| `data_logger_basic.py` | Basic usage of the `DataLogger` class for DAQ/switch units (e.g. Keysight 34970A/DAQ970A style). | None — runs on the built-in mock; `--host <ip>` for real hardware |
 
 ## Report Generator
 
