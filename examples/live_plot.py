@@ -17,6 +17,7 @@ closed or the frame budget runs out; no files are written in that case.
 """
 
 import argparse
+import time
 
 import matplotlib.animation as animation
 import matplotlib.pyplot as plt
@@ -163,6 +164,13 @@ def main():
         # Start acquisition
         scope.run()
         print("Acquisition running...")
+
+        # Real hardware needs a moment for the signal to settle after
+        # starting acquisition before the first capture is meaningful; the
+        # mock has no such settling behavior to model, so skip the wait
+        # there to keep the headless run fast.
+        if args.host != "mock":
+            time.sleep(0.5)
 
         # Start live plotting
         print(f"\nStarting live plot ({args.frames} frames)...")
