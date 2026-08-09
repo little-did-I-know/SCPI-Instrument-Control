@@ -9,7 +9,13 @@ Requirements: none by default -- runs against the built-in mock scope. Pass
 
 Expected output: correlation and peak-difference figures printed to the
 console. References are written to a temporary directory that is removed on
-exit; pass --storage-dir to keep them.
+exit; pass --storage-dir to keep them. Against the mock, the two captures are
+synthesized identically (same signal spec, no noise) and the reported
+correlation is a perfect 1.000000 with a peak difference of 0.000e+00 V --
+that is the mock behaving correctly, not the example faking a result. A real
+instrument's captures will differ by acquisition noise and jitter, so the
+same run against hardware will print a correlation just under 1.0 and a
+nonzero peak difference.
 """
 
 import argparse
