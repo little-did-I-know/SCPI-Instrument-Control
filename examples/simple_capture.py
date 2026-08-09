@@ -7,8 +7,8 @@ Requirements: none by default -- runs against the built-in mock scope. Pass
 --host <ip> to drive a real oscilloscope on the network.
 
 Expected output: per-channel capture stats and basic analysis (Vpp, mean,
-RMS, frequency) printed to the console, and 'simple_capture.npz' saved to
-the current directory.
+RMS, frequency) printed to the console, and 'simple_capture_ch1.npz' and
+'simple_capture_ch2.npz' saved to the current directory.
 """
 
 import argparse
@@ -64,7 +64,7 @@ def main():
                 print(f"  Frequency: {analysis['frequency'] / 1e3:.2f} kHz")
 
         # Save waveforms to file
-        print("\nSaving waveforms to 'simple_capture.npz'...")
+        print("\nSaving waveforms to 'simple_capture_ch1.npz' and 'simple_capture_ch2.npz'...")
         collector.save_data(waveforms, "simple_capture.npz", format="npz")
         print("Done!")
 

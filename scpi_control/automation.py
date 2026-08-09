@@ -599,6 +599,8 @@ class DataCollector:
         Example:
             >>> data = collector.capture_single([1, 2])
             >>> collector.save_data(data, 'measurement.npz')
+            # writes measurement_ch1.npz and measurement_ch2.npz -- one file
+            # per channel, suffixed with "_ch{n}" before the extension.
         """
         for ch, waveform in waveforms.items():
             base, ext = filename.rsplit(".", 1) if "." in filename else (filename, format or "npz")
