@@ -11,14 +11,18 @@ Note: the mock synthesizes analogue test signals (sine, square, ramp, ...),
 not framed bus traffic, so a mock run demonstrates decoder setup and the
 decode call rather than a realistic bus transcript. Running the UART decoder
 against the mock's 10 kHz square wave does not find real UART frames -- but
-it is not guaranteed to find *zero* events either: the decoder's edge
-detector treats every falling edge as a candidate start bit, and by chance
-one of the square wave's own periodic edges can line up with the 9600-baud
-bit grid closely enough to pass the start/stop checks, producing a single
-spurious byte (0x00) that has nothing to do with real bus data -- an
-aliasing artefact of feeding a periodic test signal to a decoder tuned for
-asynchronous framing, not a decoded transmission. Point --host at hardware
-probing a real UART line to see genuine decoded bytes.
+it is not guaranteed to find *zero* events either: the captured buffer holds
+14 falling edges, and the decoder tries each as a candidate start bit. The
+first 13 are correctly rejected (the wave's ~50 us low phase has already
+flipped back high by the time the decoder samples 52 us later). The 14th
+is the last edge in the buffer, so its start-bit and eight data-bit sample
+times all fall past the end of the capture; the decoder's nearest-sample
+lookup has no bounds check, so those nine out-of-range queries silently
+clamp to the buffer's final (still-low) sample instead of being rejected.
+The result is a single spurious byte (0x00) that has nothing to do with
+real bus data -- a buffer-boundary clamping artifact, not periodic or
+baud-rate phase alignment. Point --host at hardware probing a real UART
+line to see genuine decoded bytes.
 
 Expected output: each decoder's required channels and parameters, then the
 UART event summary for the mock's square wave -- deterministically
