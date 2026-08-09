@@ -188,6 +188,11 @@ def test_a_converted_example_fails_loudly_on_an_unreachable_host(tmp_path):
     env = {**os.environ, "MPLBACKEND": "Agg", "PYTHONIOENCODING": "utf-8"}
     result = subprocess.run(
         [sys.executable, str(EXAMPLES_DIR / "basic_usage.py"), "--host", "192.0.2.1"],
-        cwd=tmp_path, env=env, input="", capture_output=True, text=True, timeout=_DEFAULT_TIMEOUT,
+        cwd=tmp_path,
+        env=env,
+        input="",
+        capture_output=True,
+        text=True,
+        timeout=_DEFAULT_TIMEOUT,
     )
     assert result.returncode != 0, "example exited 0 despite being unable to reach the instrument"

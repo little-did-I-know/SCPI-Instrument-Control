@@ -546,11 +546,11 @@ Drive the web gateway's REST API from Python — no browser needed.
 ### Requirements
 
 - scpi_control - Core library
-- No hardware required
+- Not executed in CI -- needs a running `scpi-web` gateway, not merely an instrument. It is compile-checked only -- start the gateway and run it by hand after changes.
 
 ### Configuration
 
-No hardware required.
+Not executed in CI: needs a running `scpi-web` gateway, not merely an instrument. It is compile-checked only -- start the gateway and run it by hand after changes.
 
 ### Usage
 
@@ -1337,11 +1337,11 @@ Power supply control via USB connection.
 ### Requirements
 
 - scpi_control - Core library
-- No hardware required
+- Not executed in CI -- this example's subject is the USB/VISA transport itself, which the mock connection cannot stand in for without demonstrating nothing. It is compile-checked only -- verify it against real hardware after changes.
 
 ### Configuration
 
-No hardware required.
+Not executed in CI: this example's subject is the USB/VISA transport itself, which the mock connection cannot stand in for without demonstrating nothing. It is compile-checked only -- verify it against real hardware after changes.
 
 ### Usage
 

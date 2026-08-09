@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Every network-facing example now takes `--host`, defaulting to `mock`, and runs with no instrument attached — the built-in mock supplies the waveforms. Previously all but one required editing a hardcoded `SCOPE_IP` before they would run at all. `function_generator_basic.py`'s `--ip` flag is renamed `--host` for consistency.
+- Converted examples now exit non-zero on unexpected failure instead of printing an error and exiting 0. Anyone scripting or automating against these examples should check the exit code again — a blanket `except Exception: print(...)` around `main()` previously made several examples report success even when nothing worked (e.g. `basic_usage.py` pointed at an unreachable host).
 - The examples execution guard covers 33 of 36 examples, up from 15. The three it cannot execute — `psu_usb_connection.py` (USB/VISA transport), `psu_gui_test.py` (Qt GUI), `gateway_rest_client.py` (needs a running gateway) — now say so in their docstrings and in the README, so the gap is visible rather than silent.
 
 ## [7.0.1] - 2026-08-07

@@ -607,7 +607,7 @@ A Tektronix MSO exposes measurements as numbered "badges" that must be
 allocated before they can be read. scpi_control pools them: the first
 measurement of a given type allocates a badge, repeats reuse it with a single
 query, and disconnecting removes the badges it created without touching any
-of the user configured on the front panel.
+of the badges the user configured on the front panel.
 
 Requirements: none by default -- runs against a built-in mock MSO58. Pass
 --host <ip> to drive a real Tektronix MSO on the network.
@@ -1122,11 +1122,11 @@ Test the power supply GUI with a mock connection.
 ### Requirements
 
 - PyQt6 - For GUI
-- No hardware required
+- Not executed in CI -- launches a Qt GUI and needs PyQt6 plus a display. It is compile-checked only -- verify it manually after changes.
 
 ### Configuration
 
-No hardware required.
+Not executed in CI: launches a Qt GUI and needs PyQt6 plus a display. It is compile-checked only -- verify it manually after changes.
 
 ### Usage
 
