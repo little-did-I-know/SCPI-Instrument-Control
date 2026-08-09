@@ -50,7 +50,7 @@ pip install "SCPI-Instrument-Control"
 | File | What it shows | Requirements |
 | --- | --- | --- |
 | `function_generator_basic.py` | Basic control of Siglent SDG-series function generators over Ethernet/LAN. | None — runs on the built-in mock; `--host <ip>` for real hardware |
-| `vector_graphics_xy_mode.py` | Using the oscilloscope as a vector display: generating X/Y waveform data for shapes, saving waveform files for an AWG, and animating via rotation/transforms. | `SCPI-Instrument-Control[fun]`, external AWG/DAC feeding the scope's channels |
+| `vector_graphics_xy_mode.py` | Using the oscilloscope as a vector display: generating X/Y waveform data for shapes, saving waveform files for an AWG, and animating via rotation/transforms. Generation and file-writing run headless; an external AWG/DAC is only needed to actually display the shapes on a scope. | None — runs on the built-in mock; `--host <ip>` for real hardware. `SCPI-Instrument-Control[fun]` additionally needed for the text-rendering demo (skipped with a warning if absent) |
 
 ## Power Supply
 
