@@ -25,6 +25,7 @@ pip install "SCPI-Instrument-Control"
 | --- | --- | --- |
 | `basic_usage.py` | Connecting to an oscilloscope, configuring channels and trigger, and performing basic operations. | None — runs on the built-in mock; `--host <ip>` for real hardware |
 | `waveform_capture.py` | Capturing waveform data from the oscilloscope and saving it to a file. | None — runs on the built-in mock; `--host <ip>` for real hardware (matplotlib is a core dependency) |
+| `screen_capture_example.py` | Pulling a screenshot off the instrument's display with `ScreenCapture` and saving the scope's native BMP to a file. | None — runs on the built-in mock; `--host <ip>` for real hardware |
 | `measurements.py` | Automated measurements (frequency, Vpp, RMS, period, etc.) on oscilloscope channels. | None — runs on the built-in mock; `--host <ip>` for real hardware |
 | `math_channels.py` | Waveform math: adding and subtracting two captured channels with `MathOperations`, computed in Python on captured samples rather than an instrument MATH channel. | None — runs on the built-in mock; `--host <ip>` for real hardware |
 | `reference_waveforms.py` | Golden-reference comparison: saving a captured waveform as a named reference with `ReferenceWaveform`, then scoring a later capture against it with a correlation coefficient and a point-by-point difference. | None — runs on the built-in mock; `--host <ip>` for real hardware |
