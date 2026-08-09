@@ -17,6 +17,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Converted examples now exit non-zero on unexpected failure instead of printing an error and exiting 0. Anyone scripting or automating against these examples should check the exit code again — a blanket `except Exception: print(...)` around `main()` previously made several examples report success even when nothing worked (e.g. `basic_usage.py` pointed at an unreachable host).
 - The examples execution guard covers 33 of 36 examples, up from 15. The three it cannot execute — `psu_usb_connection.py` (USB/VISA transport), `psu_gui_test.py` (Qt GUI), `gateway_rest_client.py` (needs a running gateway) — now say so in their docstrings and in the README, so the gap is visible rather than silent.
 
+### Fixed
+
+- Oscilloscope (legacy Siglent dialect): `channel.unit` no longer returns the raw echoed response. Real hardware answers `C1:UNIT?` with the header still attached (`C1:UNIT V`, RC01020-E01C p.137); previously that header was returned verbatim, so `scope.channel1.unit` came back as `"C1:UNIT V"` instead of `"V"`. Code that worked around the old value should drop the workaround. The mock's `C1:UNIT?` answer was updated to match the same header-echoed form.
+
 ## [7.0.1] - 2026-08-07
 
 ### Added

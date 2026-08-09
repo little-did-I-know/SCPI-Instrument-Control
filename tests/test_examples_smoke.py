@@ -169,7 +169,13 @@ def test_no_hardware_example_runs(filename, module, tmp_path):
     # disengaged badge pooling). Assert on what they print.
     if filename == "live_plot.py":
         assert "frame 20 rendered" in result.stdout, "live_plot ran but rendered no frames"
+        # "frame 20 rendered" alone would still print if every one of the 20
+        # acquisitions raised -- update() swallows per-channel errors and
+        # unconditionally prints the "rendered" line regardless. Guard against
+        # a systematic mock failure hiding behind that unconditional print.
+        assert "Error acquiring" not in result.stdout, "live_plot rendered frames but every acquisition failed"
     if filename == "measurement_badges_example.py":
+        assert "ADDNew" in result.stdout, "badge pooling did not engage"
         assert "Badges allocated: []" not in result.stdout, "badge pooling did not engage"
 
 
