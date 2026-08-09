@@ -174,7 +174,7 @@ class ProtocolDecoder(ABC):
 
         return sorted(edge_times)
 
-    def _sample_at_time(self, signal: np.ndarray, time: np.ndarray, sample_time: float, threshold: float) -> bool:
+    def _sample_at_time(self, signal: np.ndarray, time: np.ndarray, sample_time: float, threshold: float) -> Optional[bool]:
         """Sample digital signal at a specific time.
 
         Args:
@@ -184,14 +184,23 @@ class ProtocolDecoder(ABC):
             threshold: Voltage threshold
 
         Returns:
-            True if signal is high, False if low
+            True if signal is high, False if low, or None if sample_time falls
+            outside the captured buffer (or the buffer is empty). A capture
+            legitimately ends mid-frame; callers must treat None as "this
+            moment was never captured", not silently coerce it to a level.
         """
+        if len(time) == 0:
+            return None
+
+        if sample_time < time[0] or sample_time > time[-1]:
+            return None
+
         # Find closest time index
         idx = np.argmin(np.abs(time - sample_time))
 
-        return signal[idx] > threshold
+        return bool(signal[idx] > threshold)
 
-    def _get_bit_at_time(self, signal: np.ndarray, time: np.ndarray, sample_time: float, threshold: float) -> int:
+    def _get_bit_at_time(self, signal: np.ndarray, time: np.ndarray, sample_time: float, threshold: float) -> Optional[int]:
         """Get bit value at a specific time.
 
         Args:
@@ -201,9 +210,15 @@ class ProtocolDecoder(ABC):
             threshold: Voltage threshold
 
         Returns:
-            1 if high, 0 if low
+            1 if high, 0 if low, or None if sample_time falls outside the
+            captured buffer. Callers must check `is None` -- 0 is a valid bit
+            value, so `if not bit:` would treat a real low bit the same as an
+            out-of-range read.
         """
-        return 1 if self._sample_at_time(signal, time, sample_time, threshold) else 0
+        level = self._sample_at_time(signal, time, sample_time, threshold)
+        if level is None:
+            return None
+        return 1 if level else 0
 
     def __repr__(self) -> str:
         """String representation."""

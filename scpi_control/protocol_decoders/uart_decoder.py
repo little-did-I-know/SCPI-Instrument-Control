@@ -151,6 +151,17 @@ class UARTDecoder(ProtocolDecoder):
                 start_bit_time = start_time + sample_offset
                 start_bit = self._get_bit_at_time(signal, time, start_bit_time, threshold)
 
+                if start_bit is None:
+                    # This start edge, and its sample point, are within the
+                    # buffer (start_edges are only ever detected times), but
+                    # the sample offset already pushed us past the end of
+                    # the capture. start_edges are in ascending time order,
+                    # so every later candidate has even less buffer left --
+                    # no further frame can fit either. Stop entirely rather
+                    # than keep probing.
+                    logger.debug(f"UART {channel_name}: start bit sample out of range at {start_bit_time:.6f}s, no further frames can fit")
+                    break
+
                 expected_start = 0 if idle_high else 1
                 if start_bit != expected_start:
                     # Not a valid start bit
@@ -159,20 +170,35 @@ class UARTDecoder(ProtocolDecoder):
                 # Decode data bits
                 data_value = 0
                 bit_times = []
+                truncated = False
 
                 for bit_idx in range(data_bits):
                     bit_time = start_time + (bit_idx + 1) * bit_period + sample_offset
                     bit_val = self._get_bit_at_time(signal, time, bit_time, threshold)
+                    if bit_val is None:
+                        # Just this frame ran past the end of the capture --
+                        # abandon it, but a later (spurious) start edge may
+                        # still decode cleanly, so keep trying.
+                        truncated = True
+                        break
                     bit_times.append(bit_time)
 
                     # LSB first
                     data_value |= bit_val << bit_idx
+
+                if truncated:
+                    logger.debug(f"UART {channel_name}: data bit sample out of range for frame at {start_time:.6f}s, abandoning frame")
+                    continue
 
                 # Check parity (if enabled)
                 parity_valid = True
                 if parity != "none":
                     parity_bit_time = start_time + (data_bits + 1) * bit_period + sample_offset
                     parity_bit = self._get_bit_at_time(signal, time, parity_bit_time, threshold)
+
+                    if parity_bit is None:
+                        logger.debug(f"UART {channel_name}: parity bit sample out of range for frame at {start_time:.6f}s, abandoning frame")
+                        continue
 
                     if parity == "even":
                         expected_parity = bin(data_value).count("1") % 2

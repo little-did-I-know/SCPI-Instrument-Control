@@ -241,11 +241,21 @@ class I2CDecoder(ProtocolDecoder):
         for i in range(7):
             if i < len(clock_edges):
                 bit = self._get_bit_at_time(sda, time, clock_edges[i], threshold)
+                if bit is None:
+                    # Capture ended mid-address; nothing usable to report for
+                    # this transaction. START was already emitted by the
+                    # caller, and abandoning here means we never build an
+                    # ADDRESS/ACK/DATA event from a partial read.
+                    logger.debug("I2C: address bit sample out of range, abandoning transaction")
+                    return
                 address_byte = (address_byte << 1) | bit
 
         # Read/Write bit
         if len(clock_edges) > 7:
             rw_bit = self._get_bit_at_time(sda, time, clock_edges[7], threshold)
+            if rw_bit is None:
+                logger.debug("I2C: R/W bit sample out of range, abandoning transaction")
+                return
             rw_str = "READ" if rw_bit else "WRITE"
         else:
             rw_str = "?"
@@ -253,6 +263,9 @@ class I2CDecoder(ProtocolDecoder):
         # ACK/NACK
         if len(clock_edges) > 8:
             ack_bit = self._get_bit_at_time(sda, time, clock_edges[8], threshold)
+            if ack_bit is None:
+                logger.debug("I2C: address ACK bit sample out of range, abandoning transaction")
+                return
             ack = "NACK" if ack_bit else "ACK"
             ack_event_type = EventType.NACK if ack_bit else EventType.ACK
         else:
@@ -286,16 +299,31 @@ class I2CDecoder(ProtocolDecoder):
         byte_start = 9
         while byte_start + 8 < len(clock_edges):
             data_byte = 0
+            truncated = False
             for i in range(8):
                 bit_idx = byte_start + i
                 if bit_idx < len(clock_edges):
                     bit = self._get_bit_at_time(sda, time, clock_edges[bit_idx], threshold)
+                    if bit is None:
+                        truncated = True
+                        break
                     data_byte = (data_byte << 1) | bit
+
+            if truncated:
+                # clock_edges are strictly increasing timestamps drawn from
+                # this same capture, so once one goes out of range every
+                # later byte's edges will too -- stop, don't just skip this
+                # one.
+                logger.debug("I2C: data bit sample out of range, abandoning remaining transaction")
+                break
 
             # Data ACK
             ack_idx = byte_start + 8
             if ack_idx < len(clock_edges):
                 ack_bit = self._get_bit_at_time(sda, time, clock_edges[ack_idx], threshold)
+                if ack_bit is None:
+                    logger.debug("I2C: data ACK bit sample out of range, abandoning remaining transaction")
+                    break
                 data_ack = "NACK" if ack_bit else "ACK"
                 data_ack_type = EventType.NACK if ack_bit else EventType.ACK
 
