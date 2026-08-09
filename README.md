@@ -1,8 +1,16 @@
 # SCPI Instrument Control
 
-[![CI](https://github.com/little-did-I-know/SCPI-Instrument-Control/actions/workflows/ci.yml/badge.svg)](https://github.com/little-did-I-know/SCPI-Instrument-Control/actions/workflows/ci.yml)
+<!-- Two rows by intent: the first answers "should I install this?", the second
+     "is this looked after?". The platform badge is static -- it is linked to the
+     CI workflow because that matrix (ubuntu/windows/macos) is its only evidence,
+     so if an OS ever leaves the matrix this badge has to be updated by hand. -->
 [![PyPI version](https://img.shields.io/pypi/v/SCPI-Instrument-Control.svg)](https://pypi.org/project/SCPI-Instrument-Control/)
+[![Downloads](https://img.shields.io/pypi/dm/SCPI-Instrument-Control.svg)](https://pypistats.org/packages/scpi-instrument-control)
+[![Status](https://img.shields.io/pypi/status/SCPI-Instrument-Control.svg)](https://pypi.org/project/SCPI-Instrument-Control/)
 [![Python Version](https://img.shields.io/pypi/pyversions/SCPI-Instrument-Control)](https://pypi.org/project/SCPI-Instrument-Control/)
+[![Platform](https://img.shields.io/badge/platform-linux%20%7C%20macOS%20%7C%20windows-lightgrey.svg)](https://github.com/little-did-I-know/SCPI-Instrument-Control/actions/workflows/ci.yml)
+
+[![CI](https://github.com/little-did-I-know/SCPI-Instrument-Control/actions/workflows/ci.yml/badge.svg)](https://github.com/little-did-I-know/SCPI-Instrument-Control/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/little-did-I-know/SCPI-Instrument-Control/branch/main/graph/badge.svg)](https://codecov.io/gh/little-did-I-know/SCPI-Instrument-Control)
 [![Docs](https://img.shields.io/badge/docs-mkdocs-blue.svg)](https://little-did-I-know.github.io/SCPI-Instrument-Control/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)

@@ -215,7 +215,10 @@ jobs:
         uses: codecov/codecov-action@v7
         if: matrix.python-version == '3.11'
         with:
-          file: ./coverage.xml
+          # `files` (plural). codecov-action v4+ dropped `file`, and passing it only
+          # produces a warning -- the step still goes green while the path is ignored
+          # and the CLI falls back to searching the tree for a report.
+          files: ./coverage.xml
           flags: unittests
           name: codecov-umbrella
           fail_ci_if_error: false
