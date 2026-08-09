@@ -13,6 +13,7 @@ Expected output: 'example_reports/example_report.md' and, if reportlab is
 installed, 'example_reports/example_report.pdf'.
 """
 
+import sys
 from datetime import datetime
 from pathlib import Path
 
@@ -279,8 +280,6 @@ def main():
     # Check if running interactively
     enable_ai = False
     try:
-        import sys
-
         # Try to get input with a timeout by checking stdin
         if sys.stdin.isatty() and hasattr(sys.stdin, "read"):
             user_input = input("Enable AI features? (y/n): ").strip().lower()
@@ -312,7 +311,12 @@ def main():
     if md_generator.generate(report, md_path):
         print(f"    [OK] Markdown report saved: {md_path}")
     else:
-        print(f"    [FAILED] Failed to generate Markdown report")
+        # generate() returns False on any internal failure (it logs and
+        # swallows the real exception -- see scpi_control's markdown_generator.py).
+        # Markdown is this example's primary, always-attempted deliverable, so
+        # a False here is a real failure, not an optional-dependency skip.
+        print("    [FAILED] Failed to generate Markdown report", file=sys.stderr)
+        raise SystemExit(1)
 
     # Generate PDF report (if available)
     print("  - Generating PDF report...")
@@ -323,7 +327,13 @@ def main():
         if pdf_generator.generate(report, pdf_path):
             print(f"    [OK] PDF report saved: {pdf_path}")
         else:
-            print(f"    [FAILED] Failed to generate PDF report")
+            # Same reasoning as the Markdown case above: reportlab being
+            # missing is the legitimate "optional" outcome and is handled
+            # below by the ImportError branch, not here. Once reportlab is
+            # importable, PDFReportGenerator existing and generate() still
+            # returning False means real report generation failed.
+            print("    [FAILED] Failed to generate PDF report", file=sys.stderr)
+            raise SystemExit(1)
     except ImportError:
         print("  - PDF generation skipped (reportlab not installed)")
 
