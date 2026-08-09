@@ -27,7 +27,7 @@ pipeline with an empty bench.
   <!-- Absolute raw URLs, not repo-relative paths: PyPI renders this README as a
        standalone document with no repo context, so a relative src has nothing to
        resolve against and the image silently fails to load there. -->
-  <img src="https://raw.githubusercontent.com/little-did-I-know/SCPI-Instrument-Control/main/docs/images/mock-demo.gif" alt="A terminal session capturing a 1 kHz square wave from the built-in mock scope with no instrument attached" width="760">
+  <img src="https://raw.githubusercontent.com/little-did-I-know/SCPI-Instrument-Control/main/docs/images/mock-demo.gif" alt="Terminal recording of four example scripts — basic_usage, math_channels, measurement_badges_example and screen_capture_example — running one after another against the built-in mock scope with no instrument attached" width="760">
 </p>
 
 ## Try it with no instrument on your desk
