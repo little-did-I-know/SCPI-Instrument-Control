@@ -2,6 +2,12 @@
 
 Welcome to the SCPI Instrument Control documentation! SCPI Instrument Control is a universal Python library for SCPI test equipment — oscilloscopes, function generators/AWGs, power supplies, and DAQ units — with a PyQt6 desktop GUI and a browser-based lab gateway.
 
+You do not need an instrument to try it. Every example below runs against the built-in mock scope, and
+this recording is of them actually doing so — each frame is captured by running the example, so it
+cannot drift from what the code really prints:
+
+![Terminal recording of four example scripts — basic_usage, math_channels, measurement_badges_example and screen_capture_example — running one after another against the built-in mock scope with no instrument attached](images/mock-demo.gif)
+
 <div class="grid cards" markdown>
 
 - :material-clock-fast:{ .lg .middle } **Quick Start**
@@ -107,25 +113,35 @@ See the [Installation Guide](getting-started/installation.md) for more options.
 
 ## Quick Example
 
+No instrument required — this runs as written:
+
 ```python
 from scpi_control import Oscilloscope
+from scpi_control.connection import MockConnection
+from scpi_control.signal_synth import SignalSpec
 
-# Connect to oscilloscope
-scope = Oscilloscope('192.168.1.100')
+# A virtual SDS1104X-E probing a 3.3 V, 1 kHz logic clock.
+# For real hardware, drop the connection= argument and pass an address:
+#     scope = Oscilloscope("192.168.1.100")
+scope = Oscilloscope("mock", connection=MockConnection(
+    "mock",
+    channel_states={1: True},
+    signals={1: SignalSpec(kind="square", frequency=1000.0, amplitude=1.65, offset=1.65)},
+    sample_rate=20e6,
+    timebase=500e-6,
+))
 scope.connect()
 
-# Configure channel 1
-scope.channel1.voltage_scale = 1.0  # 1V/div
-scope.channel1.enabled = True
+waveform = scope.get_waveform(channel=1)
+print(f"{len(waveform.time)} samples")
+print(f"Vpp  {waveform.voltage.max() - waveform.voltage.min():.3f} V")
+print(f"Freq {scope.measurement.measure_frequency(1):.2f} Hz")
+```
 
-# Capture waveform
-waveform = scope.get_waveform(1)
-print(f"Captured {len(waveform)} samples")
-
-# Get measurements
-freq = scope.measure.frequency(1)
-vpp = scope.measure.vpp(1)
-print(f"Frequency: {freq} Hz, Vpp: {vpp} V")
+```text
+14000 samples
+Vpp  3.280 V
+Freq 1000.00 Hz
 ```
 
 ## GUI Application

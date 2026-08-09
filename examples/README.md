@@ -9,7 +9,12 @@ against mock connections with no real-hardware path at all, and three
 genuinely cannot run without extra setup (a USB/VISA transport, a Qt display,
 or a running web gateway) — those are called out below.
 
-Here is a genuine capture from a **Siglent SDS824X HD** on the bench — its 1&nbsp;kHz
+Here are four of them running back to back with nothing plugged in. Every frame is captured by
+actually executing the example, so what you see is what the code really prints:
+
+![Terminal recording of four example scripts — basic_usage, math_channels, measurement_badges_example and screen_capture_example — running one after another against the built-in mock scope with no instrument attached](../docs/images/mock-demo.gif)
+
+And here is a genuine capture from a **Siglent SDS824X HD** on the bench — its 1&nbsp;kHz
 calibration square wave, acquired over LAN and plotted by the same automation API that
 `waveform_capture.py` uses:
 
