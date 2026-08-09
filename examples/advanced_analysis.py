@@ -4,22 +4,39 @@ This example demonstrates how to perform advanced analysis on captured
 waveforms, including FFT analysis, statistical analysis, and visualization
 using matplotlib.
 
-Requirements: an oscilloscope reachable on the network -- edit SCOPE_IP below
-to match its LAN address. matplotlib is a core dependency, no extra install
-needed.
+Requirements: none by default -- runs against the built-in mock scope. Pass
+--host <ip> to drive a real oscilloscope on the network. matplotlib is a
+core dependency, no extra install needed.
 
-Expected output: basic and signal-quality stats printed to the console,
-three plot windows (time domain, FFT, histogram), and 'analyzed_waveform.npz'
-plus 'analysis_report.txt' saved to the current directory.
+Expected output: basic and signal-quality stats printed to the console;
+'advanced_analysis_time.png', 'advanced_analysis_fft.png', and
+'advanced_analysis_histogram.png' plots, plus 'analyzed_waveform.npz' and
+'analysis_report.txt', all saved to the current directory. No plot window
+is opened -- matplotlib's Agg backend (set by the test harness) cannot
+display one, so this example saves figures instead of calling plt.show().
 """
+
+import argparse
 
 import matplotlib.pyplot as plt
 import numpy as np
 
 from scpi_control.automation import DataCollector
+from scpi_control.connection import MockConnection
+from scpi_control.signal_synth import SignalSpec
 
-# Replace with your oscilloscope's IP address
-SCOPE_IP = "192.168.1.100"
+
+def _connect(host):
+    """Return a mock connection for --host mock, or None to use a real socket."""
+    if host != "mock":
+        return None
+    return MockConnection(
+        "mock",
+        channel_states={1: True},
+        signals={1: SignalSpec(kind="square", frequency=1000.0, amplitude=1.65, offset=1.65)},
+        sample_rate=20e6,
+        timebase=500e-6,
+    )
 
 
 def plot_waveform(waveform, channel_num, title="Waveform"):
@@ -109,7 +126,11 @@ def analyze_signal_quality(waveform):
 
 
 def main():
-    with DataCollector(SCOPE_IP) as collector:
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("--host", default="mock", help="Instrument hostname/IP, or 'mock' for the built-in mock scope (default: mock)")
+    args = parser.parse_args()
+
+    with DataCollector(args.host, connection=_connect(args.host)) as collector:
         print(f"Connected to {collector.scope.identify()}\n")
 
         # Capture waveform
@@ -118,7 +139,7 @@ def main():
 
         if 1 not in waveforms:
             print("Error: Channel 1 not available")
-            return
+            raise SystemExit(1)
 
         waveform = waveforms[1]
         print(f"Captured {len(waveform.voltage)} samples")
@@ -160,7 +181,9 @@ def main():
         print(f"95th percentile:  {percentiles[5]:.4f} V")
         print(f"99th percentile:  {percentiles[6]:.4f} V")
 
-        # Visualizations
+        # Visualizations. plt.show() would block waiting for a display (and is
+        # a no-op under the Agg backend anyway), so each figure is saved to a
+        # file instead.
         print("\n" + "=" * 60)
         print("GENERATING VISUALIZATIONS")
         print("=" * 60)
@@ -168,10 +191,14 @@ def main():
         # Time domain plot
         print("Plotting time-domain waveform...")
         plot_waveform(waveform, 1, "Time Domain Analysis")
+        plt.savefig("advanced_analysis_time.png", dpi=150)
+        plt.close()
 
         # Frequency domain plot
         print("Plotting frequency spectrum...")
         plot_fft(waveform, 1)
+        plt.savefig("advanced_analysis_fft.png", dpi=150)
+        plt.close()
 
         # Histogram
         print("Plotting voltage distribution...")
@@ -182,9 +209,10 @@ def main():
         plt.title("Voltage Distribution Histogram - Channel 1")
         plt.grid(True, alpha=0.3)
         plt.tight_layout()
+        plt.savefig("advanced_analysis_histogram.png", dpi=150)
+        plt.close()
 
-        print("\nDisplaying plots (close windows to continue)...")
-        plt.show()
+        print("Plots saved to 'advanced_analysis_time.png', 'advanced_analysis_fft.png', and 'advanced_analysis_histogram.png'")
 
         # Save waveform data
         print("\nSaving waveform data and analysis...")

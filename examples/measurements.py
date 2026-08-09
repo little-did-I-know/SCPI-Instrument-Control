@@ -3,25 +3,49 @@
 This script demonstrates how to perform automated measurements
 on oscilloscope channels.
 
-Requirements: an oscilloscope reachable on the network -- edit SCOPE_IP below
-to match its LAN address.
+Requirements: none by default -- runs against the built-in mock scope. Pass
+--host <ip> to drive a real oscilloscope on the network.
 
 Expected output: individual measurements (frequency, period, Vpp, amplitude,
 max/min, RMS, mean) on Channel 1 printed to the console, followed by the
 combined result of measure_all(). No files are written.
+
+Note: against --host mock, the instrument-side :MEASure values are fixed
+constants and do not track the synthesized waveform. Numbers computed from
+captured samples (via scpi_control.analysis) do track it. This is a mock
+fidelity limit, not a measurement error.
 """
 
+import argparse
 import time
 
 from scpi_control import Oscilloscope
+from scpi_control.connection import MockConnection
+from scpi_control.signal_synth import SignalSpec
 
-# Replace with your oscilloscope's IP address
-SCOPE_IP = "192.168.1.100"
+
+def _connect(host):
+    """Return a mock connection for --host mock, or None to use a real socket."""
+    if host != "mock":
+        return None
+    return MockConnection(
+        "mock",
+        channel_states={1: True},
+        signals={1: SignalSpec(kind="square", frequency=1000.0, amplitude=1.65, offset=1.65)},
+        sample_rate=20e6,
+        timebase=500e-6,
+    )
 
 
 def main():
-    # Create oscilloscope instance and connect
-    with Oscilloscope(SCOPE_IP) as scope:
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("--host", default="mock", help="Instrument hostname/IP, or 'mock' for the built-in mock scope (default: mock)")
+    args = parser.parse_args()
+
+    scope = Oscilloscope(args.host, connection=_connect(args.host))
+    scope.connect()
+
+    try:
         print(f"Connected to: {scope.device_info['model']}")
 
         # Configure channel 1
@@ -104,6 +128,9 @@ def main():
                 print(f"{name:12s}: N/A")
 
         print("\nDone!")
+
+    finally:
+        scope.disconnect()
 
 
 if __name__ == "__main__":
