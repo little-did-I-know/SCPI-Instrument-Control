@@ -3,27 +3,51 @@
 This script demonstrates how to connect to an oscilloscope,
 configure channels and trigger, and perform basic operations.
 
-Requirements: an oscilloscope reachable on the network -- edit SCOPE_IP below
-to match its LAN address.
+Requirements: none by default -- runs against the built-in mock scope. Pass
+--host <ip> to drive a real oscilloscope on the network.
 
 Expected output: connection/device info, channel and trigger configuration
 echoed to the console, frequency/Vpp measurements on Channel 1, and a summary
 of each enabled channel's configuration. No files are written.
+
+Mock limitation: the built-in mock's legacy dialect doesn't implement the
+C1:UNIT? query that get_configuration() uses internally, so the final
+"Channel Configurations" summary prints nothing when run against the mock
+(the per-channel lookup raises and is silently skipped, same as it would be
+against real hardware missing that query) -- against a real oscilloscope
+this section lists each enabled channel's scale/coupling/offset.
 """
 
-from scpi_control import Coupling, Oscilloscope, TriggerMode, TriggerSlope
+import argparse
 
-# Replace with your oscilloscope's IP address
-SCOPE_IP = "192.168.1.100"
+from scpi_control import Coupling, Oscilloscope, TriggerMode, TriggerSlope
+from scpi_control.connection import MockConnection
+from scpi_control.signal_synth import SignalSpec
+
+
+def _connect(host):
+    """Return a mock connection for --host mock, or None to use a real socket."""
+    if host != "mock":
+        return None
+    return MockConnection(
+        "mock",
+        channel_states={1: True},
+        signals={1: SignalSpec(kind="square", frequency=1000.0, amplitude=1.65, offset=1.65)},
+        sample_rate=20e6,
+        timebase=500e-6,
+    )
 
 
 def main():
-    # Create oscilloscope instance
-    scope = Oscilloscope(SCOPE_IP)
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("--host", default="mock", help="Instrument hostname/IP, or 'mock' for the built-in mock scope (default: mock)")
+    args = parser.parse_args()
+
+    scope = Oscilloscope(args.host, connection=_connect(args.host))
 
     try:
         # Connect to oscilloscope
-        print(f"Connecting to oscilloscope at {SCOPE_IP}...")
+        print(f"Connecting to oscilloscope at {args.host}...")
         scope.connect()
 
         # Get device information

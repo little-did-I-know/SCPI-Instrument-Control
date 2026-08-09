@@ -23,7 +23,7 @@ pip install "SCPI-Instrument-Control"
 
 | File | What it shows | Requirements |
 | --- | --- | --- |
-| `basic_usage.py` | Connecting to an oscilloscope, configuring channels and trigger, and performing basic operations. | Oscilloscope on the network |
+| `basic_usage.py` | Connecting to an oscilloscope, configuring channels and trigger, and performing basic operations. | None — runs on the built-in mock; `--host <ip>` for real hardware |
 | `waveform_capture.py` | Capturing waveform data from the oscilloscope and saving it to a file. | Oscilloscope on the network (matplotlib is a core dependency) |
 | `measurements.py` | Automated measurements (frequency, Vpp, RMS, period, etc.) on oscilloscope channels. | Oscilloscope on the network |
 | `live_plot.py` | Real-time waveform acquisition and plotting using matplotlib animation. | Oscilloscope on the network (matplotlib is a core dependency) |

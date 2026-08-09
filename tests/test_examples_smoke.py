@@ -52,6 +52,7 @@ FORBIDDEN = ["Siglent-Oscilloscope", ".time_interval", '="SDS1104X-E"']
 # a pre-existing O(n^2) autocorrelation in scpi_control/report_generator/utils/
 # waveform_analyzer.py makes very large captures slow; this library issue is out of scope.
 EXECUTE = [
+    ("basic_usage.py", None),
     ("dialect_override_example.py", None),
     ("trend_logging_walkthrough.py", None),
     ("psu_advanced_features.py", None),
