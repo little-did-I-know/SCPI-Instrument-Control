@@ -4,7 +4,8 @@ Nothing here is hand-typed. Each segment runs a real example as a subprocess and
 renders the first N lines of what it actually printed, so the GIF cannot drift
 from what the examples really do.
 
-Run from the repo root:  python scripts/media/make_demo_gif.py
+Resolves its own repo root from __file__, so it can be run from anywhere:
+  python scripts/media/make_demo_gif.py
 """
 
 from __future__ import annotations
@@ -52,7 +53,7 @@ X0, Y0 = 26, 74  # text origin
 GAP = 6  # between the command line and the output block
 BOTTOM_PAD = 30
 RIGHT_MARGIN = 16
-ELLIPSIS = "..."
+ELLIPSIS = "..."  # ASCII, not "…": the fallback font renders the Unicode ellipsis as tofu
 
 # (example path relative to the repo root, how many leading stdout lines to show)
 #
@@ -71,13 +72,26 @@ TOUR = [
     ("examples/screen_capture_example.py", 1),
 ]
 
+# Cut points above are honesty guarantees, not just layout choices. If a
+# reorder ever moves one of these strings above the cut, the rendered GIF
+# would show a number the example's own output later contradicts -- catch
+# that at generation time instead of shipping it. Kept as a separate
+# module-level dict (not a third TOUR element) so the guard test's table
+# parsing stays simple.
+FORBIDDEN = {"examples/basic_usage.py": ("Vpp:", "Frequency:")}
+
 
 def run_example(rel_path: str) -> list[str]:
     """Run one example in a scratch cwd and return the lines it printed."""
     script = REPO_ROOT / rel_path
     env = {**os.environ, "MPLBACKEND": "Agg", "PYTHONIOENCODING": "utf-8"}
     with tempfile.TemporaryDirectory() as scratch:
-        proc = subprocess.run([sys.executable, str(script)], cwd=scratch, capture_output=True, text=True, timeout=120, env=env)
+        # input="" (rather than relying on subprocess defaults) closes stdin
+        # after writing nothing. On Windows, an inherited/DEVNULL stdin can
+        # make isatty() report True, fooling an example's interactivity
+        # check into calling input() and hanging. See
+        # tests/test_examples_smoke.py's identical guard for the full story.
+        proc = subprocess.run([sys.executable, str(script)], cwd=scratch, capture_output=True, text=True, timeout=120, env=env, input="")
     if proc.returncode != 0:
         raise RuntimeError(f"{rel_path} exited {proc.returncode} -- refusing to render a GIF of a broken example.\n--- stderr ---\n{proc.stderr}")
     return proc.stdout.splitlines()
@@ -87,6 +101,10 @@ def build_segments() -> list[dict]:
     segments = []
     for rel_path, max_lines in TOUR:
         lines = run_example(rel_path)
+        for bad in FORBIDDEN.get(rel_path, ()):
+            hit = next((ln for ln in lines[:max_lines] if bad in ln), None)
+            if hit:
+                raise RuntimeError(f"{rel_path}'s first {max_lines} lines now contain a mock :MEASure value: {hit!r}")
         segments.append({"command": f"python {rel_path}", "lines": lines[:max_lines], "truncated": len(lines) > max_lines})
     return segments
 
@@ -138,6 +156,8 @@ def draw_state(height: int, command: str, out_lines: list[str], ellipsis: bool =
 
 def main():
     segments = build_segments()
+    if not segments:
+        raise RuntimeError("TOUR is empty -- nothing to render")
     assert_fits(segments)
     height = canvas_height(segments)
 

@@ -5,7 +5,9 @@ them drives the **real library against the built-in mock scope**, so the
 pictures cannot drift from what the code actually does — no hand-drawn mockups,
 no hardware required.
 
-Run them from the repository root:
+`make_social_preview.py` and `make_gui_screenshots.py` must be run from the
+repository root; `make_demo_gif.py` resolves its own repo root from `__file__`
+and can be run from anywhere:
 
 ```bash
 python scripts/media/make_demo_gif.py          # docs/images/mock-demo.gif
@@ -33,7 +35,7 @@ python scripts/media/make_gui_screenshots.py   # docs/images/gui-live-view.png, 
   comment in `make_gui_screenshots.py`.
 - **The demo GIF shows contiguous prefixes, never filtered lines.** `TOUR`'s
   second value truncates each example's output; it never selects a subset.
-  `basic_usage.py` stops at 11 lines on purpose — line 19 is the mock's fixed
-  `:MEASure` value, which does not track the waveform the example configured.
+  `basic_usage.py` stops at 11 lines on purpose — line 19 and 20 are the mock's
+  fixed `:MEASure` values, which do not track the waveform the example configured.
   `tests/test_media_tour.py` guards that every toured example still exists and
   is still covered by the execution guard.
