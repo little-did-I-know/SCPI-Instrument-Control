@@ -18,6 +18,7 @@ examples:
       - "function_generator_basic.py"
       - "data_logger_basic.py"
       - "network_discovery.py"
+      - "screen_capture_example.py"
 
     intermediate:
       - "live_plot.py"
@@ -32,6 +33,8 @@ examples:
       - "waveform_provenance_and_extract.py"
       - "comparison_report.py"
       - "batch_report.py"
+      - "math_channels.py"
+      - "reference_waveforms.py"
 
     advanced:
       - "advanced_analysis.py"
@@ -42,6 +45,10 @@ examples:
       - "report_branding.py"
       - "report_computed_analysis.py"
       - "report_ai_qa.py"
+      - "awg_scope_loopback.py"
+      - "frequency_response_sweep.py"
+      - "measurement_badges_example.py"
+      - "protocol_decoding.py"
 
   # Files to exclude from documentation
   exclude_files:

@@ -7,7 +7,12 @@ Advanced examples demonstrating signal analysis, FFT processing, and specialized
 | Example | Description |
 |---------|-------------|
 | [Advanced waveform analysis and visualization](#advanced-waveform-analysis-and-visualization) | Advanced waveform analysis and visualization. |
+| [AWG-to-scope loopback: a mock function generator's live state drives what a](#awg-to-scope-loopback-a-mock-function-generators-live-state-drives-what-a) | AWG-to-scope loopback: a mock function generator's live state drives what a
+mock oscilloscope captures, optionally through an RC device-under-test model. |
+| [Measure a frequency response: mock AWG -> RC low-pass -> mock scope](#measure-a-frequency-response-mock-awg-rc-low-pass-mock-scope) | Measure a frequency response: mock AWG -> RC low-pass -> mock scope. |
+| [Tektronix measurement badges: how repeat measurements reuse a slot](#tektronix-measurement-badges-how-repeat-measurements-reuse-a-slot) | Tektronix measurement badges: how repeat measurements reuse a slot. |
 | [Probe Calibration Analysis Example](#probe-calibration-analysis-example) | Probe Calibration Analysis Example |
+| [Serial protocol decoding: I2C, SPI and UART](#serial-protocol-decoding-i2c-spi-and-uart) | Serial protocol decoding: I2C, SPI and UART. |
 | [Test the power supply GUI with a mock connection](#test-the-power-supply-gui-with-a-mock-connection) | Test the power supply GUI with a mock connection. |
 | [Ask a local LLM questions about a report, using tool-calling](#ask-a-local-llm-questions-about-a-report-using-tool-calling) | Ask a local LLM questions about a report, using tool-calling. |
 | [Apply company branding to a generated report](#apply-company-branding-to-a-generated-report) | Apply company branding to a generated report. |
@@ -24,11 +29,11 @@ Advanced waveform analysis and visualization.
 ### Requirements
 
 - matplotlib - For plotting
-- Oscilloscope connected to network
+- None -- runs on the built-in mock; `--host <ip>` for real hardware
 
 ### Configuration
 
-Update `SCOPE_IP` to match your oscilloscope's IP address (default: `192.168.1.100`).
+None -- runs on the built-in mock with no setup. Pass `--host <ip>` to drive real hardware instead.
 
 ### Usage
 
@@ -45,22 +50,44 @@ This example demonstrates how to perform advanced analysis on captured
 waveforms, including FFT analysis, statistical analysis, and visualization
 using matplotlib.
 
-Requirements: an oscilloscope reachable on the network -- edit SCOPE_IP below
-to match its LAN address. matplotlib is a core dependency, no extra install
-needed.
+Requirements: none by default -- runs against the built-in mock scope. Pass
+--host <ip> to drive a real oscilloscope on the network. matplotlib is a
+core dependency, no extra install needed.
 
-Expected output: basic and signal-quality stats printed to the console,
-three plot windows (time domain, FFT, histogram), and 'analyzed_waveform.npz'
-plus 'analysis_report.txt' saved to the current directory.
+Expected output: basic and signal-quality stats printed to the console;
+'advanced_analysis_time.png', 'advanced_analysis_fft.png', and
+'advanced_analysis_histogram.png' plots, plus 'analyzed_waveform_ch1.npz' and
+'analysis_report.txt', all saved to the current directory. No plot window
+is opened -- matplotlib's Agg backend (set by the test harness) cannot
+display one, so this example saves figures instead of calling plt.show().
+
+Note: against --host mock, the instrument-side :MEASure values are fixed
+constants and do not track the synthesized waveform. Numbers computed from
+captured samples (via scpi_control.analysis) do track it. This is a mock
+fidelity limit, not a measurement error.
 """
+
+import argparse
 
 import matplotlib.pyplot as plt
 import numpy as np
 
 from scpi_control.automation import DataCollector
+from scpi_control.connection import MockConnection
+from scpi_control.signal_synth import SignalSpec
 
-# Replace with your oscilloscope's IP address
-SCOPE_IP = "192.168.1.100"
+
+def _connect(host):
+    """Return a mock connection for --host mock, or None to use a real socket."""
+    if host != "mock":
+        return None
+    return MockConnection(
+        "mock",
+        channel_states={1: True},
+        signals={1: SignalSpec(kind="square", frequency=1000.0, amplitude=1.65, offset=1.65)},
+        sample_rate=20e6,
+        timebase=500e-6,
+    )
 
 
 def plot_waveform(waveform, channel_num, title="Waveform"):
@@ -150,7 +177,11 @@ def analyze_signal_quality(waveform):
 
 
 def main():
-    with DataCollector(SCOPE_IP) as collector:
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("--host", default="mock", help="Instrument hostname/IP, or 'mock' for the built-in mock scope (default: mock)")
+    args = parser.parse_args()
+
+    with DataCollector(args.host, connection=_connect(args.host)) as collector:
         print(f"Connected to {collector.scope.identify()}\n")
 
         # Capture waveform
@@ -159,7 +190,7 @@ def main():
 
         if 1 not in waveforms:
             print("Error: Channel 1 not available")
-            return
+            raise SystemExit(1)
 
         waveform = waveforms[1]
         print(f"Captured {len(waveform.voltage)} samples")
@@ -201,7 +232,9 @@ def main():
         print(f"95th percentile:  {percentiles[5]:.4f} V")
         print(f"99th percentile:  {percentiles[6]:.4f} V")
 
-        # Visualizations
+        # Visualizations. plt.show() would block waiting for a display (and is
+        # a no-op under the Agg backend anyway), so each figure is saved to a
+        # file instead.
         print("\n" + "=" * 60)
         print("GENERATING VISUALIZATIONS")
         print("=" * 60)
@@ -209,10 +242,14 @@ def main():
         # Time domain plot
         print("Plotting time-domain waveform...")
         plot_waveform(waveform, 1, "Time Domain Analysis")
+        plt.savefig("advanced_analysis_time.png", dpi=150)
+        plt.close()
 
         # Frequency domain plot
         print("Plotting frequency spectrum...")
         plot_fft(waveform, 1)
+        plt.savefig("advanced_analysis_fft.png", dpi=150)
+        plt.close()
 
         # Histogram
         print("Plotting voltage distribution...")
@@ -223,9 +260,10 @@ def main():
         plt.title("Voltage Distribution Histogram - Channel 1")
         plt.grid(True, alpha=0.3)
         plt.tight_layout()
+        plt.savefig("advanced_analysis_histogram.png", dpi=150)
+        plt.close()
 
-        print("\nDisplaying plots (close windows to continue)...")
-        plt.show()
+        print("Plots saved to 'advanced_analysis_time.png', 'advanced_analysis_fft.png', and 'advanced_analysis_histogram.png'")
 
         # Save waveform data
         print("\nSaving waveform data and analysis...")
@@ -251,6 +289,371 @@ def main():
 
         print("Analysis report saved to 'analysis_report.txt'")
         print("Done!")
+
+
+if __name__ == "__main__":
+    main()
+```
+
+---
+
+## AWG-to-scope loopback: a mock function generator's live state drives what a
+
+AWG-to-scope loopback: a mock function generator's live state drives what a
+mock oscilloscope captures, optionally through an RC device-under-test model.
+
+### Requirements
+
+- scpi_control - Core library
+- No hardware required
+
+### Configuration
+
+No hardware required.
+
+### Usage
+
+```bash
+python examples/awg_scope_loopback.py
+```
+
+### Source Code
+
+```python
+"""AWG-to-scope loopback: a mock function generator's live state drives what a
+mock oscilloscope captures, optionally through an RC device-under-test model.
+
+scpi_control.connection.mock.loopback.AwgLoopback is a callable suitable for
+MockConnection(signals={...}): it reads a separate mock AWG connection's
+current channel state every time the scope acquires, so a SCPI write on the
+AWG changes the very next scope capture -- two mock instruments joined by one
+virtual cable. An optional scpi_control.dut.RCLowPass sits on that cable,
+standing in for a device under test between the two instruments and rounding
+the edges of whatever the AWG outputs.
+
+This example (1) opens a mock AWG and a mock scope wired together with
+AwgLoopback and prints the captured peak-to-peak of a sine, (2) switches the
+AWG to a square wave with a plain SCPI write and prints the new peak-to-peak,
+then (3) adds an RCLowPass DUT and prints the 10%-90% rise time of the
+square wave's rising edge with and without the DUT, to show how much it
+rounds the edge. Rise time is used rather than a raw sample-to-sample step
+because the mock's int8 code quantization (25 codes/division, see
+docs/user-guide/synthetic-signals.md) would dominate a step-height
+comparison at a gentle cutoff; a 10%-90% time span is many samples wide and
+is not limited by the code grid.
+
+Requirements: SCPI-Instrument-Control (core install) -- runs entirely against
+mock connections, no instrument needed.
+"""
+
+import numpy as np
+
+from scpi_control.connection import MockConnection
+from scpi_control.connection.mock.loopback import AwgLoopback
+from scpi_control.dut import RCLowPass
+from scpi_control.oscilloscope import Oscilloscope
+
+SAMPLE_RATE = 1_000_000.0
+TIMEBASE = 1e-3
+
+
+def _make_awg() -> MockConnection:
+    """A mock AWG, output enabled at 2.0 Vpp / 1 kHz sine."""
+    awg = MockConnection("mock", awg_mode=True)
+    awg.connect()
+    awg.write("C1:BSWV FRQ,1000")
+    awg.write("C1:BSWV AMP,2.0")
+    awg.write("C1:OUTP ON")
+    return awg
+
+
+def _make_scope(source) -> Oscilloscope:
+    """A mock scope whose channel 1 synthesizes from `source` (an AwgLoopback)."""
+    conn = MockConnection(
+        "mock",
+        channel_states={1: True, 2: False, 3: False, 4: False},
+        trigger_status=["Stop"],
+        sample_rate=SAMPLE_RATE,
+        timebase=TIMEBASE,
+        signals={1: source},
+    )
+    scope = Oscilloscope("mock", connection=conn)
+    scope.connect()
+    return scope
+
+
+def _vpp(voltage) -> float:
+    return float(voltage.max() - voltage.min())
+
+
+def _rising_crossing(time_s: np.ndarray, voltage: np.ndarray, level: float, start_index: int = 0):
+    """Sub-sample time of the first rising crossing of `level` at/after `start_index`.
+
+    Linear interpolation between the two bracketing samples locates the
+    crossing between samples, not just to the nearest one. Returns
+    (crossing_time, index_of_the_sample_just_before_the_crossing).
+    """
+    candidates = np.flatnonzero((voltage[start_index:-1] < level) & (voltage[start_index + 1 :] >= level))
+    if candidates.size == 0:
+        raise ValueError(f"no rising crossing of {level} found at or after index {start_index}")
+    i = start_index + int(candidates[0])
+    t0, t1 = time_s[i], time_s[i + 1]
+    v0, v1 = voltage[i], voltage[i + 1]
+    crossing_time = float(t0 + (level - v0) * (t1 - t0) / (v1 - v0))
+    return crossing_time, i
+
+
+def _rise_time_10_90_us(waveform) -> float:
+    """10%-90% rise time (microseconds) of the first rising transition.
+
+    The 10% and 90% levels are relative to the trace's own min/max, so this
+    works the same way whether or not a DUT has rounded the edge. Unlike a
+    raw sample-to-sample step, a rise time spans many samples and is not
+    limited by the mock's int8 code quantization.
+    """
+    voltage = waveform.voltage
+    time_s = waveform.time
+    lo, hi = float(voltage.min()), float(voltage.max())
+    v10 = lo + 0.10 * (hi - lo)
+    v90 = lo + 0.90 * (hi - lo)
+    t10, i10 = _rising_crossing(time_s, voltage, v10)
+    t90, _ = _rising_crossing(time_s, voltage, v90, start_index=i10)
+    return (t90 - t10) * 1e6
+
+
+def demo_live_loopback() -> MockConnection:
+    """Capture a sine, switch the AWG to a square over SCPI, capture again."""
+    print("=== Part 1: the scope captures whatever the AWG is currently outputting ===")
+    awg = _make_awg()
+    scope = _make_scope(AwgLoopback(awg, awg_channel=1))
+    try:
+        sine = scope.get_waveform(1, provenance=False)
+        print(f"AWG set to SINE, 2.0 Vpp: scope captures Vpp={_vpp(sine.voltage):.3f} V")
+
+        awg.write("C1:BSWV WVTP,SQUARE")
+        square = scope.get_waveform(1, provenance=False)
+        print(f"AWG switched to SQUARE via 'C1:BSWV WVTP,SQUARE': scope captures Vpp={_vpp(square.voltage):.3f} V")
+    finally:
+        scope.disconnect()
+    return awg
+
+
+def demo_dut(awg: MockConnection) -> None:
+    """Add an RCLowPass DUT between the (now square-wave) AWG and the scope."""
+    print()
+    print("=== Part 2: an RCLowPass DUT rounds the square wave's edges ===")
+    sharp_scope = _make_scope(AwgLoopback(awg))
+    soft_scope = _make_scope(AwgLoopback(awg, dut=RCLowPass(cutoff_hz=2_000.0)))
+    try:
+        sharp = sharp_scope.get_waveform(1, provenance=False)
+        soft = soft_scope.get_waveform(1, provenance=False)
+    finally:
+        sharp_scope.disconnect()
+        soft_scope.disconnect()
+
+    sharp_rise_us = _rise_time_10_90_us(sharp)
+    soft_rise_us = _rise_time_10_90_us(soft)
+    print(f"10-90 percent rise time with no DUT: {sharp_rise_us:.3f} us (an ideal edge, a fraction of one sample)")
+    print(f"10-90 percent rise time with RCLowPass(cutoff_hz=2000): {soft_rise_us:.1f} us")
+    print("The DUT stretched the rising edge from a fraction of a microsecond to roughly " f"{soft_rise_us:.0f} us -- the edge is visibly rounded")
+
+
+def main() -> None:
+    awg = demo_live_loopback()
+    try:
+        demo_dut(awg)
+    finally:
+        awg.disconnect()
+
+
+if __name__ == "__main__":
+    main()
+```
+
+---
+
+## Measure a frequency response: mock AWG -> RC low-pass -> mock scope
+
+Measure a frequency response: mock AWG -> RC low-pass -> mock scope.
+
+### Requirements
+
+- scpi_control - Core library
+- No hardware required
+
+### Configuration
+
+No hardware required.
+
+### Usage
+
+```bash
+python examples/frequency_response_sweep.py
+```
+
+### Source Code
+
+```python
+"""Measure a frequency response: mock AWG -> RC low-pass -> mock scope.
+
+Channel 1 is patched straight to the generator (the reference); channel 2 sees
+the same signal through an RCLowPass device model with a 1 kHz corner. The sweep
+steps the generator across two decades, autoranges the response channel at every
+point, and compares the measured corner against the analytic one.
+
+Everything here runs against mock connections -- no instrument required, and no
+claim in the output has been validated against real hardware, because there is
+no function generator on the development bench.
+
+Requirements: SCPI-Instrument-Control (core install).
+"""
+
+import math
+
+from scpi_control.connection import MockConnection
+from scpi_control.connection.mock.loopback import AwgLoopback
+from scpi_control.dut import RCLowPass
+from scpi_control.frequency_response import sweep
+from scpi_control.function_generator import FunctionGenerator
+from scpi_control.oscilloscope import Oscilloscope
+
+CUTOFF_HZ = 1000.0
+
+
+def main() -> None:
+    awg_connection = MockConnection("mock", awg_mode=True)
+    awg = FunctionGenerator("mock", connection=awg_connection)
+    awg.connect()
+
+    scope = Oscilloscope(
+        "mock",
+        connection=MockConnection(
+            "mock",
+            channel_states={1: True, 2: True, 3: False, 4: False},
+            trigger_status=["Stop"],
+            sample_rate=1e6,
+            timebase=1e-3,
+            signals={
+                1: AwgLoopback(awg_connection, awg_channel=1),
+                2: AwgLoopback(awg_connection, awg_channel=1, dut=RCLowPass(CUTOFF_HZ)),
+            },
+        ),
+    )
+    scope.connect()
+
+    try:
+        print(f"Sweeping 100 Hz to 10 kHz through an RC low-pass with a {CUTOFF_HZ:.0f} Hz corner\n")
+        print(f"{'frequency':>12} {'gain':>10} {'phase':>10} {'V/div':>8}")
+
+        def show(point):
+            if point.gain_db is None:
+                print(f"{point.frequency_hz:>10.1f} Hz {'--':>10} {'--':>10}   ({point.excluded_reason})")
+            else:
+                print(f"{point.frequency_hz:>10.1f} Hz {point.gain_db:>9.2f} dB {point.phase_deg:>8.1f} deg {point.volts_per_div:>7.3f}")
+
+        result = sweep(scope, awg, reference_channel=1, response_channel=2, start_hz=100.0, stop_hz=10000.0, points_per_decade=5, amplitude_vpp=2.0, settle_s=0.0, on_point=show)
+    finally:
+        scope.disconnect()
+        awg.disconnect()
+
+    measured = result.cutoff_hz()
+    print(f"\nMeasured -3 dB corner: {measured:.1f} Hz (model: {CUTOFF_HZ:.1f} Hz)")
+    print(f"Error: {100 * (measured - CUTOFF_HZ) / CUTOFF_HZ:+.1f}% -- interpolated between points, so it cannot beat the point spacing")
+
+    at_cutoff = min(result.usable(), key=lambda point: abs(point.frequency_hz - CUTOFF_HZ))
+    ratio = at_cutoff.frequency_hz / CUTOFF_HZ
+    print(f"\nAt {at_cutoff.frequency_hz:.1f} Hz: measured {at_cutoff.gain_db:.3f} dB / {at_cutoff.phase_deg:.2f} deg")
+    print(f"{'':>{len(f'At {at_cutoff.frequency_hz:.1f} Hz:')}} analytic {-10 * math.log10(1 + ratio**2):.3f} dB / {-math.degrees(math.atan(ratio)):.2f} deg")
+
+    result.to_csv("frequency_response.csv")
+    print("\nWrote frequency_response.csv (metadata header + one row per point)")
+
+    figure = result.plot(title=f"RC low-pass, {CUTOFF_HZ:.0f} Hz corner")
+    figure.savefig("frequency_response.png")
+    print("Wrote frequency_response.png (Bode plot; excluded points would show as gaps, none here)")
+
+
+if __name__ == "__main__":
+    main()
+```
+
+---
+
+## Tektronix measurement badges: how repeat measurements reuse a slot
+
+Tektronix measurement badges: how repeat measurements reuse a slot.
+
+### Requirements
+
+- scpi_control - Core library
+- None -- runs on the built-in mock; `--host <ip>` for real hardware
+
+### Configuration
+
+None -- runs on the built-in mock with no setup. Pass `--host <ip>` to drive real hardware instead.
+
+### Usage
+
+```bash
+python examples/measurement_badges_example.py
+```
+
+### Source Code
+
+```python
+"""Tektronix measurement badges: how repeat measurements reuse a slot.
+
+A Tektronix MSO exposes measurements as numbered "badges" that must be
+allocated before they can be read. scpi_control pools them: the first
+measurement of a given type allocates a badge, repeats reuse it with a single
+query, and disconnecting removes the badges it created without touching any
+of the user configured on the front panel.
+
+Requirements: none by default -- runs against a built-in mock MSO58. Pass
+--host <ip> to drive a real Tektronix MSO on the network.
+
+Expected output: measured values plus, for the mock run only, the SCPI
+traffic that allocated and removed the badge (a real-hardware run has no
+`connection` object to inspect, so those two trace lines are skipped). No
+files are written.
+"""
+
+import argparse
+
+from scpi_control import Oscilloscope
+from scpi_control.connection import MockConnection
+
+MSO58_IDN = "TEKTRONIX,MSO58,MOCK0300,CF:91.1CT FV:2.0"
+
+
+def _connect(host):
+    if host != "mock":
+        return None
+    return MockConnection("mock", idn=MSO58_IDN, channel_states={i: True for i in range(1, 9)})
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Tektronix measurement badge pooling")
+    parser.add_argument("--host", default="mock", help="Instrument hostname/IP, or 'mock' (default: mock)")
+    args = parser.parse_args()
+
+    connection = _connect(args.host)
+    scope = Oscilloscope(args.host, connection=connection)
+    scope.connect()
+    try:
+        print(f"Connected to: {scope.identify()}")
+
+        print(f"CH1 Vpp (first call, allocates a badge): {scope.measurement.measure_vpp(1):.3f} V")
+        print(f"CH1 Vpp (second call, reuses the badge): {scope.measurement.measure_vpp(1):.3f} V")
+        print(f"CH2 Vpp (different channel, its own slot): {scope.measurement.measure_vpp(2):.3f} V")
+    finally:
+        scope.disconnect()
+
+    if connection is not None:
+        allocated = [w for w in connection.writes if "ADDNew" in w]
+        removed = [w for w in connection.writes if "DELete" in w]
+        print(f"Badges allocated: {allocated}")
+        print(f"Badges removed on disconnect: {removed}")
 
 
 if __name__ == "__main__":
@@ -609,6 +1012,109 @@ if __name__ == "__main__":
 
 ---
 
+## Serial protocol decoding: I2C, SPI and UART
+
+Serial protocol decoding: I2C, SPI and UART.
+
+### Requirements
+
+- scpi_control - Core library
+- None -- runs on the built-in mock; `--host <ip>` for real hardware
+
+### Configuration
+
+None -- runs on the built-in mock with no setup. Pass `--host <ip>` to drive real hardware instead.
+
+### Usage
+
+```bash
+python examples/protocol_decoding.py
+```
+
+### Source Code
+
+```python
+"""Serial protocol decoding: I2C, SPI and UART.
+
+Shows what each decoder needs before it can run -- which channels it must be
+given and which parameters it exposes -- then decodes a captured waveform and
+summarises the events found.
+
+Requirements: none by default -- runs against the built-in mock scope. Pass
+--host <ip> to drive a real oscilloscope on the network.
+
+Note: the mock synthesizes analogue test signals (sine, square, ramp, ...),
+not framed bus traffic, so a mock run demonstrates decoder setup and the
+decode call rather than a realistic bus transcript. Running the UART decoder
+against the mock's 10 kHz square wave does not find real UART frames -- but
+it is not guaranteed to find *zero* events either: the captured buffer holds
+14 falling edges, and the decoder tries each as a candidate start bit. The
+first 13 are correctly rejected (the wave's ~50 us low phase has already
+flipped back high by the time the decoder samples 52 us later). The 14th
+is the last edge in the buffer, so its start-bit and eight data-bit sample
+times all fall past the end of the capture; the decoder's nearest-sample
+lookup has no bounds check, so those nine out-of-range queries silently
+clamp to the buffer's final (still-low) sample instead of being rejected.
+The result is a single spurious byte (0x00) that has nothing to do with
+real bus data -- a buffer-boundary clamping artifact, not periodic or
+baud-rate phase alignment. Point --host at hardware probing a real UART
+line to see genuine decoded bytes.
+
+Expected output: each decoder's required channels and parameters, then the
+UART event summary for the mock's square wave -- deterministically
+`UART event summary: {'DATA': 1}`, the single spurious byte described above.
+No files are written.
+"""
+
+import argparse
+
+from scpi_control import Oscilloscope
+from scpi_control.connection import MockConnection
+from scpi_control.protocol_decoders import I2CDecoder, SPIDecoder, UARTDecoder
+from scpi_control.signal_synth import SignalSpec
+
+
+def _connect(host):
+    if host != "mock":
+        return None
+    return MockConnection(
+        "mock",
+        channel_states={1: True, 2: True},
+        signals={
+            1: SignalSpec(kind="square", frequency=10000.0, amplitude=1.65, offset=1.65),
+            2: SignalSpec(kind="square", frequency=5000.0, amplitude=1.65, offset=1.65),
+        },
+        sample_rate=10e6,
+        timebase=1e-3,
+    )
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Serial protocol decoding")
+    parser.add_argument("--host", default="mock", help="Instrument hostname/IP, or 'mock' (default: mock)")
+    args = parser.parse_args()
+
+    for decoder in (I2CDecoder(), SPIDecoder(), UARTDecoder()):
+        name = type(decoder).__name__
+        print(f"{name}: channels={decoder.get_required_channels()} parameters={sorted(decoder.get_parameters())}")
+
+    scope = Oscilloscope(args.host, connection=_connect(args.host))
+    scope.connect()
+    try:
+        waveform = scope.get_waveform(channel=1)
+        decoder = UARTDecoder()
+        decoder.decode({"TX": waveform})
+        print(f"UART event summary: {decoder.get_event_summary()}")
+    finally:
+        scope.disconnect()
+
+
+if __name__ == "__main__":
+    main()
+```
+
+---
+
 ## Test the power supply GUI with a mock connection
 
 Test the power supply GUI with a mock connection.
@@ -640,6 +1146,9 @@ Requirements: `SCPI-Instrument-Control[gui]` -- no instrument needed, but it
 opens an interactive PyQt6 window against a mock PSU and requires a display
 and user interaction (choosing a PSU, clicking through the GUI). That is why
 this example is compile-checked only, not auto-executed in the smoke suite.
+
+Not executed in CI: launches a Qt GUI and needs PyQt6 plus a display. It is
+compile-checked only -- verify it manually after changes.
 """
 
 import sys
@@ -1131,6 +1640,7 @@ Expected output: 'example_reports/example_report.md' and, if reportlab is
 installed, 'example_reports/example_report.pdf'.
 """
 
+import sys
 from datetime import datetime
 from pathlib import Path
 
@@ -1278,46 +1788,45 @@ def create_report_with_ai(report: TestReport) -> TestReport:
     """
     Add AI-generated content to the report.
 
-    This requires Ollama or LM Studio to be running locally.
+    This requires Ollama or LM Studio to be running locally. An unreachable
+    service is handled explicitly below -- test_connection() returns False
+    rather than raising, so AI features are skipped gracefully. Anything
+    else that goes wrong here is a real bug and is left to propagate rather
+    than being reported as just another "AI unavailable" case.
     """
-    try:
-        # Configure Ollama (default settings)
-        llm_config = LLMConfig.create_ollama_config(model="llama3.2")
+    # Configure Ollama (default settings)
+    llm_config = LLMConfig.create_ollama_config(model="llama3.2")
 
-        # Create client and analyzer
-        llm_client = LLMClient(llm_config)
-        analyzer = ReportAnalyzer(llm_client)
+    # Create client and analyzer
+    llm_client = LLMClient(llm_config)
+    analyzer = ReportAnalyzer(llm_client)
 
-        print("Testing LLM connection...")
-        if not llm_client.test_connection():
-            print("Warning: Could not connect to LLM. Skipping AI features.")
-            print("To enable AI features, install and run Ollama: https://ollama.com")
-            return report
+    print("Testing LLM connection...")
+    if not llm_client.test_connection():
+        print("Warning: Could not connect to LLM. Skipping AI features.")
+        print("To enable AI features, install and run Ollama: https://ollama.com")
+        return report
 
-        print("Generating AI-powered executive summary...")
-        report.executive_summary = analyzer.generate_executive_summary(report)
-        report.summary_source = SUMMARY_SOURCE_AI
+    print("Generating AI-powered executive summary...")
+    report.executive_summary = analyzer.generate_executive_summary(report)
+    report.summary_source = SUMMARY_SOURCE_AI
 
-        print("Generating AI key findings...")
-        report.key_findings = analyzer.generate_key_findings(report, max_findings=3) or []
+    print("Generating AI key findings...")
+    report.key_findings = analyzer.generate_key_findings(report, max_findings=3) or []
 
-        print("Generating AI recommendations...")
-        suggestions = analyzer.suggest_next_steps(report)
-        if suggestions:
-            # Parse suggestions into list
-            report.recommendations = [line.strip() for line in suggestions.split("\n") if line.strip() and (line.strip()[0].isdigit() or line.strip().startswith("-"))]
+    print("Generating AI recommendations...")
+    suggestions = analyzer.suggest_next_steps(report)
+    if suggestions:
+        # Parse suggestions into list
+        report.recommendations = [line.strip() for line in suggestions.split("\n") if line.strip() and (line.strip()[0].isdigit() or line.strip().startswith("-"))]
 
-        # Add AI insights to sections
-        for section in report.sections:
-            if section.measurements:
-                print(f"Analyzing section: {section.title}...")
-                section.ai_insights = analyzer.interpret_measurements(report)
+    # Add AI insights to sections
+    for section in report.sections:
+        if section.measurements:
+            print(f"Analyzing section: {section.title}...")
+            section.ai_insights = analyzer.interpret_measurements(report)
 
-        print("AI analysis complete!")
-
-    except Exception as e:
-        print(f"Warning: AI features failed: {e}")
-        print("Continuing without AI features...")
+    print("AI analysis complete!")
 
     return report
 
@@ -1398,8 +1907,6 @@ def main():
     # Check if running interactively
     enable_ai = False
     try:
-        import sys
-
         # Try to get input with a timeout by checking stdin
         if sys.stdin.isatty() and hasattr(sys.stdin, "read"):
             user_input = input("Enable AI features? (y/n): ").strip().lower()
@@ -1431,7 +1938,12 @@ def main():
     if md_generator.generate(report, md_path):
         print(f"    [OK] Markdown report saved: {md_path}")
     else:
-        print(f"    [FAILED] Failed to generate Markdown report")
+        # generate() returns False on any internal failure (it logs and
+        # swallows the real exception -- see scpi_control's markdown_generator.py).
+        # Markdown is this example's primary, always-attempted deliverable, so
+        # a False here is a real failure, not an optional-dependency skip.
+        print("    [FAILED] Failed to generate Markdown report", file=sys.stderr)
+        raise SystemExit(1)
 
     # Generate PDF report (if available)
     print("  - Generating PDF report...")
@@ -1442,7 +1954,13 @@ def main():
         if pdf_generator.generate(report, pdf_path):
             print(f"    [OK] PDF report saved: {pdf_path}")
         else:
-            print(f"    [FAILED] Failed to generate PDF report")
+            # Same reasoning as the Markdown case above: reportlab being
+            # missing is the legitimate "optional" outcome and is handled
+            # below by the ImportError branch, not here. Once reportlab is
+            # importable, PDFReportGenerator existing and generate() still
+            # returning False means real report generation failed.
+            print("    [FAILED] Failed to generate PDF report", file=sys.stderr)
+            raise SystemExit(1)
     except ImportError:
         print("  - PDF generation skipped (reportlab not installed)")
 
@@ -1466,12 +1984,12 @@ Vector Graphics on Oscilloscope using XY Mode
 
 ### Requirements
 
-- scpi_control[fun] - Vector graphics extras
-- Oscilloscope connected to network
+- scpi_control - Core library
+- None -- runs on the built-in mock; `--host <ip>` for real hardware
 
 ### Configuration
 
-Update `SCOPE_IP` to match your oscilloscope's IP address (default: `192.168.1.100`).
+None -- runs on the built-in mock with no setup. Pass `--host <ip>` to drive real hardware instead.
 
 ### Usage
 
@@ -1484,43 +2002,59 @@ python examples/vector_graphics_xy_mode.py
 ```python
 """Vector Graphics on Oscilloscope using XY Mode
 
-This example demonstrates how to use the oscilloscope as a vector display
-by generating waveforms for XY mode.
+This example demonstrates how to use the oscilloscope as a vector display by
+generating waveforms for XY mode: circles, polygons, a star, Lissajous
+figures, text, and rotation-animation frames, all saved as CSV waveform
+files ready for an external AWG/DAC.
 
-REQUIREMENTS:
-    - Install fun extras: pip install "SCPI-Instrument-Control[fun]"
-    - External AWG/DAC to feed signals into scope channels
-      OR use scope's built-in AWG if available
-    - Oscilloscope channels connected to AWG outputs
+To actually see these shapes on a scope, feed the generated *_x.csv /
+*_y.csv pairs into an external AWG (or the scope's own built-in AWG) wired
+into the scope's X and Y channels, then enable XY mode on the display. This
+script itself only talks to the oscilloscope (to configure its channels for
+XY display) and generates/saves waveform data -- it never drives an AWG, so
+it runs to completion with no AWG attached.
 
-SETUP:
-    1. Connect AWG CH1 output → Scope CH1 (X axis)
-    2. Connect AWG CH2 output → Scope CH2 (Y axis)
-    3. Enable XY mode on oscilloscope (Display → XY Mode → ON)
-    4. Adjust voltage scales to see full pattern
+Requirements: none by default -- runs against the built-in mock scope. Pass
+--host <ip> to drive a real oscilloscope on the network. Text-shape
+generation additionally needs the 'fun' extras
+(pip install "SCPI-Instrument-Control[fun]") -- shapely, Pillow,
+svgpathtools; if they are not installed, that one demo is skipped with a
+warning and everything else still runs.
 
-WHAT THIS DOES:
-    - Generates X/Y waveform data for various shapes
-    - Saves waveform files that can be loaded into an AWG
-    - Creates animations by rotating and transforming shapes
+Expected output: connection/device info, XY-mode configuration echoed to the
+console, progress messages for each shape/demo, and CSV waveform file pairs
+(<name>_x.csv, <name>_y.csv) written under vector_waveforms/ in the current
+directory for the circle, square, star, triangle, 3 Lissajous figures, 24
+rotating-star animation frames, and a composite smiley face -- plus text
+"HELLO" if the 'fun' extras are installed.
 """
 
-import time
+import argparse
+import os
 
 import numpy as np
 
 from scpi_control import Oscilloscope
-from scpi_control.vector_graphics import Shape, VectorDisplay
+from scpi_control.connection import MockConnection
+from scpi_control.vector_graphics import Shape, VectorPath
 
-# Configuration
-SCOPE_IP = "192.168.1.100"
 SAMPLE_RATE = 1e6  # 1 MSa/s for AWG
 DURATION = 0.1  # 100ms per frame
 OUTPUT_DIR = "vector_waveforms"
 
 
+def _connect(host):
+    """Return a mock connection for --host mock, or None to use a real socket."""
+    if host != "mock":
+        return None
+    return MockConnection("mock", channel_states={1: True, 2: True})
+
+
 def main():
     """Main demonstration of vector graphics features."""
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("--host", default="mock", help="Instrument hostname/IP, or 'mock' for the built-in mock scope (default: mock)")
+    args = parser.parse_args()
 
     print("=" * 60)
     print("  Oscilloscope Vector Graphics Demo")
@@ -1531,194 +2065,169 @@ def main():
     print()
 
     # Connect to oscilloscope
-    print(f"Connecting to {SCOPE_IP}...")
-    scope = Oscilloscope(SCOPE_IP)
+    print(f"Connecting to {args.host}...")
+    scope = Oscilloscope(args.host, connection=_connect(args.host))
     scope.connect()
     print(f"Connected: {scope.identify()}")
     print()
 
-    # Initialize vector display
-    print("Initializing vector display (CH1=X, CH2=Y)...")
-    display = scope.vector_display
-    display.enable_xy_mode(voltage_scale=1.0)
-    print("[OK] XY mode configured")
-    print()
-
-    # Create output directory
-    import os
-
-    os.makedirs(OUTPUT_DIR, exist_ok=True)
-
-    # ==========================================
-    # Demo 1: Basic Shapes
-    # ==========================================
-    print("Demo 1: Basic Shapes")
-    print("-" * 40)
-
-    # Circle
-    print("  Generating circle...")
-    circle = Shape.circle(radius=0.8, points=1000)
-    display.save_waveforms(circle, f"{OUTPUT_DIR}/01_circle", sample_rate=SAMPLE_RATE, duration=DURATION)
-
-    # Square
-    print("  Generating square...")
-    square = Shape.rectangle(width=1.6, height=1.6, points_per_side=250)
-    display.save_waveforms(square, f"{OUTPUT_DIR}/02_square", sample_rate=SAMPLE_RATE, duration=DURATION)
-
-    # Star
-    print("  Generating star...")
-    star = Shape.star(num_points=5, outer_radius=0.9, inner_radius=0.4)
-    display.save_waveforms(star, f"{OUTPUT_DIR}/03_star", sample_rate=SAMPLE_RATE, duration=DURATION)
-
-    # Triangle
-    print("  Generating triangle...")
-    triangle = Shape.polygon(
-        [
-            (0, 0.8),  # Top
-            (-0.7, -0.4),  # Bottom left
-            (0.7, -0.4),  # Bottom right
-        ],
-        points_per_side=300,
-    )
-    display.save_waveforms(triangle, f"{OUTPUT_DIR}/04_triangle", sample_rate=SAMPLE_RATE, duration=DURATION)
-
-    print("[OK] Basic shapes generated\n")
-
-    # ==========================================
-    # Demo 2: Lissajous Figures
-    # ==========================================
-    print("Demo 2: Lissajous Figures")
-    print("-" * 40)
-
-    lissajous_patterns = [
-        (3, 2, np.pi / 2, "3_2"),
-        (5, 4, 0, "5_4"),
-        (7, 5, np.pi / 4, "7_5"),
-    ]
-
-    for a, b, delta, name in lissajous_patterns:
-        print(f"  Generating Lissajous {a}:{b}...")
-        lissajous = Shape.lissajous(a=a, b=b, delta=delta, points=2000)
-        display.save_waveforms(lissajous, f"{OUTPUT_DIR}/lissajous_{name}", sample_rate=SAMPLE_RATE, duration=DURATION)
-
-    print("[OK] Lissajous figures generated\n")
-
-    # ==========================================
-    # Demo 3: Text
-    # ==========================================
-    print("Demo 3: Text Rendering")
-    print("-" * 40)
-    print("  Generating text 'HELLO'...")
-
     try:
-        text = Shape.text("HELLO", font_size=0.6)
-        display.save_waveforms(text, f"{OUTPUT_DIR}/text_hello", sample_rate=SAMPLE_RATE, duration=DURATION)
-        print("[OK] Text generated")
-    except Exception as e:
-        print(f"  WARNING: Text generation skipped: {e}")
+        # Initialize vector display
+        print("Initializing vector display (CH1=X, CH2=Y)...")
+        display = scope.vector_display
+        display.enable_xy_mode(voltage_scale=1.0)
+        print("[OK] XY mode configured")
+        print()
 
-    print()
+        # Create output directory
+        os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-    # ==========================================
-    # Demo 4: Animations (Rotating Star)
-    # ==========================================
-    print("Demo 4: Animation Frames (Rotating Star)")
-    print("-" * 40)
+        # ==========================================
+        # Demo 1: Basic Shapes
+        # ==========================================
+        print("Demo 1: Basic Shapes")
+        print("-" * 40)
 
-    star_base = Shape.star(num_points=5, outer_radius=0.8, inner_radius=0.3)
+        # Circle
+        print("  Generating circle...")
+        circle = Shape.circle(radius=0.8, points=1000)
+        display.save_waveforms(circle, f"{OUTPUT_DIR}/01_circle", sample_rate=SAMPLE_RATE, duration=DURATION)
 
-    for i, angle in enumerate(range(0, 360, 15)):
-        rotated_star = star_base.rotate(angle)
-        display.save_waveforms(
-            rotated_star,
-            f"{OUTPUT_DIR}/anim_star_frame_{i:02d}",
-            sample_rate=SAMPLE_RATE,
-            duration=DURATION / 10,
-        )  # Faster frames
-        print(f"  Frame {i+1}/24 (angle={angle}deg)")
+        # Square
+        print("  Generating square...")
+        square = Shape.rectangle(width=1.6, height=1.6, points_per_side=250)
+        display.save_waveforms(square, f"{OUTPUT_DIR}/02_square", sample_rate=SAMPLE_RATE, duration=DURATION)
 
-    print("[OK] Animation frames generated\n")
+        # Star
+        print("  Generating star...")
+        star = Shape.star(num_points=5, outer_radius=0.9, inner_radius=0.4)
+        display.save_waveforms(star, f"{OUTPUT_DIR}/03_star", sample_rate=SAMPLE_RATE, duration=DURATION)
 
-    # ==========================================
-    # Demo 5: Composite Shapes
-    # ==========================================
-    print("Demo 5: Composite Shapes")
-    print("-" * 40)
+        # Triangle
+        print("  Generating triangle...")
+        triangle = Shape.polygon(
+            [
+                (0, 0.8),  # Top
+                (-0.7, -0.4),  # Bottom left
+                (0.7, -0.4),  # Bottom right
+            ],
+            points_per_side=300,
+        )
+        display.save_waveforms(triangle, f"{OUTPUT_DIR}/04_triangle", sample_rate=SAMPLE_RATE, duration=DURATION)
 
-    # Smiley face (circle + eyes + mouth)
-    print("  Generating smiley face...")
-    face_outer = Shape.circle(radius=0.9, points=500)
-    eye_left = Shape.circle(radius=0.1, center=(-0.3, 0.3), points=100)
-    eye_right = Shape.circle(radius=0.1, center=(0.3, 0.3), points=100)
+        print("[OK] Basic shapes generated\n")
 
-    # Mouth as an arc (half circle)
-    t = np.linspace(0, np.pi, 200)
-    mouth_x = 0.5 * np.cos(t)
-    mouth_y = -0.2 + 0.3 * np.sin(t)
-    from scpi_control.vector_graphics import VectorPath
+        # ==========================================
+        # Demo 2: Lissajous Figures
+        # ==========================================
+        print("Demo 2: Lissajous Figures")
+        print("-" * 40)
 
-    mouth = VectorPath(x=mouth_x, y=mouth_y, connected=False)
+        lissajous_patterns = [
+            (3, 2, np.pi / 2, "3_2"),
+            (5, 4, 0, "5_4"),
+            (7, 5, np.pi / 4, "7_5"),
+        ]
 
-    # Combine all parts
-    smiley = face_outer.combine(eye_left).combine(eye_right).combine(mouth)
-    display.save_waveforms(smiley, f"{OUTPUT_DIR}/composite_smiley", sample_rate=SAMPLE_RATE, duration=DURATION)
-    print("[OK] Smiley face generated\n")
+        for a, b, delta, name in lissajous_patterns:
+            print(f"  Generating Lissajous {a}:{b}...")
+            lissajous = Shape.lissajous(a=a, b=b, delta=delta, points=2000)
+            display.save_waveforms(lissajous, f"{OUTPUT_DIR}/lissajous_{name}", sample_rate=SAMPLE_RATE, duration=DURATION)
 
-    # ==========================================
-    # Summary
-    # ==========================================
-    print("=" * 60)
-    print("  Demo Complete!")
-    print("=" * 60)
-    print()
-    print(f"Waveform files saved to: {OUTPUT_DIR}/")
-    print()
-    print("Next Steps:")
-    print("  1. Load the .csv files into your AWG")
-    print("     - Load *_x.csv -> AWG Channel 1")
-    print("     - Load *_y.csv -> AWG Channel 2")
-    print("  2. Enable XY mode on the oscilloscope")
-    print("  3. Start the AWG output")
-    print("  4. Adjust timebase and voltage scales to see the pattern")
-    print()
-    print("Tips:")
-    print("  - Use CSV format for most AWGs")
-    print("  - Adjust sample rate to match your AWG capabilities")
-    print("  - Connect AWG outputs directly to scope inputs")
-    print("  - Set scope to DC coupling for best results")
-    print()
+        print("[OK] Lissajous figures generated\n")
 
-    # Cleanup
-    scope.disconnect()
+        # ==========================================
+        # Demo 3: Text
+        # ==========================================
+        print("Demo 3: Text Rendering")
+        print("-" * 40)
+        print("  Generating text 'HELLO'...")
+
+        try:
+            text = Shape.text("HELLO", font_size=0.6)
+            display.save_waveforms(text, f"{OUTPUT_DIR}/text_hello", sample_rate=SAMPLE_RATE, duration=DURATION)
+            print("[OK] Text generated")
+        except ImportError as e:
+            # Text rendering needs the optional 'fun' extras (shapely, Pillow,
+            # svgpathtools); everything else in this demo works without them.
+            print(f"  WARNING: Text generation skipped: {e}")
+
+        print()
+
+        # ==========================================
+        # Demo 4: Animations (Rotating Star)
+        # ==========================================
+        print("Demo 4: Animation Frames (Rotating Star)")
+        print("-" * 40)
+
+        star_base = Shape.star(num_points=5, outer_radius=0.8, inner_radius=0.3)
+
+        for i, angle in enumerate(range(0, 360, 15)):
+            rotated_star = star_base.rotate(angle)
+            display.save_waveforms(
+                rotated_star,
+                f"{OUTPUT_DIR}/anim_star_frame_{i:02d}",
+                sample_rate=SAMPLE_RATE,
+                duration=DURATION / 10,
+            )  # Faster frames
+            print(f"  Frame {i+1}/24 (angle={angle}deg)")
+
+        print("[OK] Animation frames generated\n")
+
+        # ==========================================
+        # Demo 5: Composite Shapes
+        # ==========================================
+        print("Demo 5: Composite Shapes")
+        print("-" * 40)
+
+        # Smiley face (circle + eyes + mouth)
+        print("  Generating smiley face...")
+        face_outer = Shape.circle(radius=0.9, points=500)
+        eye_left = Shape.circle(radius=0.1, center=(-0.3, 0.3), points=100)
+        eye_right = Shape.circle(radius=0.1, center=(0.3, 0.3), points=100)
+
+        # Mouth as an arc (half circle)
+        t = np.linspace(0, np.pi, 200)
+        mouth_x = 0.5 * np.cos(t)
+        mouth_y = -0.2 + 0.3 * np.sin(t)
+        mouth = VectorPath(x=mouth_x, y=mouth_y, connected=False)
+
+        # Combine all parts
+        smiley = face_outer.combine(eye_left).combine(eye_right).combine(mouth)
+        display.save_waveforms(smiley, f"{OUTPUT_DIR}/composite_smiley", sample_rate=SAMPLE_RATE, duration=DURATION)
+        print("[OK] Smiley face generated\n")
+
+        # ==========================================
+        # Summary
+        # ==========================================
+        print("=" * 60)
+        print("  Demo Complete!")
+        print("=" * 60)
+        print()
+        print(f"Waveform files saved to: {OUTPUT_DIR}/")
+        print()
+        print("Next Steps:")
+        print("  1. Load the .csv files into your AWG")
+        print("     - Load *_x.csv -> AWG Channel 1")
+        print("     - Load *_y.csv -> AWG Channel 2")
+        print("  2. Enable XY mode on the oscilloscope")
+        print("  3. Start the AWG output")
+        print("  4. Adjust timebase and voltage scales to see the pattern")
+        print()
+        print("Tips:")
+        print("  - Use CSV format for most AWGs")
+        print("  - Adjust sample rate to match your AWG capabilities")
+        print("  - Connect AWG outputs directly to scope inputs")
+        print("  - Set scope to DC coupling for best results")
+        print()
+
+    finally:
+        # Cleanup
+        scope.disconnect()
 
 
 if __name__ == "__main__":
-    try:
-        main()
-    except ImportError as e:
-        if "fun" in str(e):
-            print()
-            print("=" * 60)
-            print("  ERROR: Missing 'fun' extras")
-            print("=" * 60)
-            print()
-            print("Vector graphics features require additional packages.")
-            print()
-            print("Install with:")
-            print('  pip install "SCPI-Instrument-Control[fun]"')
-            print()
-            print("This will install:")
-            print("  - shapely (geometric operations)")
-            print("  - Pillow (text rendering)")
-            print("  - svgpathtools (SVG path support)")
-            print()
-        else:
-            raise
-    except KeyboardInterrupt:
-        print("\n\nDemo interrupted by user")
-    except Exception as e:
-        print(f"\nError: {e}")
-        raise
+    main()
 ```
 
 ---

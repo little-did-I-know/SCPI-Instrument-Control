@@ -9,7 +9,7 @@ The same recorder powers the browser UI's Log tab and the
 /api/sessions/{id}/scope/log.csv endpoint when running scpi-web.
 
 Requirements: SCPI-Instrument-Control (core install; the session layer is
-FastAPI-free)
+FastAPI-free) -- runs entirely against a mock session, no hardware needed.
 """
 
 import csv

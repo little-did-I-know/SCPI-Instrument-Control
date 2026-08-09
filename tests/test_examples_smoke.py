@@ -163,3 +163,31 @@ def test_no_hardware_example_runs(filename, module, tmp_path):
         timeout=_TIMEOUTS.get(filename, _DEFAULT_TIMEOUT),
     )
     assert result.returncode == 0, f"{filename} exited {result.returncode}\n--- stderr ---\n{result.stderr[-3000:]}"
+
+    # These two entries' real work is invisible to a returncode check: each can
+    # fail completely and still exit 0 (lazy matplotlib animation; silently
+    # disengaged badge pooling). Assert on what they print.
+    if filename == "live_plot.py":
+        assert "frame 20 rendered" in result.stdout, "live_plot ran but rendered no frames"
+    if filename == "measurement_badges_example.py":
+        assert "Badges allocated: []" not in result.stdout, "badge pooling did not engage"
+
+
+@pytest.mark.slow
+def test_a_converted_example_fails_loudly_on_an_unreachable_host(tmp_path):
+    """An example that cannot reach its instrument must exit non-zero.
+
+    A blanket `except Exception: print(...)` around main() makes an example exit 0
+    even when nothing worked, which turns the EXECUTE guard above into a false pass:
+    it would prove only that the script ran. This was real -- the pre-conversion
+    basic_usage.py, pointed at a nonexistent 192.168.1.100, exited 0.
+
+    192.0.2.1 is TEST-NET-1 (RFC 5737), guaranteed unroutable, so this cannot
+    accidentally reach a real instrument on someone's bench.
+    """
+    env = {**os.environ, "MPLBACKEND": "Agg", "PYTHONIOENCODING": "utf-8"}
+    result = subprocess.run(
+        [sys.executable, str(EXAMPLES_DIR / "basic_usage.py"), "--host", "192.0.2.1"],
+        cwd=tmp_path, env=env, input="", capture_output=True, text=True, timeout=_DEFAULT_TIMEOUT,
+    )
+    assert result.returncode != 0, "example exited 0 despite being unable to reach the instrument"

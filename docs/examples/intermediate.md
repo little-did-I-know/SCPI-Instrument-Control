@@ -12,8 +12,10 @@ Intermediate examples showing automation patterns, real-time data capture, and b
 | [Continuous time-series data collection](#continuous-time-series-data-collection) | Continuous time-series data collection. |
 | [Drive the web gateway's REST API from Python — no browser needed](#drive-the-web-gateways-rest-api-from-python-no-browser-needed) | Drive the web gateway's REST API from Python — no browser needed. |
 | [Live plotting example for Siglent oscilloscope](#live-plotting-example-for-siglent-oscilloscope) | Live plotting example for Siglent oscilloscope. |
+| [Waveform math: adding and subtracting captured channels](#waveform-math-adding-and-subtracting-captured-channels) | Waveform math: adding and subtracting captured channels. |
 | [Advanced PSU features demonstration](#advanced-psu-features-demonstration) | Advanced PSU features demonstration. |
 | [Power supply control via USB connection](#power-supply-control-via-usb-connection) | Power supply control via USB connection. |
+| [Golden-reference comparison: save a known-good capture and compare later ones](#golden-reference-comparison-save-a-known-good-capture-and-compare-later-ones) | Golden-reference comparison: save a known-good capture and compare later ones. |
 | [Synthetic signal generation: parameterized test waveforms, and the mock](#synthetic-signal-generation-parameterized-test-waveforms-and-the-mock) | Synthetic signal generation: parameterized test waveforms, and the mock
 oscilloscope's state-coupled synthesis. |
 | [Record measurement trends in-process and export them as CSV](#record-measurement-trends-in-process-and-export-them-as-csv) | Record measurement trends in-process and export them as CSV. |
@@ -29,11 +31,11 @@ Batch capture with different configurations.
 ### Requirements
 
 - scpi_control - Core library
-- Oscilloscope connected to network
+- None -- runs on the built-in mock; `--host <ip>` for real hardware
 
 ### Configuration
 
-Update `SCOPE_IP` to match your oscilloscope's IP address (default: `192.168.1.100`).
+None -- runs on the built-in mock with no setup. Pass `--host <ip>` to drive real hardware instead.
 
 ### Usage
 
@@ -50,18 +52,32 @@ This example demonstrates how to capture multiple waveforms with different
 timebase and voltage scale settings. This is useful for characterizing
 signals at different time scales or for automated testing.
 
-Requirements: an oscilloscope reachable on the network -- edit SCOPE_IP below
-to match its LAN address.
+Requirements: none by default -- runs against the built-in mock scope. Pass
+--host <ip> to drive a real oscilloscope on the network.
 
 Expected output: progress lines for each capture, a summary of the first
 five results, and the batch saved to a 'batch_output/' directory (waveform
 files plus metadata.txt) in the current directory.
 """
 
-from scpi_control.automation import DataCollector
+import argparse
 
-# Replace with your oscilloscope's IP address
-SCOPE_IP = "192.168.1.100"
+from scpi_control.automation import DataCollector
+from scpi_control.connection import MockConnection
+from scpi_control.signal_synth import SignalSpec
+
+
+def _connect(host):
+    """Return a mock connection for --host mock, or None to use a real socket."""
+    if host != "mock":
+        return None
+    return MockConnection(
+        "mock",
+        channel_states={1: True},
+        signals={1: SignalSpec(kind="square", frequency=1000.0, amplitude=1.65, offset=1.65)},
+        sample_rate=20e6,
+        timebase=500e-6,
+    )
 
 
 def progress_callback(current, total, status):
@@ -71,8 +87,12 @@ def progress_callback(current, total, status):
 
 
 def main():
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("--host", default="mock", help="Instrument hostname/IP, or 'mock' for the built-in mock scope (default: mock)")
+    args = parser.parse_args()
+
     # Create data collector with context manager
-    with DataCollector(SCOPE_IP) as collector:
+    with DataCollector(args.host, connection=_connect(args.host)) as collector:
         print(f"Connected to {collector.scope.identify()}\n")
 
         # Configure batch capture parameters
@@ -181,7 +201,11 @@ def _save_capture(name: str, amplitude: float, seed: int) -> Path:
     waveform.provenance is set -- see scpi_control/waveform.py.
     """
     waveform = make_waveform(SignalSpec(kind="sine", frequency=1_000.0, amplitude=amplitude, noise_rms=0.02, seed=seed), sample_rate=100_000.0, n_points=2_000)
-    waveform.provenance = AcquisitionProvenance(instrument=InstrumentInfo(manufacturer="Siglent", model="SDS1104X-E"))
+    # Honest synthetic identity. This waveform came from make_waveform(), not an
+    # instrument -- claiming a real Siglent model here put fabricated hardware into
+    # a signed report's manifest and sign-off block (audit M1). Provenance itself
+    # stays, because plain CSV needs it to write the channel header (see docstring).
+    waveform.provenance = AcquisitionProvenance(instrument=InstrumentInfo(manufacturer="Synthetic", model="make_waveform (no instrument)"))
     path = OUTPUT_DIR / name
     Waveform(Mock()).save_waveform(waveform, str(path), format="CSV")
     return path
@@ -218,7 +242,7 @@ def main() -> None:
         title="Production Batch Test",
         technician="Lab Tech",
         test_date=datetime.now(),
-        equipment_model="SDS1104X-E",
+        equipment_model=None,  # No real equipment -- fully synthetic data
     )
     # build_comparison_report() includes the raw-data appendix (SHA-256
     # manifest) and a sign-off block by default -- pass include_appendix=False
@@ -316,7 +340,11 @@ def _save_capture(name: str, amplitude: float, noise_rms: float) -> Path:
     (a single channel per run) but matches the convention used elsewhere.
     """
     waveform = make_waveform(SignalSpec(kind="sine", frequency=1_000.0, amplitude=amplitude, noise_rms=noise_rms, seed=42), sample_rate=100_000.0, n_points=2_000)
-    waveform.provenance = AcquisitionProvenance(instrument=InstrumentInfo(manufacturer="Siglent", model="SDS1104X-E"))
+    # Honest synthetic identity. This waveform came from make_waveform(), not an
+    # instrument -- claiming a real Siglent model here put fabricated hardware into
+    # a signed report's manifest and sign-off block (audit M1). Provenance itself
+    # stays, because plain CSV needs it to write the channel header (see docstring).
+    waveform.provenance = AcquisitionProvenance(instrument=InstrumentInfo(manufacturer="Synthetic", model="make_waveform (no instrument)"))
     path = OUTPUT_DIR / name
     Waveform(Mock()).save_waveform(waveform, str(path), format="CSV")
     return path
@@ -356,7 +384,7 @@ def main() -> None:
         title="Firmware Update Regression Check",
         technician="Lab Tech",
         test_date=datetime.now(),
-        equipment_model="SDS1104X-E",
+        equipment_model=None,  # No real equipment -- fully synthetic data
     )
     # build_comparison_report() includes the raw-data appendix (SHA-256
     # manifest) and a sign-off block by default -- pass include_appendix=False
@@ -395,11 +423,11 @@ Continuous time-series data collection.
 ### Requirements
 
 - scpi_control - Core library
-- Oscilloscope connected to network
+- None -- runs on the built-in mock; `--host <ip>` for real hardware
 
 ### Configuration
 
-Update `SCOPE_IP` to match your oscilloscope's IP address (default: `192.168.1.100`).
+None -- runs on the built-in mock with no setup. Pass `--host <ip>` to drive real hardware instead.
 
 ### Usage
 
@@ -416,18 +444,35 @@ This example demonstrates how to collect waveforms continuously over a
 period of time. This is useful for monitoring signals, collecting statistics,
 or capturing time-varying phenomena.
 
-Requirements: an oscilloscope reachable on the network -- edit SCOPE_IP below
-to match its LAN address.
+Requirements: none by default -- runs against the built-in mock scope. Pass
+--host <ip> to drive a real oscilloscope on the network. Use --duration to
+control the length of the first (in-memory) run (default: 2.0 seconds); the
+second (file-saving) run lasts 3x as long, mirroring the original 10s/30s
+ratio while staying well inside a test timeout.
 
-Expected output: a 10-second in-memory capture run with Vpp statistics
-printed to the console, followed by a 30-second run that saves waveform
-files to a 'continuous_data/' directory in the current directory.
+Expected output: an in-memory capture run with Vpp statistics printed to
+the console, followed by a second run that saves waveform files to a
+'continuous_data/' directory in the current directory.
 """
 
-from scpi_control.automation import DataCollector
+import argparse
 
-# Replace with your oscilloscope's IP address
-SCOPE_IP = "192.168.1.100"
+from scpi_control.automation import DataCollector
+from scpi_control.connection import MockConnection
+from scpi_control.signal_synth import SignalSpec
+
+
+def _connect(host):
+    """Return a mock connection for --host mock, or None to use a real socket."""
+    if host != "mock":
+        return None
+    return MockConnection(
+        "mock",
+        channel_states={1: True},
+        signals={1: SignalSpec(kind="square", frequency=1000.0, amplitude=1.65, offset=1.65)},
+        sample_rate=20e6,
+        timebase=500e-6,
+    )
 
 
 def progress_callback(captures_done, status):
@@ -436,12 +481,17 @@ def progress_callback(captures_done, status):
 
 
 def main():
-    with DataCollector(SCOPE_IP) as collector:
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("--host", default="mock", help="Instrument hostname/IP, or 'mock' for the built-in mock scope (default: mock)")
+    parser.add_argument("--duration", type=float, default=2.0, help="Duration in seconds of the first (in-memory) run; the second run lasts 3x as long (default: 2.0)")
+    args = parser.parse_args()
+
+    with DataCollector(args.host, connection=_connect(args.host)) as collector:
         print(f"Connected to {collector.scope.identify()}\n")
 
         # Example 1: Collect to memory (good for short durations)
-        print("Example 1: Collecting to memory for 10 seconds...")
-        results = collector.start_continuous_capture(channels=[1, 2], duration=10, interval=0.5, progress_callback=progress_callback)  # 10 seconds  # Capture every 0.5 seconds
+        print(f"Example 1: Collecting to memory for {args.duration:.1f} seconds...")
+        results = collector.start_continuous_capture(channels=[1, 2], duration=args.duration, interval=0.5, progress_callback=progress_callback)
 
         print(f"\nCollected {len(results)} captures to memory")
         print(f"First capture timestamp: {results[0]['timestamp']}")
@@ -465,19 +515,20 @@ def main():
             print(f"  Max: {np.max(ch1_vpps):.3f}V")
 
         # Example 2: Collect to files (good for long durations)
+        second_duration = args.duration * 3
         print("\n" + "=" * 60)
-        print("Example 2: Collecting to files for 30 seconds...")
+        print(f"Example 2: Collecting to files for {second_duration:.1f} seconds...")
         print("Files will be saved to 'continuous_data/' directory")
         print("Press Ctrl+C to stop early\n")
 
         collector.start_continuous_capture(
             channels=[1, 2],
-            duration=30,
+            duration=second_duration,
             interval=1.0,
             output_dir="continuous_data",
             file_format="npz",
             progress_callback=progress_callback,
-        )  # 30 seconds  # Capture every 1 second
+        )
 
         print("\nContinuous capture complete! Files saved to 'continuous_data/'")
 
@@ -531,6 +582,10 @@ screenshot PNG — the same API the browser UI uses.
 Requirements:
     - SCPI-Instrument-Control[web] (for the gateway itself)
     - Python standard library only for this client (urllib)
+
+Not executed in CI: needs a running `scpi-web` gateway, not merely an
+instrument. It is compile-checked only -- start the gateway and run it by
+hand after changes.
 """
 
 import json
@@ -611,11 +666,11 @@ Live plotting example for Siglent oscilloscope.
 ### Requirements
 
 - matplotlib - For plotting
-- Oscilloscope connected to network
+- None -- runs on the built-in mock; `--host <ip>` for real hardware
 
 ### Configuration
 
-Update `SCOPE_IP` to match your oscilloscope's IP address (default: `192.168.1.100`).
+None -- runs on the built-in mock with no setup. Pass `--host <ip>` to drive real hardware instead.
 
 ### Usage
 
@@ -631,24 +686,28 @@ python examples/live_plot.py
 This script demonstrates real-time waveform acquisition and plotting
 using matplotlib animation.
 
-Requirements: an oscilloscope reachable on the network -- edit SCOPE_IP below
-to match its LAN address. matplotlib is a core dependency, no extra install
-needed.
+Requirements: none by default -- runs against the built-in mock scope. Pass
+--host <ip> to drive a real oscilloscope on the network. matplotlib is a
+core dependency, no extra install needed.
 
-Expected output: an interactive plot window that updates every 200ms with
-the live Channel 1 waveform, until the window is closed. No files are
-written.
+Expected output: against --host mock there is no display, so --frames
+waveform updates (default: 20) are rendered headlessly -- each one printed
+to the console as it happens -- and the final frame is saved to
+'live_plot.png' in the current directory. Against a real host, an
+interactive plot window updates every 200ms with the live Channel 1
+waveform, bounded to --frames updates (repeat=False), until the window is
+closed or the frame budget runs out; no files are written in that case.
 """
 
+import argparse
 import time
 
 import matplotlib.animation as animation
 import matplotlib.pyplot as plt
 
 from scpi_control import Oscilloscope
-
-# Replace with your oscilloscope's IP address
-SCOPE_IP = "192.168.1.100"
+from scpi_control.connection import MockConnection
+from scpi_control.signal_synth import SignalSpec
 
 # Channel colors (matching oscilloscope theme)
 CHANNEL_COLORS = {
@@ -657,6 +716,19 @@ CHANNEL_COLORS = {
     3: "#FF1493",  # Magenta
     4: "#00FF00",  # Green
 }
+
+
+def _connect(host):
+    """Return a mock connection for --host mock, or None to use a real socket."""
+    if host != "mock":
+        return None
+    return MockConnection(
+        "mock",
+        channel_states={1: True},
+        signals={1: SignalSpec(kind="square", frequency=1000.0, amplitude=1.65, offset=1.65)},
+        sample_rate=20e6,
+        timebase=500e-6,
+    )
 
 
 class LivePlotter:
@@ -692,7 +764,7 @@ class LivePlotter:
         """Animation update function.
 
         Args:
-            frame: Frame number (not used)
+            frame: Frame number (used only for the progress message)
 
         Returns:
             List of line objects
@@ -712,24 +784,52 @@ class LivePlotter:
         self.ax.relim()
         self.ax.autoscale_view()
 
+        print(f"  frame {frame + 1} rendered")
         return list(self.lines.values())
 
-    def start(self, interval=200):
-        """Start live plotting.
+    def start(self, host, frames, interval=200):
+        """Drive up to `frames` updates. Caller is responsible for showing or
+        saving the figure afterward.
+
+        Against --host mock there is no display and no event loop to drive
+        matplotlib's Timer-based animation -- plt.show() is a no-op under
+        the Agg backend, and a FuncAnimation left to its own devices renders
+        at most one frame from a single savefig()-triggered draw. So the
+        mock path calls update() directly in a bounded loop -- the exact
+        function a live animation would call -- to genuinely render every
+        frame headlessly. Against real hardware, a FuncAnimation drives
+        update() on a timer via the GUI event loop the caller's plt.show()
+        starts, bounded to `frames` renders (repeat=False).
 
         Args:
-            interval: Update interval in milliseconds (default: 200)
+            host: the --host value driving this run ('mock' or a real host)
+            frames: number of frames to render before stopping
+            interval: update interval in milliseconds, real hardware only (default: 200)
+
+        Returns:
+            The FuncAnimation instance for a real host, or None for mock (a
+            reference must be kept alive until plt.show() returns, or it is
+            garbage-collected and the animation silently stops).
         """
-        anim = animation.FuncAnimation(self.fig, self.update, interval=interval, blit=False, cache_frame_data=False)
-        plt.show()
+        if host == "mock":
+            for frame in range(frames):
+                self.update(frame)
+            return None
+        anim = animation.FuncAnimation(self.fig, self.update, frames=frames, interval=interval, blit=False, cache_frame_data=False, repeat=False)
+        return anim
 
 
 def main():
-    # Connect to oscilloscope
-    print(f"Connecting to oscilloscope at {SCOPE_IP}...")
-    scope = Oscilloscope(SCOPE_IP)
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("--host", default="mock", help="Instrument hostname/IP, or 'mock' for the built-in mock scope (default: mock)")
+    parser.add_argument("--frames", type=int, default=20, help="Number of animation frames to render before exiting (default: 20)")
+    args = parser.parse_args()
+
+    scope = Oscilloscope(args.host, connection=_connect(args.host))
 
     try:
+        # Connect to oscilloscope
+        print(f"Connecting to oscilloscope at {args.host}...")
         scope.connect()
         print(f"Connected to: {scope.device_info['model']}")
 
@@ -748,26 +848,123 @@ def main():
         scope.run()
         print("Acquisition running...")
 
-        # Wait a moment for signal to stabilize
-        time.sleep(0.5)
+        # Real hardware needs a moment for the signal to settle after
+        # starting acquisition before the first capture is meaningful; the
+        # mock has no such settling behavior to model, so skip the wait
+        # there to keep the headless run fast.
+        if args.host != "mock":
+            time.sleep(0.5)
 
         # Start live plotting
-        print("\nStarting live plot...")
-        print("Close the plot window to stop.")
+        print(f"\nStarting live plot ({args.frames} frames)...")
+        if args.host != "mock":
+            print("Close the plot window to stop.")
 
         plotter = LivePlotter(scope, channels=[1])
-        plotter.start(interval=200)  # Update every 200ms
+        # anim must stay referenced until plt.show() returns -- if it's
+        # garbage-collected first, the animation silently stops (mock's
+        # explicit loop above doesn't need it; start() returns None there).
+        anim = plotter.start(args.host, args.frames, interval=200)  # Update every 200ms
 
-    except Exception as e:
-        print(f"\nError: {e}")
-        import traceback
-
-        traceback.print_exc()
+        if args.host == "mock":
+            plt.savefig("live_plot.png")
+        else:
+            plt.show()
 
     finally:
         print("\nDisconnecting...")
         scope.disconnect()
         print("Done!")
+
+
+if __name__ == "__main__":
+    main()
+```
+
+---
+
+## Waveform math: adding and subtracting captured channels
+
+Waveform math: adding and subtracting captured channels.
+
+### Requirements
+
+- scpi_control - Core library
+- None -- runs on the built-in mock; `--host <ip>` for real hardware
+
+### Configuration
+
+None -- runs on the built-in mock with no setup. Pass `--host <ip>` to drive real hardware instead.
+
+### Usage
+
+```bash
+python examples/math_channels.py
+```
+
+### Source Code
+
+```python
+"""Waveform math: adding and subtracting captured channels.
+
+Combines two captured channels arithmetically with scpi_control.math_channel.
+MathOperations works on captured WaveformData objects, so the arithmetic
+happens in Python on real samples -- it does not depend on the instrument
+having a MATH channel.
+
+Requirements: none by default -- runs against the built-in mock scope. Pass
+--host <ip> to drive a real oscilloscope on the network.
+
+Expected output: per-channel and combined Vpp figures printed to the console.
+No files are written.
+"""
+
+import argparse
+
+from scpi_control import Oscilloscope
+from scpi_control.connection import MockConnection
+from scpi_control.math_channel import MathOperations
+from scpi_control.signal_synth import SignalSpec
+
+
+def _connect(host):
+    if host != "mock":
+        return None
+    return MockConnection(
+        "mock",
+        channel_states={1: True, 2: True},
+        signals={
+            1: SignalSpec(kind="sine", frequency=1000.0, amplitude=1.0),
+            2: SignalSpec(kind="sine", frequency=1000.0, amplitude=0.7),
+        },
+        sample_rate=1e6,
+        timebase=1e-3,
+    )
+
+
+def _vpp(waveform):
+    return float(waveform.voltage.max() - waveform.voltage.min())
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Waveform math on two captured channels")
+    parser.add_argument("--host", default="mock", help="Instrument hostname/IP, or 'mock' (default: mock)")
+    args = parser.parse_args()
+
+    scope = Oscilloscope(args.host, connection=_connect(args.host))
+    scope.connect()
+    try:
+        ch1 = scope.get_waveform(channel=1)
+        ch2 = scope.get_waveform(channel=2)
+        print(f"CH1 Vpp: {_vpp(ch1):.3f} V")
+        print(f"CH2 Vpp: {_vpp(ch2):.3f} V")
+
+        total = MathOperations.add(ch1, ch2)
+        diff = MathOperations.subtract(ch1, ch2)
+        print(f"CH1 + CH2 Vpp: {_vpp(total):.3f} V")
+        print(f"CH1 - CH2 Vpp: {_vpp(diff):.3f} V")
+    finally:
+        scope.disconnect()
 
 
 if __name__ == "__main__":
@@ -1110,29 +1307,25 @@ if __name__ == "__main__":
     print("- OVP/OCP protection")
     print("\nUsing mock connection (no hardware required)")
 
-    try:
-        # Run all demos
-        demo_data_logging()
-        demo_tracking_modes()
-        demo_timer_functionality()
-        demo_waveform_generation()
-        demo_ovp_ocp_protection()
-        demo_real_world_scenario()
+    # Run all demos. No outer try/except here: an unhandled exception is
+    # exactly what should happen on a real failure -- swallowing it here
+    # would let the script "complete" and exit 0 while a demo silently
+    # failed.
+    demo_data_logging()
+    demo_tracking_modes()
+    demo_timer_functionality()
+    demo_waveform_generation()
+    demo_ovp_ocp_protection()
+    demo_real_world_scenario()
 
-        print("\n" + "=" * 60)
-        print("All demos completed successfully!")
-        print("=" * 60)
-        print("\nCheck the generated CSV files:")
-        print("- psu_manual_log.csv")
-        print("- psu_timed_log.csv")
-        print("- psu_output1_log.csv")
-        print("- characterization_log.csv")
-
-    except Exception as e:
-        print(f"\nError during demo: {e}")
-        import traceback
-
-        traceback.print_exc()
+    print("\n" + "=" * 60)
+    print("All demos completed successfully!")
+    print("=" * 60)
+    print("\nCheck the generated CSV files:")
+    print("- psu_manual_log.csv")
+    print("- psu_timed_log.csv")
+    print("- psu_output1_log.csv")
+    print("- characterization_log.csv")
 ```
 
 ---
@@ -1144,11 +1337,11 @@ Power supply control via USB connection.
 ### Requirements
 
 - scpi_control - Core library
-- Oscilloscope connected to network
+- No hardware required
 
 ### Configuration
 
-Update `SCOPE_IP` to match your oscilloscope's IP address (default: `192.168.1.100`).
+No hardware required.
 
 ### Usage
 
@@ -1172,6 +1365,10 @@ Supports:
     - GPIB (IEEE-488)
     - Serial (RS-232)
     - TCP/IP (VXI-11 or raw socket)
+
+Not executed in CI: this example's subject is the USB/VISA transport itself,
+which the mock connection cannot stand in for without demonstrating nothing.
+It is compile-checked only -- verify it against real hardware after changes.
 """
 
 from scpi_control import PowerSupply
@@ -1430,6 +1627,109 @@ if __name__ == "__main__":
 
 ---
 
+## Golden-reference comparison: save a known-good capture and compare later ones
+
+Golden-reference comparison: save a known-good capture and compare later ones.
+
+### Requirements
+
+- scpi_control - Core library
+- None -- runs on the built-in mock; `--host <ip>` for real hardware
+
+### Configuration
+
+None -- runs on the built-in mock with no setup. Pass `--host <ip>` to drive real hardware instead.
+
+### Usage
+
+```bash
+python examples/reference_waveforms.py
+```
+
+### Source Code
+
+```python
+"""Golden-reference comparison: save a known-good capture and compare later ones.
+
+Stores a captured waveform as a named reference, then scores a later capture
+against it with a correlation coefficient and a point-by-point difference --
+the shape of a pass/fail bench check.
+
+Requirements: none by default -- runs against the built-in mock scope. Pass
+--host <ip> to drive a real oscilloscope on the network.
+
+Expected output: correlation and peak-difference figures printed to the
+console. References are written to a temporary directory that is removed on
+exit; pass --storage-dir to keep them. Against the mock, the two captures are
+synthesized identically (same signal spec, no noise) and the reported
+correlation is a perfect 1.000000 with a peak difference of 0.000e+00 V --
+that is the mock behaving correctly, not the example faking a result. A real
+instrument's captures will differ by acquisition noise and jitter, so the
+same run against hardware will print a correlation just under 1.0 and a
+nonzero peak difference.
+"""
+
+import argparse
+import shutil
+import tempfile
+
+from scpi_control import Oscilloscope
+from scpi_control.connection import MockConnection
+from scpi_control.reference_waveform import ReferenceWaveform
+from scpi_control.signal_synth import SignalSpec
+
+
+def _connect(host):
+    if host != "mock":
+        return None
+    return MockConnection(
+        "mock",
+        channel_states={1: True},
+        signals={1: SignalSpec(kind="sine", frequency=1000.0, amplitude=1.0)},
+        sample_rate=1e6,
+        timebase=1e-3,
+    )
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Save and compare against a golden reference waveform")
+    parser.add_argument("--host", default="mock", help="Instrument hostname/IP, or 'mock' (default: mock)")
+    parser.add_argument("--storage-dir", default=None, help="Where to keep references (default: a temp dir, deleted on exit)")
+    args = parser.parse_args()
+
+    storage = args.storage_dir or tempfile.mkdtemp()
+    scope = Oscilloscope(args.host, connection=_connect(args.host))
+    scope.connect()
+    try:
+        store = ReferenceWaveform(storage_dir=storage)
+
+        golden = scope.get_waveform(channel=1)
+        store.save_reference(golden, "baseline")
+        print(f"Saved reference 'baseline' ({len(golden.time)} samples)")
+
+        # load_reference returns a dict -- calculate_correlation needs that dict,
+        # not the reference's name.
+        reference = store.load_reference("baseline")
+
+        later = scope.get_waveform(channel=1)
+        correlation = store.calculate_correlation(later, reference)
+        difference = store.calculate_difference(later, reference)
+
+        print(f"Correlation with baseline: {correlation:.6f}")
+        print(f"Peak absolute difference:  {abs(difference).max():.3e} V")
+        print(f"References on file: {[r['name'] for r in store.list_references()]}")
+    finally:
+        scope.disconnect()
+        if args.storage_dir is None:
+            shutil.rmtree(storage, ignore_errors=True)
+
+
+if __name__ == "__main__":
+    main()
+```
+
+---
+
 ## Synthetic signal generation: parameterized test waveforms, and the mock
 
 Synthetic signal generation: parameterized test waveforms, and the mock
@@ -1467,9 +1767,11 @@ next capture -- exactly like a real scope.
 
 This example (1) generates a few signal kinds directly and prints basic
 stats, (2) opens a mock oscilloscope session, acquires, then changes TDIV and
-VDIV over SCPI to show the capture's length and clipping respond, and (3)
-saves one synthesized capture and reloads it with load_waveform() to show the
-chain composes.
+VDIV over SCPI to show the capture's length and clipping respond, (3) saves
+one synthesized capture and reloads it with load_waveform() to show the chain
+composes, (4) synthesizes a multitone and compares its measured THD to the
+analytically expected value, and (5) synthesizes a chirp and measures its
+start/end frequency from zero crossings.
 
 Requirements: SCPI-Instrument-Control (core install) -- runs entirely against
 a mock connection, no instrument needed.
@@ -1477,6 +1779,9 @@ a mock connection, no instrument needed.
 
 from pathlib import Path
 
+import numpy as np
+
+from scpi_control.analysis import FFTAnalyzer
 from scpi_control.connection import MockConnection
 from scpi_control.oscilloscope import Oscilloscope
 from scpi_control.signal_synth import SignalSpec, make_waveform
@@ -1559,10 +1864,63 @@ def demo_reload() -> None:
     print(f"First 5 samples (V): {loaded.voltage[:5].tolist()}")
 
 
+def demo_multitone() -> None:
+    """Synthesize a multitone and compare its measured THD to the analytic value.
+
+    harmonics gives the relative amplitudes of the 2nd, 3rd, ... harmonic of a
+    coherent series riding on the fundamental, so THD comes out to exactly
+    sqrt(sum(h**2)) -- independent of amplitude, frequency, and phase.
+    """
+    print()
+    print("=== Part 4: multitone -- measured vs. expected THD ===")
+    harmonics = (0.1, 0.05)
+    spec = SignalSpec(kind="multitone", frequency=1_000.0, amplitude=1.0, harmonics=harmonics)
+    waveform = make_waveform(spec, sample_rate=100_000.0, n_points=100_000)
+    measured_thd = FFTAnalyzer.thd_of_waveform(waveform)
+    expected_thd = 100.0 * float(np.sqrt(np.sum(np.square(harmonics))))
+    print(f"multitone: measured THD = {measured_thd:.3f}%  " f"expected THD (100*sqrt(sum(h**2))) = {expected_thd:.3f}%")
+
+
+def _zero_crossing_freq(time_s: np.ndarray, voltage: np.ndarray, from_end: bool) -> float:
+    """Estimate instantaneous frequency from one pair of rising zero crossings.
+
+    Linear interpolation between the two bracketing samples locates each
+    crossing sub-sample; the reciprocal of the gap between one crossing and
+    the next is a local frequency estimate -- accurate near the start or end
+    of a sweep, where the chirp's instantaneous frequency is nearly constant
+    over a single cycle.
+    """
+    rising = np.flatnonzero((voltage[:-1] <= 0.0) & (voltage[1:] > 0.0))
+    pair = rising[-2:] if from_end else rising[:2]
+
+    def _crossing_time(i: int) -> float:
+        t0, t1 = time_s[i], time_s[i + 1]
+        v0, v1 = voltage[i], voltage[i + 1]
+        return float(t0 + (0.0 - v0) * (t1 - t0) / (v1 - v0))
+
+    return 1.0 / (_crossing_time(pair[1]) - _crossing_time(pair[0]))
+
+
+def demo_chirp() -> None:
+    """Synthesize a chirp and measure its start/end frequency from zero crossings."""
+    print()
+    print("=== Part 5: chirp -- measured start/end frequency ===")
+    spec = SignalSpec(kind="chirp")  # defaults: 1 kHz -> 10 kHz over 10 ms, then it retraces
+    sample_rate = 1_000_000.0
+    n_points = int(round(sample_rate * spec.sweep_time))
+    waveform = make_waveform(spec, sample_rate=sample_rate, n_points=n_points)
+    start_freq = _zero_crossing_freq(waveform.time, waveform.voltage, from_end=False)
+    end_freq = _zero_crossing_freq(waveform.time, waveform.voltage, from_end=True)
+    print(f"chirp: configured {spec.frequency:.1f} Hz -> {spec.end_frequency:.1f} Hz over {spec.sweep_time * 1000:.1f} ms")
+    print(f"chirp: measured start = {start_freq:.1f} Hz  measured end = {end_freq:.1f} Hz")
+
+
 def main() -> None:
     demo_make_waveform()
     demo_mock_session()
     demo_reload()
+    demo_multitone()
+    demo_chirp()
 
 
 if __name__ == "__main__":
@@ -1578,11 +1936,11 @@ Record measurement trends in-process and export them as CSV.
 ### Requirements
 
 - scpi_control - Core library
-- Oscilloscope connected to network
+- No hardware required
 
 ### Configuration
 
-Update `SCOPE_IP` to match your oscilloscope's IP address (default: `192.168.1.100`).
+No hardware required.
 
 ### Usage
 
@@ -1604,7 +1962,7 @@ The same recorder powers the browser UI's Log tab and the
 /api/sessions/{id}/scope/log.csv endpoint when running scpi-web.
 
 Requirements: SCPI-Instrument-Control (core install; the session layer is
-FastAPI-free)
+FastAPI-free) -- runs entirely against a mock session, no hardware needed.
 """
 
 import csv
@@ -1656,11 +2014,11 @@ Trigger-based event capture.
 ### Requirements
 
 - scpi_control - Core library
-- Oscilloscope connected to network
+- None -- runs on the built-in mock; `--host <ip>` for real hardware
 
 ### Configuration
 
-Update `SCOPE_IP` to match your oscilloscope's IP address (default: `192.168.1.100`).
+None -- runs on the built-in mock with no setup. Pass `--host <ip>` to drive real hardware instead.
 
 ### Usage
 
@@ -1677,24 +2035,48 @@ This example demonstrates how to wait for specific trigger conditions
 and capture waveforms when they occur. This is useful for capturing
 sporadic events or signals that meet specific criteria.
 
-Requirements: an oscilloscope reachable on the network -- edit SCOPE_IP below
-to match its LAN address.
+Requirements: none by default -- runs against the built-in mock scope, seeded
+so its trigger status already reads "stopped" and both waits resolve
+immediately. The mock cannot represent a genuinely sporadic/untriggered
+event, so this only exercises the wait/capture code paths, not real waiting.
+Pass --host <ip> to drive a real oscilloscope on the network.
 
 Expected output: a single trigger wait (up to 30s) that saves to
 'trigger_captures/' if it fires, followed by up to 10 polled trigger events
 saved to 'multi_trigger_captures/' in the current directory.
 """
 
-from scpi_control.automation import DataCollector, TriggerWaitCollector
+import argparse
+import time
+from pathlib import Path
 
-# Replace with your oscilloscope's IP address
-SCOPE_IP = "192.168.1.100"
+from scpi_control.automation import DataCollector, TriggerWaitCollector
+from scpi_control.connection import MockConnection
+from scpi_control.signal_synth import SignalSpec
+
+
+def _connect(host):
+    """Return a mock connection for --host mock, or None to use a real socket."""
+    if host != "mock":
+        return None
+    return MockConnection(
+        "mock",
+        channel_states={1: True},
+        signals={1: SignalSpec(kind="square", frequency=1000.0, amplitude=1.65, offset=1.65)},
+        sample_rate=20e6,
+        timebase=500e-6,
+        trigger_status=["Stop"],
+    )
 
 
 def main():
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("--host", default="mock", help="Instrument hostname/IP, or 'mock' for the built-in mock scope (default: mock)")
+    args = parser.parse_args()
+
     # Example 1: Wait for a single trigger event
     print("Example 1: Waiting for trigger event...")
-    with TriggerWaitCollector(SCOPE_IP) as tc:
+    with TriggerWaitCollector(args.host, connection=_connect(args.host)) as tc:
         # Configure trigger: Channel 1, Rising edge, 1V threshold
         tc.collector.scope.trigger.set_source(1)
         tc.collector.scope.trigger.set_slope("POS")  # Rising edge
@@ -1705,6 +2087,10 @@ def main():
         print("  Edge: Rising")
         print("  Level: 1.0V")
         print("\nWaiting for trigger (max 30 seconds)...")
+
+        # wait_for_trigger(save_on_trigger=True) writes into output_dir without
+        # creating it first, so it must already exist.
+        Path("trigger_captures").mkdir(exist_ok=True)
 
         # Wait for trigger
         waveforms = tc.wait_for_trigger(channels=[1, 2], max_wait=30.0, save_on_trigger=True, output_dir="trigger_captures")
@@ -1720,7 +2106,7 @@ def main():
     print("\n" + "=" * 60)
     print("Example 2: Capturing 10 trigger events...")
 
-    with DataCollector(SCOPE_IP) as collector:
+    with DataCollector(args.host, connection=_connect(args.host)) as collector:
         # Configure trigger
         collector.scope.trigger.set_source(1)
         collector.scope.trigger.set_slope("POS")
@@ -1738,14 +2124,15 @@ def main():
             # Trigger single acquisition
             collector.scope.trigger_single()
 
-            # Wait for trigger (simple polling)
-            import time
-
+            # Wait for trigger (simple polling). Uses the dialect-normalized
+            # acquisition_status() rather than a raw ":TRIG:STAT?" query --
+            # that literal command is modern-dialect only and times out
+            # against a legacy-dialect scope (mock or real).
             timeout = 5.0
             start = time.time()
             while (time.time() - start) < timeout:
-                status = collector.scope.query(":TRIG:STAT?").strip()
-                if status == "Stop":
+                status = collector.scope.acquisition_status()
+                if status == "STOP":
                     # Capture waveform
                     waveforms = collector.capture_single([1, 2])
                     captures.append(waveforms)
@@ -1758,8 +2145,10 @@ def main():
         if captures:
             print(f"\nCaptured {len(captures)} events")
 
-            # Save all captures
+            # Save all captures. save_data() writes into the given directory
+            # without creating it first, so it must already exist.
             print("Saving captures to 'multi_trigger_captures/'...")
+            Path("multi_trigger_captures").mkdir(exist_ok=True)
             for i, waveforms in enumerate(captures):
                 collector.save_data(waveforms, f"multi_trigger_captures/event_{i+1:03d}", format="npz")
 

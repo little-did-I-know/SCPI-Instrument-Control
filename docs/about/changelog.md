@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Five examples for features that had none: `math_channels.py` (waveform arithmetic), `reference_waveforms.py` (golden-reference comparison), `screen_capture_example.py`, `measurement_badges_example.py` (Tektronix badge pooling), and `protocol_decoding.py` (I2C/SPI/UART).
+
+### Changed
+
+- Every network-facing example now takes `--host`, defaulting to `mock`, and runs with no instrument attached — the built-in mock supplies the waveforms. Previously all but one required editing a hardcoded `SCOPE_IP` before they would run at all. `function_generator_basic.py`'s `--ip` flag is renamed `--host` for consistency.
+- The examples execution guard covers 33 of 36 examples, up from 15. The three it cannot execute — `psu_usb_connection.py` (USB/VISA transport), `psu_gui_test.py` (Qt GUI), `gateway_rest_client.py` (needs a running gateway) — now say so in their docstrings and in the README, so the gap is visible rather than silent.
+
 ## [7.0.1] - 2026-08-07
 
 ### Added

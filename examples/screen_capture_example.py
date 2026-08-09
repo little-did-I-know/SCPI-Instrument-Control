@@ -39,7 +39,7 @@ def _connect(host):
 def main():
     parser = argparse.ArgumentParser(description="Capture the instrument's screen")
     parser.add_argument("--host", default="mock", help="Instrument hostname/IP, or 'mock' (default: mock)")
-    parser.add_argument("--output", default="screenshot.bmp", help="Where to write the image (default: screenshot.bmp)")
+    parser.add_argument("--output", default="screenshot.bmp", help="Where to write the BMP screenshot (default: screenshot.bmp)")
     args = parser.parse_args()
 
     scope = Oscilloscope(args.host, connection=_connect(args.host))

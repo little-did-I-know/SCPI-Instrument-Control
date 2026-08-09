@@ -38,6 +38,7 @@ class ExampleMetadata:
     category: str
     requirements: List[str]
     no_hardware: bool
+    mock_by_default: bool
 
 
 # Phrases examples actually use in their docstrings to say they need no real
@@ -47,6 +48,18 @@ class ExampleMetadata:
 # configuration block stamped on them.
 NO_HARDWARE_PATTERN = re.compile(
     r"no hardware|mock connection|fully synthetic|without hardware|hardware-free|no instrument needed",
+    re.IGNORECASE,
+)
+
+# The mock-first examples refresh (2026-08) gave every network-facing example
+# a `--host` flag defaulting to "mock": no hardware is required to run them,
+# but a real instrument remains one flag away. Their docstrings all share the
+# phrasing "Requirements: none by default -- runs against the built-in mock
+# ...". This is a *third* state distinct from NO_HARDWARE_PATTERN's "no real
+# instrument path exists at all" (e.g. synthetic_signals.py) -- these examples
+# DO have a real-hardware path, it's just not the default.
+MOCK_BY_DEFAULT_PATTERN = re.compile(
+    r"none by default\s*--\s*runs against (?:the|a) built-in mock",
     re.IGNORECASE,
 )
 
@@ -61,6 +74,19 @@ def is_no_hardware_example(docstring: str) -> bool:
         True if the docstring indicates the example runs without hardware.
     """
     return bool(NO_HARDWARE_PATTERN.search(docstring))
+
+
+def is_mock_by_default_example(docstring: str) -> bool:
+    """Detect whether an example defaults to a mock but also supports real hardware.
+
+    Args:
+        docstring: Module docstring.
+
+    Returns:
+        True if the docstring uses the mock-first-examples-refresh phrasing
+        ("Requirements: none by default -- runs against the built-in mock ...").
+    """
+    return bool(MOCK_BY_DEFAULT_PATTERN.search(docstring))
 
 
 def load_config(config_path: Path = None) -> dict:
@@ -154,7 +180,9 @@ def extract_requirements(filepath: Path, docstring: str) -> List[str]:
     if not requirements:
         requirements = ["scpi_control - Core library"]
 
-    if is_no_hardware_example(docstring):
+    if is_mock_by_default_example(docstring):
+        requirements.append("None -- runs on the built-in mock; `--host <ip>` for real hardware")
+    elif is_no_hardware_example(docstring):
         requirements.append("No hardware required")
     else:
         requirements.append("Oscilloscope connected to network")
@@ -258,6 +286,7 @@ def parse_example_file(filepath: Path, config: dict) -> ExampleMetadata:
         category=category,
         requirements=requirements,
         no_hardware=is_no_hardware_example(docstring),
+        mock_by_default=is_mock_by_default_example(docstring),
     )
 
 
@@ -292,7 +321,9 @@ def generate_example_section(example: ExampleMetadata) -> str:
     # Configuration
     lines.append("### Configuration")
     lines.append("")
-    if example.no_hardware:
+    if example.mock_by_default:
+        lines.append("None -- runs on the built-in mock with no setup. Pass `--host <ip>` to drive real hardware instead.")
+    elif example.no_hardware:
         lines.append("No hardware required.")
     else:
         lines.append(f"Update `SCOPE_IP` to match your oscilloscope's IP address (default: `{example.scope_ip}`).")
