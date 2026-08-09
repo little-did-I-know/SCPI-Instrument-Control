@@ -156,14 +156,20 @@ def main():
 
     pal = [f.convert("P", palette=Image.ADAPTIVE, colors=64) for f in frames]
     DEST.parent.mkdir(parents=True, exist_ok=True)
-    pal[0].save(DEST, save_all=True, append_images=pal[1:], duration=durations, loop=0, optimize=True, disposal=2)
+    tmp = DEST.with_name(DEST.stem + ".tmp.gif")
+    try:
+        pal[0].save(tmp, save_all=True, append_images=pal[1:], duration=durations, loop=0, optimize=True, disposal=2)
+        size_kb = tmp.stat().st_size / 1024
+        if size_kb > SIZE_BUDGET_KB:
+            raise RuntimeError(f"GIF is {size_kb:.0f} KB, over the {SIZE_BUDGET_KB} KB budget -- shorten holds or reduce palette depth")
+        os.replace(tmp, DEST)
+    except BaseException:
+        tmp.unlink(missing_ok=True)
+        raise
 
-    size_kb = DEST.stat().st_size / 1024
     print(f"wrote {DEST} ({size_kb:.0f} KB, {len(frames)} frames, {W}x{height})")
     for seg in segments:
         print(f"  {seg['command']}: {len(seg['lines'])} lines{' (truncated)' if seg['truncated'] else ''}")
-    if size_kb > SIZE_BUDGET_KB:
-        raise RuntimeError(f"GIF is {size_kb:.0f} KB, over the {SIZE_BUDGET_KB} KB budget -- shorten holds or reduce palette depth")
 
 
 if __name__ == "__main__":
