@@ -374,7 +374,12 @@ class PDFReportGenerator(BaseReportGenerator):
             output_path: Path to save the report
 
         Returns:
-            True if successful, False otherwise
+            True if the report was written to output_path, False if writing it
+            failed for an environmental reason (permission denied, disk full,
+            a bad output path -- anything that raises OSError). A programming
+            error (AttributeError, TypeError, etc.) is not reported as False;
+            it propagates so a defect in report rendering is never
+            indistinguishable from an I/O failure.
         """
         if not self.validate_report(report):
             logger.error("Report validation failed")
@@ -475,7 +480,11 @@ class PDFReportGenerator(BaseReportGenerator):
 
             return True
 
-        except Exception as e:
+        except OSError as e:
+            # Environmental failure (permission denied, disk full, a bad
+            # path, ...) -- this is the documented False case. Anything else
+            # (AttributeError, TypeError, KeyError, ...) is a programming
+            # error and must propagate rather than be reported as False.
             logger.exception(f"Failed to generate PDF report: {e}")
             return False
 
