@@ -11,8 +11,8 @@ max/min, RMS, mean) on Channel 1 printed to the console, followed by the
 combined result of measure_all(). No files are written.
 
 Note: against --host mock, the instrument-side :MEASure values are fixed
-constants and do not track the synthesized waveform. Numbers computed from
-captured samples (via scpi_control.analysis) do track it. This is a mock
+constants and do not track the synthesized waveform. See advanced_analysis.py
+for numbers computed from captured samples, which do track it. This is a mock
 fidelity limit, not a measurement error.
 """
 

@@ -10,10 +10,15 @@ core dependency, no extra install needed.
 
 Expected output: basic and signal-quality stats printed to the console;
 'advanced_analysis_time.png', 'advanced_analysis_fft.png', and
-'advanced_analysis_histogram.png' plots, plus 'analyzed_waveform.npz' and
+'advanced_analysis_histogram.png' plots, plus 'analyzed_waveform_ch1.npz' and
 'analysis_report.txt', all saved to the current directory. No plot window
 is opened -- matplotlib's Agg backend (set by the test harness) cannot
 display one, so this example saves figures instead of calling plt.show().
+
+Note: against --host mock, the instrument-side :MEASure values are fixed
+constants and do not track the synthesized waveform. Numbers computed from
+captured samples (via scpi_control.analysis) do track it. This is a mock
+fidelity limit, not a measurement error.
 """
 
 import argparse
