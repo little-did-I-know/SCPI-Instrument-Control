@@ -85,6 +85,7 @@ EXECUTE = [
     ("data_logger_basic.py", None),
     ("vector_graphics_xy_mode.py", None),
     ("math_channels.py", None),
+    ("reference_waveforms.py", None),
 ]
 
 _TIMEOUTS = {"report_ai_qa.py": 240}
