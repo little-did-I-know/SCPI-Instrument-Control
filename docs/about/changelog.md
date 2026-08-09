@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- CI: the Codecov upload step passed `file:`, an input `codecov/codecov-action` dropped at v4. It was silently ignored — the run logged `Unexpected input(s) 'file'`, stayed green, and uploaded only because the CLI falls back to searching the tree for a report. Now `files:`, so the explicit path is honoured.
+
+### Changed
+
+- README badges regrouped into two rows and extended from six to nine. The first row answers "should I install this?" (version, downloads, release status, Python versions, platform); the second answers "is this looked after?" (CI, coverage, docs, licence). New badges: monthly PyPI downloads, PyPI release status, and supported platforms. The platform badge is static and linked to the CI workflow, since that job's ubuntu/windows/macos matrix is the only thing backing the claim — it needs updating by hand if an OS ever leaves the matrix. Because `pyproject.toml` sets `readme = README.md`, these also appear on the PyPI project page from the next release onward.
+
 ## [7.0.1] - 2026-08-07
 
 ### Added
