@@ -297,3 +297,17 @@ def test_badge_mock_unknown_slot_times_out():
     # A real scope answers nothing for a badge that does not exist
     with pytest.raises(exceptions.TimeoutError):
         conn.query("MEASUrement:MEAS7:RESUlts:CURRentacq:MEAN?")
+
+
+def test_legacy_dialect_answers_channel_unit():
+    from scpi_control import Oscilloscope
+    from scpi_control.connection.mock import MockConnection
+
+    scope = Oscilloscope("mock", connection=MockConnection("mock", channel_states={1: True}))
+    scope.connect()
+    try:
+        assert scope.channel1.unit == "V"
+        config = scope.channel1.get_configuration()
+        assert config, "get_configuration() returned nothing"
+    finally:
+        scope.disconnect()

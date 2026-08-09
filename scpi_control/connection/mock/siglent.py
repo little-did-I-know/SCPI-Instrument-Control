@@ -577,6 +577,14 @@ def handle_query(conn, command: str) -> Optional[str]:
             value = conn.probe_ratios.get(channel, 1.0)
             return f"C{channel}:ATTN {value:g}"
 
+        if match := re.match(r"C(\d+):UNIT\?", command, re.IGNORECASE):
+            # RC01020-E01C p.137. Bare value, no header echo: unlike
+            # voltage_scale/voltage_offset/probe_ratio (which defensively
+            # strip a "C1:XXX " prefix before parsing), Channel.unit does
+            # response.strip() only -- an echoed header would come back
+            # verbatim as the "unit" and break get_configuration().
+            return "V"
+
         if upper == "BWL?":
             # RC01020-E01C p.27: bare query; RESPONSE FORMAT echoes the "BWL"
             # header followed by ALL-channel <channel>,<mode> pairs (task 14,
