@@ -176,9 +176,12 @@ class UARTDecoder(ProtocolDecoder):
                     bit_time = start_time + (bit_idx + 1) * bit_period + sample_offset
                     bit_val = self._get_bit_at_time(signal, time, bit_time, threshold)
                     if bit_val is None:
-                        # Just this frame ran past the end of the capture --
-                        # abandon it, but a later (spurious) start edge may
-                        # still decode cleanly, so keep trying.
+                        # Unlike the start-bit check above (which breaks the
+                        # whole scan), only this one frame ran past the end
+                        # of the capture -- its start bit was still in
+                        # range, so a later (spurious) start edge could
+                        # still land somewhere that decodes cleanly. Abandon
+                        # just this frame and keep trying.
                         truncated = True
                         break
                     bit_times.append(bit_time)
