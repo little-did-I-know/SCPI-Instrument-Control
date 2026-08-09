@@ -11,6 +11,10 @@ Supports:
     - GPIB (IEEE-488)
     - Serial (RS-232)
     - TCP/IP (VXI-11 or raw socket)
+
+Not executed in CI: this example's subject is the USB/VISA transport itself,
+which the mock connection cannot stand in for without demonstrating nothing.
+It is compile-checked only -- verify it against real hardware after changes.
 """
 
 from scpi_control import PowerSupply

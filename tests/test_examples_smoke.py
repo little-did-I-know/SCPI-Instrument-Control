@@ -5,11 +5,13 @@ blocks their reintroduction), (2) every .py example at least compiles, (3) the
 notebook is valid JSON. Task 2 adds a fourth guard: executing the no-hardware
 examples as subprocesses.
 
-Limitation: examples not yet listed in EXECUTE are covered by the token scan and
-the compile check, not by running them. Some simply have not been converted to
-the --host mock pattern yet (later tasks in this refresh); others cannot run
-headless at all, each for its own reason (e.g. a USB/VISA transport, a Qt GUI,
-an external gateway process) rather than one shared "hardware-bound" cause.
+Limitation: examples not listed in EXECUTE are covered by the token scan and the
+compile check, not by running them. Three files are permanent exceptions, each for
+its own reason rather than one shared "hardware-bound" cause: psu_usb_connection.py
+(its subject is the USB/VISA transport itself, which the mock cannot stand in for),
+psu_gui_test.py (launches a Qt GUI, needs PyQt6 plus a display), and
+gateway_rest_client.py (needs a running scpi-web gateway, not merely an instrument).
+Every other example under examples/ is in EXECUTE.
 
 The execution guard is the expensive one -- each example is a real subprocess, and
 report_ai_qa.py additionally does live inference wherever a local Ollama is running.

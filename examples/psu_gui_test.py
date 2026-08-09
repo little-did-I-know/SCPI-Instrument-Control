@@ -7,6 +7,9 @@ Requirements: `SCPI-Instrument-Control[gui]` -- no instrument needed, but it
 opens an interactive PyQt6 window against a mock PSU and requires a display
 and user interaction (choosing a PSU, clicking through the GUI). That is why
 this example is compile-checked only, not auto-executed in the smoke suite.
+
+Not executed in CI: launches a Qt GUI and needs PyQt6 plus a display. It is
+compile-checked only -- verify it manually after changes.
 """
 
 import sys
