@@ -20,7 +20,14 @@ class BaseReportGenerator(ABC):
             output_path: Path to save the generated report
 
         Returns:
-            True if successful, False otherwise
+            True if the report was written successfully. False means the
+            report could not be written for an environmental reason -- an I/O
+            failure such as permission denied, disk full, or a bad output
+            path (anything an implementation catches as OSError). A
+            programming error (AttributeError, TypeError, KeyError, etc.) is
+            not reported as False: implementations let it propagate, so a
+            defect in report rendering is never indistinguishable from an
+            I/O failure.
         """
         pass
 

@@ -5,7 +5,9 @@ them drives the **real library against the built-in mock scope**, so the
 pictures cannot drift from what the code actually does — no hand-drawn mockups,
 no hardware required.
 
-Run them from the repository root:
+`make_social_preview.py` and `make_gui_screenshots.py` must be run from the
+repository root; `make_demo_gif.py` resolves its own repo root from `__file__`
+and can be run from anywhere:
 
 ```bash
 python scripts/media/make_demo_gif.py          # docs/images/mock-demo.gif
@@ -15,7 +17,7 @@ python scripts/media/make_gui_screenshots.py   # docs/images/gui-live-view.png, 
 
 | Script | Produces | Needs |
 | --- | --- | --- |
-| `make_demo_gif.py` | The README hero GIF — a terminal session capturing a 1 kHz square wave. The printed output is captured by executing the snippet, not typed by hand. | Pillow |
+| `make_demo_gif.py` | The README hero GIF — a tour of four examples running with no instrument attached. Each segment runs the real example as a subprocess and renders a contiguous prefix of what it actually printed, so the GIF cannot drift from the examples. | Pillow |
 | `make_social_preview.py` | The 1280×640 GitHub social-preview card. Upload it under **Settings → Social preview** (see `BRANDING.md`). | Pillow |
 | `make_gui_screenshots.py` | Desktop-GUI screenshots with live traces. Builds the real `MainWindow` and swaps only the `Oscilloscope` factory for one on a `MockConnection`. | PyQt6, PyQtGraph, Matplotlib |
 
@@ -31,3 +33,9 @@ python scripts/media/make_gui_screenshots.py   # docs/images/gui-live-view.png, 
   fixed constants that do not track the waveform it synthesizes, so such a
   screenshot would show numbers contradicting the trace beside them. See the
   comment in `make_gui_screenshots.py`.
+- **The demo GIF shows contiguous prefixes, never filtered lines.** `TOUR`'s
+  second value truncates each example's output; it never selects a subset.
+  `basic_usage.py` stops at 11 lines on purpose — line 19 and 20 are the mock's
+  fixed `:MEASure` values, which do not track the waveform the example configured.
+  `tests/test_media_tour.py` guards that every toured example still exists and
+  is still covered by the execution guard.
