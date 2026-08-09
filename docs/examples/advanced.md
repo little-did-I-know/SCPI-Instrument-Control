@@ -1046,24 +1046,23 @@ Requirements: none by default -- runs against the built-in mock scope. Pass
 Note: the mock synthesizes analogue test signals (sine, square, ramp, ...),
 not framed bus traffic, so a mock run demonstrates decoder setup and the
 decode call rather than a realistic bus transcript. Running the UART decoder
-against the mock's 10 kHz square wave does not find real UART frames -- but
-it is not guaranteed to find *zero* events either: the captured buffer holds
-14 falling edges, and the decoder tries each as a candidate start bit. The
-first 13 are correctly rejected (the wave's ~50 us low phase has already
-flipped back high by the time the decoder samples 52 us later). The 14th
-is the last edge in the buffer, so its start-bit and eight data-bit sample
-times all fall past the end of the capture; the decoder's nearest-sample
-lookup has no bounds check, so those nine out-of-range queries silently
-clamp to the buffer's final (still-low) sample instead of being rejected.
-The result is a single spurious byte (0x00) that has nothing to do with
-real bus data -- a buffer-boundary clamping artifact, not periodic or
-baud-rate phase alignment. Point --host at hardware probing a real UART
-line to see genuine decoded bytes.
+against the mock's 10 kHz square wave finds no real UART frames: the
+captured buffer holds 14 falling edges, and the decoder tries each as a
+candidate start bit, but every one is correctly rejected. The first 13 fail
+the start-bit check outright (the wave's ~50 us low phase has already
+flipped back high by the time the decoder samples 52 us later). The 14th is
+the last edge in the buffer, close enough to the end that its start-bit and
+eight data-bit sample times fall past the end of the capture; the decoder
+now recognises those as unresolvable (the sample-time-to-index lookup is
+bounds-checked and returns None past either end of the buffer, rather than
+clamping to the nearest end sample) and abandons that candidate frame
+instead of fabricating a byte from samples that were never captured. Point
+--host at hardware probing a real UART line to see genuine decoded bytes.
 
 Expected output: each decoder's required channels and parameters, then the
 UART event summary for the mock's square wave -- deterministically
-`UART event summary: {'DATA': 1}`, the single spurious byte described above.
-No files are written.
+`UART event summary: {}`, since none of the 14 candidate start bits above
+survive both checks. No files are written.
 """
 
 import argparse

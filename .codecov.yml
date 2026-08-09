@@ -31,6 +31,17 @@ coverage:
     - "**/__pycache__"
     - "**/*.pyc"
     - "**/test_*.py"
+    # The desktop GUI cannot execute in CI at all: the test job installs
+    # `.[dev,web]`, which excludes PyQt6 (it lives in the `gui` extra), and the
+    # runner has no display for a Qt event loop. Counting these lines measures
+    # the CI environment rather than the code, and drags the reported figure
+    # down by ~8 points without telling anyone anything actionable.
+    #
+    # This is an exclusion, NOT a claim that the GUI is tested -- it is not.
+    # If the GUI ever gains CI coverage (an offscreen Qt platform plugin plus
+    # the `gui` extra installed), delete this entry rather than leaving a
+    # tested subsystem invisible.
+    - "scpi_control/gui/"
 
 comment:
   layout: "reach,diff,flags,tree,files"

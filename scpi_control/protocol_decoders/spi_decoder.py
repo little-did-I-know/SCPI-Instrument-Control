@@ -1,7 +1,7 @@
 """SPI (Serial Peripheral Interface) protocol decoder."""
 
 import logging
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 import numpy as np
 
@@ -148,6 +148,14 @@ class SPIDecoder(ProtocolDecoder):
                         bit_order,
                     )
 
+                    if mosi_word is None:
+                        # Clock edges are strictly increasing timestamps
+                        # drawn from this same capture, so once one word's
+                        # bits run out of range, later words in this
+                        # transaction will too -- stop, don't skip ahead.
+                        logger.debug("SPI: MOSI bit sample out of range, abandoning remaining transaction")
+                        break
+
                     # Decode MISO (if available)
                     if miso is not None:
                         miso_word = self._decode_word(
@@ -157,6 +165,9 @@ class SPIDecoder(ProtocolDecoder):
                             threshold,
                             bit_order,
                         )
+                        if miso_word is None:
+                            logger.debug("SPI: MISO bit sample out of range, abandoning remaining transaction")
+                            break
                         data_str = f"MOSI: 0x{mosi_word:02X}, MISO: 0x{miso_word:02X}"
                         data_dict = {"mosi": mosi_word, "miso": miso_word}
                     else:
@@ -236,7 +247,7 @@ class SPIDecoder(ProtocolDecoder):
         clock_edges: List[float],
         threshold: float,
         bit_order: str,
-    ) -> int:
+    ) -> Optional[int]:
         """Decode a word from signal at clock edges.
 
         Args:
@@ -247,12 +258,15 @@ class SPIDecoder(ProtocolDecoder):
             bit_order: 'MSB' or 'LSB'
 
         Returns:
-            Decoded word value
+            Decoded word value, or None if any bit's clock edge falls outside
+            the captured buffer -- a partial word must not be reported.
         """
         word = 0
 
         for i, edge_time in enumerate(clock_edges):
             bit = self._get_bit_at_time(signal, time, edge_time, threshold)
+            if bit is None:
+                return None
 
             if bit_order == "MSB":
                 # MSB first
