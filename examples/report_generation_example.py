@@ -160,46 +160,45 @@ def create_report_with_ai(report: TestReport) -> TestReport:
     """
     Add AI-generated content to the report.
 
-    This requires Ollama or LM Studio to be running locally.
+    This requires Ollama or LM Studio to be running locally. An unreachable
+    service is handled explicitly below -- test_connection() returns False
+    rather than raising, so AI features are skipped gracefully. Anything
+    else that goes wrong here is a real bug and is left to propagate rather
+    than being reported as just another "AI unavailable" case.
     """
-    try:
-        # Configure Ollama (default settings)
-        llm_config = LLMConfig.create_ollama_config(model="llama3.2")
+    # Configure Ollama (default settings)
+    llm_config = LLMConfig.create_ollama_config(model="llama3.2")
 
-        # Create client and analyzer
-        llm_client = LLMClient(llm_config)
-        analyzer = ReportAnalyzer(llm_client)
+    # Create client and analyzer
+    llm_client = LLMClient(llm_config)
+    analyzer = ReportAnalyzer(llm_client)
 
-        print("Testing LLM connection...")
-        if not llm_client.test_connection():
-            print("Warning: Could not connect to LLM. Skipping AI features.")
-            print("To enable AI features, install and run Ollama: https://ollama.com")
-            return report
+    print("Testing LLM connection...")
+    if not llm_client.test_connection():
+        print("Warning: Could not connect to LLM. Skipping AI features.")
+        print("To enable AI features, install and run Ollama: https://ollama.com")
+        return report
 
-        print("Generating AI-powered executive summary...")
-        report.executive_summary = analyzer.generate_executive_summary(report)
-        report.summary_source = SUMMARY_SOURCE_AI
+    print("Generating AI-powered executive summary...")
+    report.executive_summary = analyzer.generate_executive_summary(report)
+    report.summary_source = SUMMARY_SOURCE_AI
 
-        print("Generating AI key findings...")
-        report.key_findings = analyzer.generate_key_findings(report, max_findings=3) or []
+    print("Generating AI key findings...")
+    report.key_findings = analyzer.generate_key_findings(report, max_findings=3) or []
 
-        print("Generating AI recommendations...")
-        suggestions = analyzer.suggest_next_steps(report)
-        if suggestions:
-            # Parse suggestions into list
-            report.recommendations = [line.strip() for line in suggestions.split("\n") if line.strip() and (line.strip()[0].isdigit() or line.strip().startswith("-"))]
+    print("Generating AI recommendations...")
+    suggestions = analyzer.suggest_next_steps(report)
+    if suggestions:
+        # Parse suggestions into list
+        report.recommendations = [line.strip() for line in suggestions.split("\n") if line.strip() and (line.strip()[0].isdigit() or line.strip().startswith("-"))]
 
-        # Add AI insights to sections
-        for section in report.sections:
-            if section.measurements:
-                print(f"Analyzing section: {section.title}...")
-                section.ai_insights = analyzer.interpret_measurements(report)
+    # Add AI insights to sections
+    for section in report.sections:
+        if section.measurements:
+            print(f"Analyzing section: {section.title}...")
+            section.ai_insights = analyzer.interpret_measurements(report)
 
-        print("AI analysis complete!")
-
-    except Exception as e:
-        print(f"Warning: AI features failed: {e}")
-        print("Continuing without AI features...")
+    print("AI analysis complete!")
 
     return report
 

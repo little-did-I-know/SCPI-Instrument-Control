@@ -310,26 +310,22 @@ if __name__ == "__main__":
     print("- OVP/OCP protection")
     print("\nUsing mock connection (no hardware required)")
 
-    try:
-        # Run all demos
-        demo_data_logging()
-        demo_tracking_modes()
-        demo_timer_functionality()
-        demo_waveform_generation()
-        demo_ovp_ocp_protection()
-        demo_real_world_scenario()
+    # Run all demos. No outer try/except here: an unhandled exception is
+    # exactly what should happen on a real failure -- swallowing it here
+    # would let the script "complete" and exit 0 while a demo silently
+    # failed.
+    demo_data_logging()
+    demo_tracking_modes()
+    demo_timer_functionality()
+    demo_waveform_generation()
+    demo_ovp_ocp_protection()
+    demo_real_world_scenario()
 
-        print("\n" + "=" * 60)
-        print("All demos completed successfully!")
-        print("=" * 60)
-        print("\nCheck the generated CSV files:")
-        print("- psu_manual_log.csv")
-        print("- psu_timed_log.csv")
-        print("- psu_output1_log.csv")
-        print("- characterization_log.csv")
-
-    except Exception as e:
-        print(f"\nError during demo: {e}")
-        import traceback
-
-        traceback.print_exc()
+    print("\n" + "=" * 60)
+    print("All demos completed successfully!")
+    print("=" * 60)
+    print("\nCheck the generated CSV files:")
+    print("- psu_manual_log.csv")
+    print("- psu_timed_log.csv")
+    print("- psu_output1_log.csv")
+    print("- characterization_log.csv")
