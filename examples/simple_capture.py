@@ -3,23 +3,41 @@
 This example shows how to capture a single waveform from one or more channels
 and save it to a file.
 
-Requirements: an oscilloscope reachable on the network -- edit SCOPE_IP below
-to match its LAN address.
+Requirements: none by default -- runs against the built-in mock scope. Pass
+--host <ip> to drive a real oscilloscope on the network.
 
 Expected output: per-channel capture stats and basic analysis (Vpp, mean,
 RMS, frequency) printed to the console, and 'simple_capture.npz' saved to
 the current directory.
 """
 
-from scpi_control.automation import DataCollector
+import argparse
 
-# Replace with your oscilloscope's IP address
-SCOPE_IP = "192.168.1.100"
+from scpi_control.automation import DataCollector
+from scpi_control.connection import MockConnection
+from scpi_control.signal_synth import SignalSpec
+
+
+def _connect(host):
+    """Return a mock connection for --host mock, or None to use a real socket."""
+    if host != "mock":
+        return None
+    return MockConnection(
+        "mock",
+        channel_states={1: True},
+        signals={1: SignalSpec(kind="square", frequency=1000.0, amplitude=1.65, offset=1.65)},
+        sample_rate=20e6,
+        timebase=500e-6,
+    )
 
 
 def main():
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("--host", default="mock", help="Instrument hostname/IP, or 'mock' for the built-in mock scope (default: mock)")
+    args = parser.parse_args()
+
     # Create data collector and connect
-    collector = DataCollector(SCOPE_IP)
+    collector = DataCollector(args.host, connection=_connect(args.host))
     collector.connect()
 
     try:

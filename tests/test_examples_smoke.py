@@ -53,6 +53,11 @@ FORBIDDEN = ["Siglent-Oscilloscope", ".time_interval", '="SDS1104X-E"']
 # waveform_analyzer.py makes very large captures slow; this library issue is out of scope.
 EXECUTE = [
     ("basic_usage.py", None),
+    ("simple_capture.py", None),
+    ("waveform_capture.py", None),
+    ("batch_capture.py", None),
+    ("continuous_capture.py", None),
+    ("trigger_based_capture.py", None),
     ("dialect_override_example.py", None),
     ("trend_logging_walkthrough.py", None),
     ("psu_advanced_features.py", None),

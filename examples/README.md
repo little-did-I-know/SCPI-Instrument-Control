@@ -24,13 +24,13 @@ pip install "SCPI-Instrument-Control"
 | File | What it shows | Requirements |
 | --- | --- | --- |
 | `basic_usage.py` | Connecting to an oscilloscope, configuring channels and trigger, and performing basic operations. | None — runs on the built-in mock; `--host <ip>` for real hardware |
-| `waveform_capture.py` | Capturing waveform data from the oscilloscope and saving it to a file. | Oscilloscope on the network (matplotlib is a core dependency) |
+| `waveform_capture.py` | Capturing waveform data from the oscilloscope and saving it to a file. | None — runs on the built-in mock; `--host <ip>` for real hardware (matplotlib is a core dependency) |
 | `measurements.py` | Automated measurements (frequency, Vpp, RMS, period, etc.) on oscilloscope channels. | Oscilloscope on the network |
 | `live_plot.py` | Real-time waveform acquisition and plotting using matplotlib animation. | Oscilloscope on the network (matplotlib is a core dependency) |
-| `simple_capture.py` | Single waveform capture with analysis via the automation API (Vpp, RMS, frequency) and saving to NumPy format. | Oscilloscope on the network |
-| `batch_capture.py` | Capturing multiple waveforms with different timebase and voltage-scale settings, for characterizing signals at different scales. | Oscilloscope on the network |
-| `continuous_capture.py` | Collecting waveforms continuously over a period of time, for monitoring, statistics, or time-varying phenomena. | Oscilloscope on the network |
-| `trigger_based_capture.py` | Waiting for specific trigger conditions and capturing waveforms when they occur, for sporadic events. | Oscilloscope on the network |
+| `simple_capture.py` | Single waveform capture with analysis via the automation API (Vpp, RMS, frequency) and saving to NumPy format. | None — runs on the built-in mock; `--host <ip>` for real hardware |
+| `batch_capture.py` | Capturing multiple waveforms with different timebase and voltage-scale settings, for characterizing signals at different scales. | None — runs on the built-in mock; `--host <ip>` for real hardware |
+| `continuous_capture.py` | Collecting waveforms continuously over a period of time, for monitoring, statistics, or time-varying phenomena. | None — runs on the built-in mock; `--host <ip>` for real hardware |
+| `trigger_based_capture.py` | Waiting for specific trigger conditions and capturing waveforms when they occur, for sporadic events. | None — runs on the built-in mock; `--host <ip>` for real hardware |
 | `advanced_analysis.py` | Advanced waveform analysis and visualization: FFT analysis, statistical analysis, and matplotlib plots. | Oscilloscope on the network (matplotlib is a core dependency) |
 | `probe_calibration_analysis.py` | Waveform region extraction for probe compensation analysis: plateau detection, slope analysis, calibration guidance, and zoomed PDF report plots. | `SCPI-Instrument-Control[report-generator]` (no hardware — fully synthetic) |
 | `dialect_override_example.py` | SCPI dialect auto-detection from `*IDN?` and the `dialect=` override for forcing a command set; runs entirely on mock connections. | Core install only (no hardware) |
