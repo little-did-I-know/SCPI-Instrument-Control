@@ -280,6 +280,13 @@ class Channel:
         if not self._scope._has_command("get_channel_unit"):
             raise exceptions.FeatureNotSupportedError(f"channel unit is not supported on the {self._dialect} dialect")
         response = self._scope.query(self._cmd("get_channel_unit", ch=self._channel))
+        # Real hardware echoes the header (RC01020-E01C p.137: `<channel>: UNIT <type>`);
+        # some dialects and older mocks return the bare value. Handle both, as
+        # voltage_scale/voltage_offset/probe_ratio do.
+        if ":" in response:
+            response = response.split(":", 1)[1]
+        if " " in response:
+            response = response.rsplit(" ", 1)[-1]
         return response.strip()
 
     @unit.setter

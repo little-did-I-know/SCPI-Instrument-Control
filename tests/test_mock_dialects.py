@@ -303,9 +303,14 @@ def test_legacy_dialect_answers_channel_unit():
     from scpi_control import Oscilloscope
     from scpi_control.connection.mock import MockConnection
 
-    scope = Oscilloscope("mock", connection=MockConnection("mock", channel_states={1: True}))
+    conn = MockConnection("mock", channel_states={1: True})
+    scope = Oscilloscope("mock", connection=conn)
     scope.connect()
     try:
+        # The mock must answer the way the manual says real hardware does
+        # (RC01020-E01C p.137: RESPONSE FORMAT `<channel>: UNIT <type>`).
+        assert conn.query("C1:UNIT?").strip() == "C1:UNIT V"
+        # ...and the driver must parse that back to a bare unit.
         assert scope.channel1.unit == "V"
         config = scope.channel1.get_configuration()
         assert config, "get_configuration() returned nothing"
