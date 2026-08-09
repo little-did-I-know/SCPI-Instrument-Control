@@ -7,9 +7,14 @@ Requirements: none by default -- runs against the built-in mock DAQ (a
 Keysight 34970A). Pass --host <ip> to drive a real DAQ/switch unit on the
 network.
 
-Expected output: basic voltage measurements, a multi-channel scan, ~5
-seconds of continuous logging, and alarm-limit / mx+b scaling demos, all
-narrated on the console. No files are written.
+Expected output: basic voltage measurements, all narrated on the console.
+No files are written.
+
+Against --host mock (the default) or with --all-demos, four more demos also
+run: a multi-channel scan, ~5 seconds of continuous logging, and
+alarm-limit / mx+b scaling demos. These write channel, scan-list, alarm,
+and scaling configuration to the instrument, so against a real DAQ
+(--host <ip>) they are opt-in only -- pass --all-demos to run them there.
 
 Mock fidelity note: the mock DAQ's readings are a fixed, static CSV string
 (three values by default) returned for every measurement/scan/fetch query,
@@ -152,16 +157,29 @@ def scaling_example(host):
 def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--host", default="mock", help="DAQ hostname/IP, or 'mock' for the built-in mock DAQ (default: mock)")
+    parser.add_argument(
+        "--all-demos",
+        action="store_true",
+        help="Also run the multi-channel scan, continuous logging, alarm-limit, and mx+b scaling demos "
+        "against a real --host. These write channel/scan-list/alarm/scaling configuration to the "
+        "instrument -- opt in deliberately. Always on against --host mock.",
+    )
     args = parser.parse_args()
 
     print("Data Logger / DAQ Basic Examples")
     print("================================\n")
 
     basic_measurements(args.host)
-    scan_multiple_channels(args.host)
-    continuous_logging(args.host)
-    alarm_monitoring(args.host)
-    scaling_example(args.host)
+
+    # Writing scan/alarm/scaling configuration is opt-in on real hardware:
+    # the original gated these behind manual uncommenting.
+    if args.host == "mock" or args.all_demos:
+        scan_multiple_channels(args.host)
+        continuous_logging(args.host)
+        alarm_monitoring(args.host)
+        scaling_example(args.host)
+    else:
+        print("\nSkipping scan/logging/alarm/scaling demos (they write configuration to the instrument). " "Pass --all-demos to run them against real hardware.")
 
 
 if __name__ == "__main__":

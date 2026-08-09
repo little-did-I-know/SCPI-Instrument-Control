@@ -16,10 +16,14 @@ Requirements: none by default -- runs against the built-in mock PSU (a
 on the network.
 
 Expected output: connection/device info, output 1 setpoints and
-measurements, a 3-output walkthrough (CH3 is the SPD3303X's fixed
-auxiliary rail -- see the comments in multi_output_demo() for what it does
-and doesn't support), and a context-manager demo, all echoed to the
-console. No files are written.
+measurements, all echoed to the console. No files are written.
+
+Against --host mock (the default) or with --all-demos, two more demos also
+run: a 3-output walkthrough (CH3 is the SPD3303X's fixed auxiliary rail --
+see the comments in multi_output_demo() for what it does and doesn't
+support) and a context-manager demo. These drive outputs 2 and 3 to fixed
+setpoints, so against a real power supply (--host <ip>) they are opt-in
+only -- pass --all-demos to run them there.
 """
 
 import argparse
@@ -166,6 +170,13 @@ def context_manager_demo(host):
 def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--host", default="mock", help="Power supply hostname/IP, or 'mock' for the built-in mock PSU (default: mock)")
+    parser.add_argument(
+        "--all-demos",
+        action="store_true",
+        help="Also run the multi-output and context-manager demos against a real --host. "
+        "These drive output 2 to 12V/1.5A and enable output 3 -- opt in deliberately. "
+        "Always on against --host mock.",
+    )
     args = parser.parse_args()
 
     print("=" * 60)
@@ -173,15 +184,20 @@ def main():
     print("=" * 60)
     basic_output_demo(args.host)
 
-    print("\n" + "=" * 60)
-    print("Multi-Output Example")
-    print("=" * 60)
-    multi_output_demo(args.host)
+    # Driving outputs 2/3 is opt-in on real hardware: the original gated
+    # this behind manual uncommenting.
+    if args.host == "mock" or args.all_demos:
+        print("\n" + "=" * 60)
+        print("Multi-Output Example")
+        print("=" * 60)
+        multi_output_demo(args.host)
 
-    print("\n" + "=" * 60)
-    print("Context Manager Example")
-    print("=" * 60)
-    context_manager_demo(args.host)
+        print("\n" + "=" * 60)
+        print("Context Manager Example")
+        print("=" * 60)
+        context_manager_demo(args.host)
+    else:
+        print("\nSkipping multi-output and context-manager demos (they drive outputs 2/3). " "Pass --all-demos to run them against real hardware.")
 
 
 if __name__ == "__main__":
