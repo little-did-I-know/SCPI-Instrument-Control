@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.1.0] - 2026-08-09
+
 ### Added
 
 - Five examples for features that had none: `math_channels.py` (waveform arithmetic), `reference_waveforms.py` (golden-reference comparison), `screen_capture_example.py`, `measurement_badges_example.py` (Tektronix badge pooling), and `protocol_decoding.py` (I2C/SPI/UART).

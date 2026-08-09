@@ -25,7 +25,7 @@ For automated test report generation:
     from scpi_control.report_generator import ReportGenerator
 """
 
-__version__ = "7.0.1"
+__version__ = "7.1.0"
 
 from scpi_control.capabilities import ScopeCapabilities
 from scpi_control.exceptions import CommandError, SiglentConnectionError, SiglentError, SiglentTimeoutError
