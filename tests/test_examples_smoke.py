@@ -5,9 +5,9 @@ blocks their reintroduction), (2) every .py example at least compiles, (3) the
 notebook is valid JSON. Task 2 adds a fourth guard: executing the no-hardware
 examples as subprocesses.
 
-Limitation: hardware-bound examples (e.g. simple_capture.py, advanced_analysis.py)
-cannot be executed headless, so their fixes are covered by the token scan and the
-compile check, not by running them.
+Limitation: hardware-bound examples (e.g. advanced_analysis.py) cannot be executed
+headless, so their fixes are covered by the token scan and the compile check, not
+by running them.
 
 The execution guard is the expensive one -- each example is a real subprocess, and
 report_ai_qa.py additionally does live inference wherever a local Ollama is running.
