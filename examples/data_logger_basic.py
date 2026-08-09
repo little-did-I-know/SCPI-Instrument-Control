@@ -3,22 +3,47 @@
 This example demonstrates basic usage of the DataLogger class for
 data acquisition systems like the Keysight 34970A/DAQ970A.
 
-Requirements:
-    - A SCPI-compatible DAQ system (Keysight 34970A, DAQ970A, or similar)
-    - Network connection to the instrument
+Requirements: none by default -- runs against the built-in mock DAQ (a
+Keysight 34970A). Pass --host <ip> to drive a real DAQ/switch unit on the
+network.
+
+Expected output: basic voltage measurements, all narrated on the console.
+No files are written.
+
+Against --host mock (the default) or with --all-demos, four more demos also
+run: a multi-channel scan, ~5 seconds of continuous logging, and
+alarm-limit / mx+b scaling demos. These write channel, scan-list, alarm,
+and scaling configuration to the instrument, so against a real DAQ
+(--host <ip>) they are opt-in only -- pass --all-demos to run them there.
+
+Mock fidelity note: the mock DAQ's readings are a fixed, static CSV string
+(three values by default) returned for every measurement/scan/fetch query,
+regardless of how many channels are in the scan list or what channels were
+configured. Against --host mock, scan_multiple_channels() below will report
+3 scanned channels even though 5 were configured, and continuous_logging()
+will report the same three readings on every scan -- neither tracks real
+channel count or varies over time. This is a mock limitation, not a bug in
+this example.
 """
 
+import argparse
+
 from scpi_control import DataLogger
-
-# Replace with your DAQ's IP address
-DAQ_IP = "192.168.1.100"
+from scpi_control.connection import MockConnection
 
 
-def basic_measurements():
+def _connect(host):
+    """Return a mock connection for --host mock, or None to use a real socket."""
+    if host != "mock":
+        return None
+    return MockConnection("mock", daq_mode=True)
+
+
+def basic_measurements(host):
     """Demonstrate basic voltage measurements."""
     print("=== Basic Voltage Measurements ===\n")
 
-    with DataLogger(DAQ_IP) as daq:
+    with DataLogger(host, connection=_connect(host)) as daq:
         print(f"Connected to: {daq.identify()}")
         print(f"Model: {daq.model_capability.model_name}")
         print(f"Channels available: {daq.model_capability.get_all_channels()}\n")
@@ -35,11 +60,11 @@ def basic_measurements():
             print(f"  Channel {reading.channel}: {reading.value:.6f} {reading.unit}")
 
 
-def scan_multiple_channels():
+def scan_multiple_channels(host):
     """Demonstrate scanning multiple channels."""
     print("\n=== Multi-Channel Scan ===\n")
 
-    with DataLogger(DAQ_IP) as daq:
+    with DataLogger(host, connection=_connect(host)) as daq:
         # Configure different measurement types on different channels
         daq.configure_voltage_dc([101, 102], range="10")  # 10V range
         daq.configure_temperature([103, 104], sensor_type="TC", sensor_subtype="K")
@@ -62,11 +87,11 @@ def scan_multiple_channels():
             print(f"  Channel {ch}: {reading.value:.6f}")
 
 
-def continuous_logging():
+def continuous_logging(host):
     """Demonstrate continuous data logging."""
     print("\n=== Continuous Logging (5 seconds) ===\n")
 
-    with DataLogger(DAQ_IP) as daq:
+    with DataLogger(host, connection=_connect(host)) as daq:
         # Configure for voltage monitoring
         channels = [101, 102]
         daq.configure_voltage_dc(channels)
@@ -84,11 +109,11 @@ def continuous_logging():
         print(f"Total readings: {sum(len(r) for r in all_readings)}")
 
 
-def alarm_monitoring():
+def alarm_monitoring(host):
     """Demonstrate alarm/limit checking."""
     print("\n=== Alarm Monitoring ===\n")
 
-    with DataLogger(DAQ_IP) as daq:
+    with DataLogger(host, connection=_connect(host)) as daq:
         if not daq.model_capability.has_alarm:
             print("This model does not support alarm limits")
             return
@@ -107,11 +132,11 @@ def alarm_monitoring():
         print(f"Current reading: {readings[0].value:.3f} V")
 
 
-def scaling_example():
+def scaling_example(host):
     """Demonstrate mx+b scaling."""
     print("\n=== Scaling (mx+b) Example ===\n")
 
-    with DataLogger(DAQ_IP) as daq:
+    with DataLogger(host, connection=_connect(host)) as daq:
         if not daq.model_capability.has_math:
             print("This model does not support scaling")
             return
@@ -129,19 +154,33 @@ def scaling_example():
         # Note: scaled value would be returned if DAQ returns scaled data
 
 
-if __name__ == "__main__":
+def main():
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("--host", default="mock", help="DAQ hostname/IP, or 'mock' for the built-in mock DAQ (default: mock)")
+    parser.add_argument(
+        "--all-demos",
+        action="store_true",
+        help="Also run the multi-channel scan, continuous logging, alarm-limit, and mx+b scaling demos "
+        "against a real --host. These write channel/scan-list/alarm/scaling configuration to the "
+        "instrument -- opt in deliberately. Always on against --host mock.",
+    )
+    args = parser.parse_args()
+
     print("Data Logger / DAQ Basic Examples")
     print("================================\n")
 
-    try:
-        basic_measurements()
-        # scan_multiple_channels()
-        # continuous_logging()
-        # alarm_monitoring()
-        # scaling_example()
-    except Exception as e:
-        print(f"Error: {e}")
-        print("\nMake sure:")
-        print(f"  1. Your DAQ is connected at {DAQ_IP}")
-        print("  2. The IP address is correct")
-        print("  3. No other software is using the connection")
+    basic_measurements(args.host)
+
+    # Writing scan/alarm/scaling configuration is opt-in on real hardware:
+    # the original gated these behind manual uncommenting.
+    if args.host == "mock" or args.all_demos:
+        scan_multiple_channels(args.host)
+        continuous_logging(args.host)
+        alarm_monitoring(args.host)
+        scaling_example(args.host)
+    else:
+        print("\nSkipping scan/logging/alarm/scaling demos (they write configuration to the instrument). " "Pass --all-demos to run them against real hardware.")
+
+
+if __name__ == "__main__":
+    main()

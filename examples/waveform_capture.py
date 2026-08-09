@@ -3,28 +3,46 @@
 This script demonstrates how to capture waveform data from
 the oscilloscope and save it to a file.
 
-Requirements: an oscilloscope reachable on the network -- edit SCOPE_IP below
-to match its LAN address. matplotlib is a core dependency, no extra install
-needed.
+Requirements: none by default -- runs against the built-in mock scope. Pass
+--host <ip> to drive a real oscilloscope on the network. matplotlib is a
+core dependency, no extra install needed.
 
 Expected output: captures Channel 1, saves 'waveform.csv' and 'waveform.png'
-to the current directory, and opens a plot window.
+to the current directory, and opens a plot window (a no-op under a
+non-interactive matplotlib backend, e.g. in tests).
 """
+
+import argparse
 
 import matplotlib.pyplot as plt
 
 from scpi_control import Oscilloscope
+from scpi_control.connection import MockConnection
+from scpi_control.signal_synth import SignalSpec
 
-# Replace with your oscilloscope's IP address
-SCOPE_IP = "192.168.1.100"
+
+def _connect(host):
+    """Return a mock connection for --host mock, or None to use a real socket."""
+    if host != "mock":
+        return None
+    return MockConnection(
+        "mock",
+        channel_states={1: True},
+        signals={1: SignalSpec(kind="square", frequency=1000.0, amplitude=1.65, offset=1.65)},
+        sample_rate=20e6,
+        timebase=500e-6,
+    )
 
 
 def main():
-    # Create oscilloscope instance and connect
-    scope = Oscilloscope(SCOPE_IP)
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("--host", default="mock", help="Instrument hostname/IP, or 'mock' for the built-in mock scope (default: mock)")
+    args = parser.parse_args()
+
+    scope = Oscilloscope(args.host, connection=_connect(args.host))
 
     try:
-        print(f"Connecting to oscilloscope at {SCOPE_IP}...")
+        print(f"Connecting to oscilloscope at {args.host}...")
         scope.connect()
         print(f"Connected to: {scope.device_info['model']}")
 
@@ -67,12 +85,6 @@ def main():
 
         # Show plot
         plt.show()
-
-    except Exception as e:
-        print(f"\nError: {e}")
-        import traceback
-
-        traceback.print_exc()
 
     finally:
         print("\nDisconnecting...")

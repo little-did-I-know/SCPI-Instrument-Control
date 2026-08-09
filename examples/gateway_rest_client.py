@@ -19,6 +19,10 @@ screenshot PNG — the same API the browser UI uses.
 Requirements:
     - SCPI-Instrument-Control[web] (for the gateway itself)
     - Python standard library only for this client (urllib)
+
+Not executed in CI: needs a running `scpi-web` gateway, not merely an
+instrument. It is compile-checked only -- start the gateway and run it by
+hand after changes.
 """
 
 import json

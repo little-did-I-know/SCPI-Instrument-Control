@@ -577,6 +577,13 @@ def handle_query(conn, command: str) -> Optional[str]:
             value = conn.probe_ratios.get(channel, 1.0)
             return f"C{channel}:ATTN {value:g}"
 
+        if match := re.match(r"C(\d+):UNIT\?", command, re.IGNORECASE):
+            # RC01020-E01C p.137: RESPONSE FORMAT "<channel>: UNIT <type>" --
+            # header-echoed, like voltage_scale/voltage_offset/probe_ratio.
+            # channel.py's unit getter strips the echo before returning it.
+            channel = int(match.group(1))
+            return f"C{channel}:UNIT V"
+
         if upper == "BWL?":
             # RC01020-E01C p.27: bare query; RESPONSE FORMAT echoes the "BWL"
             # header followed by ALL-channel <channel>,<mode> pairs (task 14,

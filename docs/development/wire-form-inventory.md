@@ -54,7 +54,7 @@ Checked against the Siglent Digital Oscilloscopes Programming Guide
 | `get_acq_status` | `SAST?` | request matches; response is `SAST <status>` (mock answers bare, no header) | MISMATCH_DEFERRED | RC01020-E01C p.116 |
 | `get_bandwidth_limit` | `BWL?` | `BandWidth_Limit?` (bare, no channel — returns ALL channels as header-echoed `<channel>,<mode>` pairs); mock now answers `BWL C1,OFF,C2,OFF,...` | VERIFIED | RC01020-E01C p.27 |
 | `get_channel_display` | `C{ch}:TRA?` | request matches; response is `<trace>:TRAce <mode>` (mock answers bare) | MISMATCH_DEFERRED | RC01020-E01C p.124 |
-| `get_channel_unit` | `C{ch}:UNIT?` | `<channel>:UNIT?` | VERIFIED | RC01020-E01C p.137 |
+| `get_channel_unit` | `C{ch}:UNIT?` | `<channel>:UNIT?`; response `<channel>: UNIT <type>` — mock now answers header-echoed, e.g. `C1:UNIT V`, and the driver strips the echo | VERIFIED | RC01020-E01C p.137 |
 | `get_coupling` | `C{ch}:CPL?` | request matches; response is `<channel>:CouPLing <coupling>` (mock answers bare) | MISMATCH_DEFERRED | RC01020-E01C p.35 |
 | `get_cursor_type` | `CRST?` | CRST is CURSOR_SET, a trace-prefixed *positioning* query, not a mode selector; also dead code (no caller) | MISMATCH_DEFERRED | RC01020-E01C p.38 |
 | `get_cursor_value` | `CRVA?` | `<trace>:CuRsor_Value? [<mode>,...]` (trace prefix + mode required); response shape driver expects also disagrees with the manual's worked example | MISMATCH_DEFERRED | RC01020-E01C p.40 |

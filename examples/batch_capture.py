@@ -4,18 +4,32 @@ This example demonstrates how to capture multiple waveforms with different
 timebase and voltage scale settings. This is useful for characterizing
 signals at different time scales or for automated testing.
 
-Requirements: an oscilloscope reachable on the network -- edit SCOPE_IP below
-to match its LAN address.
+Requirements: none by default -- runs against the built-in mock scope. Pass
+--host <ip> to drive a real oscilloscope on the network.
 
 Expected output: progress lines for each capture, a summary of the first
 five results, and the batch saved to a 'batch_output/' directory (waveform
 files plus metadata.txt) in the current directory.
 """
 
-from scpi_control.automation import DataCollector
+import argparse
 
-# Replace with your oscilloscope's IP address
-SCOPE_IP = "192.168.1.100"
+from scpi_control.automation import DataCollector
+from scpi_control.connection import MockConnection
+from scpi_control.signal_synth import SignalSpec
+
+
+def _connect(host):
+    """Return a mock connection for --host mock, or None to use a real socket."""
+    if host != "mock":
+        return None
+    return MockConnection(
+        "mock",
+        channel_states={1: True},
+        signals={1: SignalSpec(kind="square", frequency=1000.0, amplitude=1.65, offset=1.65)},
+        sample_rate=20e6,
+        timebase=500e-6,
+    )
 
 
 def progress_callback(current, total, status):
@@ -25,8 +39,12 @@ def progress_callback(current, total, status):
 
 
 def main():
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("--host", default="mock", help="Instrument hostname/IP, or 'mock' for the built-in mock scope (default: mock)")
+    args = parser.parse_args()
+
     # Create data collector with context manager
-    with DataCollector(SCOPE_IP) as collector:
+    with DataCollector(args.host, connection=_connect(args.host)) as collector:
         print(f"Connected to {collector.scope.identify()}\n")
 
         # Configure batch capture parameters

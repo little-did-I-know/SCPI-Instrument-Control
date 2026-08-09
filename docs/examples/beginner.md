@@ -13,6 +13,7 @@ Complete examples for getting started with the Siglent Oscilloscope library. The
 | [Measurement example for Siglent oscilloscope](#measurement-example-for-siglent-oscilloscope) | Measurement example for Siglent oscilloscope. |
 | [Discover SCPI instruments on the local network](#discover-scpi-instruments-on-the-local-network) | Discover SCPI instruments on the local network. |
 | [Basic power supply control example](#basic-power-supply-control-example) | Basic power supply control example. |
+| [Pulling a screenshot off the instrument's display](#pulling-a-screenshot-off-the-instruments-display) | Pulling a screenshot off the instrument's display. |
 | [Simple single capture example](#simple-single-capture-example) | Simple single capture example. |
 | [Waveform capture example for Siglent oscilloscope](#waveform-capture-example-for-siglent-oscilloscope) | Waveform capture example for Siglent oscilloscope. |
 
@@ -25,11 +26,11 @@ Basic usage example for Siglent oscilloscope control.
 ### Requirements
 
 - scpi_control - Core library
-- Oscilloscope connected to network
+- None -- runs on the built-in mock; `--host <ip>` for real hardware
 
 ### Configuration
 
-Update `SCOPE_IP` to match your oscilloscope's IP address (default: `192.168.1.100`).
+None -- runs on the built-in mock with no setup. Pass `--host <ip>` to drive real hardware instead.
 
 ### Usage
 
@@ -45,27 +46,44 @@ python examples/basic_usage.py
 This script demonstrates how to connect to an oscilloscope,
 configure channels and trigger, and perform basic operations.
 
-Requirements: an oscilloscope reachable on the network -- edit SCOPE_IP below
-to match its LAN address.
+Requirements: none by default -- runs against the built-in mock scope. Pass
+--host <ip> to drive a real oscilloscope on the network.
 
 Expected output: connection/device info, channel and trigger configuration
 echoed to the console, frequency/Vpp measurements on Channel 1, and a summary
 of each enabled channel's configuration. No files are written.
 """
 
-from scpi_control import Coupling, Oscilloscope, TriggerMode, TriggerSlope
+import argparse
 
-# Replace with your oscilloscope's IP address
-SCOPE_IP = "192.168.1.100"
+from scpi_control import Coupling, Oscilloscope, TriggerMode, TriggerSlope
+from scpi_control.connection import MockConnection
+from scpi_control.signal_synth import SignalSpec
+
+
+def _connect(host):
+    """Return a mock connection for --host mock, or None to use a real socket."""
+    if host != "mock":
+        return None
+    return MockConnection(
+        "mock",
+        channel_states={1: True},
+        signals={1: SignalSpec(kind="square", frequency=1000.0, amplitude=1.65, offset=1.65)},
+        sample_rate=20e6,
+        timebase=500e-6,
+    )
 
 
 def main():
-    # Create oscilloscope instance
-    scope = Oscilloscope(SCOPE_IP)
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("--host", default="mock", help="Instrument hostname/IP, or 'mock' for the built-in mock scope (default: mock)")
+    args = parser.parse_args()
+
+    scope = Oscilloscope(args.host, connection=_connect(args.host))
 
     try:
         # Connect to oscilloscope
-        print(f"Connecting to oscilloscope at {SCOPE_IP}...")
+        print(f"Connecting to oscilloscope at {args.host}...")
         scope.connect()
 
         # Get device information
@@ -126,9 +144,6 @@ def main():
             except Exception:
                 pass
 
-    except Exception as e:
-        print(f"\nError: {e}")
-
     finally:
         # Disconnect
         print("\nDisconnecting...")
@@ -149,11 +164,11 @@ Basic Data Logger / DAQ example.
 ### Requirements
 
 - scpi_control - Core library
-- Oscilloscope connected to network
+- None -- runs on the built-in mock; `--host <ip>` for real hardware
 
 ### Configuration
 
-Update `SCOPE_IP` to match your oscilloscope's IP address (default: `192.168.1.100`).
+None -- runs on the built-in mock with no setup. Pass `--host <ip>` to drive real hardware instead.
 
 ### Usage
 
@@ -169,22 +184,47 @@ python examples/data_logger_basic.py
 This example demonstrates basic usage of the DataLogger class for
 data acquisition systems like the Keysight 34970A/DAQ970A.
 
-Requirements:
-    - A SCPI-compatible DAQ system (Keysight 34970A, DAQ970A, or similar)
-    - Network connection to the instrument
+Requirements: none by default -- runs against the built-in mock DAQ (a
+Keysight 34970A). Pass --host <ip> to drive a real DAQ/switch unit on the
+network.
+
+Expected output: basic voltage measurements, all narrated on the console.
+No files are written.
+
+Against --host mock (the default) or with --all-demos, four more demos also
+run: a multi-channel scan, ~5 seconds of continuous logging, and
+alarm-limit / mx+b scaling demos. These write channel, scan-list, alarm,
+and scaling configuration to the instrument, so against a real DAQ
+(--host <ip>) they are opt-in only -- pass --all-demos to run them there.
+
+Mock fidelity note: the mock DAQ's readings are a fixed, static CSV string
+(three values by default) returned for every measurement/scan/fetch query,
+regardless of how many channels are in the scan list or what channels were
+configured. Against --host mock, scan_multiple_channels() below will report
+3 scanned channels even though 5 were configured, and continuous_logging()
+will report the same three readings on every scan -- neither tracks real
+channel count or varies over time. This is a mock limitation, not a bug in
+this example.
 """
 
+import argparse
+
 from scpi_control import DataLogger
-
-# Replace with your DAQ's IP address
-DAQ_IP = "192.168.1.100"
+from scpi_control.connection import MockConnection
 
 
-def basic_measurements():
+def _connect(host):
+    """Return a mock connection for --host mock, or None to use a real socket."""
+    if host != "mock":
+        return None
+    return MockConnection("mock", daq_mode=True)
+
+
+def basic_measurements(host):
     """Demonstrate basic voltage measurements."""
     print("=== Basic Voltage Measurements ===\n")
 
-    with DataLogger(DAQ_IP) as daq:
+    with DataLogger(host, connection=_connect(host)) as daq:
         print(f"Connected to: {daq.identify()}")
         print(f"Model: {daq.model_capability.model_name}")
         print(f"Channels available: {daq.model_capability.get_all_channels()}\n")
@@ -201,11 +241,11 @@ def basic_measurements():
             print(f"  Channel {reading.channel}: {reading.value:.6f} {reading.unit}")
 
 
-def scan_multiple_channels():
+def scan_multiple_channels(host):
     """Demonstrate scanning multiple channels."""
     print("\n=== Multi-Channel Scan ===\n")
 
-    with DataLogger(DAQ_IP) as daq:
+    with DataLogger(host, connection=_connect(host)) as daq:
         # Configure different measurement types on different channels
         daq.configure_voltage_dc([101, 102], range="10")  # 10V range
         daq.configure_temperature([103, 104], sensor_type="TC", sensor_subtype="K")
@@ -228,11 +268,11 @@ def scan_multiple_channels():
             print(f"  Channel {ch}: {reading.value:.6f}")
 
 
-def continuous_logging():
+def continuous_logging(host):
     """Demonstrate continuous data logging."""
     print("\n=== Continuous Logging (5 seconds) ===\n")
 
-    with DataLogger(DAQ_IP) as daq:
+    with DataLogger(host, connection=_connect(host)) as daq:
         # Configure for voltage monitoring
         channels = [101, 102]
         daq.configure_voltage_dc(channels)
@@ -250,11 +290,11 @@ def continuous_logging():
         print(f"Total readings: {sum(len(r) for r in all_readings)}")
 
 
-def alarm_monitoring():
+def alarm_monitoring(host):
     """Demonstrate alarm/limit checking."""
     print("\n=== Alarm Monitoring ===\n")
 
-    with DataLogger(DAQ_IP) as daq:
+    with DataLogger(host, connection=_connect(host)) as daq:
         if not daq.model_capability.has_alarm:
             print("This model does not support alarm limits")
             return
@@ -273,11 +313,11 @@ def alarm_monitoring():
         print(f"Current reading: {readings[0].value:.3f} V")
 
 
-def scaling_example():
+def scaling_example(host):
     """Demonstrate mx+b scaling."""
     print("\n=== Scaling (mx+b) Example ===\n")
 
-    with DataLogger(DAQ_IP) as daq:
+    with DataLogger(host, connection=_connect(host)) as daq:
         if not daq.model_capability.has_math:
             print("This model does not support scaling")
             return
@@ -295,22 +335,36 @@ def scaling_example():
         # Note: scaled value would be returned if DAQ returns scaled data
 
 
-if __name__ == "__main__":
+def main():
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("--host", default="mock", help="DAQ hostname/IP, or 'mock' for the built-in mock DAQ (default: mock)")
+    parser.add_argument(
+        "--all-demos",
+        action="store_true",
+        help="Also run the multi-channel scan, continuous logging, alarm-limit, and mx+b scaling demos "
+        "against a real --host. These write channel/scan-list/alarm/scaling configuration to the "
+        "instrument -- opt in deliberately. Always on against --host mock.",
+    )
+    args = parser.parse_args()
+
     print("Data Logger / DAQ Basic Examples")
     print("================================\n")
 
-    try:
-        basic_measurements()
-        # scan_multiple_channels()
-        # continuous_logging()
-        # alarm_monitoring()
-        # scaling_example()
-    except Exception as e:
-        print(f"Error: {e}")
-        print("\nMake sure:")
-        print(f"  1. Your DAQ is connected at {DAQ_IP}")
-        print("  2. The IP address is correct")
-        print("  3. No other software is using the connection")
+    basic_measurements(args.host)
+
+    # Writing scan/alarm/scaling configuration is opt-in on real hardware:
+    # the original gated these behind manual uncommenting.
+    if args.host == "mock" or args.all_demos:
+        scan_multiple_channels(args.host)
+        continuous_logging(args.host)
+        alarm_monitoring(args.host)
+        scaling_example(args.host)
+    else:
+        print("\nSkipping scan/logging/alarm/scaling demos (they write configuration to the instrument). " "Pass --all-demos to run them against real hardware.")
+
+
+if __name__ == "__main__":
+    main()
 ```
 
 ---
@@ -407,11 +461,11 @@ Basic Function Generator / AWG Usage Example.
 ### Requirements
 
 - scpi_control - Core library
-- Oscilloscope connected to network
+- None -- runs on the built-in mock; `--host <ip>` for real hardware
 
 ### Configuration
 
-Update `SCOPE_IP` to match your oscilloscope's IP address (default: `192.168.1.100`).
+None -- runs on the built-in mock with no setup. Pass `--host <ip>` to drive real hardware instead.
 
 ### Usage
 
@@ -432,13 +486,16 @@ Supported models:
 - SDG2000X series (SDG2042X, SDG2082X, SDG2122X, etc.)
 - Generic SCPI-compliant arbitrary waveform generators
 
-Requirements:
-- Function generator connected to network
-- IP address configured on generator
-- Default SCPI port: 5025
+Requirements: none by default -- runs against the built-in mock AWG. Pass
+--host <ip> to drive a real function generator on the network (default
+SCPI port: 5025).
+
+Expected output: log lines narrating each waveform demo (sine, square,
+pulse, ramp, channel synchronization, manual configuration) and the final
+"all outputs off" safety step. No files are written.
 
 Usage:
-    python function_generator_basic.py --ip 192.168.1.100
+    python function_generator_basic.py --host 192.168.1.100
 """
 
 import argparse
@@ -446,23 +503,31 @@ import logging
 import time
 
 from scpi_control import FunctionGenerator
+from scpi_control.connection import MockConnection
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 
+def _connect(host):
+    """Return a mock connection for --host mock, or None to use a real socket."""
+    if host != "mock":
+        return None
+    return MockConnection("mock", awg_mode=True)
+
+
 def main():
     """Main function to demonstrate AWG control."""
     parser = argparse.ArgumentParser(description="Control Siglent Function Generator")
-    parser.add_argument("--ip", type=str, default="192.168.1.100", help="Function generator IP address")
+    parser.add_argument("--host", type=str, default="mock", help="Function generator hostname/IP, or 'mock' for the built-in mock AWG (default: mock)")
     parser.add_argument("--port", type=int, default=5025, help="SCPI port (default: 5025)")
     args = parser.parse_args()
 
-    logger.info(f"Connecting to function generator at {args.ip}:{args.port}")
+    logger.info(f"Connecting to function generator at {args.host}:{args.port}")
 
     # Using context manager for automatic connection/disconnection
-    with FunctionGenerator(args.ip, port=args.port) as awg:
+    with FunctionGenerator(args.host, port=args.port, connection=_connect(args.host)) as awg:
         # Get device info
         logger.info(f"Connected to: {awg.identify()}")
         logger.info(f"Model: {awg.model_capability.model_name}")
@@ -556,11 +621,11 @@ Measurement example for Siglent oscilloscope.
 ### Requirements
 
 - scpi_control - Core library
-- Oscilloscope connected to network
+- None -- runs on the built-in mock; `--host <ip>` for real hardware
 
 ### Configuration
 
-Update `SCOPE_IP` to match your oscilloscope's IP address (default: `192.168.1.100`).
+None -- runs on the built-in mock with no setup. Pass `--host <ip>` to drive real hardware instead.
 
 ### Usage
 
@@ -576,25 +641,49 @@ python examples/measurements.py
 This script demonstrates how to perform automated measurements
 on oscilloscope channels.
 
-Requirements: an oscilloscope reachable on the network -- edit SCOPE_IP below
-to match its LAN address.
+Requirements: none by default -- runs against the built-in mock scope. Pass
+--host <ip> to drive a real oscilloscope on the network.
 
 Expected output: individual measurements (frequency, period, Vpp, amplitude,
 max/min, RMS, mean) on Channel 1 printed to the console, followed by the
 combined result of measure_all(). No files are written.
+
+Note: against --host mock, the instrument-side :MEASure values are fixed
+constants and do not track the synthesized waveform. See advanced_analysis.py
+for numbers computed from captured samples, which do track it. This is a mock
+fidelity limit, not a measurement error.
 """
 
+import argparse
 import time
 
 from scpi_control import Oscilloscope
+from scpi_control.connection import MockConnection
+from scpi_control.signal_synth import SignalSpec
 
-# Replace with your oscilloscope's IP address
-SCOPE_IP = "192.168.1.100"
+
+def _connect(host):
+    """Return a mock connection for --host mock, or None to use a real socket."""
+    if host != "mock":
+        return None
+    return MockConnection(
+        "mock",
+        channel_states={1: True},
+        signals={1: SignalSpec(kind="square", frequency=1000.0, amplitude=1.65, offset=1.65)},
+        sample_rate=20e6,
+        timebase=500e-6,
+    )
 
 
 def main():
-    # Create oscilloscope instance and connect
-    with Oscilloscope(SCOPE_IP) as scope:
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("--host", default="mock", help="Instrument hostname/IP, or 'mock' for the built-in mock scope (default: mock)")
+    args = parser.parse_args()
+
+    scope = Oscilloscope(args.host, connection=_connect(args.host))
+    scope.connect()
+
+    try:
         print(f"Connected to: {scope.device_info['model']}")
 
         # Configure channel 1
@@ -678,6 +767,9 @@ def main():
 
         print("\nDone!")
 
+    finally:
+        scope.disconnect()
+
 
 if __name__ == "__main__":
     main()
@@ -757,11 +849,11 @@ Basic power supply control example.
 ### Requirements
 
 - scpi_control - Core library
-- Oscilloscope connected to network
+- None -- runs on the built-in mock; `--host <ip>` for real hardware
 
 ### Configuration
 
-Update `SCOPE_IP` to match your oscilloscope's IP address (default: `192.168.1.100`).
+None -- runs on the built-in mock with no setup. Pass `--host <ip>` to drive real hardware instead.
 
 ### Usage
 
@@ -774,8 +866,9 @@ python examples/psu_basic_control.py
 ```python
 """Basic power supply control example.
 
-This example demonstrates how to control a SCPI power supply using the Siglent package.
-Works with both Siglent SPD series and generic SCPI-99 compliant power supplies.
+This example demonstrates how to control a SCPI power supply using the
+scpi_control package. Works with both Siglent SPD series and generic
+SCPI-99 compliant power supplies.
 
 Connection Methods:
     - Ethernet/LAN (this example): PowerSupply('192.168.1.200')
@@ -783,128 +876,148 @@ Connection Methods:
 
 For USB support:
     pip install "SCPI-Instrument-Control[usb]"
+
+Requirements: none by default -- runs against the built-in mock PSU (a
+3-output Siglent SPD3303X). Pass --host <ip> to drive a real power supply
+on the network.
+
+Expected output: connection/device info, output 1 setpoints and
+measurements, all echoed to the console. No files are written.
+
+Against --host mock (the default) or with --all-demos, two more demos also
+run: a 3-output walkthrough (CH3 is the SPD3303X's fixed auxiliary rail --
+see the comments in multi_output_demo() for what it does and doesn't
+support) and a context-manager demo. These drive outputs 2 and 3 to fixed
+setpoints, so against a real power supply (--host <ip>) they are opt-in
+only -- pass --all-demos to run them there.
 """
 
+import argparse
+
 from scpi_control import PowerSupply
-
-# Replace with your power supply's IP address
-PSU_IP = "192.168.1.200"
+from scpi_control.connection import MockConnection
 
 
-def main():
-    # Connect to power supply (use your PSU's IP address)
-    psu = PowerSupply(PSU_IP)
+def _connect(host):
+    """Return a mock connection for --host mock, or None to use a real socket."""
+    if host != "mock":
+        return None
+    return MockConnection("mock", psu_mode=True)
+
+
+def basic_output_demo(host):
+    """Connect, configure output 1, measure, and disconnect."""
+    psu = PowerSupply(host, connection=_connect(host))
 
     print("Connecting to power supply...")
     psu.connect()
-
-    # Display device information
-    print(f"\nConnected to: {psu.device_info['manufacturer']} {psu.device_info['model']}")
-    print(f"Firmware: {psu.device_info['firmware']}")
-    print(f"Serial: {psu.device_info['serial']}")
-    print(f"Number of outputs: {psu.model_capability.num_outputs}")
-    print(f"SCPI variant: {psu.model_capability.scpi_variant}")
-
-    # Configure output 1
-    print("\n--- Configuring Output 1 ---")
-    psu.output1.voltage = 5.0
-    psu.output1.current = 1.0
-    print(f"Set voltage: {psu.output1.voltage}V")
-    print(f"Set current limit: {psu.output1.current}A")
-
-    # Enable output
-    print("\nEnabling output 1...")
-    psu.output1.enable()
-    print(f"Output enabled: {psu.output1.enabled}")
-
-    # Read measurements
-    print("\n--- Measurements ---")
-    measured_v = psu.output1.measure_voltage()
-    measured_i = psu.output1.measure_current()
-    measured_p = psu.output1.measure_power()
-
-    print(f"Measured voltage: {measured_v:.3f}V")
-    print(f"Measured current: {measured_i:.3f}A")
-    print(f"Measured power: {measured_p:.3f}W")
-
     try:
-        mode = psu.output1.get_mode()
-        print(f"Operating mode: {mode}")
-    except Exception as e:
-        print(f"Mode query not supported: {e}")
+        # Display device information
+        print(f"\nConnected to: {psu.device_info['manufacturer']} {psu.device_info['model']}")
+        print(f"Firmware: {psu.device_info['firmware']}")
+        print(f"Serial: {psu.device_info['serial']}")
+        print(f"Number of outputs: {psu.model_capability.num_outputs}")
+        print(f"SCPI variant: {psu.model_capability.scpi_variant}")
 
-    # Get full configuration
-    print("\n--- Output 1 Configuration ---")
-    config = psu.output1.get_configuration()
-    for key, value in config.items():
-        print(f"{key}: {value}")
+        # Configure output 1
+        print("\n--- Configuring Output 1 ---")
+        psu.output1.voltage = 5.0
+        psu.output1.current = 1.0
+        print(f"Set voltage: {psu.output1.voltage}V")
+        print(f"Set current limit: {psu.output1.current}A")
 
-    # Disable output (safety)
-    print("\nDisabling output 1...")
-    psu.output1.disable()
-    print(f"Output enabled: {psu.output1.enabled}")
+        # Enable output
+        print("\nEnabling output 1...")
+        psu.output1.enable()
+        print(f"Output enabled: {psu.output1.enabled}")
 
-    # Disconnect
-    psu.disconnect()
-    print("\nDisconnected from power supply")
+        # Read measurements
+        print("\n--- Measurements ---")
+        measured_v = psu.output1.measure_voltage()
+        measured_i = psu.output1.measure_current()
+        measured_p = psu.output1.measure_power()
+
+        print(f"Measured voltage: {measured_v:.3f}V")
+        print(f"Measured current: {measured_i:.3f}A")
+        print(f"Measured power: {measured_p:.3f}W")
+
+        # get_mode() is not supported on every model (e.g. plain SCPI-99
+        # supplies); a narrow catch here for a genuinely optional query, not
+        # a safety net for unexpected failures.
+        try:
+            mode = psu.output1.get_mode()
+            print(f"Operating mode: {mode}")
+        except Exception as e:
+            print(f"Mode query not supported: {e}")
+
+        # Get full configuration
+        print("\n--- Output 1 Configuration ---")
+        config = psu.output1.get_configuration()
+        for key, value in config.items():
+            print(f"{key}: {value}")
+
+        # Disable output (safety)
+        print("\nDisabling output 1...")
+        psu.output1.disable()
+        print(f"Output enabled: {psu.output1.enabled}")
+    finally:
+        psu.disconnect()
+        print("\nDisconnected from power supply")
 
 
-def multi_output_example():
+def multi_output_demo(host):
     """Example for multi-output power supplies (e.g., SPD3303X)."""
-
-    psu = PowerSupply(PSU_IP)
+    psu = PowerSupply(host, connection=_connect(host))
     psu.connect()
 
-    if psu.model_capability.num_outputs < 3:
-        print("This example requires a 3-output power supply")
+    try:
+        if psu.model_capability.num_outputs < 3:
+            print("This example requires a 3-output power supply -- skipping")
+            return
+
+        print(f"\nConfiguring {psu.model_capability.num_outputs} outputs...")
+
+        # Configure different voltages on each output
+        psu.output1.voltage = 5.0
+        psu.output1.current = 2.0
+        psu.output1.enable()
+
+        psu.output2.voltage = 12.0
+        psu.output2.current = 1.5
+        psu.output2.enable()
+
+        # CH3 is the fixed auxiliary rail. Its voltage is selected by the DIP
+        # switch on the front panel (2.5V / 3.3V / 5V -- QS0503X-E01B p.21), and
+        # the SPD3303X command set has no way to set or measure it: VOLTage and
+        # CURRent are [{CH1|CH2}:] only (p.39) and MEASure is [{CH1|CH2}] (p.38).
+        # Setting output3.voltage now raises FeatureNotSupportedError rather than
+        # sending a command the firmware discards. Switching it on IS documented
+        # (OUTPut {CH1|CH2|CH3},{ON|OFF}, p.40):
+        psu.output3.enable()
+
+        # Read all measurements. CH3 has no MEASure form (QS0503X-E01B p.38), so
+        # skip it rather than let measure_voltage() raise FeatureNotSupportedError.
+        for output_num in [1, 2, 3]:
+            spec = psu.model_capability.output_specs[output_num - 1]
+            if not spec.measurable:
+                print(f"Output {output_num}: measurement not supported (fixed rail)")
+                continue
+            output = getattr(psu, f"output{output_num}")
+            v = output.measure_voltage()
+            i = output.measure_current()
+            p = output.measure_power()
+            print(f"Output {output_num}: {v:.2f}V, {i:.3f}A, {p:.2f}W")
+
+        # Safety: Turn off all outputs
+        print("\nTurning off all outputs (safety)...")
+        psu.all_outputs_off()
+    finally:
         psu.disconnect()
-        return
-
-    print(f"Configuring {psu.model_capability.num_outputs} outputs...")
-
-    # Configure different voltages on each output
-    psu.output1.voltage = 5.0
-    psu.output1.current = 2.0
-    psu.output1.enable()
-
-    psu.output2.voltage = 12.0
-    psu.output2.current = 1.5
-    psu.output2.enable()
-
-    # CH3 is the fixed auxiliary rail. Its voltage is selected by the DIP
-    # switch on the front panel (2.5V / 3.3V / 5V -- QS0503X-E01B p.21), and
-    # the SPD3303X command set has no way to set or measure it: VOLTage and
-    # CURRent are [{CH1|CH2}:] only (p.39) and MEASure is [{CH1|CH2}] (p.38).
-    # Setting output3.voltage now raises FeatureNotSupportedError rather than
-    # sending a command the firmware discards. Switching it on IS documented
-    # (OUTPut {CH1|CH2|CH3},{ON|OFF}, p.40):
-    psu.output3.enable()
-
-    # Read all measurements. CH3 has no MEASure form (QS0503X-E01B p.38), so
-    # skip it rather than let measure_voltage() raise FeatureNotSupportedError.
-    for output_num in [1, 2, 3]:
-        spec = psu.model_capability.output_specs[output_num - 1]
-        if not spec.measurable:
-            print(f"Output {output_num}: measurement not supported (fixed rail)")
-            continue
-        output = getattr(psu, f"output{output_num}")
-        v = output.measure_voltage()
-        i = output.measure_current()
-        p = output.measure_power()
-        print(f"Output {output_num}: {v:.2f}V, {i:.3f}A, {p:.2f}W")
-
-    # Safety: Turn off all outputs
-    print("\nTurning off all outputs (safety)...")
-    psu.all_outputs_off()
-
-    psu.disconnect()
 
 
-def context_manager_example():
-    """Example using context manager for automatic connection management."""
-
-    # Using 'with' ensures proper connection/disconnection
-    with PowerSupply(PSU_IP) as psu:
+def context_manager_demo(host):
+    """Example using a context manager for automatic connection management."""
+    with PowerSupply(host, connection=_connect(host)) as psu:
         print(f"Connected to {psu.model_capability.model_name}")
 
         psu.output1.voltage = 3.3
@@ -920,23 +1033,128 @@ def context_manager_example():
     print("Automatically disconnected")
 
 
-if __name__ == "__main__":
+def main():
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("--host", default="mock", help="Power supply hostname/IP, or 'mock' for the built-in mock PSU (default: mock)")
+    parser.add_argument(
+        "--all-demos",
+        action="store_true",
+        help="Also run the multi-output and context-manager demos against a real --host. "
+        "These drive output 2 to 12V/1.5A and enable output 3 -- opt in deliberately. "
+        "Always on against --host mock.",
+    )
+    args = parser.parse_args()
+
     print("=" * 60)
     print("Power Supply Control Example")
     print("=" * 60)
+    basic_output_demo(args.host)
 
-    # Run basic example
+    # Driving outputs 2/3 is opt-in on real hardware: the original gated
+    # this behind manual uncommenting.
+    if args.host == "mock" or args.all_demos:
+        print("\n" + "=" * 60)
+        print("Multi-Output Example")
+        print("=" * 60)
+        multi_output_demo(args.host)
+
+        print("\n" + "=" * 60)
+        print("Context Manager Example")
+        print("=" * 60)
+        context_manager_demo(args.host)
+    else:
+        print("\nSkipping multi-output and context-manager demos (they drive outputs 2/3). " "Pass --all-demos to run them against real hardware.")
+
+
+if __name__ == "__main__":
     main()
+```
 
-    print("\n" + "=" * 60)
-    print("For multi-output example, uncomment the following line:")
-    print("=" * 60)
-    # multi_output_example()
+---
 
-    print("\n" + "=" * 60)
-    print("Context Manager Example")
-    print("=" * 60)
-    # context_manager_example()
+## Pulling a screenshot off the instrument's display
+
+Pulling a screenshot off the instrument's display.
+
+### Requirements
+
+- scpi_control - Core library
+- None -- runs on the built-in mock; `--host <ip>` for real hardware
+
+### Configuration
+
+None -- runs on the built-in mock with no setup. Pass `--host <ip>` to drive real hardware instead.
+
+### Usage
+
+```bash
+python examples/screen_capture_example.py
+```
+
+### Source Code
+
+```python
+"""Pulling a screenshot off the instrument's display.
+
+Requirements: none by default -- runs against the built-in mock scope. Pass
+--host <ip> to drive a real oscilloscope on the network.
+
+Note: the mock answers SCDP? with a minimal but valid 1x1-pixel BMP (58
+bytes), not the instrument's actual framebuffer, so a mock run demonstrates
+the transfer and the file write, not a picture worth looking at. It decodes
+as a real (if tiny) image -- it is not a fake/placeholder byte string.
+Against real hardware the same call returns the scope's actual screen
+contents.
+
+Expected output: the byte count printed to the console and 'screenshot.bmp'
+written to the current directory. The scope returns BMP, not PNG -- use
+ScreenCapture.get_screenshot_pil() (requires Pillow) if you want PNG.
+"""
+
+import argparse
+import sys
+
+from scpi_control import Oscilloscope
+from scpi_control.connection import MockConnection
+from scpi_control.screen_capture import ScreenCapture
+from scpi_control.signal_synth import SignalSpec
+
+
+def _connect(host):
+    if host != "mock":
+        return None
+    return MockConnection(
+        "mock",
+        channel_states={1: True},
+        signals={1: SignalSpec(kind="sine", frequency=1000.0, amplitude=1.0)},
+        sample_rate=1e6,
+        timebase=1e-3,
+    )
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Capture the instrument's screen")
+    parser.add_argument("--host", default="mock", help="Instrument hostname/IP, or 'mock' (default: mock)")
+    parser.add_argument("--output", default="screenshot.bmp", help="Where to write the BMP screenshot (default: screenshot.bmp)")
+    args = parser.parse_args()
+
+    scope = Oscilloscope(args.host, connection=_connect(args.host))
+    scope.connect()
+    try:
+        camera = ScreenCapture(scope)
+        data = camera.capture_screenshot()
+        if not data:
+            print("No screenshot returned by the instrument.", file=sys.stderr)
+            raise SystemExit(1)
+        with open(args.output, "wb") as handle:
+            handle.write(data)
+        print(f"Wrote {len(data)} bytes to {args.output}")
+    finally:
+        scope.disconnect()
+
+
+if __name__ == "__main__":
+    main()
 ```
 
 ---
@@ -948,11 +1166,11 @@ Simple single capture example.
 ### Requirements
 
 - scpi_control - Core library
-- Oscilloscope connected to network
+- None -- runs on the built-in mock; `--host <ip>` for real hardware
 
 ### Configuration
 
-Update `SCOPE_IP` to match your oscilloscope's IP address (default: `192.168.1.100`).
+None -- runs on the built-in mock with no setup. Pass `--host <ip>` to drive real hardware instead.
 
 ### Usage
 
@@ -968,23 +1186,41 @@ python examples/simple_capture.py
 This example shows how to capture a single waveform from one or more channels
 and save it to a file.
 
-Requirements: an oscilloscope reachable on the network -- edit SCOPE_IP below
-to match its LAN address.
+Requirements: none by default -- runs against the built-in mock scope. Pass
+--host <ip> to drive a real oscilloscope on the network.
 
 Expected output: per-channel capture stats and basic analysis (Vpp, mean,
 RMS, frequency) printed to the console, and 'simple_capture.npz' saved to
 the current directory.
 """
 
-from scpi_control.automation import DataCollector
+import argparse
 
-# Replace with your oscilloscope's IP address
-SCOPE_IP = "192.168.1.100"
+from scpi_control.automation import DataCollector
+from scpi_control.connection import MockConnection
+from scpi_control.signal_synth import SignalSpec
+
+
+def _connect(host):
+    """Return a mock connection for --host mock, or None to use a real socket."""
+    if host != "mock":
+        return None
+    return MockConnection(
+        "mock",
+        channel_states={1: True},
+        signals={1: SignalSpec(kind="square", frequency=1000.0, amplitude=1.65, offset=1.65)},
+        sample_rate=20e6,
+        timebase=500e-6,
+    )
 
 
 def main():
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("--host", default="mock", help="Instrument hostname/IP, or 'mock' for the built-in mock scope (default: mock)")
+    args = parser.parse_args()
+
     # Create data collector and connect
-    collector = DataCollector(SCOPE_IP)
+    collector = DataCollector(args.host, connection=_connect(args.host))
     collector.connect()
 
     try:
@@ -1032,11 +1268,11 @@ Waveform capture example for Siglent oscilloscope.
 ### Requirements
 
 - matplotlib - For plotting
-- Oscilloscope connected to network
+- None -- runs on the built-in mock; `--host <ip>` for real hardware
 
 ### Configuration
 
-Update `SCOPE_IP` to match your oscilloscope's IP address (default: `192.168.1.100`).
+None -- runs on the built-in mock with no setup. Pass `--host <ip>` to drive real hardware instead.
 
 ### Usage
 
@@ -1052,28 +1288,46 @@ python examples/waveform_capture.py
 This script demonstrates how to capture waveform data from
 the oscilloscope and save it to a file.
 
-Requirements: an oscilloscope reachable on the network -- edit SCOPE_IP below
-to match its LAN address. matplotlib is a core dependency, no extra install
-needed.
+Requirements: none by default -- runs against the built-in mock scope. Pass
+--host <ip> to drive a real oscilloscope on the network. matplotlib is a
+core dependency, no extra install needed.
 
 Expected output: captures Channel 1, saves 'waveform.csv' and 'waveform.png'
-to the current directory, and opens a plot window.
+to the current directory, and opens a plot window (a no-op under a
+non-interactive matplotlib backend, e.g. in tests).
 """
+
+import argparse
 
 import matplotlib.pyplot as plt
 
 from scpi_control import Oscilloscope
+from scpi_control.connection import MockConnection
+from scpi_control.signal_synth import SignalSpec
 
-# Replace with your oscilloscope's IP address
-SCOPE_IP = "192.168.1.100"
+
+def _connect(host):
+    """Return a mock connection for --host mock, or None to use a real socket."""
+    if host != "mock":
+        return None
+    return MockConnection(
+        "mock",
+        channel_states={1: True},
+        signals={1: SignalSpec(kind="square", frequency=1000.0, amplitude=1.65, offset=1.65)},
+        sample_rate=20e6,
+        timebase=500e-6,
+    )
 
 
 def main():
-    # Create oscilloscope instance and connect
-    scope = Oscilloscope(SCOPE_IP)
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("--host", default="mock", help="Instrument hostname/IP, or 'mock' for the built-in mock scope (default: mock)")
+    args = parser.parse_args()
+
+    scope = Oscilloscope(args.host, connection=_connect(args.host))
 
     try:
-        print(f"Connecting to oscilloscope at {SCOPE_IP}...")
+        print(f"Connecting to oscilloscope at {args.host}...")
         scope.connect()
         print(f"Connected to: {scope.device_info['model']}")
 
@@ -1116,12 +1370,6 @@ def main():
 
         # Show plot
         plt.show()
-
-    except Exception as e:
-        print(f"\nError: {e}")
-        import traceback
-
-        traceback.print_exc()
 
     finally:
         print("\nDisconnecting...")

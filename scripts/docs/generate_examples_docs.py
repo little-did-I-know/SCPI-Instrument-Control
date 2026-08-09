@@ -38,6 +38,8 @@ class ExampleMetadata:
     category: str
     requirements: List[str]
     no_hardware: bool
+    mock_by_default: bool
+    ci_exception_reason: Optional[str]
 
 
 # Phrases examples actually use in their docstrings to say they need no real
@@ -50,9 +52,64 @@ NO_HARDWARE_PATTERN = re.compile(
     re.IGNORECASE,
 )
 
+# The mock-first examples refresh (2026-08) gave every network-facing example
+# a `--host` flag defaulting to "mock": no hardware is required to run them,
+# but a real instrument remains one flag away. Their docstrings all share the
+# phrasing "Requirements: none by default -- runs against the built-in mock
+# ...". This is a *third* state distinct from NO_HARDWARE_PATTERN's "no real
+# instrument path exists at all" (e.g. synthetic_signals.py) -- these examples
+# DO have a real-hardware path, it's just not the default.
+MOCK_BY_DEFAULT_PATTERN = re.compile(
+    r"none by default\s*--\s*runs against (?:the|a) built-in mock",
+    re.IGNORECASE,
+)
+
+# Three examples (psu_usb_connection.py, psu_gui_test.py, gateway_rest_client.py)
+# are permanently excluded from the execution guard in tests/test_examples_smoke.py
+# -- each for its own reason, not a shared "needs hardware" cause. Task 7 added
+# this exact phrase, verbatim, to each of their docstrings specifically to make
+# that gap visible rather than silent.
+#
+# This is a DELIBERATE MARKER, not a heuristic, and it must take precedence over
+# NO_HARDWARE_PATTERN/MOCK_BY_DEFAULT_PATTERN rather than being reconciled with
+# them: those two patterns match on words like "mock connection" or "hardware"
+# appearing ANYWHERE in the docstring, with no notion of negation. A CI-exception
+# docstring talks *about* mocks and hardware precisely because it's explaining why
+# the mock can't stand in here -- e.g. psu_usb_connection.py's "...the mock
+# connection cannot stand in for..." contains the bare substring "mock connection"
+# and previously matched NO_HARDWARE_PATTERN, rendering as "No hardware required":
+# the exact opposite of what the docstring says. Matching this literal marker
+# first, and short-circuiting the other two patterns when it's present, avoids
+# that inversion without trying to teach a regex to understand negation.
+NOT_EXECUTED_IN_CI_PATTERN = re.compile(r"Not executed in CI:\s*(?P<reason>.+)", re.IGNORECASE | re.DOTALL)
+
+
+def extract_ci_exception_reason(docstring: str) -> Optional[str]:
+    """Extract the reason text following the literal 'Not executed in CI:' marker.
+
+    Args:
+        docstring: Module docstring.
+
+    Returns:
+        The reason paragraph (marker stripped, whitespace collapsed to single
+        spaces) if the marker is present, else None.
+    """
+    match = NOT_EXECUTED_IN_CI_PATTERN.search(docstring)
+    if not match:
+        return None
+    # Stop at the first blank line after the marker (end of that paragraph);
+    # collapse the docstring's wrapped-line indentation into single spaces.
+    paragraph = match.group("reason").split("\n\n")[0]
+    return re.sub(r"\s+", " ", paragraph).strip()
+
 
 def is_no_hardware_example(docstring: str) -> bool:
     """Detect whether an example's docstring declares it needs no real hardware.
+
+    The CI-exception marker takes precedence: an example excluded from CI is
+    never classified as no-hardware here, even if its docstring separately
+    contains a phrase like "mock connection" while explaining why the mock
+    can't substitute for what the example demonstrates.
 
     Args:
         docstring: Module docstring.
@@ -60,7 +117,26 @@ def is_no_hardware_example(docstring: str) -> bool:
     Returns:
         True if the docstring indicates the example runs without hardware.
     """
+    if extract_ci_exception_reason(docstring) is not None:
+        return False
     return bool(NO_HARDWARE_PATTERN.search(docstring))
+
+
+def is_mock_by_default_example(docstring: str) -> bool:
+    """Detect whether an example defaults to a mock but also supports real hardware.
+
+    The CI-exception marker takes precedence; see is_no_hardware_example().
+
+    Args:
+        docstring: Module docstring.
+
+    Returns:
+        True if the docstring uses the mock-first-examples-refresh phrasing
+        ("Requirements: none by default -- runs against the built-in mock ...").
+    """
+    if extract_ci_exception_reason(docstring) is not None:
+        return False
+    return bool(MOCK_BY_DEFAULT_PATTERN.search(docstring))
 
 
 def load_config(config_path: Path = None) -> dict:
@@ -122,12 +198,15 @@ def extract_scope_ip(filepath: Path) -> str:
     return "192.168.1.100"
 
 
-def extract_requirements(filepath: Path, docstring: str) -> List[str]:
+def extract_requirements(filepath: Path, docstring: str, ci_exception_reason: Optional[str] = None) -> List[str]:
     """Extract requirements from docstring or imports.
 
     Args:
         filepath: Path to Python file.
         docstring: Module docstring.
+        ci_exception_reason: Result of extract_ci_exception_reason(docstring),
+            if already computed by the caller (avoids re-parsing it here). When
+            set, it takes precedence over every hardware heuristic below.
 
     Returns:
         List of requirements.
@@ -154,7 +233,11 @@ def extract_requirements(filepath: Path, docstring: str) -> List[str]:
     if not requirements:
         requirements = ["scpi_control - Core library"]
 
-    if is_no_hardware_example(docstring):
+    if ci_exception_reason:
+        requirements.append(f"Not executed in CI -- {ci_exception_reason}")
+    elif is_mock_by_default_example(docstring):
+        requirements.append("None -- runs on the built-in mock; `--host <ip>` for real hardware")
+    elif is_no_hardware_example(docstring):
         requirements.append("No hardware required")
     else:
         requirements.append("Oscilloscope connected to network")
@@ -239,7 +322,8 @@ def parse_example_file(filepath: Path, config: dict) -> ExampleMetadata:
     filename = filepath.name
     docstring = extract_module_docstring(filepath)
     scope_ip = extract_scope_ip(filepath)
-    requirements = extract_requirements(filepath, docstring)
+    ci_exception_reason = extract_ci_exception_reason(docstring)
+    requirements = extract_requirements(filepath, docstring, ci_exception_reason)
     category = categorize_example(filename, config)
     title = get_example_title(filename, docstring)
 
@@ -258,6 +342,8 @@ def parse_example_file(filepath: Path, config: dict) -> ExampleMetadata:
         category=category,
         requirements=requirements,
         no_hardware=is_no_hardware_example(docstring),
+        mock_by_default=is_mock_by_default_example(docstring),
+        ci_exception_reason=ci_exception_reason,
     )
 
 
@@ -292,7 +378,11 @@ def generate_example_section(example: ExampleMetadata) -> str:
     # Configuration
     lines.append("### Configuration")
     lines.append("")
-    if example.no_hardware:
+    if example.ci_exception_reason:
+        lines.append(f"Not executed in CI: {example.ci_exception_reason}")
+    elif example.mock_by_default:
+        lines.append("None -- runs on the built-in mock with no setup. Pass `--host <ip>` to drive real hardware instead.")
+    elif example.no_hardware:
         lines.append("No hardware required.")
     else:
         lines.append(f"Update `SCOPE_IP` to match your oscilloscope's IP address (default: `{example.scope_ip}`).")

@@ -5,9 +5,13 @@ blocks their reintroduction), (2) every .py example at least compiles, (3) the
 notebook is valid JSON. Task 2 adds a fourth guard: executing the no-hardware
 examples as subprocesses.
 
-Limitation: hardware-bound examples (e.g. simple_capture.py, advanced_analysis.py)
-cannot be executed headless, so their fixes are covered by the token scan and the
-compile check, not by running them.
+Limitation: examples not listed in EXECUTE are covered by the token scan and the
+compile check, not by running them. Three files are permanent exceptions, each for
+its own reason rather than one shared "hardware-bound" cause: psu_usb_connection.py
+(its subject is the USB/VISA transport itself, which the mock cannot stand in for),
+psu_gui_test.py (launches a Qt GUI, needs PyQt6 plus a display), and
+gateway_rest_client.py (needs a running scpi-web gateway, not merely an instrument).
+Every other example under examples/ is in EXECUTE.
 
 The execution guard is the expensive one -- each example is a real subprocess, and
 report_ai_qa.py additionally does live inference wherever a local Ollama is running.
@@ -52,6 +56,12 @@ FORBIDDEN = ["Siglent-Oscilloscope", ".time_interval", '="SDS1104X-E"']
 # a pre-existing O(n^2) autocorrelation in scpi_control/report_generator/utils/
 # waveform_analyzer.py makes very large captures slow; this library issue is out of scope.
 EXECUTE = [
+    ("basic_usage.py", None),
+    ("simple_capture.py", None),
+    ("waveform_capture.py", None),
+    ("batch_capture.py", None),
+    ("continuous_capture.py", None),
+    ("trigger_based_capture.py", None),
     ("dialect_override_example.py", None),
     ("trend_logging_walkthrough.py", None),
     ("psu_advanced_features.py", None),
@@ -67,6 +77,18 @@ EXECUTE = [
     ("frequency_response_sweep.py", None),
     ("comparison_report.py", None),
     ("batch_report.py", None),
+    ("measurements.py", None),
+    ("advanced_analysis.py", None),
+    ("live_plot.py", None),
+    ("function_generator_basic.py", None),
+    ("psu_basic_control.py", None),
+    ("data_logger_basic.py", None),
+    ("vector_graphics_xy_mode.py", None),
+    ("math_channels.py", None),
+    ("reference_waveforms.py", None),
+    ("screen_capture_example.py", None),
+    ("measurement_badges_example.py", None),
+    ("protocol_decoding.py", None),
 ]
 
 _TIMEOUTS = {"report_ai_qa.py": 240}
@@ -141,3 +163,42 @@ def test_no_hardware_example_runs(filename, module, tmp_path):
         timeout=_TIMEOUTS.get(filename, _DEFAULT_TIMEOUT),
     )
     assert result.returncode == 0, f"{filename} exited {result.returncode}\n--- stderr ---\n{result.stderr[-3000:]}"
+
+    # These two entries' real work is invisible to a returncode check: each can
+    # fail completely and still exit 0 (lazy matplotlib animation; silently
+    # disengaged badge pooling). Assert on what they print.
+    if filename == "live_plot.py":
+        assert "frame 20 rendered" in result.stdout, "live_plot ran but rendered no frames"
+        # "frame 20 rendered" alone would still print if every one of the 20
+        # acquisitions raised -- update() swallows per-channel errors and
+        # unconditionally prints the "rendered" line regardless. Guard against
+        # a systematic mock failure hiding behind that unconditional print.
+        assert "Error acquiring" not in result.stdout, "live_plot rendered frames but every acquisition failed"
+    if filename == "measurement_badges_example.py":
+        assert "ADDNew" in result.stdout, "badge pooling did not engage"
+        assert "Badges allocated: []" not in result.stdout, "badge pooling did not engage"
+
+
+@pytest.mark.slow
+def test_a_converted_example_fails_loudly_on_an_unreachable_host(tmp_path):
+    """An example that cannot reach its instrument must exit non-zero.
+
+    A blanket `except Exception: print(...)` around main() makes an example exit 0
+    even when nothing worked, which turns the EXECUTE guard above into a false pass:
+    it would prove only that the script ran. This was real -- the pre-conversion
+    basic_usage.py, pointed at a nonexistent 192.168.1.100, exited 0.
+
+    192.0.2.1 is TEST-NET-1 (RFC 5737), guaranteed unroutable, so this cannot
+    accidentally reach a real instrument on someone's bench.
+    """
+    env = {**os.environ, "MPLBACKEND": "Agg", "PYTHONIOENCODING": "utf-8"}
+    result = subprocess.run(
+        [sys.executable, str(EXAMPLES_DIR / "basic_usage.py"), "--host", "192.0.2.1"],
+        cwd=tmp_path,
+        env=env,
+        input="",
+        capture_output=True,
+        text=True,
+        timeout=_DEFAULT_TIMEOUT,
+    )
+    assert result.returncode != 0, "example exited 0 despite being unable to reach the instrument"
