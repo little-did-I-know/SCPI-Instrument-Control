@@ -77,6 +77,7 @@ EXECUTE = [
     ("batch_report.py", None),
     ("measurements.py", None),
     ("advanced_analysis.py", None),
+    ("live_plot.py", None),
 ]
 
 _TIMEOUTS = {"report_ai_qa.py": 240}
