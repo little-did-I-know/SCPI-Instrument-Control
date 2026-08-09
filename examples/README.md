@@ -26,6 +26,7 @@ pip install "SCPI-Instrument-Control"
 | `basic_usage.py` | Connecting to an oscilloscope, configuring channels and trigger, and performing basic operations. | None — runs on the built-in mock; `--host <ip>` for real hardware |
 | `waveform_capture.py` | Capturing waveform data from the oscilloscope and saving it to a file. | None — runs on the built-in mock; `--host <ip>` for real hardware (matplotlib is a core dependency) |
 | `measurements.py` | Automated measurements (frequency, Vpp, RMS, period, etc.) on oscilloscope channels. | None — runs on the built-in mock; `--host <ip>` for real hardware |
+| `math_channels.py` | Waveform math: adding and subtracting two captured channels with `MathOperations`, computed in Python on captured samples rather than an instrument MATH channel. | None — runs on the built-in mock; `--host <ip>` for real hardware |
 | `live_plot.py` | Real-time waveform acquisition and plotting using matplotlib animation, bounded to `--frames` updates. | None — runs on the built-in mock; `--host <ip>` for real hardware (matplotlib is a core dependency) |
 | `simple_capture.py` | Single waveform capture with analysis via the automation API (Vpp, RMS, frequency) and saving to NumPy format. | None — runs on the built-in mock; `--host <ip>` for real hardware |
 | `batch_capture.py` | Capturing multiple waveforms with different timebase and voltage-scale settings, for characterizing signals at different scales. | None — runs on the built-in mock; `--host <ip>` for real hardware |
