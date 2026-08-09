@@ -2,338 +2,338 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
          <loc>https://little-did-I-know.github.io/SCPI-Instrument-Control/</loc>
-         <lastmod>2026-08-07</lastmod>
+         <lastmod>2026-08-09</lastmod>
     </url>
     <url>
          <loc>https://little-did-I-know.github.io/SCPI-Instrument-Control/about/changelog/</loc>
-         <lastmod>2026-08-07</lastmod>
+         <lastmod>2026-08-09</lastmod>
     </url>
     <url>
          <loc>https://little-did-I-know.github.io/SCPI-Instrument-Control/about/license/</loc>
-         <lastmod>2026-08-07</lastmod>
+         <lastmod>2026-08-09</lastmod>
     </url>
     <url>
          <loc>https://little-did-I-know.github.io/SCPI-Instrument-Control/about/security/</loc>
-         <lastmod>2026-08-07</lastmod>
+         <lastmod>2026-08-09</lastmod>
     </url>
     <url>
          <loc>https://little-did-I-know.github.io/SCPI-Instrument-Control/api/analysis/</loc>
-         <lastmod>2026-08-07</lastmod>
+         <lastmod>2026-08-09</lastmod>
     </url>
     <url>
          <loc>https://little-did-I-know.github.io/SCPI-Instrument-Control/api/automation/</loc>
-         <lastmod>2026-08-07</lastmod>
+         <lastmod>2026-08-09</lastmod>
     </url>
     <url>
          <loc>https://little-did-I-know.github.io/SCPI-Instrument-Control/api/awg_output/</loc>
-         <lastmod>2026-08-07</lastmod>
+         <lastmod>2026-08-09</lastmod>
     </url>
     <url>
          <loc>https://little-did-I-know.github.io/SCPI-Instrument-Control/api/capabilities/</loc>
-         <lastmod>2026-08-07</lastmod>
+         <lastmod>2026-08-09</lastmod>
     </url>
     <url>
          <loc>https://little-did-I-know.github.io/SCPI-Instrument-Control/api/channel/</loc>
-         <lastmod>2026-08-07</lastmod>
+         <lastmod>2026-08-09</lastmod>
     </url>
     <url>
          <loc>https://little-did-I-know.github.io/SCPI-Instrument-Control/api/comparison/</loc>
-         <lastmod>2026-08-07</lastmod>
+         <lastmod>2026-08-09</lastmod>
     </url>
     <url>
          <loc>https://little-did-I-know.github.io/SCPI-Instrument-Control/api/connection_socket/</loc>
-         <lastmod>2026-08-07</lastmod>
+         <lastmod>2026-08-09</lastmod>
     </url>
     <url>
          <loc>https://little-did-I-know.github.io/SCPI-Instrument-Control/api/data_logger/</loc>
-         <lastmod>2026-08-07</lastmod>
+         <lastmod>2026-08-09</lastmod>
     </url>
     <url>
          <loc>https://little-did-I-know.github.io/SCPI-Instrument-Control/api/exceptions/</loc>
-         <lastmod>2026-08-07</lastmod>
+         <lastmod>2026-08-09</lastmod>
     </url>
     <url>
          <loc>https://little-did-I-know.github.io/SCPI-Instrument-Control/api/function_generator/</loc>
-         <lastmod>2026-08-07</lastmod>
+         <lastmod>2026-08-09</lastmod>
     </url>
     <url>
          <loc>https://little-did-I-know.github.io/SCPI-Instrument-Control/api/gui/</loc>
-         <lastmod>2026-08-07</lastmod>
+         <lastmod>2026-08-09</lastmod>
     </url>
     <url>
          <loc>https://little-did-I-know.github.io/SCPI-Instrument-Control/api/math_channel/</loc>
-         <lastmod>2026-08-07</lastmod>
+         <lastmod>2026-08-09</lastmod>
     </url>
     <url>
          <loc>https://little-did-I-know.github.io/SCPI-Instrument-Control/api/measurement/</loc>
-         <lastmod>2026-08-07</lastmod>
+         <lastmod>2026-08-09</lastmod>
     </url>
     <url>
          <loc>https://little-did-I-know.github.io/SCPI-Instrument-Control/api/models/</loc>
-         <lastmod>2026-08-07</lastmod>
+         <lastmod>2026-08-09</lastmod>
     </url>
     <url>
          <loc>https://little-did-I-know.github.io/SCPI-Instrument-Control/api/oscilloscope/</loc>
-         <lastmod>2026-08-07</lastmod>
+         <lastmod>2026-08-09</lastmod>
     </url>
     <url>
          <loc>https://little-did-I-know.github.io/SCPI-Instrument-Control/api/power_supply/</loc>
-         <lastmod>2026-08-07</lastmod>
+         <lastmod>2026-08-09</lastmod>
     </url>
     <url>
          <loc>https://little-did-I-know.github.io/SCPI-Instrument-Control/api/power_supply_output/</loc>
-         <lastmod>2026-08-07</lastmod>
+         <lastmod>2026-08-09</lastmod>
     </url>
     <url>
          <loc>https://little-did-I-know.github.io/SCPI-Instrument-Control/api/protocol_decode/</loc>
-         <lastmod>2026-08-07</lastmod>
+         <lastmod>2026-08-09</lastmod>
     </url>
     <url>
          <loc>https://little-did-I-know.github.io/SCPI-Instrument-Control/api/provenance/</loc>
-         <lastmod>2026-08-07</lastmod>
+         <lastmod>2026-08-09</lastmod>
     </url>
     <url>
          <loc>https://little-did-I-know.github.io/SCPI-Instrument-Control/api/psu_data_logger/</loc>
-         <lastmod>2026-08-07</lastmod>
+         <lastmod>2026-08-09</lastmod>
     </url>
     <url>
          <loc>https://little-did-I-know.github.io/SCPI-Instrument-Control/api/reference_waveform/</loc>
-         <lastmod>2026-08-07</lastmod>
+         <lastmod>2026-08-09</lastmod>
     </url>
     <url>
          <loc>https://little-did-I-know.github.io/SCPI-Instrument-Control/api/scpi_extract/</loc>
-         <lastmod>2026-08-07</lastmod>
+         <lastmod>2026-08-09</lastmod>
     </url>
     <url>
          <loc>https://little-did-I-know.github.io/SCPI-Instrument-Control/api/screen_capture/</loc>
-         <lastmod>2026-08-07</lastmod>
+         <lastmod>2026-08-09</lastmod>
     </url>
     <url>
          <loc>https://little-did-I-know.github.io/SCPI-Instrument-Control/api/server_compute/</loc>
-         <lastmod>2026-08-07</lastmod>
+         <lastmod>2026-08-09</lastmod>
     </url>
     <url>
          <loc>https://little-did-I-know.github.io/SCPI-Instrument-Control/api/server_discovery/</loc>
-         <lastmod>2026-08-07</lastmod>
+         <lastmod>2026-08-09</lastmod>
     </url>
     <url>
          <loc>https://little-did-I-know.github.io/SCPI-Instrument-Control/api/server_recorder/</loc>
-         <lastmod>2026-08-07</lastmod>
+         <lastmod>2026-08-09</lastmod>
     </url>
     <url>
          <loc>https://little-did-I-know.github.io/SCPI-Instrument-Control/api/server_sessions/</loc>
-         <lastmod>2026-08-07</lastmod>
+         <lastmod>2026-08-09</lastmod>
     </url>
     <url>
          <loc>https://little-did-I-know.github.io/SCPI-Instrument-Control/api/signal_synth/</loc>
-         <lastmod>2026-08-07</lastmod>
+         <lastmod>2026-08-09</lastmod>
     </url>
     <url>
          <loc>https://little-did-I-know.github.io/SCPI-Instrument-Control/api/trigger/</loc>
-         <lastmod>2026-08-07</lastmod>
+         <lastmod>2026-08-09</lastmod>
     </url>
     <url>
          <loc>https://little-did-I-know.github.io/SCPI-Instrument-Control/api/vector_graphics/</loc>
-         <lastmod>2026-08-07</lastmod>
+         <lastmod>2026-08-09</lastmod>
     </url>
     <url>
          <loc>https://little-did-I-know.github.io/SCPI-Instrument-Control/api/vocabulary/</loc>
-         <lastmod>2026-08-07</lastmod>
+         <lastmod>2026-08-09</lastmod>
     </url>
     <url>
          <loc>https://little-did-I-know.github.io/SCPI-Instrument-Control/api/waveform/</loc>
-         <lastmod>2026-08-07</lastmod>
+         <lastmod>2026-08-09</lastmod>
     </url>
     <url>
          <loc>https://little-did-I-know.github.io/SCPI-Instrument-Control/api/waveform_io/</loc>
-         <lastmod>2026-08-07</lastmod>
+         <lastmod>2026-08-09</lastmod>
     </url>
     <url>
          <loc>https://little-did-I-know.github.io/SCPI-Instrument-Control/development/BUILDING_EXECUTABLES/</loc>
-         <lastmod>2026-08-07</lastmod>
+         <lastmod>2026-08-09</lastmod>
     </url>
     <url>
          <loc>https://little-did-I-know.github.io/SCPI-Instrument-Control/development/CODE_SIGNING/</loc>
-         <lastmod>2026-08-07</lastmod>
+         <lastmod>2026-08-09</lastmod>
     </url>
     <url>
          <loc>https://little-did-I-know.github.io/SCPI-Instrument-Control/development/EXPERIMENTAL_FEATURES/</loc>
-         <lastmod>2026-08-07</lastmod>
+         <lastmod>2026-08-09</lastmod>
     </url>
     <url>
          <loc>https://little-did-I-know.github.io/SCPI-Instrument-Control/development/ICON_SETUP/</loc>
-         <lastmod>2026-08-07</lastmod>
+         <lastmod>2026-08-09</lastmod>
     </url>
     <url>
          <loc>https://little-did-I-know.github.io/SCPI-Instrument-Control/development/PRE_COMMIT_CHECKS/</loc>
-         <lastmod>2026-08-07</lastmod>
+         <lastmod>2026-08-09</lastmod>
     </url>
     <url>
          <loc>https://little-did-I-know.github.io/SCPI-Instrument-Control/development/PROJECT_STRUCTURE/</loc>
-         <lastmod>2026-08-07</lastmod>
+         <lastmod>2026-08-09</lastmod>
     </url>
     <url>
          <loc>https://little-did-I-know.github.io/SCPI-Instrument-Control/development/PYPI_DEPLOYMENT/</loc>
-         <lastmod>2026-08-07</lastmod>
+         <lastmod>2026-08-09</lastmod>
     </url>
     <url>
          <loc>https://little-did-I-know.github.io/SCPI-Instrument-Control/development/TESTING_BUILD_WORKFLOW/</loc>
-         <lastmod>2026-08-07</lastmod>
+         <lastmod>2026-08-09</lastmod>
     </url>
     <url>
          <loc>https://little-did-I-know.github.io/SCPI-Instrument-Control/development/VERSION_BUMPING/</loc>
-         <lastmod>2026-08-07</lastmod>
+         <lastmod>2026-08-09</lastmod>
     </url>
     <url>
          <loc>https://little-did-I-know.github.io/SCPI-Instrument-Control/development/building/</loc>
-         <lastmod>2026-08-07</lastmod>
+         <lastmod>2026-08-09</lastmod>
     </url>
     <url>
          <loc>https://little-did-I-know.github.io/SCPI-Instrument-Control/development/contributing/</loc>
-         <lastmod>2026-08-07</lastmod>
+         <lastmod>2026-08-09</lastmod>
     </url>
     <url>
          <loc>https://little-did-I-know.github.io/SCPI-Instrument-Control/development/structure/</loc>
-         <lastmod>2026-08-07</lastmod>
+         <lastmod>2026-08-09</lastmod>
     </url>
     <url>
          <loc>https://little-did-I-know.github.io/SCPI-Instrument-Control/development/testing/</loc>
-         <lastmod>2026-08-07</lastmod>
+         <lastmod>2026-08-09</lastmod>
     </url>
     <url>
          <loc>https://little-did-I-know.github.io/SCPI-Instrument-Control/development/vendor-manuals/</loc>
-         <lastmod>2026-08-07</lastmod>
+         <lastmod>2026-08-09</lastmod>
     </url>
     <url>
          <loc>https://little-did-I-know.github.io/SCPI-Instrument-Control/development/wire-form-inventory/</loc>
-         <lastmod>2026-08-07</lastmod>
+         <lastmod>2026-08-09</lastmod>
     </url>
     <url>
          <loc>https://little-did-I-know.github.io/SCPI-Instrument-Control/examples/advanced/</loc>
-         <lastmod>2026-08-07</lastmod>
+         <lastmod>2026-08-09</lastmod>
     </url>
     <url>
          <loc>https://little-did-I-know.github.io/SCPI-Instrument-Control/examples/beginner/</loc>
-         <lastmod>2026-08-07</lastmod>
+         <lastmod>2026-08-09</lastmod>
     </url>
     <url>
          <loc>https://little-did-I-know.github.io/SCPI-Instrument-Control/examples/intermediate/</loc>
-         <lastmod>2026-08-07</lastmod>
+         <lastmod>2026-08-09</lastmod>
     </url>
     <url>
          <loc>https://little-did-I-know.github.io/SCPI-Instrument-Control/gateway/</loc>
-         <lastmod>2026-08-07</lastmod>
+         <lastmod>2026-08-09</lastmod>
     </url>
     <url>
          <loc>https://little-did-I-know.github.io/SCPI-Instrument-Control/gateway/admin-panel/</loc>
-         <lastmod>2026-08-07</lastmod>
+         <lastmod>2026-08-09</lastmod>
     </url>
     <url>
          <loc>https://little-did-I-know.github.io/SCPI-Instrument-Control/gateway/api/</loc>
-         <lastmod>2026-08-07</lastmod>
+         <lastmod>2026-08-09</lastmod>
     </url>
     <url>
          <loc>https://little-did-I-know.github.io/SCPI-Instrument-Control/gateway/browser-ui/</loc>
-         <lastmod>2026-08-07</lastmod>
+         <lastmod>2026-08-09</lastmod>
     </url>
     <url>
          <loc>https://little-did-I-know.github.io/SCPI-Instrument-Control/gateway/security/</loc>
-         <lastmod>2026-08-07</lastmod>
+         <lastmod>2026-08-09</lastmod>
     </url>
     <url>
          <loc>https://little-did-I-know.github.io/SCPI-Instrument-Control/getting-started/connection/</loc>
-         <lastmod>2026-08-07</lastmod>
+         <lastmod>2026-08-09</lastmod>
     </url>
     <url>
          <loc>https://little-did-I-know.github.io/SCPI-Instrument-Control/getting-started/installation/</loc>
-         <lastmod>2026-08-07</lastmod>
+         <lastmod>2026-08-09</lastmod>
     </url>
     <url>
          <loc>https://little-did-I-know.github.io/SCPI-Instrument-Control/getting-started/quickstart/</loc>
-         <lastmod>2026-08-07</lastmod>
+         <lastmod>2026-08-09</lastmod>
     </url>
     <url>
          <loc>https://little-did-I-know.github.io/SCPI-Instrument-Control/gui/fft-analysis/</loc>
-         <lastmod>2026-08-07</lastmod>
+         <lastmod>2026-08-09</lastmod>
     </url>
     <url>
          <loc>https://little-did-I-know.github.io/SCPI-Instrument-Control/gui/interface/</loc>
-         <lastmod>2026-08-07</lastmod>
+         <lastmod>2026-08-09</lastmod>
     </url>
     <url>
          <loc>https://little-did-I-know.github.io/SCPI-Instrument-Control/gui/live-view/</loc>
-         <lastmod>2026-08-07</lastmod>
+         <lastmod>2026-08-09</lastmod>
     </url>
     <url>
          <loc>https://little-did-I-know.github.io/SCPI-Instrument-Control/gui/overview/</loc>
-         <lastmod>2026-08-07</lastmod>
+         <lastmod>2026-08-09</lastmod>
     </url>
     <url>
          <loc>https://little-did-I-know.github.io/SCPI-Instrument-Control/gui/protocol-decoding/</loc>
-         <lastmod>2026-08-07</lastmod>
+         <lastmod>2026-08-09</lastmod>
     </url>
     <url>
          <loc>https://little-did-I-know.github.io/SCPI-Instrument-Control/gui/vector-graphics/</loc>
-         <lastmod>2026-08-07</lastmod>
+         <lastmod>2026-08-09</lastmod>
     </url>
     <url>
          <loc>https://little-did-I-know.github.io/SCPI-Instrument-Control/gui/visual-measurements/</loc>
-         <lastmod>2026-08-07</lastmod>
+         <lastmod>2026-08-09</lastmod>
     </url>
     <url>
          <loc>https://little-did-I-know.github.io/SCPI-Instrument-Control/report-generator/</loc>
-         <lastmod>2026-08-07</lastmod>
+         <lastmod>2026-08-09</lastmod>
     </url>
     <url>
          <loc>https://little-did-I-know.github.io/SCPI-Instrument-Control/report-generator/api-reference/</loc>
-         <lastmod>2026-08-07</lastmod>
+         <lastmod>2026-08-09</lastmod>
     </url>
     <url>
          <loc>https://little-did-I-know.github.io/SCPI-Instrument-Control/report-generator/getting-started/</loc>
-         <lastmod>2026-08-07</lastmod>
+         <lastmod>2026-08-09</lastmod>
     </url>
     <url>
          <loc>https://little-did-I-know.github.io/SCPI-Instrument-Control/report-generator/llm-setup/</loc>
-         <lastmod>2026-08-07</lastmod>
+         <lastmod>2026-08-09</lastmod>
     </url>
     <url>
          <loc>https://little-did-I-know.github.io/SCPI-Instrument-Control/report-generator/templates/</loc>
-         <lastmod>2026-08-07</lastmod>
+         <lastmod>2026-08-09</lastmod>
     </url>
     <url>
          <loc>https://little-did-I-know.github.io/SCPI-Instrument-Control/user-guide/advanced-features/</loc>
-         <lastmod>2026-08-07</lastmod>
+         <lastmod>2026-08-09</lastmod>
     </url>
     <url>
          <loc>https://little-did-I-know.github.io/SCPI-Instrument-Control/user-guide/basic-usage/</loc>
-         <lastmod>2026-08-07</lastmod>
+         <lastmod>2026-08-09</lastmod>
     </url>
     <url>
          <loc>https://little-did-I-know.github.io/SCPI-Instrument-Control/user-guide/data-provenance/</loc>
-         <lastmod>2026-08-07</lastmod>
+         <lastmod>2026-08-09</lastmod>
     </url>
     <url>
          <loc>https://little-did-I-know.github.io/SCPI-Instrument-Control/user-guide/frequency-response/</loc>
-         <lastmod>2026-08-07</lastmod>
+         <lastmod>2026-08-09</lastmod>
     </url>
     <url>
          <loc>https://little-did-I-know.github.io/SCPI-Instrument-Control/user-guide/measurements/</loc>
-         <lastmod>2026-08-07</lastmod>
+         <lastmod>2026-08-09</lastmod>
     </url>
     <url>
          <loc>https://little-did-I-know.github.io/SCPI-Instrument-Control/user-guide/scpi-dialects/</loc>
-         <lastmod>2026-08-07</lastmod>
+         <lastmod>2026-08-09</lastmod>
     </url>
     <url>
          <loc>https://little-did-I-know.github.io/SCPI-Instrument-Control/user-guide/synthetic-signals/</loc>
-         <lastmod>2026-08-07</lastmod>
+         <lastmod>2026-08-09</lastmod>
     </url>
     <url>
          <loc>https://little-did-I-know.github.io/SCPI-Instrument-Control/user-guide/trigger-control/</loc>
-         <lastmod>2026-08-07</lastmod>
+         <lastmod>2026-08-09</lastmod>
     </url>
     <url>
          <loc>https://little-did-I-know.github.io/SCPI-Instrument-Control/user-guide/waveform-capture/</loc>
-         <lastmod>2026-08-07</lastmod>
+         <lastmod>2026-08-09</lastmod>
     </url>
 </urlset>
