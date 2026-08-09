@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Report generation: `MarkdownReportGenerator.generate()` and `PDFReportGenerator.generate()` caught `Exception` around their whole write path, so a programming error (e.g. an `AttributeError` from a report model change) was indistinguishable from an environmental failure (permission denied, disk full, a bad output path) -- both just returned `False`, and the real bug was visible only as a log line. They now catch only `OSError`; every other exception propagates. This is not a signature change -- `generate()` still returns `bool` and no caller needs updating -- but a caller that previously saw `False` for a latent bug will now see the exception instead.
 - Oscilloscope (legacy Siglent dialect): `channel.unit` no longer returns the raw echoed response. Real hardware answers `C1:UNIT?` with the header still attached (`C1:UNIT V`, RC01020-E01C p.137); previously that header was returned verbatim, so `scope.channel1.unit` came back as `"C1:UNIT V"` instead of `"V"`. Code that worked around the old value should drop the workaround. The mock's `C1:UNIT?` answer was updated to match the same header-echoed form.
 - CI: the Codecov upload step passed `file:`, an input `codecov/codecov-action` dropped at v4. It was silently ignored — the run logged `Unexpected input(s) 'file'`, stayed green, and uploaded only because the CLI falls back to searching the tree for a report. Now `files:`, so the explicit path is honoured.
 
