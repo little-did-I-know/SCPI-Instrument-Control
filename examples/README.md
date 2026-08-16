@@ -91,6 +91,7 @@ pip install "SCPI-Instrument-Control"
 | `comparison_report.py` | Before/after comparison report: two synthetic captures run through `RunSet` → `ComparisonAnalyzer` → `build_comparison_report()`, with a `CriteriaSet` flagging an amplitude regression, an overlay plot, a Delta/Delta% table, a SHA-256 raw-data manifest, and a sign-off block. | `SCPI-Instrument-Control[report-generator]` (no hardware - fully synthetic) |
 | `batch_report.py` | Batch report across five synthesized DUTs, one a deliberate outlier: `MODE_BATCH` comparison with per-DUT pass/fail, cross-run aggregate statistics, and a yield figure in the executive summary. | `SCPI-Instrument-Control[report-generator]` (no hardware - fully synthetic) |
 | `report_ai_qa.py` | Interactive Q&A over a report with a local LLM using tool-calling: the model calls the report's analysis tools to answer, and the example degrades cleanly when no tool-capable Ollama model is running. | `SCPI-Instrument-Control[report-generator]`; optional local Ollama (no hardware) |
+| `report_annotations.py` | Annotating report plots: text labels, vertical/horizontal reference lines, and shaded spans, plus a figure caption, on a synthetic step-response capture, rendered to an annotated PDF. | `SCPI-Instrument-Control[report-generator]` (no hardware - fully synthetic) |
 
 ## Interactive Tutorial
 

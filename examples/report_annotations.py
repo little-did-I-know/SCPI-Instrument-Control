@@ -2,7 +2,8 @@
 
 Run:  python examples/report_annotations.py
 
-Writes annotated_report.pdf next to this script. Requires the `report-generator` extra:
+Writes annotated_report.pdf to the current directory. Requires the
+`report-generator` extra:
     pip install -e ".[report-generator]"
 """
 
@@ -52,7 +53,7 @@ def main() -> int:
     metadata = ReportMetadata(title="Annotated Bench Check", technician="robin", test_date=datetime.now())
     report = TestReport(metadata=metadata, sections=[section])
 
-    output = Path(__file__).with_name("annotated_report.pdf")
+    output = Path("annotated_report.pdf")
     if not PDFReportGenerator().generate(report, output):
         print("PDF generation failed - is the `report-generator` extra installed?")
         return 1
