@@ -28,6 +28,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 from PyQt6.QtWidgets import QApplication, QFileDialog, QMessageBox  # noqa: E402
 
 from scpi_control.report_generator import main_window as mw_module  # noqa: E402
+from scpi_control.report_generator.models.app_settings import AppSettings  # noqa: E402
 from scpi_control.report_generator.models.report_data import WaveformData  # noqa: E402
 from scpi_control.report_generator.utils.waveform_loader import WaveformLoader  # noqa: E402
 
@@ -52,9 +53,16 @@ def _make_waveform(channel: str, source_file: Path) -> WaveformData:
 
 @pytest.fixture
 def window(monkeypatch):
-    """A real MainWindow, built headlessly. monkeypatch is threaded through
-    so AppSettings.load() (run in __init__) cannot pick up a real prior
-    session's on-disk settings during the test."""
+    """A real MainWindow, built headlessly. AppSettings.load() (a classmethod,
+    called from __init__) is patched to return a fresh default instance so
+    MainWindow construction never touches the real on-disk settings file
+    (get_settings_file() does a mkdir(parents=True, exist_ok=True) plus a
+    read under %APPDATA%\\SiglentReportGenerator\\ / ~/.config/... on a real
+    machine) -- without this patch every test here would read and depend on
+    whatever settings the developer happened to have saved from a real
+    session."""
+    monkeypatch.setattr(AppSettings, "load", classmethod(lambda cls: AppSettings()))
+
     global _qapp
     _qapp = QApplication.instance() or QApplication([])
     win = mw_module.MainWindow()
@@ -148,10 +156,21 @@ def test_no_selection_shows_a_message_instead_of_raising(window, monkeypatch):
 
 
 def test_selecting_a_waveform_opens_the_annotation_dialog(window, monkeypatch):
-    waveform = _make_waveform("C1", Path("capture.csv"))
-    window.waveforms.append(waveform)
-    window.waveform_list.addItem("C1 - capture.csv")
-    window.waveform_list.setCurrentRow(0)
+    """Uses 3 waveforms and selects the MIDDLE row (index 1), not the first
+    or last. A hardcoded self.waveforms[0] would fail this (row 1 != row 0),
+    and so would a hardcoded self.waveforms[-1] (row 1 != the last index, 2)
+    -- only a genuine self.waveforms[row] passes. See task-10-report.md for
+    the load-bearing proof: this test was confirmed to fail against a
+    self.waveforms[0] mutant and pass against the real self.waveforms[row]."""
+    waveforms = [
+        _make_waveform("C1", Path("capture1.csv")),
+        _make_waveform("C2", Path("capture1.csv")),
+        _make_waveform("C1", Path("capture2.csv")),
+    ]
+    window.waveforms.extend(waveforms)
+    for w in waveforms:
+        window.waveform_list.addItem(f"{w.channel} - {w.source_file.name}")
+    window.waveform_list.setCurrentRow(1)
 
     dialog_instance = MagicMock()
     dialog_spy = MagicMock(return_value=dialog_instance)
@@ -159,5 +178,5 @@ def test_selecting_a_waveform_opens_the_annotation_dialog(window, monkeypatch):
 
     window._on_annotate_waveform()
 
-    dialog_spy.assert_called_once_with(waveform, window)
+    dialog_spy.assert_called_once_with(waveforms[1], window)
     dialog_instance.exec.assert_called_once()
