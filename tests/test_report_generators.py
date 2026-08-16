@@ -168,3 +168,39 @@ def test_pymupdf_is_available_for_the_preview_dialog():
     """PDF preview imports fitz (widgets/pdf_preview_dialog.py:17); without it
     declared, a clean `pip install .[report-generator]` leaves the feature dead."""
     pytest.importorskip("fitz")
+
+
+def test_markdown_generation_with_annotations_emits_captions(tmp_path):
+    from scpi_control.report_generator.generators.markdown_generator import MarkdownReportGenerator
+
+    out = tmp_path / "annotated.md"
+    assert MarkdownReportGenerator().generate(make_annotated_report(), out) is True
+
+    text = out.read_text(encoding="utf-8")
+    assert "Figure 1: C1 with a 10x probe" in text
+    assert "Figure 2: spectrum of C1" in text
+    assert "Figure 3: all runs" in text
+
+
+def test_markdown_draws_annotations_on_all_four_plots(tmp_path, monkeypatch):
+    from scpi_control.report_generator.generators import markdown_generator
+
+    calls = []
+    real = markdown_generator.draw_annotations
+
+    def spy(ax, annotations, style, x_scale=1.0):
+        calls.append((list(annotations or []), x_scale))
+        return real(ax, annotations, style, x_scale)
+
+    monkeypatch.setattr(markdown_generator, "draw_annotations", spy)
+
+    out = tmp_path / "annotated.md"
+    assert markdown_generator.MarkdownReportGenerator().generate(make_annotated_report(), out) is True
+
+    # Count, not membership: the waveform and overlay plots both use 1e6, so
+    # `1e6 in scales` stays true even if one of those two call sites is deleted.
+    assert len(calls) == 4  # waveform, region zoom, overlay, FFT
+    scales = [x_scale for _, x_scale in calls]
+    assert scales.count(1e6) == 2  # waveform + overlay
+    assert scales.count(1e3) == 1  # region zoom
+    assert scales.count(1e-6) == 1  # FFT
