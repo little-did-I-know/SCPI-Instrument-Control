@@ -13,6 +13,7 @@ The subprocess-based regression guard below proves that separation holds.
 
 import subprocess
 import sys
+from unittest.mock import MagicMock
 
 import numpy as np
 import pytest
@@ -167,3 +168,29 @@ def test_update_preserves_style_fields_not_shown_in_the_form(monkeypatch):
     assert updated.text_dy == 0.25
     assert updated.color == "red"
     assert updated.fontsize == 14
+
+
+def test_unexpected_save_error_shows_a_message_instead_of_crashing(monkeypatch):
+    """_on_save only documents ValueError, but _atomic_write_text's
+    mkstemp/os.replace raise OSError on a read-only or vanished directory,
+    and json.dumps raises TypeError on a numpy.float32 coordinate. PyQt6's
+    default for an unhandled exception in a slot is to print the traceback
+    and call qFatal(), killing the app and every unsaved annotation with
+    it -- this must not escape _on_save."""
+    waveform = make_waveform()
+    dialog = _make_dialog(waveform, monkeypatch)  # importorskip("PyQt6") happens here
+
+    from PyQt6.QtWidgets import QMessageBox
+
+    from scpi_control.report_generator.widgets import annotation_dialog as dialog_module
+
+    def _raise(*_args, **_kwargs):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(dialog_module, "save_annotations", _raise)
+    critical_spy = MagicMock()
+    monkeypatch.setattr(QMessageBox, "critical", critical_spy)
+
+    dialog._on_save()  # must not raise
+
+    critical_spy.assert_called_once()

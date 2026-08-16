@@ -240,6 +240,24 @@ class AnnotationDialog(QDialog):
         except ValueError as exc:
             QMessageBox.warning(self, "Cannot save", str(exc))
             return
+        except Exception as exc:
+            # ValueError is the only *documented* raise, but not the only
+            # possible one: _atomic_write_text's mkstemp/os.replace raise
+            # OSError on a read-only or vanished directory, and json.dumps
+            # raises TypeError on a numpy.float32 coordinate. PyQt6's default
+            # for an unhandled exception in a slot is to print the traceback
+            # and call qFatal(), killing the whole app -- and with it every
+            # unsaved annotation, metadata edit and AI-generated section from
+            # this session. Match the other disk-touching dialogs in this
+            # package (see template_manager_dialog.py) rather than letting
+            # that happen.
+            logger.exception("Failed to save annotations")
+            QMessageBox.critical(
+                self,
+                "Error Saving Annotations",
+                f"Failed to save annotations:\n{exc}",
+            )
+            return
         QMessageBox.information(self, "Saved", f"Annotations saved to {path}")
 
     def _on_close(self) -> None:
