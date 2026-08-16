@@ -1,5 +1,12 @@
 """Data models for report generation."""
 
+from scpi_control.report_generator.models.annotations import (
+    KIND_HLINE,
+    KIND_LABEL,
+    KIND_SPAN,
+    KIND_VLINE,
+    PlotAnnotation,
+)
 from scpi_control.report_generator.models.comparison import (
     MODE_BATCH,
     MODE_COMPARISON,
@@ -16,6 +23,11 @@ from scpi_control.report_generator.models.report_elements import ComparisonTable
 from scpi_control.report_generator.models.template import ReportTemplate
 
 __all__ = [
+    "PlotAnnotation",
+    "KIND_LABEL",
+    "KIND_VLINE",
+    "KIND_HLINE",
+    "KIND_SPAN",
     "TestReport",
     "TestSection",
     "WaveformData",
