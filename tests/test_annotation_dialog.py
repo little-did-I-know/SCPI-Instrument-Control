@@ -96,3 +96,74 @@ def test_anchor_helper_imports_without_pyqt():
     )
     result = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True)
     assert result.returncode == 0, f"anchors module needs PyQt6:\n{result.stderr}"
+
+
+_qapp = None  # module-level: a QApplication with no surviving reference is
+# garbage-collected, which invalidates every widget built on top of it even
+# while a Python reference to those widgets is still held.
+
+
+def _make_dialog(waveform, monkeypatch):
+    """Build an AnnotationDialog headlessly. Guarded by importorskip so a
+    PyQt6-less environment (CI) skips these tests rather than failing."""
+    global _qapp
+    pytest.importorskip("PyQt6")
+    monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
+    from PyQt6.QtWidgets import QApplication
+
+    from scpi_control.report_generator.widgets.annotation_dialog import AnnotationDialog
+
+    _qapp = QApplication.instance() or QApplication([])
+    return AnnotationDialog(waveform)
+
+
+def test_caption_survives_closing_the_dialog_without_saving(monkeypatch):
+    """The OS titlebar X goes through QDialog.closeEvent -> reject(), which
+    never touches the QDialogButtonBox's rejected signal that _on_close is
+    wired to. A caption typed but not explicitly saved must still survive
+    that exit path."""
+    waveform = make_waveform()
+    dialog = _make_dialog(waveform, monkeypatch)
+
+    # QDialog.closeEvent only calls reject() while the dialog is visible;
+    # closing a never-shown dialog just accepts the close event with no
+    # reject()/done() call, so show() first to exercise the real X-button path.
+    dialog.show()
+    dialog.caption_edit.setText("A caption typed but never explicitly saved")
+    dialog.close()
+
+    assert waveform.caption == "A caption typed but never explicitly saved"
+
+
+def test_update_preserves_style_fields_not_shown_in_the_form(monkeypatch):
+    """_build_annotation() only knows about the fields the form shows
+    (kind/text/x/y/x_end/arrow). Update must not silently reset the four
+    fields the form has no widgets for -- they round-trip through the
+    sidecar via PlotAnnotation.to_dict()/from_dict(), so resetting them here
+    is real, persisted data loss."""
+    from scpi_control.report_generator.models.annotations import KIND_LABEL, PlotAnnotation
+
+    waveform = make_waveform()
+    original = PlotAnnotation(
+        kind=KIND_LABEL,
+        text="Peak",
+        x=1e-5,
+        y=0.5,
+        text_dx=0.15,
+        text_dy=0.25,
+        color="red",
+        fontsize=14,
+    )
+    waveform.annotations.append(original)
+
+    dialog = _make_dialog(waveform, monkeypatch)
+    dialog.annotation_list.setCurrentRow(0)
+    dialog.text_edit.setText("Peak (typo fixed)")
+    dialog._on_update()
+
+    updated = waveform.annotations[0]
+    assert updated.text == "Peak (typo fixed)"
+    assert updated.text_dx == 0.15
+    assert updated.text_dy == 0.25
+    assert updated.color == "red"
+    assert updated.fontsize == 14

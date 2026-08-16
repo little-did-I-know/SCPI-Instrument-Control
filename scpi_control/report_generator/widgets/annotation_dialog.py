@@ -108,6 +108,15 @@ class AnnotationDialog(QDialog):
         box.rejected.connect(self._on_close)
         outer.addWidget(box)
 
+        # `finished` is emitted by done(), which every exit path -- the Close
+        # button (accept/reject), Escape, and the OS titlebar X (whose default
+        # closeEvent calls reject() directly, never touching the button box's
+        # rejected signal) -- goes through. One connection here means a typed
+        # caption is never lost regardless of how the dialog was closed.
+        # _apply_caption() is idempotent, so also running it from _on_close is
+        # harmless.
+        self.finished.connect(lambda _result: self._apply_caption())
+
         self._on_kind_changed()
 
     def _make_spin(self, suffix: str) -> QDoubleSpinBox:
@@ -181,8 +190,19 @@ class AnnotationDialog(QDialog):
         row = self.annotation_list.currentRow()
         if row < 0:
             return
+        existing = self.waveform.annotations[row]
         annotation = self._build_annotation()
         if annotation is not None:
+            # The form has no widgets for these four -- carry them across from
+            # the annotation being replaced so an edit that only touches text
+            # or a coordinate doesn't silently reset styling that round-trips
+            # through the sidecar via to_dict()/from_dict(). Kind-agnostic, so
+            # this is correct even if the user also changed `kind`. Add is
+            # unaffected: it always builds fresh with defaults.
+            annotation.text_dx = existing.text_dx
+            annotation.text_dy = existing.text_dy
+            annotation.color = existing.color
+            annotation.fontsize = existing.fontsize
             self.waveform.annotations[row] = annotation
             self._refresh_list()
             self.annotation_list.setCurrentRow(row)
