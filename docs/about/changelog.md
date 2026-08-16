@@ -11,8 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Plot annotations in reports.** Waveform, region, FFT and comparison-overlay
   plots can carry text labels, vertical and horizontal reference lines, and
-  shaded spans, plus a figure caption beneath the plot. Annotations are set from
-  a new **Annotate…** editor in the report generator app or from Python
+  shaded spans; waveform, FFT and comparison-overlay plots can also carry a figure
+  caption beneath the plot (a region zoom inherits its parent waveform's
+  annotations but has no caption of its own). Annotations are set from a new
+  **Annotate…** editor in the report generator app or from Python
   (`PlotAnnotation`), and persist in a `<source>.annotations.json` sidecar that
   is restored when the waveform is re-imported. See
   `examples/report_annotations.py`.

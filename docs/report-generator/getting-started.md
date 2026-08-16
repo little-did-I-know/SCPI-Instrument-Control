@@ -295,7 +295,10 @@ Scroll through the metadata form and fill in the fields:
 
 Waveform, region-zoom, FFT and comparison-overlay plots can carry your own markup on
 top of the automatic capture data: text labels, vertical and horizontal reference
-lines, shaded spans, and a figure caption beneath the plot.
+lines, and shaded spans. Waveform, FFT and comparison-overlay plots can also carry a
+figure caption beneath the plot; a region zoom cannot — it is a sub-view of its
+parent waveform's already-captioned figure, so it inherits the parent's annotations
+(clipped to the region's time window) but has no caption of its own.
 
 **The four kinds:**
 
@@ -320,7 +323,7 @@ changes.
 1. Select a waveform in the imported list.
 2. Click **Annotate…**.
 3. Pick an anchor from the dropdown (waveform start/end/midpoint, max, min, or a
-   region boundary) to prefill coordinates, or enter them by hand.
+   region's start, midpoint or end) to prefill coordinates, or enter them by hand.
 4. Enter the annotation text, choose the kind, and click **Add**.
 5. Repeat for as many annotations as you need, and set a figure caption if you want
    one.
@@ -349,14 +352,21 @@ same file twice does not duplicate them.
 - **Comparison/batch overlay annotations are API-only and do not persist.** An
   overlay spans several source files, so there is no single sidecar that could own
   it — set them in Python for each report you generate.
+- **FFT plot annotations have no GUI route for creating or saving them.** They can be
+  set from Python via `save_annotations(waveforms, fft={...})` and are restored
+  automatically on re-import (same sidecar, same channel), but the **Annotate…**
+  dialog edits waveform annotations only.
 - **Overlapping labels are not auto-spaced.** If two labels land on top of each
   other, nudge one with `text_dx`/`text_dy` (offsets from the anchor, as a fraction
   of the axis span) rather than expecting automatic layout.
-- **A literal `*` or `_` in a Markdown caption can corrupt the surrounding emphasis
-  markup**, because Markdown captions are emitted unescaped by design (so a caption
-  can itself carry Markdown formatting). PDF captions are escaped and unaffected —
-  if this matters, prefer the PDF report or avoid `*`/`_` in captions destined for
-  Markdown.
+- **A literal `*` or `_` in a caption can corrupt the surrounding emphasis markup, in
+  both PDF and Markdown reports.** Both formats deliberately interpret `*text*` and
+  `_text_` in a caption as emphasis — the Markdown generator emits captions
+  unescaped, and the PDF generator's markdown-to-ReportLab conversion pairs `*`/`_`
+  into `<i>` tags — so this is a real feature, not a bug, when the pairing is
+  intentional. An unpaired literal `*` or `_` breaks that pairing and corrupts the
+  rendered text either way. Avoid a lone `*` or `_` in captions unless you mean it as
+  emphasis.
 
 ## Menu Bar
 
