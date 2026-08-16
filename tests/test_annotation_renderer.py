@@ -168,3 +168,16 @@ def test_clip_boundary_values_are_inclusive_for_points():
 def test_clip_handles_empty_and_none():
     assert clip_to_window([], 0.0, 1.0) == []
     assert clip_to_window(None, 0.0, 1.0) == []
+
+
+def test_clip_drops_a_span_straddling_a_zero_width_window_instead_of_raising():
+    """A degenerate clamp (start == end) must not construct an invalid
+    zero-width PlotAnnotation -- the span is simply not visible here."""
+    span = PlotAnnotation(kind=KIND_SPAN, text="settling", x=1e-6, x_end=9e-6)
+    assert clip_to_window([span], 4e-6, 4e-6) == []
+
+
+def test_clip_point_kinds_on_a_zero_width_window_still_use_inclusive_bounds():
+    on_point = PlotAnnotation(kind=KIND_VLINE, text="on", x=4e-6)
+    off_point = PlotAnnotation(kind=KIND_LABEL, text="off", x=5e-6, y=0.1)
+    assert clip_to_window([on_point, off_point], 4e-6, 4e-6) == [on_point]

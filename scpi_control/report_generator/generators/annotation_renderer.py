@@ -109,9 +109,11 @@ def clip_to_window(annotations: Optional[Iterable[PlotAnnotation]], start: float
         if annotation.kind == KIND_HLINE:
             kept.append(annotation)  # no x position; no window can exclude it
         elif annotation.kind == KIND_SPAN:
-            if annotation.x_end <= start or annotation.x >= end:
-                continue  # no overlap
-            kept.append(replace(annotation, x=max(annotation.x, start), x_end=min(annotation.x_end, end)))
+            clamped_x = max(annotation.x, start)
+            clamped_x_end = min(annotation.x_end, end)
+            if clamped_x_end <= clamped_x:
+                continue  # no overlap once clamped -- includes a zero-width window
+            kept.append(replace(annotation, x=clamped_x, x_end=clamped_x_end))
         else:  # label, vline -- both anchored at a single x
             if start <= annotation.x <= end:
                 kept.append(annotation)
