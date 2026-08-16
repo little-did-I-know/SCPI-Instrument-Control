@@ -291,6 +291,73 @@ Scroll through the metadata form and fill in the fields:
 - **Diagrams** - Include circuit diagrams or schematics
 - **Reference Images** - Compare with expected waveforms
 
+## Annotating Plots
+
+Waveform, region-zoom, FFT and comparison-overlay plots can carry your own markup on
+top of the automatic capture data: text labels, vertical and horizontal reference
+lines, shaded spans, and a figure caption beneath the plot.
+
+**The four kinds:**
+
+- **Label** — a text callout pinned to an `(x, y)` point, with an arrow, for calling
+  out a specific feature (an edge, a glitch, a measurement point).
+- **Vertical line** — a dashed line at a given `x`, for marking a moment in time
+  (a trigger point, an edge).
+- **Horizontal line** — a dashed line at a given `y`, for marking a threshold or
+  nominal level (a spec limit, a rail voltage).
+- **Span** — a shaded band between two `x` values, for marking a window (a settling
+  region, a glitch duration).
+
+**Coordinates are always in domain units** — seconds on a time-domain plot (waveform,
+region, comparison), hertz on an FFT plot — never the display units a given plot
+happens to use (a waveform plot may show microseconds, a region plot milliseconds,
+an FFT plot megahertz). The renderer converts domain units to display units when it
+draws the plot, so an annotation's position does not shift if a plot's display scale
+changes.
+
+### GUI route
+
+1. Select a waveform in the imported list.
+2. Click **Annotate…**.
+3. Pick an anchor from the dropdown (waveform start/end/midpoint, max, min, or a
+   region boundary) to prefill coordinates, or enter them by hand.
+4. Enter the annotation text, choose the kind, and click **Add**.
+5. Repeat for as many annotations as you need, and set a figure caption if you want
+   one.
+6. Click **Save to file** to write the annotations to the sidecar (see below).
+
+### API route
+
+Annotations are plain `PlotAnnotation` objects assigned to a `WaveformData`'s
+`annotations` list (or a `TestSection`'s `fft_annotations` for an FFT plot). See
+`examples/report_annotations.py` for a complete, runnable example covering all four
+kinds plus a caption.
+
+### Persistence
+
+Saving writes a `<source>.annotations.json` sidecar next to the waveform's source
+file, keyed by channel. A save **merges by channel**: it reads whatever sidecar
+already exists and only replaces the channels you saved, so saving one channel of a
+multi-channel capture does not erase the other channels' annotations, and saving a
+waveform's annotations without touching its FFT data leaves that channel's
+previously saved FFT annotations intact. Re-importing the source file restores the
+saved annotations and caption automatically; loading is idempotent, so importing the
+same file twice does not duplicate them.
+
+### Limitations
+
+- **Comparison/batch overlay annotations are API-only and do not persist.** An
+  overlay spans several source files, so there is no single sidecar that could own
+  it — set them in Python for each report you generate.
+- **Overlapping labels are not auto-spaced.** If two labels land on top of each
+  other, nudge one with `text_dx`/`text_dy` (offsets from the anchor, as a fraction
+  of the axis span) rather than expecting automatic layout.
+- **A literal `*` or `_` in a Markdown caption can corrupt the surrounding emphasis
+  markup**, because Markdown captions are emitted unescaped by design (so a caption
+  can itself carry Markdown formatting). PDF captions are escaped and unaffected —
+  if this matters, prefer the PDF report or avoid `*`/`_` in captions destined for
+  Markdown.
+
 ## Menu Bar
 
 ### File Menu
