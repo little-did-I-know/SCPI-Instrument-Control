@@ -1,0 +1,114 @@
+"""The annotation renderer, tested against a bare matplotlib axes.
+
+draw_annotations is pure -- axes in, axes mutated, nothing returned -- so these
+tests need no ReportLab, no PyQt and no PDF generation.
+"""
+
+import matplotlib
+
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+import numpy as np
+import pytest
+
+from scpi_control.report_generator.generators.annotation_renderer import draw_annotations
+from scpi_control.report_generator.models.annotations import (
+    KIND_HLINE,
+    KIND_LABEL,
+    KIND_SPAN,
+    KIND_VLINE,
+    PlotAnnotation,
+)
+from scpi_control.report_generator.models.plot_style import PlotStyle
+
+
+@pytest.fixture
+def axes():
+    """An axes with a real trace, so get_xlim()/get_ylim() return real limits."""
+    fig, ax = plt.subplots()
+    t = np.linspace(0, 20.0, 100)  # display units: microseconds
+    ax.plot(t, np.sin(t))
+    yield ax
+    plt.close(fig)
+
+
+def test_label_anchor_is_converted_from_domain_units_to_display_units(axes):
+    # 1.2e-5 seconds at x_scale 1e6 is 12.0 microseconds on the axis.
+    annotation = PlotAnnotation(kind=KIND_LABEL, text="ringing", x=1.2e-5, y=0.5)
+    draw_annotations(axes, [annotation], PlotStyle(), x_scale=1e6)
+
+    assert len(axes.texts) == 1
+    assert axes.texts[0].xy == pytest.approx((12.0, 0.5))
+    assert axes.texts[0].get_text() == "ringing"
+
+
+def test_y_is_never_scaled(axes):
+    annotation = PlotAnnotation(kind=KIND_HLINE, text="limit", y=0.75)
+    draw_annotations(axes, [annotation], PlotStyle(), x_scale=1e6)
+
+    hline = axes.lines[-1]
+    assert hline.get_ydata()[0] == pytest.approx(0.75)
+
+
+def test_text_offset_is_a_fraction_of_the_axis_span(axes):
+    x_span = axes.get_xlim()[1] - axes.get_xlim()[0]
+    y_span = axes.get_ylim()[1] - axes.get_ylim()[0]
+    annotation = PlotAnnotation(kind=KIND_LABEL, text="x", x=1.0e-5, y=0.0, text_dx=0.1, text_dy=0.25)
+    draw_annotations(axes, [annotation], PlotStyle(), x_scale=1e6)
+
+    tx, ty = axes.texts[0].get_position()
+    assert tx == pytest.approx(10.0 + 0.1 * x_span)
+    assert ty == pytest.approx(0.0 + 0.25 * y_span)
+
+
+def test_each_kind_produces_the_expected_artists(axes):
+    lines_before = len(axes.lines)
+    annotations = [
+        PlotAnnotation(kind=KIND_LABEL, text="a", x=5e-6, y=0.1),
+        PlotAnnotation(kind=KIND_VLINE, text="b", x=6e-6),
+        PlotAnnotation(kind=KIND_HLINE, text="c", y=0.2),
+        PlotAnnotation(kind=KIND_SPAN, text="d", x=7e-6, x_end=9e-6),
+    ]
+    draw_annotations(axes, annotations, PlotStyle(), x_scale=1e6)
+
+    assert len(axes.lines) == lines_before + 2  # vline + hline
+    assert len(axes.patches) == 1  # span
+    assert len(axes.texts) == 4  # one text per kind
+
+
+def test_empty_and_none_annotation_lists_are_no_ops(axes):
+    before = (len(axes.lines), len(axes.texts), len(axes.patches))
+    draw_annotations(axes, [], PlotStyle(), x_scale=1e6)
+    draw_annotations(axes, None, PlotStyle(), x_scale=1e6)
+    assert (len(axes.lines), len(axes.texts), len(axes.patches)) == before
+
+
+def test_per_annotation_overrides_beat_the_style(axes):
+    style = PlotStyle(annotation_color="#333333", annotation_fontsize=9)
+    annotations = [
+        PlotAnnotation(kind=KIND_LABEL, text="styled", x=5e-6, y=0.1),
+        PlotAnnotation(kind=KIND_LABEL, text="override", x=6e-6, y=0.2, color="#ff0000", fontsize=20),
+    ]
+    draw_annotations(axes, annotations, style, x_scale=1e6)
+
+    assert axes.texts[0].get_fontsize() == 9
+    assert axes.texts[1].get_fontsize() == 20
+    assert axes.texts[1].get_color() == "#ff0000"
+
+
+def test_style_arrow_default_applies_when_the_annotation_leaves_it_unset(axes):
+    """arrow is tri-state: None follows the style. If it were a plain bool the
+    style default could never win, because every annotation would claim True."""
+    style = PlotStyle(annotation_arrow=False)
+    draw_annotations(axes, [PlotAnnotation(kind=KIND_LABEL, text="a", x=5e-6, y=0.1)], style, x_scale=1e6)
+    assert axes.texts[0].arrow_patch is None
+
+    draw_annotations(axes, [PlotAnnotation(kind=KIND_LABEL, text="b", x=6e-6, y=0.2, arrow=True)], style, x_scale=1e6)
+    assert axes.texts[1].arrow_patch is not None
+
+
+def test_annotation_without_text_draws_the_line_but_no_label(axes):
+    lines_before = len(axes.lines)
+    draw_annotations(axes, [PlotAnnotation(kind=KIND_VLINE, x=5e-6)], PlotStyle(), x_scale=1e6)
+    assert len(axes.lines) == lines_before + 1
+    assert len(axes.texts) == 0
