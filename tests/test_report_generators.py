@@ -133,10 +133,11 @@ def test_pdf_draws_annotations_on_all_four_plots(tmp_path, monkeypatch):
     out = tmp_path / "annotated.pdf"
     assert pdf_generator.PDFReportGenerator().generate(make_annotated_report(), out) is True
 
+    assert len(calls) == 4  # waveform, region zoom, overlay, FFT
     scales = [x_scale for _, x_scale in calls]
-    assert 1e6 in scales  # waveform and overlay plots draw microseconds
-    assert 1e3 in scales  # region zoom draws milliseconds
-    assert 1e-6 in scales  # FFT draws megahertz
+    assert scales.count(1e6) == 2  # waveform + overlay
+    assert scales.count(1e3) == 1  # region zoom
+    assert scales.count(1e-6) == 1  # FFT
 
     # The region window is 1e-5..9e-5 s, so the vline at 1e-5 survives clipping
     # but the hline (no x) is always kept and the label at 5e-5 is inside.
@@ -146,6 +147,7 @@ def test_pdf_draws_annotations_on_all_four_plots(tmp_path, monkeypatch):
 
 def test_pdf_caption_text_reaches_the_document(tmp_path):
     pytest.importorskip("reportlab")
+    fitz = pytest.importorskip("fitz")
     from scpi_control.report_generator.generators.pdf_generator import PDFReportGenerator
 
     generator = PDFReportGenerator()
@@ -153,6 +155,13 @@ def test_pdf_caption_text_reaches_the_document(tmp_path):
     out = tmp_path / "annotated.pdf"
     assert generator.generate(report, out) is True
     assert "FigureCaption" in generator.styles
+
+    doc = fitz.open(out)
+    text = "\n".join(page.get_text() for page in doc)
+    doc.close()
+    assert "Figure 1: C1 with a 10x probe" in text
+    assert "Figure 2: spectrum of C1" in text
+    assert "Figure 3: all runs" in text
 
 
 def test_pymupdf_is_available_for_the_preview_dialog():

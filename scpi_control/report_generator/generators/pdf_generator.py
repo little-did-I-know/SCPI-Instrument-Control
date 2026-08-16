@@ -725,9 +725,10 @@ class PDFReportGenerator(BaseReportGenerator):
             story.append(Paragraph("FFT Analysis", self.styles["SubsectionHeading"]))
             fft_img = self._generate_fft_plot(section.fft_frequency, section.fft_magnitude, section.fft_annotations)
             if fft_img:
-                story.append(fft_img)
+                fft_group = [fft_img]
                 if section.fft_caption:
-                    story.append(Paragraph(self._markdown_to_reportlab(section.fft_caption), self.styles["FigureCaption"]))
+                    fft_group.append(Paragraph(self._markdown_to_reportlab(section.fft_caption), self.styles["FigureCaption"]))
+                story.append(KeepTogether(fft_group))
                 story.append(Spacer(1, 0.1 * inch))
 
         # Images
