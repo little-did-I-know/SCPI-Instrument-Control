@@ -39,6 +39,7 @@ import numpy as np
 from PIL import Image
 
 from scpi_control.report_generator.generators.base import BaseReportGenerator
+from scpi_control.report_generator.generators.annotation_renderer import clip_to_window, draw_annotations
 from scpi_control.report_generator.models.plot_style import PlotStyle
 from scpi_control.report_generator.models.report_data import MeasurementResult, TestReport, TestSection, WaveformData, WaveformRegion
 from scpi_control.report_generator.models.report_options import ReportOptions
@@ -216,6 +217,17 @@ class PDFReportGenerator(BaseReportGenerator):
                 textColor=colors.HexColor(self.branding.failure_color),
                 alignment=TA_CENTER,
                 spaceAfter=20,
+            )
+        )
+
+        self.styles.add(
+            ParagraphStyle(
+                name="FigureCaption",
+                parent=self.styles["Normal"],
+                fontSize=8,
+                textColor=colors.grey,
+                alignment=TA_CENTER,
+                spaceBefore=2,
             )
         )
 
@@ -675,7 +687,10 @@ class PDFReportGenerator(BaseReportGenerator):
                 drawing = self._generate_overlay_plot(spec)
                 if drawing is not None:
                     channel_label = self._markdown_to_reportlab(spec.channel_label)
-                    story.append(KeepTogether([Paragraph(f"Channel {channel_label} — all runs", self.styles["SubsectionHeading"]), drawing]))
+                    grouped = [Paragraph(f"Channel {channel_label} — all runs", self.styles["SubsectionHeading"]), drawing]
+                    if spec.caption:
+                        grouped.append(Paragraph(self._markdown_to_reportlab(spec.caption), self.styles["FigureCaption"]))
+                    story.append(KeepTogether(grouped))
                     story.append(Spacer(1, 0.1 * inch))
 
         # Comparison table
@@ -708,9 +723,11 @@ class PDFReportGenerator(BaseReportGenerator):
         # FFT
         if section.include_fft and section.fft_frequency is not None:
             story.append(Paragraph("FFT Analysis", self.styles["SubsectionHeading"]))
-            fft_img = self._generate_fft_plot(section.fft_frequency, section.fft_magnitude)
+            fft_img = self._generate_fft_plot(section.fft_frequency, section.fft_magnitude, section.fft_annotations)
             if fft_img:
                 story.append(fft_img)
+                if section.fft_caption:
+                    story.append(Paragraph(self._markdown_to_reportlab(section.fft_caption), self.styles["FigureCaption"]))
                 story.append(Spacer(1, 0.1 * inch))
 
         # Images
@@ -765,6 +782,8 @@ class PDFReportGenerator(BaseReportGenerator):
             plot_img = self._generate_waveform_plot(waveform)
             if plot_img:
                 keep_together_elements.append(plot_img)
+                if waveform.caption:
+                    keep_together_elements.append(Paragraph(self._markdown_to_reportlab(waveform.caption), self.styles["FigureCaption"]))
 
         # Use KeepTogether to prevent title and plot from being separated
         if keep_together_elements:
@@ -1024,6 +1043,12 @@ class PDFReportGenerator(BaseReportGenerator):
                 ax.set_ylabel("Voltage (V)", fontsize=self.plot_style.label_fontsize)
                 ax.set_title(f"{region.label} - Zoomed View", fontsize=self.plot_style.title_fontsize)
                 ax.grid(True, alpha=0.3)
+                draw_annotations(
+                    ax,
+                    clip_to_window(waveform.annotations, region.start_time, region.end_time),
+                    self.plot_style,
+                    x_scale=1e3,
+                )
                 fig.tight_layout()
                 fig.savefig(buf, format="svg")
                 plt.close(fig)
@@ -1223,6 +1248,7 @@ class PDFReportGenerator(BaseReportGenerator):
                 ax.set_xlabel("Time (µs)", fontsize=self.plot_style.label_fontsize)
                 ax.set_ylabel("Voltage (V)", fontsize=self.plot_style.label_fontsize)
                 ax.set_title(waveform.label, fontsize=self.plot_style.title_fontsize, fontweight="bold")
+                draw_annotations(ax, waveform.annotations, self.plot_style, x_scale=1e6)
                 fig.tight_layout()
                 fig.savefig(buf, format="svg")
                 plt.close(fig)
@@ -1246,6 +1272,7 @@ class PDFReportGenerator(BaseReportGenerator):
                 ax.set_xlabel("Time (µs)", fontsize=self.plot_style.label_fontsize)
                 ax.set_ylabel("Voltage (V)", fontsize=self.plot_style.label_fontsize)
                 ax.legend(fontsize=self.plot_style.label_fontsize)
+                draw_annotations(ax, spec.annotations, self.plot_style, x_scale=1e6)
                 fig.tight_layout()
                 fig.savefig(buf, format="svg")
                 plt.close(fig)
@@ -1327,7 +1354,7 @@ class PDFReportGenerator(BaseReportGenerator):
             elements.append(Paragraph("Signature: ________________________&nbsp;&nbsp;&nbsp;&nbsp;Date: ____________", self.styles["Normal"]))
         return KeepTogether(elements)
 
-    def _generate_fft_plot(self, frequency: np.ndarray, magnitude: np.ndarray) -> Optional[Drawing]:
+    def _generate_fft_plot(self, frequency: np.ndarray, magnitude: np.ndarray, annotations=None) -> Optional[Drawing]:
         """Generate an FFT plot as a scaled vector Drawing."""
         try:
             style = self.plot_style.matplotlib_style or "default"
@@ -1339,6 +1366,7 @@ class PDFReportGenerator(BaseReportGenerator):
                 ax.set_xlabel("Frequency (MHz)", fontsize=self.plot_style.label_fontsize)
                 ax.set_ylabel("Magnitude (dB)", fontsize=self.plot_style.label_fontsize)
                 ax.set_title("FFT Analysis", fontsize=self.plot_style.title_fontsize, fontweight="bold")
+                draw_annotations(ax, annotations, self.plot_style, x_scale=1e-6)
                 fig.tight_layout()
                 fig.savefig(buf, format="svg")
                 plt.close(fig)
