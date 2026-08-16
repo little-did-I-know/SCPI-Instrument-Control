@@ -77,6 +77,29 @@ def test_anchor_choices_survive_a_waveform_with_no_regions():
     assert len(build_anchor_choices(waveform)) >= 5
 
 
+def test_anchor_choices_detect_regions_on_demand_for_a_fresh_import():
+    """docs/report-generator/getting-started.md tells the user the anchor
+    dropdown offers "a region's start, midpoint or end", but nothing populates
+    waveform.regions at import time -- the only producer is
+    ComputedAnalyzer._populate_waveforms, which runs at report-build time. Per
+    the design spec (2026-08-16-plot-annotations-design.md section 6),
+    build_anchor_choices must call WaveformAnalyzer.detect_regions on demand
+    when the waveform has no regions yet, so the documented flow is real."""
+    from scpi_control.report_generator.utils.anchors import build_anchor_choices
+
+    # A step with clear high/low plateaus, not the sine make_waveform() uses --
+    # detect_regions only looks for plateaus/edges on signal types a sine
+    # isn't classified as.
+    t = np.linspace(0, 1e-4, 1000)
+    voltage = np.where(t < 3e-5, 0.0, 3.3)
+    waveform = WaveformData(channel="C1", time=t, voltage=voltage, sample_rate=1e7, record_length=1000)
+    assert waveform.regions == []
+
+    labels = [label for label, _, _ in build_anchor_choices(waveform)]
+
+    assert any("—" in label for label in labels), f"no region anchor among: {labels}"
+
+
 def test_dialog_module_imports_when_pyqt_is_available():
     pytest.importorskip("PyQt6")
     from scpi_control.report_generator.widgets.annotation_dialog import AnnotationDialog
