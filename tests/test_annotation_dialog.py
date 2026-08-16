@@ -3,7 +3,16 @@
 Only the pure helper is tested. The Qt widget itself needs a display and is
 covered by the smoke import below, guarded by importorskip so a PyQt6-less
 environment skips rather than fails.
+
+build_anchor_choices lives in `utils.anchors`, not in `widgets.annotation_dialog`,
+specifically so these tests can import it without pulling in PyQt6 -- CI has no
+PyQt6 (it is only in the gui/report-generator/all extras), and
+widgets/annotation_dialog.py imports PyQt6 at module level via widgets/__init__.py.
+The subprocess-based regression guard below proves that separation holds.
 """
+
+import subprocess
+import sys
 
 import numpy as np
 import pytest
@@ -18,7 +27,7 @@ def make_waveform():
 
 
 def test_anchor_choices_include_the_waveform_bounds_and_midpoint():
-    from scpi_control.report_generator.widgets.annotation_dialog import build_anchor_choices
+    from scpi_control.report_generator.utils.anchors import build_anchor_choices
 
     waveform = make_waveform()
     labels = [label for label, _, _ in build_anchor_choices(waveform)]
@@ -31,7 +40,7 @@ def test_anchor_choices_include_the_waveform_bounds_and_midpoint():
 def test_anchor_choices_locate_the_extrema():
     """WaveformAnalyzer.analyze() returns vmax as a bare scalar with no time
     attached, so the dialog computes extrema LOCATIONS itself."""
-    from scpi_control.report_generator.widgets.annotation_dialog import build_anchor_choices
+    from scpi_control.report_generator.utils.anchors import build_anchor_choices
 
     waveform = make_waveform()
     choices = {label: (x, y) for label, x, y in build_anchor_choices(waveform)}
@@ -48,7 +57,7 @@ def test_anchor_choices_locate_the_extrema():
 
 
 def test_anchor_choices_expose_each_detected_region_at_start_mid_and_end():
-    from scpi_control.report_generator.widgets.annotation_dialog import build_anchor_choices
+    from scpi_control.report_generator.utils.anchors import build_anchor_choices
 
     waveform = make_waveform()
     waveform.add_region(start_time=2e-5, end_time=6e-5, label="Plateau")
@@ -60,7 +69,7 @@ def test_anchor_choices_expose_each_detected_region_at_start_mid_and_end():
 
 
 def test_anchor_choices_survive_a_waveform_with_no_regions():
-    from scpi_control.report_generator.widgets.annotation_dialog import build_anchor_choices
+    from scpi_control.report_generator.utils.anchors import build_anchor_choices
 
     waveform = make_waveform()
     waveform.clear_regions()
@@ -72,3 +81,18 @@ def test_dialog_module_imports_when_pyqt_is_available():
     from scpi_control.report_generator.widgets.annotation_dialog import AnnotationDialog
 
     assert AnnotationDialog is not None
+
+
+def test_anchor_helper_imports_without_pyqt():
+    code = (
+        "import sys\n"
+        "class _Block:\n"
+        "    def find_spec(self, name, path=None, target=None):\n"
+        "        if name == 'PyQt6' or name.startswith('PyQt6.'):\n"
+        "            raise ImportError('PyQt6 blocked for this test')\n"
+        "        return None\n"
+        "sys.meta_path.insert(0, _Block())\n"
+        "from scpi_control.report_generator.utils.anchors import build_anchor_choices\n"
+    )
+    result = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True)
+    assert result.returncode == 0, f"anchors module needs PyQt6:\n{result.stderr}"

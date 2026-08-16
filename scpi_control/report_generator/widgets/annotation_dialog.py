@@ -6,9 +6,8 @@ which stay editable. Nothing requires an anchor -- coordinates can be typed.
 """
 
 import logging
-from typing import List, Optional, Tuple
+from typing import Optional
 
-import numpy as np
 from PyQt6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -32,6 +31,7 @@ from scpi_control.report_generator.models.annotations import (
     KIND_VLINE,
     PlotAnnotation,
 )
+from scpi_control.report_generator.utils.anchors import build_anchor_choices
 from scpi_control.report_generator.utils.annotation_store import save_annotations
 
 logger = logging.getLogger(__name__)
@@ -43,39 +43,6 @@ KIND_CHOICES = (
     ("Horizontal reference line", KIND_HLINE),
     ("Shaded span", KIND_SPAN),
 )
-
-
-def build_anchor_choices(waveform) -> List[Tuple[str, float, Optional[float]]]:
-    """Every feature the user can anchor an annotation to.
-
-    Returns (label, x_seconds, y_volts_or_None) triples. Extrema locations are
-    computed here rather than read from WaveformAnalyzer.analyze(), which returns
-    vmax/vmin as bare scalars with no time attached.
-    """
-    time = np.asarray(waveform.time)
-    voltage = np.asarray(waveform.voltage)
-    if time.size == 0:
-        return []
-
-    start, end = float(time[0]), float(time[-1])
-    peak = int(np.argmax(voltage))
-    trough = int(np.argmin(voltage))
-
-    choices: List[Tuple[str, float, Optional[float]]] = [
-        ("Waveform start", start, float(voltage[0])),
-        ("Waveform midpoint", (start + end) / 2.0, None),
-        ("Waveform end", end, float(voltage[-1])),
-        ("Maximum", float(time[peak]), float(voltage[peak])),
-        ("Minimum", float(time[trough]), float(voltage[trough])),
-    ]
-
-    for region in waveform.regions:
-        mid = (region.start_time + region.end_time) / 2.0
-        choices.append((f"{region.label} — start", float(region.start_time), None))
-        choices.append((f"{region.label} — mid", float(mid), None))
-        choices.append((f"{region.label} — end", float(region.end_time), None))
-
-    return choices
 
 
 class AnnotationDialog(QDialog):
