@@ -353,9 +353,11 @@ same file twice does not duplicate them.
   overlay spans several source files, so there is no single sidecar that could own
   it — set them in Python for each report you generate.
 - **FFT plot annotations have no GUI route for creating or saving them.** They can be
-  set from Python via `save_annotations(waveforms, fft={...})` and are restored
-  automatically on re-import (same sidecar, same channel), but the **Annotate…**
-  dialog edits waveform annotations only.
+  set from Python via `save_annotations(waveforms, fft={...})`. Restoring them on
+  re-import requires the caller to set the `TestSection`'s `fft_channel` to the
+  channel they were saved under; the app does not currently do this itself, so
+  today automatic restore only happens for an API caller who sets `fft_channel`
+  explicitly. The **Annotate…** dialog edits waveform annotations only.
 - **Overlapping labels are not auto-spaced.** If two labels land on top of each
   other, nudge one with `text_dx`/`text_dy` (offsets from the anchor, as a fraction
   of the axis span) rather than expecting automatic layout.
