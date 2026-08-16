@@ -133,3 +133,71 @@ def test_fft_load_is_a_no_op_without_a_matching_channel(tmp_path):
     wrong_channel = TestSection(title="Spectrum")
     wrong_channel.fft_channel = "C4"
     assert load_fft_annotations_into(wrong_channel, [waveform]) == 0
+
+
+def test_save_preserves_a_sibling_channel_not_included_in_this_save(tmp_path):
+    """Saving only one channel of a multi-channel capture must not erase the
+    others -- exactly what the Task 9 annotation dialog does when it calls
+    save_annotations([self.waveform]) for a single-channel edit."""
+    source = tmp_path / "capture.csv"
+    source.write_text("placeholder")
+    ch1 = make_waveform("C1", source)
+    ch2 = make_waveform("C2", source)
+    ch1.annotations = [PlotAnnotation(kind=KIND_VLINE, text="ch1 original", x=0.0)]
+    ch2.annotations = [PlotAnnotation(kind=KIND_VLINE, text="ch2 original", x=1.0)]
+    save_annotations([ch1, ch2])
+
+    # Re-save only C1, as a single-waveform save would.
+    ch1_updated = make_waveform("C1", source)
+    ch1_updated.annotations = [PlotAnnotation(kind=KIND_VLINE, text="ch1 updated", x=2.0)]
+    save_annotations([ch1_updated])
+
+    fresh1 = make_waveform("C1", source)
+    fresh2 = make_waveform("C2", source)
+    load_annotations_into([fresh1, fresh2])
+    assert [a.text for a in fresh1.annotations] == ["ch1 updated"]
+    assert [a.text for a in fresh2.annotations] == ["ch2 original"]
+
+
+def test_corrupt_sidecar_with_invalid_utf8_bytes_warns_and_applies_nothing(tmp_path, caplog):
+    """A truncated write or a genuinely binary file raises UnicodeDecodeError
+    from read_text(), which is a ValueError subclass -- not an OSError or a
+    json.JSONDecodeError. It must still be treated as a corrupt sidecar."""
+    source = tmp_path / "capture.csv"
+    source.write_text("placeholder")
+    sidecar_path_for(source).write_bytes(b"\xff\xfe\x00 not utf-8")
+    waveform = make_waveform("C1", source)
+
+    assert load_annotations_into([waveform]) == 0
+    assert waveform.annotations == []
+    assert "capture.csv.annotations.json" in caplog.text
+
+
+def test_load_annotations_into_is_idempotent(tmp_path):
+    """Calling the loader twice on the same waveform objects -- a reload, or a
+    rebuilt section -- must not duplicate the saved annotations."""
+    source = tmp_path / "capture.csv"
+    source.write_text("placeholder")
+    waveform = make_waveform("C1", source)
+    waveform.annotations = [PlotAnnotation(kind=KIND_VLINE, text="saved", x=0.0)]
+    save_annotations([waveform])
+
+    fresh = make_waveform("C1", source)
+    load_annotations_into([fresh])
+    first_count = len(fresh.annotations)
+    load_annotations_into([fresh])
+    assert len(fresh.annotations) == first_count
+
+
+def test_load_fft_annotations_into_is_idempotent(tmp_path):
+    source = tmp_path / "capture.csv"
+    source.write_text("placeholder")
+    waveform = make_waveform("C1", source)
+    save_annotations([waveform], fft={"C1": ("Figure 2", [PlotAnnotation(kind=KIND_VLINE, text="carrier", x=1e6)])})
+
+    section = TestSection(title="Spectrum")
+    section.fft_channel = "C1"
+    load_fft_annotations_into(section, [waveform])
+    first_count = len(section.fft_annotations)
+    load_fft_annotations_into(section, [waveform])
+    assert len(section.fft_annotations) == first_count
