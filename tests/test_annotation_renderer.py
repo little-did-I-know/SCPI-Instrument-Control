@@ -112,3 +112,59 @@ def test_annotation_without_text_draws_the_line_but_no_label(axes):
     draw_annotations(axes, [PlotAnnotation(kind=KIND_VLINE, x=5e-6)], PlotStyle(), x_scale=1e6)
     assert len(axes.lines) == lines_before + 1
     assert len(axes.texts) == 0
+
+
+from scpi_control.report_generator.generators.annotation_renderer import clip_to_window
+
+
+def test_clip_keeps_annotations_inside_the_window_and_drops_those_outside():
+    inside = PlotAnnotation(kind=KIND_LABEL, text="in", x=5e-6, y=0.1)
+    before = PlotAnnotation(kind=KIND_VLINE, text="early", x=1e-6)
+    after = PlotAnnotation(kind=KIND_VLINE, text="late", x=9e-6)
+
+    kept = clip_to_window([inside, before, after], 4e-6, 6e-6)
+
+    assert kept == [inside]
+
+
+def test_clip_always_keeps_horizontal_lines():
+    """An hline has no x position, so no window can exclude it."""
+    hline = PlotAnnotation(kind=KIND_HLINE, text="3.3 V", y=3.3)
+    assert clip_to_window([hline], 4e-6, 6e-6) == [hline]
+
+
+def test_clip_clamps_a_straddling_span_without_mutating_the_original():
+    span = PlotAnnotation(kind=KIND_SPAN, text="settling", x=1e-6, x_end=9e-6)
+    kept = clip_to_window([span], 4e-6, 6e-6)
+
+    assert len(kept) == 1
+    assert kept[0].x == pytest.approx(4e-6)
+    assert kept[0].x_end == pytest.approx(6e-6)
+    assert kept[0].text == "settling"
+    # The caller's annotation is untouched -- the full-trace plot still needs it.
+    assert span.x == pytest.approx(1e-6)
+    assert span.x_end == pytest.approx(9e-6)
+
+
+def test_clip_drops_spans_that_do_not_intersect_the_window():
+    wholly_before = PlotAnnotation(kind=KIND_SPAN, text="a", x=1e-6, x_end=3e-6)
+    wholly_after = PlotAnnotation(kind=KIND_SPAN, text="b", x=7e-6, x_end=9e-6)
+    touching_edge = PlotAnnotation(kind=KIND_SPAN, text="c", x=1e-6, x_end=4e-6)
+
+    assert clip_to_window([wholly_before, wholly_after, touching_edge], 4e-6, 6e-6) == []
+
+
+def test_clip_leaves_a_fully_contained_span_alone():
+    span = PlotAnnotation(kind=KIND_SPAN, text="inner", x=4.5e-6, x_end=5.5e-6)
+    assert clip_to_window([span], 4e-6, 6e-6) == [span]
+
+
+def test_clip_boundary_values_are_inclusive_for_points():
+    at_start = PlotAnnotation(kind=KIND_VLINE, text="s", x=4e-6)
+    at_end = PlotAnnotation(kind=KIND_VLINE, text="e", x=6e-6)
+    assert clip_to_window([at_start, at_end], 4e-6, 6e-6) == [at_start, at_end]
+
+
+def test_clip_handles_empty_and_none():
+    assert clip_to_window([], 0.0, 1.0) == []
+    assert clip_to_window(None, 0.0, 1.0) == []

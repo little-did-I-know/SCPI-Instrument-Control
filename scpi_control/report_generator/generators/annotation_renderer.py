@@ -82,3 +82,37 @@ def draw_annotations(ax, annotations: Optional[Iterable[PlotAnnotation]], style,
             ax.axvspan(start, end, color=style.annotation_span_color, alpha=style.annotation_span_alpha, zorder=0)
             if annotation.text:
                 ax.text((start + end) / 2.0, y_max - 0.02 * y_span, annotation.text, color=color, fontsize=fontsize, ha="center", va="top")
+
+
+def clip_to_window(annotations: Optional[Iterable[PlotAnnotation]], start: float, end: float) -> List[PlotAnnotation]:
+    """Select the annotations visible in the domain window [start, end].
+
+    A region zoom carries no annotations of its own -- it shows the parent
+    waveform's, restricted to the region's time range, so a callout entered once
+    appears both in the full trace and in the zoom of that feature.
+
+    Args:
+        annotations: the parent waveform's annotations. None is treated as empty.
+        start: window start in domain units (seconds).
+        end: window end in domain units (seconds).
+
+    Returns:
+        A new list. Straddling spans are returned as CLAMPED COPIES -- the
+        originals are left intact because the full-trace plot still needs their
+        true extent.
+    """
+    if not annotations:
+        return []
+
+    kept: List[PlotAnnotation] = []
+    for annotation in annotations:
+        if annotation.kind == KIND_HLINE:
+            kept.append(annotation)  # no x position; no window can exclude it
+        elif annotation.kind == KIND_SPAN:
+            if annotation.x_end <= start or annotation.x >= end:
+                continue  # no overlap
+            kept.append(replace(annotation, x=max(annotation.x, start), x_end=min(annotation.x_end, end)))
+        else:  # label, vline -- both anchored at a single x
+            if start <= annotation.x <= end:
+                kept.append(annotation)
+    return kept
