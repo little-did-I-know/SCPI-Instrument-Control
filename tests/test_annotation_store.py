@@ -201,3 +201,72 @@ def test_load_fft_annotations_into_is_idempotent(tmp_path):
     first_count = len(section.fft_annotations)
     load_fft_annotations_into(section, [waveform])
     assert len(section.fft_annotations) == first_count
+
+
+def test_save_without_fft_kwarg_preserves_previously_saved_fft_data(tmp_path):
+    """Absence of the fft kwarg means "no opinion about FFT", not "clear the
+    FFT data" -- the Task 9 annotation dialog only ever holds a WaveformData
+    and never supplies fft, so every dialog save must not delete a channel's
+    FFT caption/annotations saved by an earlier call that did supply them."""
+    source = tmp_path / "capture.csv"
+    source.write_text("placeholder")
+    ch1 = make_waveform("C1", source)
+    fft_annotation = PlotAnnotation(kind=KIND_VLINE, text="carrier", x=1e6)
+    save_annotations([ch1], fft={"C1": ("cap", [fft_annotation])})
+
+    # A later save with no fft kwarg at all -- as the annotation dialog does.
+    ch1_again = make_waveform("C1", source)
+    ch1_again.annotations = [PlotAnnotation(kind=KIND_VLINE, text="new time annotation", x=0.0)]
+    save_annotations([ch1_again])
+
+    data = json.loads(sidecar_path_for(source).read_text(encoding="utf-8"))
+    assert data["waveforms"]["C1"]["fft"]["caption"] == "cap"
+    assert data["waveforms"]["C1"]["fft"]["annotations"][0]["text"] == "carrier"
+
+    section = TestSection(title="Spectrum")
+    section.fft_channel = "C1"
+    assert load_fft_annotations_into(section, [ch1_again]) == 1
+    assert section.fft_annotations == [fft_annotation]
+    assert section.fft_caption == "cap"
+
+
+def test_two_identical_sidecar_annotations_both_load_into_an_empty_waveform(tmp_path):
+    """save_annotations does no dedup, so a sidecar can legitimately hold two
+    structurally identical PlotAnnotation entries -- both must load, not just
+    one, even though PlotAnnotation equality has no identity field."""
+    source = tmp_path / "capture.csv"
+    source.write_text("placeholder")
+    ch1 = make_waveform("C1", source)
+    ch1.annotations = [
+        PlotAnnotation(kind=KIND_VLINE, text="same", x=0.0),
+        PlotAnnotation(kind=KIND_VLINE, text="same", x=0.0),
+    ]
+    save_annotations([ch1])
+
+    fresh = make_waveform("C1", source)
+    assert load_annotations_into([fresh]) == 2
+    assert len(fresh.annotations) == 2
+
+
+def test_loading_a_sidecar_with_duplicate_annotations_twice_still_leaves_exactly_two(tmp_path):
+    """Pins both properties of the multiset-aware idempotency guard at once: a
+    first load must apply both identical annotations (not silently drop the
+    second as a false "duplicate" of the first), and a second load of the
+    same sidecar must not duplicate them further. Fails under a plain
+    membership guard (first load already collapses to one) and fails under no
+    guard at all (second load doubles to four)."""
+    source = tmp_path / "capture.csv"
+    source.write_text("placeholder")
+    ch1 = make_waveform("C1", source)
+    ch1.annotations = [
+        PlotAnnotation(kind=KIND_VLINE, text="same", x=0.0),
+        PlotAnnotation(kind=KIND_VLINE, text="same", x=0.0),
+    ]
+    save_annotations([ch1])
+
+    fresh = make_waveform("C1", source)
+    load_annotations_into([fresh])
+    assert len(fresh.annotations) == 2
+
+    load_annotations_into([fresh])
+    assert len(fresh.annotations) == 2

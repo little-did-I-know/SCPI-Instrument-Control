@@ -114,6 +114,18 @@ def save_annotations(
         if waveform.channel in fft:
             caption, annotations = fft[waveform.channel]
             entry["fft"] = {"caption": caption, "annotations": [a.to_dict() for a in annotations]}
+        else:
+            # `caption`/`annotations` come straight from the WaveformData the
+            # caller holds, so they are authoritative -- if the user cleared
+            # them, that clearing must persist. `fft` is different: it is NOT
+            # reachable from a waveform (it lives on a TestSection), so a
+            # caller with no `fft` kwarg -- e.g. Task 9's annotation dialog,
+            # which only ever holds a WaveformData -- has nothing to say
+            # about FFT, not "clear the FFT data". Carry the prior on-disk
+            # entry forward so this save cannot delete it.
+            existing_entry = entries.get(waveform.channel)
+            if existing_entry and "fft" in existing_entry:
+                entry["fft"] = existing_entry["fft"]
         entries[waveform.channel] = entry
 
     path = sidecar_path_for(source_file)
@@ -154,11 +166,19 @@ def load_annotations_into(waveforms: Iterable[WaveformData]) -> int:
     Merges: annotations already on a waveform are kept, and saved ones are
     appended. A caption already set in memory is not overwritten by the sidecar.
 
-    Idempotent: an annotation already present on the target list (by value --
-    PlotAnnotation is a plain dataclass, so `==` compares fields) is skipped
-    rather than appended again. Without this, calling this function twice on
-    the same waveform objects -- a reload, or a rebuilt section -- would
-    duplicate every saved annotation.
+    Idempotent, multiset-aware: an incoming annotation is matched against a
+    *consumable* copy of what the target already holds, not a plain
+    membership test. PlotAnnotation is a plain dataclass with no identity
+    field, so two annotations a user deliberately created with identical
+    kind/text/coordinates compare equal -- a plain `in` check would then
+    treat the second one as "already present" and drop it even on the very
+    first load, which is data loss, not deduplication. Matching against a
+    copy that shrinks as matches are consumed means: a repeat load of the
+    same sidecar appends nothing (each incoming annotation finds and
+    consumes its own already-loaded twin), while two genuinely identical
+    annotations in the sidecar both load into an empty target (there is
+    nothing yet to consume, so neither is treated as a duplicate of the
+    other).
 
     Returns:
         The number of annotations newly applied (duplicates already present
@@ -175,13 +195,15 @@ def load_annotations_into(waveforms: Iterable[WaveformData]) -> int:
         if not entry:
             continue
 
+        remaining = list(waveform.annotations)  # copy; consumed as matches are found
         for raw in entry.get("annotations", []):
             try:
                 annotation = PlotAnnotation.from_dict(raw)
             except (ValueError, TypeError) as exc:
                 logger.warning(f"Skipping invalid annotation for {waveform.channel}: {exc}")
                 continue
-            if annotation in waveform.annotations:
+            if annotation in remaining:
+                remaining.remove(annotation)  # already present; consume one copy
                 continue
             waveform.annotations.append(annotation)
             applied += 1
@@ -199,10 +221,9 @@ def load_fft_annotations_into(section, waveforms: Iterable[WaveformData]) -> int
     time no TestSection exists yet. The GUI builds sections much later, and calls
     this then.
 
-    Idempotent: an annotation already present on section.fft_annotations (by
-    value) is skipped rather than appended again, for the same reason as
-    load_annotations_into -- repeated calls on the same section must not
-    duplicate entries.
+    Idempotent, multiset-aware against section.fft_annotations, for the same
+    reason and by the same consumable-copy mechanism as load_annotations_into
+    -- see that function's docstring.
 
     Returns:
         The number of annotations newly applied (duplicates already present
@@ -222,13 +243,15 @@ def load_fft_annotations_into(section, waveforms: Iterable[WaveformData]) -> int
     fft = entry.get("fft") or {}
 
     applied = 0
+    remaining = list(section.fft_annotations)  # copy; consumed as matches are found
     for raw in fft.get("annotations", []):
         try:
             annotation = PlotAnnotation.from_dict(raw)
         except (ValueError, TypeError) as exc:
             logger.warning(f"Skipping invalid FFT annotation for {channel}: {exc}")
             continue
-        if annotation in section.fft_annotations:
+        if annotation in remaining:
+            remaining.remove(annotation)  # already present; consume one copy
             continue
         section.fft_annotations.append(annotation)
         applied += 1
