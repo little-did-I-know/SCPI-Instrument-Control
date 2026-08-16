@@ -66,3 +66,46 @@ def test_from_dict_rejects_unknown_kind_and_unknown_fields():
         PlotAnnotation.from_dict({"kind": "sparkle", "x": 1.0, "y": 1.0})
     with pytest.raises(ValueError, match="Unknown annotation fields"):
         PlotAnnotation.from_dict({"kind": "vline", "x": 1.0, "wobble": 3})
+
+
+def test_plot_style_carries_annotation_defaults():
+    from scpi_control.report_generator.models.plot_style import PlotStyle
+
+    style = PlotStyle()
+    assert style.annotation_color == "#333333"
+    assert style.annotation_fontsize == 9
+    assert style.annotation_line_color == "#d62728"
+    assert style.annotation_line_style == "--"
+    assert style.annotation_span_color == "#ffcc00"
+    assert style.annotation_span_alpha == 0.25
+    assert style.annotation_arrow is True
+
+
+def test_plot_style_from_dict_accepts_templates_saved_before_annotations_existed():
+    """Templates on disk predate these fields. from_dict is cls(**data), so the
+    absent keys must fall back to defaults rather than raise."""
+    from scpi_control.report_generator.models.plot_style import PlotStyle
+
+    legacy = {
+        "waveform_color": "#1f77b4",
+        "fft_color": "#ff7f0e",
+        "grid_color": "#cccccc",
+        "background_color": "#ffffff",
+        "waveform_linewidth": 0.8,
+        "grid_alpha": 0.3,
+        "grid_enabled": True,
+        "title_fontsize": 11,
+        "label_fontsize": 10,
+        "tick_fontsize": 9,
+        "matplotlib_style": "default",
+    }
+    style = PlotStyle.from_dict(legacy)
+    assert style.annotation_fontsize == 9
+    assert style.waveform_color == "#1f77b4"
+
+
+def test_plot_style_round_trips_annotation_fields():
+    from scpi_control.report_generator.models.plot_style import PlotStyle
+
+    style = PlotStyle(annotation_color="#000000", annotation_span_alpha=0.5)
+    assert PlotStyle.from_dict(style.to_dict()) == style
