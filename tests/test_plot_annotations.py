@@ -109,3 +109,71 @@ def test_plot_style_round_trips_annotation_fields():
 
     style = PlotStyle(annotation_color="#000000", annotation_span_alpha=0.5)
     assert PlotStyle.from_dict(style.to_dict()) == style
+
+
+def test_waveform_carries_annotations_and_a_caption():
+    import numpy as np
+
+    from scpi_control.report_generator.models.report_data import WaveformData
+
+    t = np.arange(100) / 1e6
+    waveform = WaveformData(channel="C1", time=t, voltage=np.sin(t), sample_rate=1e6, record_length=100)
+    assert waveform.annotations == []
+    assert waveform.caption is None
+
+    waveform.annotations.append(PlotAnnotation(kind=KIND_LABEL, text="ringing", x=1.2e-5, y=0.5))
+    waveform.caption = "Figure 1: C1 rising edge"
+    d = waveform.to_dict()
+    assert d["annotations"] == [{"kind": "label", "text": "ringing", "x": 1.2e-5, "y": 0.5}]
+    assert d["caption"] == "Figure 1: C1 rising edge"
+
+
+def test_waveform_to_dict_omits_annotation_keys_when_unset():
+    import numpy as np
+
+    from scpi_control.report_generator.models.report_data import WaveformData
+
+    t = np.arange(10) / 1e6
+    waveform = WaveformData(channel="C1", time=t, voltage=np.sin(t), sample_rate=1e6, record_length=10)
+    d = waveform.to_dict()
+    assert "annotations" not in d
+    assert "caption" not in d
+
+
+def test_section_carries_fft_annotations_and_caption():
+    from scpi_control.report_generator.models.report_data import TestSection
+
+    section = TestSection(title="Spectrum")
+    assert section.fft_annotations == []
+    assert section.fft_caption is None
+
+    section.fft_annotations.append(PlotAnnotation(kind=KIND_VLINE, text="carrier", x=1.0e6))
+    section.fft_caption = "Figure 2: spectrum"
+    d = section.to_dict()
+    assert d["fft_annotations"] == [{"kind": "vline", "text": "carrier", "x": 1.0e6}]
+    assert d["fft_caption"] == "Figure 2: spectrum"
+
+
+def test_overlay_spec_carries_annotations_and_caption():
+    from scpi_control.report_generator.models.report_elements import OverlayPlotSpec
+
+    spec = OverlayPlotSpec(channel_label="1")
+    assert spec.annotations == []
+    assert spec.caption is None
+
+    spec.annotations.append(PlotAnnotation(kind=KIND_SPAN, text="drift", x=1e-6, x_end=2e-6))
+    spec.caption = "Figure 3: all runs"
+    d = spec.to_dict()
+    assert d["annotations"] == [{"kind": "span", "text": "drift", "x": 1e-6, "x_end": 2e-6}]
+    assert d["caption"] == "Figure 3: all runs"
+
+
+def test_waveform_region_no_longer_carries_the_dead_markers_field():
+    """`markers` was declared for 'Arrows, labels, etc.', serialized, and rendered
+    by nothing. PlotAnnotation replaces it; leaving a second half-built annotation
+    concept beside the working one only confuses the next reader."""
+    from dataclasses import fields
+
+    from scpi_control.report_generator.models.report_data import WaveformRegion
+
+    assert "markers" not in {f.name for f in fields(WaveformRegion)}

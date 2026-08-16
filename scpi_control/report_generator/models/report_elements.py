@@ -9,6 +9,8 @@ logic — the comparison analyzer and report builder fill them in.
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
+from scpi_control.report_generator.models.annotations import PlotAnnotation
+
 STATUS_PASS = "pass"
 STATUS_FAIL = "fail"
 STATUS_INCOMPLETE = "incomplete"
@@ -60,10 +62,17 @@ class OverlayPlotSpec:
 
     channel_label: str
     traces: List[OverlayTrace] = field(default_factory=list)
+    annotations: List[PlotAnnotation] = field(default_factory=list)
+    caption: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
         # Waveform arrays are not serializable; record what was plotted.
-        return {"channel_label": self.channel_label, "runs": [t.run_label for t in self.traces]}
+        data: Dict[str, Any] = {"channel_label": self.channel_label, "runs": [t.run_label for t in self.traces]}
+        if self.annotations:
+            data["annotations"] = [a.to_dict() for a in self.annotations]
+        if self.caption:
+            data["caption"] = self.caption
+        return data
 
 
 @dataclass

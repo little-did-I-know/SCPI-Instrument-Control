@@ -13,6 +13,7 @@ from typing import Any, Dict, List, Optional, Tuple
 import numpy as np
 
 from scpi_control.waveform import WaveformData as CaptureWaveform
+from scpi_control.report_generator.models.annotations import PlotAnnotation
 from scpi_control.report_generator.models.report_elements import ComparisonTable, DataManifest, OverlayPlotSpec, SignoffBlock
 
 SUMMARY_SOURCE_MANUAL = "manual"
@@ -130,7 +131,6 @@ class WaveformRegion:
     calibration_recommendation: Optional[str] = None
 
     # Visual annotations
-    markers: List[Dict[str, Any]] = field(default_factory=list)  # Arrows, labels, etc.
     highlight_color: Optional[str] = None
 
     # AI analysis
@@ -179,9 +179,6 @@ class WaveformRegion:
             if value is not None:
                 data[field_name] = value
 
-        if self.markers:
-            data["markers"] = self.markers
-
         if self.statistics:
             data["statistics"] = self.statistics
 
@@ -226,6 +223,10 @@ class WaveformData(CaptureWaveform):
 
     # Regions of interest for detailed analysis
     regions: List[WaveformRegion] = field(default_factory=list)
+
+    # User-supplied plot annotations and figure caption
+    annotations: List[PlotAnnotation] = field(default_factory=list)
+    caption: Optional[str] = None
 
     def __post_init__(self):
         """Validate via the library's rules, then apply report defaults."""
@@ -384,6 +385,11 @@ class WaveformData(CaptureWaveform):
         if self.regions:
             data["regions"] = [region.to_dict() for region in self.regions]
 
+        if self.annotations:
+            data["annotations"] = [a.to_dict() for a in self.annotations]
+        if self.caption:
+            data["caption"] = self.caption
+
         return data
 
 
@@ -467,6 +473,10 @@ class TestSection:
     manifest: Optional[DataManifest] = None
     signoff: Optional[SignoffBlock] = None
 
+    # FFT plot annotations and figure caption
+    fft_annotations: List[PlotAnnotation] = field(default_factory=list)
+    fft_caption: Optional[str] = None
+
     order: int = 0  # For sorting sections
 
     def to_dict(self) -> Dict[str, Any]:
@@ -496,6 +506,11 @@ class TestSection:
             data["manifest"] = self.manifest.to_dict()
         if self.signoff:
             data["signoff"] = self.signoff.to_dict()
+
+        if self.fft_annotations:
+            data["fft_annotations"] = [a.to_dict() for a in self.fft_annotations]
+        if self.fft_caption:
+            data["fft_caption"] = self.fft_caption
 
         return data
 
