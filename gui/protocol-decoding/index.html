@@ -5127,13 +5127,13 @@
 <p><strong>Example:</strong></p>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>Time      | Dir | Data (Hex) | ASCII | Error
 </span><span id="__span-17-2"><a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>----------|-----|------------|-------|-------
-</span><span id="__span-17-3"><a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a>0.000 ms  | TX  | 0x48       | &#39;H&#39;   | -
-</span><span id="__span-17-4"><a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a>1.042 ms  | TX  | 0x65       | &#39;e&#39;   | -
-</span><span id="__span-17-5"><a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a>2.083 ms  | TX  | 0x6C       | &#39;l&#39;   | -
-</span><span id="__span-17-6"><a id="__codelineno-17-6" name="__codelineno-17-6" href="#__codelineno-17-6"></a>3.125 ms  | TX  | 0x6C       | &#39;l&#39;   | -
-</span><span id="__span-17-7"><a id="__codelineno-17-7" name="__codelineno-17-7" href="#__codelineno-17-7"></a>4.167 ms  | TX  | 0x6F       | &#39;o&#39;   | -
-</span><span id="__span-17-8"><a id="__codelineno-17-8" name="__codelineno-17-8" href="#__codelineno-17-8"></a>5.208 ms  | RX  | 0x4F       | &#39;O&#39;   | -
-</span><span id="__span-17-9"><a id="__codelineno-17-9" name="__codelineno-17-9" href="#__codelineno-17-9"></a>6.250 ms  | RX  | 0x4B       | &#39;K&#39;   | -
+</span><span id="__span-17-3"><a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a>0.000 ms  | TX  | 0x48       | 'H'   | -
+</span><span id="__span-17-4"><a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a>1.042 ms  | TX  | 0x65       | 'e'   | -
+</span><span id="__span-17-5"><a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a>2.083 ms  | TX  | 0x6C       | 'l'   | -
+</span><span id="__span-17-6"><a id="__codelineno-17-6" name="__codelineno-17-6" href="#__codelineno-17-6"></a>3.125 ms  | TX  | 0x6C       | 'l'   | -
+</span><span id="__span-17-7"><a id="__codelineno-17-7" name="__codelineno-17-7" href="#__codelineno-17-7"></a>4.167 ms  | TX  | 0x6F       | 'o'   | -
+</span><span id="__span-17-8"><a id="__codelineno-17-8" name="__codelineno-17-8" href="#__codelineno-17-8"></a>5.208 ms  | RX  | 0x4F       | 'O'   | -
+</span><span id="__span-17-9"><a id="__codelineno-17-9" name="__codelineno-17-9" href="#__codelineno-17-9"></a>6.250 ms  | RX  | 0x4B       | 'K'   | -
 </span></code></pre></div>
 <h2 id="decoding-features">Decoding Features<a class="headerlink" href="#decoding-features" title="Permanent link">&para;</a></h2>
 <h3 id="display-modes">Display Modes<a class="headerlink" href="#display-modes" title="Permanent link">&para;</a></h3>
@@ -5202,7 +5202,7 @@
 <li>Address (I2C)</li>
 </ul>
 <p><strong>Example:</strong></p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-20-1"><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a>Search: &quot;Hello&quot; in UART data
+<div class="language-text highlight"><pre><span></span><code><span id="__span-20-1"><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a>Search: "Hello" in UART data
 </span><span id="__span-20-2"><a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a>Result: Highlights all occurrences
 </span></code></pre></div>
 <h2 id="exporting-decoded-data">Exporting Decoded Data<a class="headerlink" href="#exporting-decoded-data" title="Permanent link">&para;</a></h2>
@@ -5323,10 +5323,10 @@
 </span><span id="__span-27-4"><a id="__codelineno-27-4" name="__codelineno-27-4" href="#__codelineno-27-4"></a>Format: 8N1
 </span></code></pre></div>
 <p><strong>Captured Data:</strong></p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-28-1"><a id="__codelineno-28-1" name="__codelineno-28-1" href="#__codelineno-28-1"></a>TX: &quot;AT\r\n&quot;
-</span><span id="__span-28-2"><a id="__codelineno-28-2" name="__codelineno-28-2" href="#__codelineno-28-2"></a>RX: &quot;OK\r\n&quot;
-</span><span id="__span-28-3"><a id="__codelineno-28-3" name="__codelineno-28-3" href="#__codelineno-28-3"></a>TX: &quot;AT+GMR\r\n&quot;
-</span><span id="__span-28-4"><a id="__codelineno-28-4" name="__codelineno-28-4" href="#__codelineno-28-4"></a>RX: &quot;v1.2.3\r\nOK\r\n&quot;
+<div class="language-text highlight"><pre><span></span><code><span id="__span-28-1"><a id="__codelineno-28-1" name="__codelineno-28-1" href="#__codelineno-28-1"></a>TX: "AT\r\n"
+</span><span id="__span-28-2"><a id="__codelineno-28-2" name="__codelineno-28-2" href="#__codelineno-28-2"></a>RX: "OK\r\n"
+</span><span id="__span-28-3"><a id="__codelineno-28-3" name="__codelineno-28-3" href="#__codelineno-28-3"></a>TX: "AT+GMR\r\n"
+</span><span id="__span-28-4"><a id="__codelineno-28-4" name="__codelineno-28-4" href="#__codelineno-28-4"></a>RX: "v1.2.3\r\nOK\r\n"
 </span></code></pre></div>
 <p><strong>Interpretation:</strong></p>
 <ul>

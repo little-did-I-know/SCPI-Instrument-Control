@@ -4062,10 +4062,10 @@
 <h2 id="quick-start">Quick Start<a class="headerlink" href="#quick-start" title="Permanent link">&para;</a></h2>
 <h3 id="installation">Installation<a class="headerlink" href="#installation" title="Permanent link">&para;</a></h3>
 <p>Install the Report Generator with all required dependencies:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span><span class="s2">&quot;.[report-generator]&quot;</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span><span class="s2">".[report-generator]"</span>
 </span></code></pre></div>
 <p>Or install everything:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span><span class="s2">&quot;.[all]&quot;</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span><span class="s2">".[all]"</span>
 </span></code></pre></div>
 <h3 id="launch-the-application">Launch the Application<a class="headerlink" href="#launch-the-application" title="Permanent link">&para;</a></h3>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># Using the installed command</span>
@@ -4106,7 +4106,7 @@
 <p>Generate automated test reports for production testing with pass/fail criteria and audit trails.</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># Automated QA report generation</span>
 </span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="n">report</span> <span class="o">=</span> <span class="n">create_qa_report</span><span class="p">(</span><span class="n">waveforms</span><span class="p">,</span> <span class="n">criteria_set</span><span class="p">)</span>
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="k">if</span> <span class="ow">not</span> <span class="n">report</span><span class="o">.</span><span class="n">calculate_overall_result</span><span class="p">()</span> <span class="o">==</span> <span class="s2">&quot;PASS&quot;</span><span class="p">:</span>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="k">if</span> <span class="ow">not</span> <span class="n">report</span><span class="o">.</span><span class="n">calculate_overall_result</span><span class="p">()</span> <span class="o">==</span> <span class="s2">"PASS"</span><span class="p">:</span>
 </span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>    <span class="n">send_alert</span><span class="p">(</span><span class="n">report</span><span class="p">)</span>
 </span></code></pre></div>
 <h3 id="research-development">Research &amp; Development<a class="headerlink" href="#research-development" title="Permanent link">&para;</a></h3>
@@ -4114,14 +4114,14 @@
 <div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1"># Research report with AI insights</span>
 </span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="n">report</span> <span class="o">=</span> <span class="n">create_research_report</span><span class="p">(</span><span class="n">experiment_data</span><span class="p">)</span>
 </span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="n">add_ai_analysis</span><span class="p">(</span><span class="n">report</span><span class="p">,</span> <span class="n">llm_client</span><span class="p">)</span>
-</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="n">export_pdf</span><span class="p">(</span><span class="n">report</span><span class="p">,</span> <span class="s2">&quot;research_findings.pdf&quot;</span><span class="p">)</span>
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="n">export_pdf</span><span class="p">(</span><span class="n">report</span><span class="p">,</span> <span class="s2">"research_findings.pdf"</span><span class="p">)</span>
 </span></code></pre></div>
 <h3 id="field-service">Field Service<a class="headerlink" href="#field-service" title="Permanent link">&para;</a></h3>
 <p>Generate quick reports for customers on-site, completely offline.</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="c1"># On-site service report</span>
 </span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="n">report</span> <span class="o">=</span> <span class="n">create_service_report</span><span class="p">(</span><span class="n">measurements</span><span class="p">)</span>
 </span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="n">add_technician_notes</span><span class="p">(</span><span class="n">report</span><span class="p">,</span> <span class="n">notes</span><span class="p">)</span>
-</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="n">export_pdf</span><span class="p">(</span><span class="n">report</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;service_</span><span class="si">{</span><span class="n">customer_id</span><span class="si">}</span><span class="s2">.pdf&quot;</span><span class="p">)</span>
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="n">export_pdf</span><span class="p">(</span><span class="n">report</span><span class="p">,</span> <span class="sa">f</span><span class="s2">"service_</span><span class="si">{</span><span class="n">customer_id</span><span class="si">}</span><span class="s2">.pdf"</span><span class="p">)</span>
 </span></code></pre></div>
 <h2 id="system-requirements">System Requirements<a class="headerlink" href="#system-requirements" title="Permanent link">&para;</a></h2>
 <p><strong>Minimum:</strong></p>

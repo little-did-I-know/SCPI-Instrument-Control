@@ -4205,14 +4205,14 @@ time. This is expected, and the workaround is per-platform:</p>
 the <code>scpi-web</code> browser gateway, install the Python package as described below.</p>
 <h2 id="basic-installation">Basic Installation<a class="headerlink" href="#basic-installation" title="Permanent link">&para;</a></h2>
 <p>Install the base package using pip:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot;SCPI-Instrument-Control&quot;</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">"SCPI-Instrument-Control"</span>
 </span></code></pre></div>
 <p>This provides the core functionality for programmatic control.</p>
 <h2 id="optional-features">Optional Features<a class="headerlink" href="#optional-features" title="Permanent link">&para;</a></h2>
 <p>The library provides several optional feature sets that can be installed as needed:</p>
 <h3 id="gui-application">GUI Application<a class="headerlink" href="#gui-application" title="Permanent link">&para;</a></h3>
 <p>For the PyQt6-based graphical interface:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot;SCPI-Instrument-Control[gui]&quot;</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">"SCPI-Instrument-Control[gui]"</span>
 </span></code></pre></div>
 <p><strong>Includes:</strong></p>
 <ul>
@@ -4222,7 +4222,7 @@ the <code>scpi-web</code> browser gateway, install the Python package as describ
 </ul>
 <h3 id="data-export">Data Export<a class="headerlink" href="#data-export" title="Permanent link">&para;</a></h3>
 <p>For advanced data export formats:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot;SCPI-Instrument-Control[hdf5]&quot;</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">"SCPI-Instrument-Control[hdf5]"</span>
 </span></code></pre></div>
 <p><strong>Includes:</strong></p>
 <ul>
@@ -4230,7 +4230,7 @@ the <code>scpi-web</code> browser gateway, install the Python package as describ
 </ul>
 <h3 id="vector-graphics">Vector Graphics<a class="headerlink" href="#vector-graphics" title="Permanent link">&para;</a></h3>
 <p>For XY mode vector graphics and shapes:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot;SCPI-Instrument-Control[fun]&quot;</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">"SCPI-Instrument-Control[fun]"</span>
 </span></code></pre></div>
 <p><strong>Includes:</strong></p>
 <ul>
@@ -4241,7 +4241,7 @@ the <code>scpi-web</code> browser gateway, install the Python package as describ
 <h3 id="web-gateway">Web Gateway<a class="headerlink" href="#web-gateway" title="Permanent link">&para;</a></h3>
 <p>For the browser-based lab gateway (a FastAPI server plus a web UI) so any
 browser on your LAN can control the instrument, no client install required:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot;SCPI-Instrument-Control[web]&quot;</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">"SCPI-Instrument-Control[web]"</span>
 </span></code></pre></div>
 <p><strong>Includes:</strong></p>
 <ul>
@@ -4252,7 +4252,7 @@ browser on your LAN can control the instrument, no client install required:</p>
 <p>Start it with <code>scpi-web</code>. See the <a href="../../gateway/">Web Gateway guide</a> for details.</p>
 <h3 id="usb-gpib-serial">USB / GPIB / Serial<a class="headerlink" href="#usb-gpib-serial" title="Permanent link">&para;</a></h3>
 <p>For instruments connected via USB, GPIB, or serial instead of Ethernet:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot;SCPI-Instrument-Control[usb]&quot;</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">"SCPI-Instrument-Control[usb]"</span>
 </span></code></pre></div>
 <p><strong>Includes:</strong></p>
 <ul>
@@ -4261,7 +4261,7 @@ browser on your LAN can control the instrument, no client install required:</p>
 </ul>
 <h3 id="all-features">All Features<a class="headerlink" href="#all-features" title="Permanent link">&para;</a></h3>
 <p>Install everything:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot;SCPI-Instrument-Control[all]&quot;</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">"SCPI-Instrument-Control[all]"</span>
 </span></code></pre></div>
 <p><code>[all]</code> does <strong>not</strong> include the web gateway (<code>[web]</code>) or USB/GPIB/Serial
 support (<code>[usb]</code>) — install those explicitly if you need them.</p>
@@ -4272,7 +4272,7 @@ support (<code>[usb]</code>) — install those explicitly if you need them.</p>
 </span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="nb">cd</span><span class="w"> </span>SCPI-Instrument-Control
 </span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>
 </span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="c1"># Install in editable mode with development dependencies</span>
-</span><span id="__span-7-6"><a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a>pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span><span class="s2">&quot;.[dev]&quot;</span>
+</span><span id="__span-7-6"><a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a>pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span><span class="s2">".[dev]"</span>
 </span><span id="__span-7-7"><a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a>
 </span><span id="__span-7-8"><a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a><span class="c1"># Set up pre-commit hooks</span>
 </span><span id="__span-7-9"><a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a>make<span class="w"> </span>dev-setup
@@ -4289,7 +4289,7 @@ support (<code>[usb]</code>) — install those explicitly if you need them.</p>
 <h2 id="documentation">Documentation<a class="headerlink" href="#documentation" title="Permanent link">&para;</a></h2>
 <p>To build the documentation locally:</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="c1"># Install documentation dependencies</span>
-</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot;SCPI-Instrument-Control[docs]&quot;</span>
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">"SCPI-Instrument-Control[docs]"</span>
 </span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>
 </span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="c1"># Serve documentation locally</span>
 </span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>mkdocs<span class="w"> </span>serve
@@ -4302,7 +4302,7 @@ support (<code>[usb]</code>) — install those explicitly if you need them.</p>
 </span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>
 </span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="c1"># Test connection (replace with your oscilloscope IP)</span>
 </span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="kn">from</span><span class="w"> </span><span class="nn">scpi_control</span><span class="w"> </span><span class="kn">import</span> <span class="n">Oscilloscope</span>
-</span><span id="__span-9-6"><a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a><span class="n">scope</span> <span class="o">=</span> <span class="n">Oscilloscope</span><span class="p">(</span><span class="s1">&#39;192.168.1.100&#39;</span><span class="p">)</span>
+</span><span id="__span-9-6"><a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a><span class="n">scope</span> <span class="o">=</span> <span class="n">Oscilloscope</span><span class="p">(</span><span class="s1">'192.168.1.100'</span><span class="p">)</span>
 </span><span id="__span-9-7"><a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a><span class="n">scope</span><span class="o">.</span><span class="n">connect</span><span class="p">()</span>
 </span><span id="__span-9-8"><a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a><span class="nb">print</span><span class="p">(</span><span class="n">scope</span><span class="o">.</span><span class="n">identify</span><span class="p">())</span>
 </span><span id="__span-9-9"><a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a><span class="n">scope</span><span class="o">.</span><span class="n">disconnect</span><span class="p">()</span>
@@ -4325,14 +4325,14 @@ support (<code>[usb]</code>) — install those explicitly if you need them.</p>
 </span></code></pre></div>
 <p>Test SCPI connection using netcat (Linux/macOS):</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="c1"># Send *IDN? command</span>
-</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;*IDN?&quot;</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>nc<span class="w"> </span><span class="m">192</span>.168.1.100<span class="w"> </span><span class="m">5024</span>
+</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="nb">echo</span><span class="w"> </span><span class="s2">"*IDN?"</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>nc<span class="w"> </span><span class="m">192</span>.168.1.100<span class="w"> </span><span class="m">5024</span>
 </span></code></pre></div>
 <p>Or using PowerShell (Windows):</p>
-<div class="language-powershell highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="nv">$client</span> <span class="p">=</span> <span class="nb">New-Object</span> <span class="n">System</span><span class="p">.</span><span class="n">Net</span><span class="p">.</span><span class="n">Sockets</span><span class="p">.</span><span class="n">TcpClient</span><span class="p">(</span><span class="s2">&quot;192.168.1.100&quot;</span><span class="p">,</span> <span class="n">5024</span><span class="p">)</span>
+<div class="language-powershell highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="nv">$client</span> <span class="p">=</span> <span class="nb">New-Object</span> <span class="n">System</span><span class="p">.</span><span class="n">Net</span><span class="p">.</span><span class="n">Sockets</span><span class="p">.</span><span class="n">TcpClient</span><span class="p">(</span><span class="s2">"192.168.1.100"</span><span class="p">,</span> <span class="n">5024</span><span class="p">)</span>
 </span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="nv">$stream</span> <span class="p">=</span> <span class="nv">$client</span><span class="p">.</span><span class="n">GetStream</span><span class="p">()</span>
 </span><span id="__span-13-3"><a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a><span class="nv">$writer</span> <span class="p">=</span> <span class="nb">New-Object</span> <span class="n">System</span><span class="p">.</span><span class="n">IO</span><span class="p">.</span><span class="n">StreamWriter</span><span class="p">(</span><span class="nv">$stream</span><span class="p">)</span>
 </span><span id="__span-13-4"><a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a><span class="nv">$reader</span> <span class="p">=</span> <span class="nb">New-Object</span> <span class="n">System</span><span class="p">.</span><span class="n">IO</span><span class="p">.</span><span class="n">StreamReader</span><span class="p">(</span><span class="nv">$stream</span><span class="p">)</span>
-</span><span id="__span-13-5"><a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a><span class="nv">$writer</span><span class="p">.</span><span class="n">WriteLine</span><span class="p">(</span><span class="s2">&quot;*IDN?&quot;</span><span class="p">)</span>
+</span><span id="__span-13-5"><a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a><span class="nv">$writer</span><span class="p">.</span><span class="n">WriteLine</span><span class="p">(</span><span class="s2">"*IDN?"</span><span class="p">)</span>
 </span><span id="__span-13-6"><a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a><span class="nv">$writer</span><span class="p">.</span><span class="n">Flush</span><span class="p">()</span>
 </span><span id="__span-13-7"><a id="__codelineno-13-7" name="__codelineno-13-7" href="#__codelineno-13-7"></a><span class="nv">$reader</span><span class="p">.</span><span class="n">ReadLine</span><span class="p">()</span>
 </span><span id="__span-13-8"><a id="__codelineno-13-8" name="__codelineno-13-8" href="#__codelineno-13-8"></a><span class="nv">$client</span><span class="p">.</span><span class="n">Close</span><span class="p">()</span>
@@ -4341,17 +4341,17 @@ support (<code>[usb]</code>) — install those explicitly if you need them.</p>
 <h3 id="import-errors">Import Errors<a class="headerlink" href="#import-errors" title="Permanent link">&para;</a></h3>
 <p><strong>Problem</strong>: <code>ModuleNotFoundError: No module named 'siglent'</code></p>
 <p><strong>Solution</strong>: Ensure the package is installed in the correct Python environment:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="c1"># Check which Python you&#39;re using</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="c1"># Check which Python you're using</span>
 </span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>python<span class="w"> </span>--version
 </span><span id="__span-14-3"><a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>pip<span class="w"> </span>--version
 </span><span id="__span-14-4"><a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a>
 </span><span id="__span-14-5"><a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a><span class="c1"># Install in the correct environment</span>
-</span><span id="__span-14-6"><a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot;SCPI-Instrument-Control&quot;</span>
+</span><span id="__span-14-6"><a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">"SCPI-Instrument-Control"</span>
 </span></code></pre></div>
 <h3 id="gui-missing-dependencies">GUI Missing Dependencies<a class="headerlink" href="#gui-missing-dependencies" title="Permanent link">&para;</a></h3>
 <p><strong>Problem</strong>: <code>ERROR: Missing Required GUI Dependencies</code></p>
 <p><strong>Solution</strong>: Install the GUI extras:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot;SCPI-Instrument-Control[gui]&quot;</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">"SCPI-Instrument-Control[gui]"</span>
 </span></code></pre></div>
 <h3 id="connection-refused">Connection Refused<a class="headerlink" href="#connection-refused" title="Permanent link">&para;</a></h3>
 <p><strong>Problem</strong>: <code>SiglentConnectionError: Failed to connect to 192.168.1.100:5024</code></p>
