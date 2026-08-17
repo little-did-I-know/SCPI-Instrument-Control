@@ -30,6 +30,14 @@ pipeline with an empty bench.
   <img src="https://raw.githubusercontent.com/little-did-I-know/SCPI-Instrument-Control/main/docs/images/mock-demo.gif" alt="Terminal recording of four example scripts — basic_usage, math_channels, measurement_badges_example and screen_capture_example — running one after another against the built-in mock scope with no instrument attached" width="760">
 </p>
 
+Captures become reports. Annotate a plot with callouts, reference lines and shaded
+windows, and both the PDF and Markdown generators render them — here the code, then
+the plots it produced:
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/little-did-I-know/SCPI-Instrument-Control/main/docs/images/plot-annotations.gif" alt="Code adding four plot annotations — a vertical line, a label, a horizontal reference line and a shaded span — to a captured waveform, followed by the two plots that code produced: the full trace and a region zoom inheriting the same annotations" width="760">
+</p>
+
 ## Try it with no instrument on your desk
 
 ```bash
