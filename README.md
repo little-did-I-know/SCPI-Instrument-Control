@@ -35,7 +35,11 @@ windows, and both the PDF and Markdown generators render them — here the code,
 the plots it produced:
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/little-did-I-know/SCPI-Instrument-Control/main/docs/images/plot-annotations.gif" alt="Code adding four plot annotations — a vertical line, a label, a horizontal reference line and a shaded span — to a captured waveform, followed by the two plots that code produced: the full trace and a region zoom inheriting the same annotations" width="760">
+  <!-- Pinned to the commit that added this asset, not to main: a main-pinned URL
+       404s (rendering as blank space) on every branch and fork until the file
+       reaches main, which makes the image unreviewable before merge. Bump the SHA
+       when regenerating the GIF, or the README keeps showing the old one. -->
+  <img src="https://raw.githubusercontent.com/little-did-I-know/SCPI-Instrument-Control/96d89e846ada8a2ef28623a624a7ba0a9173ca2b/docs/images/plot-annotations.gif" alt="Code adding four plot annotations — a vertical line, a label, a horizontal reference line and a shaded span — to a captured waveform, followed by the two plots that code produced: the full trace and a region zoom inheriting the same annotations" width="760">
 </p>
 
 ## Try it with no instrument on your desk
