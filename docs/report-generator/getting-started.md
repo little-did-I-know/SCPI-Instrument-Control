@@ -372,6 +372,15 @@ same file twice does not duplicate them.
 - **Overlapping labels are not auto-spaced.** If two labels land on top of each
   other, nudge one with `text_dx`/`text_dy` (offsets from the anchor, as a fraction
   of the axis span) rather than expecting automatic layout.
+- **Label offsets are not clamped to the plot area.** `text_dx`/`text_dy` are applied
+  as-is, and matplotlib does not grow the axes to fit annotation text, so an offset
+  that lands outside the data range puts the text outside the plot box — a large
+  positive `text_dy` on a label near the top of the trace typically collides with the
+  plot title. Only the label kind takes offsets at all: vertical-line and span text is
+  pinned just inside the top of the axes, and horizontal-line text to the right edge at
+  its own line's height, so those stay within the plot box. Keep label offsets small
+  (the 0.06 default is roughly the right scale) and check the rendered plot rather
+  than assuming a big offset will be reined in.
 - **A literal `*` or `_` in a caption can corrupt the surrounding emphasis markup, in
   both PDF and Markdown reports.** Both formats deliberately interpret `*text*` and
   `_text_` in a caption as emphasis — the Markdown generator emits captions
