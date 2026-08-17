@@ -19,6 +19,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   is restored when the waveform is re-imported. See
   `examples/report_annotations.py`.
 
+### Fixed
+
+- **Translucent fills reached the PDF fully opaque.** `svglib` honours
+  `fill-opacity`/`stroke-opacity` but ignores a bare `opacity:`, which is what
+  matplotlib writes for a translucent *patch* — so an annotation span drawn at
+  `PlotStyle.annotation_span_alpha` (0.25 by default) was painted as a solid
+  block over its own gridlines, and a plot legend's frame lost its 80%
+  transparency. Lines were never affected: those get `stroke-opacity`, which
+  `svglib` already reads. PDF plots now render both at the alpha they were drawn
+  with. Markdown reports were always correct, so PDF and Markdown output of the
+  same report now match.
+
 ### Removed
 
 - `WaveformRegion.markers`, an unused field that was serialized but rendered by

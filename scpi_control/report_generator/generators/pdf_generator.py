@@ -49,11 +49,38 @@ from scpi_control.report_generator.utils.waveform_analyzer import WaveformAnalyz
 logger = logging.getLogger(__name__)
 
 
+# A bare `opacity: <n>` in a style attribute, but NOT the hyphenated properties
+# (fill-opacity, stroke-opacity, stop-opacity) -- rewriting one of those would
+# produce `fill-fill-opacity` and lose the alpha it already carried correctly.
+_BARE_OPACITY = re.compile(r"(?<![-\w])opacity: *([0-9.]+)")
+
+
+def _restore_patch_opacity(svg_bytes: bytes) -> bytes:
+    """Rewrite `opacity:` to the two properties svglib actually reads.
+
+    svglib honours fill-opacity and stroke-opacity but silently ignores a bare
+    `opacity:`, which is exactly what matplotlib writes for a translucent PATCH
+    (an annotation span's fill, a legend frame). The alpha was therefore dropped
+    in conversion and every span reached the PDF fully opaque, painting over the
+    gridlines it was meant to sit behind, whatever PlotStyle.annotation_span_alpha
+    said. Lines were never affected: matplotlib gives those stroke-opacity.
+
+    Both properties are set because matplotlib strokes a span's outline in the
+    same colour as its fill -- setting fill-opacity alone leaves a hard, fully
+    saturated border around a pale band.
+    """
+    try:
+        return _BARE_OPACITY.sub(lambda m: f"fill-opacity: {m.group(1)}; stroke-opacity: {m.group(1)}", svg_bytes.decode("utf-8")).encode("utf-8")
+    except UnicodeError:
+        logger.warning("SVG buffer is not valid UTF-8; leaving patch opacity as-is")
+        return svg_bytes
+
+
 def _svg_to_drawing(buf, max_width, max_height):
     """Convert an in-memory SVG buffer to a reportlab Drawing scaled to fit the
     given box (in points), preserving aspect ratio. Returns None only if svg2rlg
     could not parse the buffer."""
-    drawing = svg2rlg(buf)
+    drawing = svg2rlg(io.BytesIO(_restore_patch_opacity(buf.read())))
     if drawing is None or not drawing.width or not drawing.height:
         return drawing
     scale = min(max_width / drawing.width, max_height / drawing.height)

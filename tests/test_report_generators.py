@@ -164,6 +164,79 @@ def test_pdf_caption_text_reaches_the_document(tmp_path):
     assert "Figure 3: all runs" in text
 
 
+def test_svg_to_drawing_preserves_patch_opacity():
+    """svglib reads fill-opacity/stroke-opacity but ignores a bare `opacity:`.
+
+    matplotlib writes a translucent PATCH -- an annotation span's fill, a legend
+    frame -- as `opacity:` inside a style attribute, so every span reached the PDF
+    fully opaque whatever PlotStyle.annotation_span_alpha said. Lines were never
+    affected: those get stroke-opacity, which svglib already honours.
+
+    The second path guards the rewrite against mangling an already-hyphenated
+    property into `fill-fill-opacity`.
+    """
+    import io
+
+    pytest.importorskip("reportlab")
+    from scpi_control.report_generator.generators.pdf_generator import _svg_to_drawing
+
+    svg = b"""<?xml version="1.0" encoding="utf-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100">
+ <path d="M 10 10 L 40 10 L 40 40 L 10 40 z" style="fill: #ffcc00; opacity: 0.25; stroke: #ffcc00; stroke-linejoin: miter"/>
+ <path d="M 50 10 L 90 10 L 90 40 L 50 40 z" style="fill: #00ff00; fill-opacity: 0.5"/>
+</svg>
+"""
+    drawing = _svg_to_drawing(io.BytesIO(svg), 200, 200)
+
+    shapes = []
+
+    def collect(node):
+        for child in getattr(node, "contents", []):
+            if getattr(child, "fillColor", None) is not None:
+                shapes.append(child)
+            collect(child)
+
+    collect(drawing)
+
+    span = next(s for s in shapes if (round(s.fillColor.red, 2), round(s.fillColor.green, 2)) == (1.0, 0.8))
+    assert span.fillOpacity == pytest.approx(0.25)
+    assert span.strokeOpacity == pytest.approx(0.25)  # else the span keeps a hard saturated border
+
+    untouched = next(s for s in shapes if (round(s.fillColor.red, 2), round(s.fillColor.green, 2)) == (0.0, 1.0))
+    assert untouched.fillOpacity == pytest.approx(0.5)
+
+
+def test_pdf_span_annotation_is_translucent(tmp_path):
+    """End-to-end: the span in a generated PDF is painted at annotation_span_alpha.
+
+    Asserted on the painted fill, not on the SVG, because the alpha was lost in the
+    SVG-to-ReportLab conversion -- a test above that layer passed while every real
+    report drew an opaque block over its own gridlines.
+    """
+    pytest.importorskip("reportlab")
+    fitz = pytest.importorskip("fitz")
+    from scpi_control.report_generator.generators.pdf_generator import PDFReportGenerator
+
+    generator = PDFReportGenerator()
+    out = tmp_path / "annotated.pdf"
+    assert generator.generate(make_annotated_report(), out) is True
+
+    span_rgb = tuple(int(generator.plot_style.annotation_span_color.lstrip("#")[i : i + 2], 16) / 255 for i in (0, 2, 4))
+    doc = fitz.open(out)
+    try:
+        opacities = [
+            drawing.get("fill_opacity")
+            for page in doc
+            for drawing in page.get_drawings()
+            if drawing.get("fill") and all(round(a, 2) == round(b, 2) for a, b in zip(drawing["fill"], span_rgb))
+        ]
+    finally:
+        doc.close()
+
+    assert opacities, "no span-coloured fill found in the PDF"
+    assert all(o == pytest.approx(generator.plot_style.annotation_span_alpha) for o in opacities)
+
+
 def test_pymupdf_is_available_for_the_preview_dialog():
     """PDF preview imports fitz (widgets/pdf_preview_dialog.py:17); without it
     declared, a clean `pip install .[report-generator]` leaves the feature dead."""
