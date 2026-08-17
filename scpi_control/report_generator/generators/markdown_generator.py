@@ -12,6 +12,7 @@ from typing import List, Optional
 import matplotlib.pyplot as plt
 import numpy as np
 
+from scpi_control.report_generator.generators.annotation_renderer import clip_to_window, draw_annotations
 from scpi_control.report_generator.generators.base import BaseReportGenerator
 from scpi_control.report_generator.models.plot_style import PlotStyle
 from scpi_control.report_generator.models.report_data import MeasurementResult, TestReport, TestSection, WaveformData
@@ -208,6 +209,9 @@ class MarkdownReportGenerator(BaseReportGenerator):
                 plot_path = self._generate_overlay_plot(spec, base_path, f"{section.title}_overlay_{spec.channel_label}")
                 if plot_path:
                     lines.append(f"![Overlay: {spec.channel_label}]({plot_path})")
+                    if spec.caption:
+                        lines.append("")
+                        lines.append(f"*{spec.caption}*")
                     lines.append("")
 
         # Comparison table
@@ -235,8 +239,11 @@ class MarkdownReportGenerator(BaseReportGenerator):
             lines.append("### FFT Analysis")
             lines.append("")
             if self.include_plots:
-                fft_plot_path = self._generate_fft_plot(section.fft_frequency, section.fft_magnitude, base_path, f"{section.title}_fft")
+                fft_plot_path = self._generate_fft_plot(section.fft_frequency, section.fft_magnitude, base_path, f"{section.title}_fft", section.fft_annotations)
                 lines.append(f"![FFT Analysis]({fft_plot_path})")
+                if section.fft_caption:
+                    lines.append("")
+                    lines.append(f"*{section.fft_caption}*")
             lines.append("")
 
         # Images
@@ -270,6 +277,9 @@ class MarkdownReportGenerator(BaseReportGenerator):
         if self.include_plots:
             plot_path = self._generate_waveform_plot(waveform, base_path, name)
             lines.append(f"![{waveform.label}]({plot_path})")
+            if waveform.caption:
+                lines.append("")
+                lines.append(f"*{waveform.caption}*")
             lines.append("")
 
         # Waveform info table
@@ -484,6 +494,13 @@ class MarkdownReportGenerator(BaseReportGenerator):
 
             ax.grid(True, alpha=0.3)
 
+            draw_annotations(
+                ax,
+                clip_to_window(waveform.annotations, region.start_time, region.end_time),
+                self.plot_style,
+                x_scale=1e3,
+            )
+
             plt.tight_layout()
             plt.savefig(filepath, dpi=150, bbox_inches="tight")
             plt.close(fig)
@@ -552,13 +569,15 @@ class MarkdownReportGenerator(BaseReportGenerator):
         ax.set_ylabel("Voltage (V)", fontsize=self.plot_style.label_fontsize)
         ax.set_title(waveform.label, fontsize=self.plot_style.title_fontsize)
 
+        draw_annotations(ax, waveform.annotations, self.plot_style, x_scale=1e6)
+
         plt.tight_layout()
         plt.savefig(filepath, dpi=150, bbox_inches="tight")
         plt.close(fig)
 
         return f"{self.plots_dir}/{filename}"
 
-    def _generate_fft_plot(self, frequency: np.ndarray, magnitude: np.ndarray, base_path: Path, name: str) -> str:
+    def _generate_fft_plot(self, frequency: np.ndarray, magnitude: np.ndarray, base_path: Path, name: str, annotations=None) -> str:
         """Generate and save FFT plot with custom style."""
         plots_path = base_path / self.plots_dir
         plots_path.mkdir(parents=True, exist_ok=True)
@@ -582,6 +601,8 @@ class MarkdownReportGenerator(BaseReportGenerator):
         ax.set_xlabel("Frequency (MHz)", fontsize=self.plot_style.label_fontsize)
         ax.set_ylabel("Magnitude (dB)", fontsize=self.plot_style.label_fontsize)
         ax.set_title("FFT Analysis", fontsize=self.plot_style.title_fontsize)
+
+        draw_annotations(ax, annotations, self.plot_style, x_scale=1e-6)
 
         plt.tight_layout()
         plt.savefig(filepath, dpi=150, bbox_inches="tight")
@@ -643,6 +664,7 @@ class MarkdownReportGenerator(BaseReportGenerator):
             ax.set_ylabel("Voltage (V)", fontsize=self.plot_style.label_fontsize)
             ax.set_title(f"Channel {spec.channel_label} — all runs", fontsize=self.plot_style.title_fontsize)
             ax.legend()
+            draw_annotations(ax, spec.annotations, self.plot_style, x_scale=1e6)
             plt.tight_layout()
             plt.savefig(filepath, dpi=150, bbox_inches="tight")
             plt.close(fig)

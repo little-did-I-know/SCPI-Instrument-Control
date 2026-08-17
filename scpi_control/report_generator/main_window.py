@@ -44,6 +44,7 @@ from scpi_control.report_generator.models.plot_style import PlotStyle
 from scpi_control.report_generator.models.report_data import TestReport, TestSection, WaveformData
 from scpi_control.report_generator.models.report_options import ReportOptions
 from scpi_control.report_generator.models.template import BrandingTemplate, ReportTemplate
+from scpi_control.report_generator.utils.annotation_store import load_annotations_into, load_fft_annotations_into
 from scpi_control.report_generator.utils.waveform_loader import WaveformLoader
 
 try:
@@ -55,6 +56,7 @@ except ImportError:
 
 from scpi_control.report_generator.llm.client import LLMClient, LLMConfig
 from scpi_control.report_generator.widgets.ai_analysis_panel import AIAnalysisPanel
+from scpi_control.report_generator.widgets.annotation_dialog import AnnotationDialog
 from scpi_control.report_generator.widgets.chat_sidebar import ChatSidebar
 from scpi_control.report_generator.widgets.llm_settings_dialog import LLMSettingsDialog
 from scpi_control.report_generator.widgets.metadata_panel import MetadataPanel
@@ -182,6 +184,12 @@ class MainWindow(QMainWindow):
         self.waveform_list = QListWidget()
         import_layout.addWidget(QLabel("Imported Waveforms:"))
         import_layout.addWidget(self.waveform_list)
+
+        self.annotate_button = QPushButton("Annotate…")
+        self.annotate_button.setToolTip("Add text, reference lines and shaded spans to this waveform's plot")
+        self.annotate_button.clicked.connect(self._on_annotate_waveform)
+        import_layout.addWidget(self.annotate_button)
+        self.waveform_list.itemDoubleClicked.connect(lambda _item: self._on_annotate_waveform())
 
         # Import buttons
         btn_layout = QHBoxLayout()
@@ -317,6 +325,10 @@ class MainWindow(QMainWindow):
                 for waveform in waveforms:
                     self.waveform_list.addItem(f"{waveform.label} - {Path(file_path).name}")
 
+            applied = load_annotations_into(self.waveforms)
+            if applied:
+                logger.info(f"Applied {applied} saved annotation(s) from sidecar files")
+
             self.statusBar().showMessage(f"Imported {len(file_paths)} waveform file(s)")
 
         except Exception as e:
@@ -325,6 +337,14 @@ class MainWindow(QMainWindow):
                 "Import Error",
                 f"Failed to import waveforms:\n{str(e)}",
             )
+
+    def _on_annotate_waveform(self):
+        """Open the annotation editor for the selected waveform."""
+        row = self.waveform_list.currentRow()
+        if row < 0 or row >= len(self.waveforms):
+            QMessageBox.information(self, "No waveform selected", "Select a waveform in the list to annotate it.")
+            return
+        AnnotationDialog(self.waveforms[row], self).exec()
 
     def _import_images(self):
         """Import image files."""
@@ -630,6 +650,7 @@ class MainWindow(QMainWindow):
                 waveforms=self.waveforms,
                 order=1,
             )
+            load_fft_annotations_into(section, self.waveforms)
             report.add_section(section)
 
         # Add AI-generated content if available

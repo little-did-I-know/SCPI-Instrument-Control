@@ -32,6 +32,16 @@ class PlotStyle:
     # Matplotlib style preset
     matplotlib_style: str = "default"  # "default", "seaborn", "ggplot", etc.
 
+    # Annotation defaults. Individual PlotAnnotations may override color,
+    # fontsize and arrow; everything else here applies report-wide.
+    annotation_color: str = "#333333"
+    annotation_fontsize: int = 9
+    annotation_line_color: str = "#d62728"
+    annotation_line_style: str = "--"
+    annotation_span_color: str = "#ffcc00"
+    annotation_span_alpha: float = 0.25
+    annotation_arrow: bool = True
+
     def apply_to_axes(self, ax):
         """
         Apply this style to a matplotlib axes object.
