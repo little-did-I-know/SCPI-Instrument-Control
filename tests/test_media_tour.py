@@ -1,6 +1,6 @@
-"""The demo GIF's tour must reference examples that exist and that CI executes.
+"""The demo GIFs must reference examples that exist and that CI executes.
 
-Parsed from source rather than imported: importing the generator would require
+Parsed from source rather than imported: importing a generator would require
 Pillow, which is not installed in every CI job. Parsing uses `ast` rather than
 regex so it is immune to quote style, tuple arity, and reformatting.
 """
@@ -10,6 +10,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 GENERATOR = REPO_ROOT / "scripts" / "media" / "make_demo_gif.py"
+ANNOTATION_GENERATOR = REPO_ROOT / "scripts" / "media" / "make_annotation_gif.py"
 SMOKE = REPO_ROOT / "tests" / "test_examples_smoke.py"
 
 
@@ -55,3 +56,29 @@ def test_tour_examples_are_covered_by_the_execution_guard():
         # dependency, so it does not prove the example still works there.
         gate = execute[name]
         assert gate is None, f"{rel} is covered by an EXECUTE entry gated on {gate!r} -- a skipped test proves nothing, so this is not real coverage"
+
+
+def test_annotation_gif_points_at_a_real_covered_example():
+    """The annotation GIF's closing line sends viewers to a worked example.
+
+    Unlike the tour above, this entry is allowed to be gated on reportlab: the
+    annotation feature renders reports, so there is no ungated example that could
+    cover it. The generator's own guards carry the rest of the weight -- it
+    executes the code it renders and refuses to write a GIF if that raises.
+    """
+    example = _table(ANNOTATION_GENERATOR, "EXAMPLE")
+    assert (REPO_ROOT / example).is_file(), f"the annotation GIF points at a missing file: {example}"
+
+    name = Path(example).name
+    assert name in _execute_names(), f"{example} is referenced by the annotation GIF but is not in EXECUTE, so nothing proves it still runs"
+
+
+def test_annotation_gif_snippet_names_that_example():
+    """The rendered code ends with a pointer to the example; keep them in sync.
+
+    The generator checks this too, but only when someone regenerates the GIF --
+    this fails in CI the moment a rename breaks the pointer.
+    """
+    example = _table(ANNOTATION_GENERATOR, "EXAMPLE")
+    snippet = ANNOTATION_GENERATOR.read_text(encoding="utf-8")
+    assert Path(example).name in snippet, f"the annotation GIF's snippet no longer names {example}"

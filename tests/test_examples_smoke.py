@@ -78,6 +78,7 @@ EXECUTE = [
     ("comparison_report.py", None),
     ("batch_report.py", None),
     ("report_annotations.py", "reportlab"),
+    ("report_annotations_advanced.py", "reportlab"),
     ("measurements.py", None),
     ("advanced_analysis.py", None),
     ("live_plot.py", None),

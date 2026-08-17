@@ -124,15 +124,19 @@ def canvas_height(segments: list[dict]) -> int:
     return Y0 + LH + GAP + LH * tallest + BOTTOM_PAD
 
 
-def base_frame(height: int):
-    img = Image.new("RGB", (W, height), BG)
+DEFAULT_TITLE = "python  —  no instrument attached"  # em dash, as in the original
+
+
+def base_frame(height: int, width: int = W, title: str = DEFAULT_TITLE):
+    """The window chrome every frame sits in. Parameterised on width/title so
+    scripts/media/make_annotation_gif.py can share one look with this tour."""
+    img = Image.new("RGB", (width, height), BG)
     d = ImageDraw.Draw(img)
-    d.rectangle([0, 0, W, 44], fill=CHROME)
-    d.line([(0, 44), (W, 44)], fill=BORDER)
+    d.rectangle([0, 0, width, 44], fill=CHROME)
+    d.line([(0, 44), (width, 44)], fill=BORDER)
     for i, c in enumerate((DOT_R, DOT_Y, DOT_G)):
         d.ellipse([20 + i * 22, 16, 32 + i * 22, 28], fill=c)
-    title = "python  —  no instrument attached"  # em dash, as in the original
-    d.text(((W - d.textlength(title, font=FB)) / 2, 15), title, font=FB, fill=(125, 137, 150))
+    d.text(((width - d.textlength(title, font=FB)) / 2, 15), title, font=FB, fill=(125, 137, 150))
     return img
 
 

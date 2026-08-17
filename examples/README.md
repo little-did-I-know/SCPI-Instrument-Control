@@ -92,6 +92,7 @@ pip install "SCPI-Instrument-Control"
 | `batch_report.py` | Batch report across five synthesized DUTs, one a deliberate outlier: `MODE_BATCH` comparison with per-DUT pass/fail, cross-run aggregate statistics, and a yield figure in the executive summary. | `SCPI-Instrument-Control[report-generator]` (no hardware - fully synthetic) |
 | `report_ai_qa.py` | Interactive Q&A over a report with a local LLM using tool-calling: the model calls the report's analysis tools to answer, and the example degrades cleanly when no tool-capable Ollama model is running. | `SCPI-Instrument-Control[report-generator]`; optional local Ollama (no hardware) |
 | `report_annotations.py` | Annotating report plots: text labels, vertical/horizontal reference lines, and shaded spans, plus a figure caption, on a synthetic step-response capture, rendered to an annotated PDF. | `SCPI-Instrument-Control[report-generator]` (no hardware - fully synthetic) |
+| `report_annotations_advanced.py` | Every annotation surface beyond a single plot: all four plot types (waveform, region zoom, FFT in hertz, comparison overlay), per-annotation colour/size/arrow overrides against `PlotStyle` defaults, a region zoom inheriting the parent's annotations clipped to its window, sidecar save/restore round-trip, and the anchor list behind the **Annotate...** dialog. | `SCPI-Instrument-Control[report-generator]` (no hardware - fully synthetic) |
 
 ## Interactive Tutorial
 
