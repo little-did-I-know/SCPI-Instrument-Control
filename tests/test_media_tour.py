@@ -73,6 +73,43 @@ def test_annotation_gif_points_at_a_real_covered_example():
     assert name in _execute_names(), f"{example} is referenced by the annotation GIF but is not in EXECUTE, so nothing proves it still runs"
 
 
+def _annotation_snippet():
+    """The exact source the annotation GIF renders and executes.
+
+    SNIPPET is a triple-quoted string with .splitlines() called on it, so the
+    Assign's value is a Call, not a literal -- literal_eval the string the method
+    is called on rather than the call itself.
+    """
+    tree = ast.parse(ANNOTATION_GENERATOR.read_text(encoding="utf-8"))
+    for node in tree.body:
+        if isinstance(node, ast.Assign) and any(isinstance(t, ast.Name) and t.id == "SNIPPET" for t in node.targets):
+            value = node.value
+            if isinstance(value, ast.Call):  # ....splitlines()
+                value = value.func.value
+            return ast.literal_eval(value).strip("\n")
+    raise AssertionError(f"no SNIPPET found in {ANNOTATION_GENERATOR}")
+
+
+def test_readme_snippet_matches_the_gif_exactly():
+    """The README's annotation block is the code the GIF actually runs.
+
+    A pasted copy is a drift risk the moment the generator's snippet changes: the
+    README would then teach an API the GIF does not demonstrate, and neither would
+    look wrong on its own. Compared byte-for-byte rather than loosely, since the
+    whole point is that a reader can copy one and see the other happen.
+    """
+    readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
+    marker = "<!-- annotation-snippet:"
+    assert marker in readme, "the README's annotation snippet marker is gone -- was the block removed or renamed?"
+
+    after_marker = readme.split(marker, 1)[1]
+    fence = "```python\n"
+    assert fence in after_marker, "no python code fence follows the annotation-snippet marker"
+    block = after_marker.split(fence, 1)[1].split("```", 1)[0].strip("\n")
+
+    assert block == _annotation_snippet(), "README annotation snippet has drifted from SNIPPET in scripts/media/make_annotation_gif.py -- edit the generator, re-run it, and paste the result"
+
+
 def test_annotation_gif_snippet_names_that_example():
     """The rendered code ends with a pointer to the example; keep them in sync.
 
