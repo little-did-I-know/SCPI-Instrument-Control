@@ -30,46 +30,6 @@ pipeline with an empty bench.
   <img src="https://raw.githubusercontent.com/little-did-I-know/SCPI-Instrument-Control/main/docs/images/mock-demo.gif" alt="Terminal recording of four example scripts — basic_usage, math_channels, measurement_badges_example and screen_capture_example — running one after another against the built-in mock scope with no instrument attached" width="760">
 </p>
 
-Captures become reports. Annotate a plot with callouts, reference lines and shaded
-windows, and both the PDF and Markdown generators render them — here the code, then
-the plots it produced:
-
-<p align="center">
-  <!-- Pinned to the commit that added this asset, not to main: a main-pinned URL
-       404s (rendering as blank space) on every branch and fork until the file
-       reaches main, which makes the image unreviewable before merge. Bump the SHA
-       when regenerating the GIF, or the README keeps showing the old one. -->
-  <img src="https://raw.githubusercontent.com/little-did-I-know/SCPI-Instrument-Control/96d89e846ada8a2ef28623a624a7ba0a9173ca2b/docs/images/plot-annotations.gif" alt="Code adding four plot annotations — a vertical line, a label, a horizontal reference line and a shaded span — to a captured waveform, followed by the two plots that code produced: the full trace and a region zoom inheriting the same annotations" width="760">
-</p>
-
-<!-- annotation-snippet: byte-for-byte the SNIPPET that scripts/media/make_annotation_gif.py
-     executes to render the GIF above. tests/test_media_tour.py fails if the two diverge,
-     so edit the generator and re-run it rather than editing this block by hand. -->
-
-```python
-# wf: a WaveformData just captured from the scope. Coordinates below are in
-# DOMAIN units -- seconds here, hertz on an FFT plot -- never display units.
-wf.annotations = [
-    PlotAnnotation(kind=KIND_VLINE, text="trigger", x=1e-3),
-    PlotAnnotation(kind=KIND_LABEL, text="overshoot", x=1.03e-3, y=3.75),
-    PlotAnnotation(kind=KIND_HLINE, text="3.3 V nominal", y=3.3),
-    PlotAnnotation(kind=KIND_SPAN, text="settling", x=1e-3, x_end=2.4e-3),
-]
-wf.caption = "Figure 1: C1 step response, 10x probe"
-
-# A region zoom carries no annotations of its own -- it inherits the parent's,
-# clipped to its own window.
-wf.add_region(0.9e-3, 2.2e-3, label="Settling")
-
-MarkdownReportGenerator().generate(report, out / "report.md")
-
-# FFT plots, overlays, styling and sidecars: examples/report_annotations_advanced.py
-```
-
-`wf` and `report` come from the capture and report setup around it —
-[`examples/report_annotations_advanced.py`](examples/report_annotations_advanced.py)
-is the whole thing, runnable with no instrument attached.
-
 ## Try it with no instrument on your desk
 
 ```bash
@@ -110,6 +70,47 @@ the scope's current timebase, volts/division, offset, and trigger state, so the
 capture window follows the timebase, the code grid quantizes the way an 8-bit
 digitizer does, and free-running acquisitions drift in phase like a real one.
 Your CI can exercise the full stack with nothing plugged in.
+
+## Captures become reports
+
+Annotate a plot with callouts, reference lines and shaded windows, and both the PDF
+and Markdown generators render them — here the code, then the plots it produced:
+
+<p align="center">
+  <!-- Pinned to the commit that added this asset, not to main: a main-pinned URL
+       404s (rendering as blank space) on every branch and fork until the file
+       reaches main, which makes the image unreviewable before merge. Bump the SHA
+       when regenerating the GIF, or the README keeps showing the old one. -->
+  <img src="https://raw.githubusercontent.com/little-did-I-know/SCPI-Instrument-Control/96d89e846ada8a2ef28623a624a7ba0a9173ca2b/docs/images/plot-annotations.gif" alt="Code adding four plot annotations — a vertical line, a label, a horizontal reference line and a shaded span — to a captured waveform, followed by the two plots that code produced: the full trace and a region zoom inheriting the same annotations" width="760">
+</p>
+
+<!-- annotation-snippet: byte-for-byte the SNIPPET that scripts/media/make_annotation_gif.py
+     executes to render the GIF above. tests/test_media_tour.py fails if the two diverge,
+     so edit the generator and re-run it rather than editing this block by hand. -->
+
+```python
+# wf: a WaveformData just captured from the scope. Coordinates below are in
+# DOMAIN units -- seconds here, hertz on an FFT plot -- never display units.
+wf.annotations = [
+    PlotAnnotation(kind=KIND_VLINE, text="trigger", x=1e-3),
+    PlotAnnotation(kind=KIND_LABEL, text="overshoot", x=1.03e-3, y=3.75),
+    PlotAnnotation(kind=KIND_HLINE, text="3.3 V nominal", y=3.3),
+    PlotAnnotation(kind=KIND_SPAN, text="settling", x=1e-3, x_end=2.4e-3),
+]
+wf.caption = "Figure 1: C1 step response, 10x probe"
+
+# A region zoom carries no annotations of its own -- it inherits the parent's,
+# clipped to its own window.
+wf.add_region(0.9e-3, 2.2e-3, label="Settling")
+
+MarkdownReportGenerator().generate(report, out / "report.md")
+
+# FFT plots, overlays, styling and sidecars: examples/report_annotations_advanced.py
+```
+
+`wf` and `report` come from the capture and report setup around it —
+[`examples/report_annotations_advanced.py`](examples/report_annotations_advanced.py)
+is the whole thing, runnable with no instrument attached.
 
 ## What you get
 
