@@ -77,11 +77,12 @@ Annotate a plot with callouts, reference lines and shaded windows, and both the 
 and Markdown generators render them — here the code, then the plots it produced:
 
 <p align="center">
-  <!-- Pinned to the commit that added this asset, not to main: a main-pinned URL
-       404s (rendering as blank space) on every branch and fork until the file
-       reaches main, which makes the image unreviewable before merge. Bump the SHA
-       when regenerating the GIF, or the README keeps showing the old one. -->
-  <img src="https://raw.githubusercontent.com/little-did-I-know/SCPI-Instrument-Control/96d89e846ada8a2ef28623a624a7ba0a9173ca2b/docs/images/plot-annotations.gif" alt="Code adding four plot annotations — a vertical line, a label, a horizontal reference line and a shaded span — to a captured waveform, followed by the two plots that code produced: the full trace and a region zoom inheriting the same annotations" width="760">
+  <!-- Same main-pinned form as the hero above, so regenerating the GIF updates
+       this automatically. Worth knowing when adding a NEW image: a main-pinned URL
+       404s until the file reaches main, and GitHub renders that as blank space
+       rather than a broken-image icon, so it cannot be reviewed on the branch that
+       adds it. Pin such an image to its commit SHA until merge, then switch here. -->
+  <img src="https://raw.githubusercontent.com/little-did-I-know/SCPI-Instrument-Control/main/docs/images/plot-annotations.gif" alt="Code adding four plot annotations — a vertical line, a label, a horizontal reference line and a shaded span — to a captured waveform, followed by the two plots that code produced: the full trace and a region zoom inheriting the same annotations" width="760">
 </p>
 
 <!-- annotation-snippet: byte-for-byte the SNIPPET that scripts/media/make_annotation_gif.py
