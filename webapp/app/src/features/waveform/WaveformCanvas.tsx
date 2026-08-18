@@ -35,7 +35,7 @@ export function currentRecord(enabled: number[]): TimeRecord | null {
   return null;
 }
 
-type YMap = (v: number) => number;
+export type YMap = (v: number) => number;
 
 /** Volts -> canvas y for a channel at `voltsPerDiv`; auto-fit when no scale is known (math traces). */
 function yMapper(points: ArrayLike<number>, voltsPerDiv: number | undefined, gh: number): YMap {
@@ -49,7 +49,7 @@ function yMapper(points: ArrayLike<number>, voltsPerDiv: number | undefined, gh:
   return (v) => PAD + gh / 2 - ((v - mid) / halfSpan) * ((gh / 2) * 0.9);
 }
 
-function strokeEnvelope(ctx: CanvasRenderingContext2D, env: Envelope, y: YMap, color: string, dash: number[], width: number): void {
+export function strokeEnvelope(ctx: CanvasRenderingContext2D, env: Envelope, y: YMap, color: string, dash: number[], width: number): void {
   ctx.save();
   ctx.setLineDash(dash);
   ctx.strokeStyle = color;
@@ -57,11 +57,17 @@ function strokeEnvelope(ctx: CanvasRenderingContext2D, env: Envelope, y: YMap, c
   ctx.lineJoin = "round";
   if (env.mode === "poly") {
     ctx.beginPath();
+    let pen = false;
     for (let k = 0; k < env.xs.length; k++) {
+      if (env.ys[k] !== env.ys[k]) {
+        pen = false;
+        continue;
+      }
       const px = PAD + env.xs[k];
       const py = y(env.ys[k]);
-      if (k === 0) ctx.moveTo(px, py);
+      if (!pen) ctx.moveTo(px, py);
       else ctx.lineTo(px, py);
+      pen = true;
     }
     ctx.stroke();
   } else {

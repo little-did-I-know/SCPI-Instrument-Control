@@ -41,10 +41,11 @@ describe("useCanvasGestures", () => {
     (c as HTMLCanvasElement).setPointerCapture = () => {};
     (c as HTMLCanvasElement).releasePointerCapture = () => {};
     useSession.getState().setView({ tCenter: 0, tSpan: 0.007 });
-    fire(c, "pointerdown", { pointerId: 1, clientX: 700, clientY: 100, button: 0 });
+    const down = fire(c, "pointerdown", { pointerId: 1, clientX: 700, clientY: 100, button: 0, pointerType: "mouse" });
     fire(c, "pointermove", { pointerId: 1, clientX: 560, clientY: 100 }); // dragged 140 px left = 10% of the width
     fire(c, "pointerup", { pointerId: 1, clientX: 560, clientY: 100 });
     expect(useSession.getState().view!.tCenter).toBeCloseTo(0.0007, 9); // content follows the finger: window moves right
+    expect(down.defaultPrevented).toBe(true); // a mouse drag must not select surrounding page text
   });
 
   it("two pointers pinch-zoom about their midpoint", () => {
