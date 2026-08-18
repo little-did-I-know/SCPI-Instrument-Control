@@ -128,7 +128,7 @@ export function WaveformCanvas() {
       const ref = getFrame("REF");
       if (ref && ref.points.length > 0) {
         const scale = activeReference?.channel != null ? channels[String(activeReference.channel)]?.voltage_scale : undefined;
-        const pixels = refTracePixels(ref.points, scale, gw, gh, PAD);
+        const pixels = refTracePixels(Array.from(ref.points), scale, gw, gh, PAD);
         ctx.save();
         ctx.setLineDash(REF_TRACE.dash);
         ctx.strokeStyle = REF_TRACE.color;
@@ -153,7 +153,7 @@ export function WaveformCanvas() {
         ctx.lineWidth = 2;
         ctx.lineJoin = "round";
         ctx.beginPath();
-        frame.points.forEach((volts, index) => {
+        Array.from(frame.points).forEach((volts, index) => {
           const x = PAD + (gw * index) / Math.max(1, frame.points.length - 1);
           const y = PAD + gh / 2 - (volts / fullScale) * gh;
           if (index === 0) ctx.moveTo(x, y);
@@ -166,7 +166,7 @@ export function WaveformCanvas() {
       Object.keys(COMPUTED_TRACES).forEach((label) => {
         const frame = getFrame(label);
         if (!frame || frame.points.length === 0) return;
-        const pixels = mathTracePixels(frame.points, gw, gh, PAD);
+        const pixels = mathTracePixels(Array.from(frame.points), gw, gh, PAD);
         ctx.save();
         ctx.setLineDash(COMPUTED_TRACES[label].dash);
         ctx.strokeStyle = COMPUTED_TRACES[label].color;

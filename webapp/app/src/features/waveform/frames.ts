@@ -1,4 +1,4 @@
-export type Frame = { t0: number; dt: number; points: number[] };
+export type Frame = { t0: number; dt: number; seq?: number; points: ArrayLike<number> };
 
 const frames = new Map<number | string, Frame>();
 const listeners = new Set<() => void>();
