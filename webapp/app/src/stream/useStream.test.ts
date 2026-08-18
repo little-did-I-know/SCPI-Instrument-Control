@@ -106,6 +106,14 @@ describe("useStream", () => {
     expect(useSession.getState().error).toBeNull();
   });
 
+  it("drops a binary waveform frame with a null channel", async () => {
+    renderHook(() => useStream("abc"));
+    FakeWebSocket.last!.emitBinary(binaryFrame({ type: "waveform", channel: null, t0: 0, dt: 1 }, [1, 2]));
+    expect(getFrame(1)).toBeUndefined();
+    expect(getFrame("REF")).toBeUndefined();
+    expect(useSession.getState().error).toBeNull();
+  });
+
   it("still accepts legacy JSON waveform frames", async () => {
     renderHook(() => useStream("abc"));
     FakeWebSocket.last!.emit({ type: "waveform", channel: 1, t0: 0, dt: 1e-6, points: [0, 1] });

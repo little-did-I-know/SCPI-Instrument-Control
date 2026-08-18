@@ -37,7 +37,11 @@ export function useStream(sessionId: string | null): void {
           setFrame("REF", { t0: header.t0, dt: header.dt, points: samples });
           useSession.getState().applyReference(header.name ? { name: header.name, channel: typeof header.channel === "number" ? header.channel : null } : null);
         } else {
-          setFrame(header.channel as number | string, { t0: header.t0, dt: header.dt, seq: header.seq, points: samples });
+          if (header.channel == null) {
+            console.warn("dropping binary waveform frame without a channel");
+            return;
+          }
+          setFrame(header.channel, { t0: header.t0, dt: header.dt, seq: header.seq, points: samples });
         }
         return;
       }
