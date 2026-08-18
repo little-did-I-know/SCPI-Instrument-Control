@@ -641,7 +641,7 @@ def test_manager_forwards_the_stream_budget_to_every_session_it_creates():
         manager.close_all()
 
 
-@pytest.mark.parametrize("kwargs", [{"stream_max_points": 0}, {"stream_max_points": -1}, {"stream_max_fps": 0.0}, {"stream_max_fps": -2.0}])
+@pytest.mark.parametrize("kwargs", [{"stream_max_points": 0}, {"stream_max_points": -1}, {"stream_max_points": 1000}, {"stream_max_fps": 0.0}, {"stream_max_fps": -2.0}])
 def test_manager_rejects_a_nonsense_stream_budget(kwargs):
     from scpi_control.server.sessions import SessionManager
 

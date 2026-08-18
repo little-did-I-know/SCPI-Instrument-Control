@@ -35,10 +35,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   as new acquisitions arrive. The JSON WebSocket frames scripts consume are
   unchanged (still ≤ 2000 points). `scpi_control.server.frames.decode_binary`
   is the Python-side decoder. New `--stream-max-fps` (default 20) bounds the
-  live-view rate; on an SDS824X HD a full-record read costs ~250 ms
-  regardless of point count, and the gateway measured ~1.3 dense
-  100k-sample frames/s over the wire with one channel enabled — the density
-  is what the instrument gives away for free.
+  live-view rate. The per-channel update rate itself is unchanged by this
+  branch: on an SDS824X HD a full-record read costs ~250 ms regardless of
+  point count, so the gateway measured the same ~1.3 frames/s with dense
+  100k-sample frames that the old 2000-point live view already ran at —
+  reading is per-transfer, not per-point. What changed is resolution
+  (2000 → up to 100 000 samples per frame), not rate.
 
 ### Changed
 

@@ -395,8 +395,14 @@ class SessionManager:
             # CLI to catch it, since SessionManager is also constructed
             # directly by embedders and tests.
             raise ValueError("max_sessions must be at least 1 (got {0})".format(max_sessions))
-        if stream_max_points < 1:
-            raise ValueError("stream_max_points must be at least 1 (got {0})".format(stream_max_points))
+        if stream_max_points < MAX_FRAME_POINTS:
+            # Floored at the JSON stream's own cap (2000), not an arbitrary
+            # sanity minimum: the dense adapter reads at most stream_max_points
+            # samples per transfer, and the JSON frame builder decimates
+            # whatever it's handed down to MAX_FRAME_POINTS -- a budget below
+            # that would silently give a JSON client fewer than the 2000
+            # points every prior release guaranteed.
+            raise ValueError("stream_max_points must be at least {0} (the JSON stream's own cap); got {1}".format(MAX_FRAME_POINTS, stream_max_points))
         if not stream_max_fps > 0:
             raise ValueError("stream_max_fps must be positive (got {0})".format(stream_max_fps))
         self._sessions: Dict[str, InstrumentSession] = {}

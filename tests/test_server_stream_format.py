@@ -9,6 +9,8 @@ fastapi = pytest.importorskip("fastapi")
 pytest.importorskip("httpx")
 from fastapi.testclient import TestClient  # noqa: E402
 
+from starlette.websockets import WebSocketDisconnect  # noqa: E402
+
 from scpi_control.server.api import stream as stream_module  # noqa: E402
 from scpi_control.server.app import create_app  # noqa: E402
 from scpi_control.server.frames import decode_binary  # noqa: E402
@@ -107,16 +109,16 @@ def test_two_sockets_on_one_session_each_get_their_own_encoding(client, ws_subpr
 
 
 def test_unknown_format_closes_the_socket(client, ws_subprotocols):
-    # Same shape as test_stream_unknown_session_closes: a close before accept
-    # surfaces to the test client as an exception (a WebSocketDisconnect
-    # carrying the code, or a handshake failure, depending on the Starlette
-    # version) -- what matters is that no frame is ever delivered.
+    # The socket is accepted, THEN closed with CLOSE_UNKNOWN_FORMAT -- unlike
+    # a close-before-accept (e.g. test_stream_unknown_session_closes), which a
+    # client only ever sees as a failed handshake. Accepting first is what
+    # makes the 4400 code actually observable: receive_json() raises
+    # WebSocketDisconnect carrying it.
     sid = _create_mock(client)
-    with pytest.raises(Exception) as exc_info:
+    with pytest.raises(WebSocketDisconnect) as exc_info:
         with client.websocket_connect("/api/sessions/{0}/stream?format=msgpack".format(sid), subprotocols=ws_subprotocols) as ws:
             ws.receive_json()
-    code = getattr(exc_info.value, "code", None)
-    assert code in (None, stream_module.CLOSE_UNKNOWN_FORMAT, 403)
+    assert exc_info.value.code == stream_module.CLOSE_UNKNOWN_FORMAT
 
 
 def test_the_unknown_format_close_code_is_distinct():

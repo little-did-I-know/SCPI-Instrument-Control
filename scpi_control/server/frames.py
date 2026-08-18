@@ -18,6 +18,7 @@ session may have negotiated different formats:
 Kept free of FastAPI so adapters.py (imported on paths that never load the
 web extra) can depend on it.
 """
+
 import json
 import struct
 from typing import Any, Dict, Sequence, Tuple, Union

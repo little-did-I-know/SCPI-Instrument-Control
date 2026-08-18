@@ -46,12 +46,18 @@ def create_app(
     # gateway with no port policy or session cap at all. Refuse the ambiguous
     # combination instead of guessing.
     if manager is not None and (allowed_ports is not None or max_sessions is not None or stream_max_points is not None or stream_max_fps is not None):
-        raise ValueError("create_app() received both an explicit manager and allowed_ports/max_sessions/stream_max_points/stream_max_fps; configure those on the manager (SessionManager(...)) instead.")
-    manager = manager if manager is not None else SessionManager(
-        allowed_ports=allowed_ports,
-        max_sessions=max_sessions if max_sessions is not None else 8,
-        stream_max_points=stream_max_points if stream_max_points is not None else DENSE_MAX_POINTS,
-        stream_max_fps=stream_max_fps if stream_max_fps is not None else DEFAULT_STREAM_MAX_FPS,
+        raise ValueError(
+            "create_app() received both an explicit manager and allowed_ports/max_sessions/stream_max_points/stream_max_fps; configure those on the manager (SessionManager(...)) instead."
+        )
+    manager = (
+        manager
+        if manager is not None
+        else SessionManager(
+            allowed_ports=allowed_ports,
+            max_sessions=max_sessions if max_sessions is not None else 8,
+            stream_max_points=stream_max_points if stream_max_points is not None else DENSE_MAX_POINTS,
+            stream_max_fps=stream_max_fps if stream_max_fps is not None else DEFAULT_STREAM_MAX_FPS,
+        )
     )
 
     @asynccontextmanager

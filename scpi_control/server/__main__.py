@@ -9,7 +9,7 @@ from pathlib import Path
 
 import uvicorn
 
-from scpi_control.server.adapters import DEFAULT_STREAM_MAX_FPS, DENSE_MAX_POINTS
+from scpi_control.server.adapters import DEFAULT_STREAM_MAX_FPS, DENSE_MAX_POINTS, MAX_FRAME_POINTS
 from scpi_control.server.admin.app import DEFAULT_ADMIN_PORT, create_admin_app
 from scpi_control.server.app import create_app
 from scpi_control.server.auth import DEFAULT_CONFIG_DIR, TokenStore
@@ -149,8 +149,12 @@ def main(argv=None) -> None:
     # subcommand. --max-sessions has no subcommand use, so it is never added
     # to one.
     parser.add_argument("--max-sessions", type=int, default=8, help="maximum concurrent instrument sessions the gateway will hold open")
-    parser.add_argument("--stream-max-points", type=int, default=DENSE_MAX_POINTS, help="samples per live waveform frame on the binary stream (default: 100000; the JSON stream stays capped at 2000)")
-    parser.add_argument("--stream-max-fps", type=float, default=DEFAULT_STREAM_MAX_FPS, help="upper bound on live-view updates per second per scope session (default: 20; real instruments settle far below it)")
+    parser.add_argument(
+        "--stream-max-points", type=int, default=DENSE_MAX_POINTS, help="samples per live binary frame (default 100000; minimum 2000, the JSON stream's own cap, which is never exceeded)"
+    )
+    parser.add_argument(
+        "--stream-max-fps", type=float, default=DEFAULT_STREAM_MAX_FPS, help="upper bound on live-view updates per second per scope session (default: 20; real instruments settle far below it)"
+    )
     _add_config_dir(parser)
 
     sub = parser.add_subparsers(dest="command")
@@ -234,9 +238,14 @@ def main(argv=None) -> None:
 
     # Same reasoning as --max-sessions above: SessionManager itself rejects a
     # nonsense stream budget, but that ValueError would surface after
-    # "Gateway ready" instead of before anything starts.
-    if args.stream_max_points < 100:
-        parser.error("--stream-max-points must be at least 100 (got {0})".format(args.stream_max_points))
+    # "Gateway ready" instead of before anything starts. The floor is
+    # MAX_FRAME_POINTS (2000), not an arbitrary sanity minimum: the dense
+    # adapter reads at most stream_max_points samples per transfer, and the
+    # JSON stream's frame builder decimates whatever it's handed down to
+    # MAX_FRAME_POINTS -- so a budget below that would make a JSON client see
+    # fewer than the 2000 points every prior release guaranteed.
+    if args.stream_max_points < MAX_FRAME_POINTS:
+        parser.error("--stream-max-points must be at least 2000 (the JSON stream's own cap; got {0})".format(args.stream_max_points))
     if not args.stream_max_fps > 0:
         parser.error("--stream-max-fps must be positive (got {0})".format(args.stream_max_fps))
 

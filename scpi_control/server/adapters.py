@@ -20,7 +20,13 @@ from scpi_control import FunctionGenerator, Oscilloscope, PowerSupply
 from scpi_control.connection.mock import MockConnection
 from scpi_control.exceptions import InvalidParameterError, MeasurementUnavailableError, SiglentError
 from scpi_control.server import compute
-from scpi_control.server.frames import DENSE_MAX_POINTS, MAX_FRAME_POINTS, reference_message, to_json, waveform_message  # noqa: F401  (MAX_FRAME_POINTS re-exported: sessions.py, api/scope.py and tests import it from here)
+from scpi_control.server.frames import (  # noqa: F401  (MAX_FRAME_POINTS re-exported: sessions.py and tests import it from here)
+    DENSE_MAX_POINTS,
+    MAX_FRAME_POINTS,
+    reference_message,
+    to_json,
+    waveform_message,
+)
 from scpi_control.server.netpolicy import validate_target
 from scpi_control.server.recorder import TrendRecorder
 
@@ -151,11 +157,12 @@ def _cap_record(data, max_points: int):
     if max_points <= 0 or n <= max_points:
         return data
     step = -(-n // max_points)
+    voltage = np.asarray(data.voltage)[::step]
     return replace(
         data,
         time=np.asarray(data.time)[::step],
-        voltage=np.asarray(data.voltage)[::step],
-        record_length=len(np.asarray(data.voltage)[::step]),
+        voltage=voltage,
+        record_length=len(voltage),
         sample_rate=(data.sample_rate / step) if data.sample_rate else data.sample_rate,
     )
 

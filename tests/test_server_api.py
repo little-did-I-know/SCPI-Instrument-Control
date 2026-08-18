@@ -391,7 +391,7 @@ def test_cli_rejects_non_positive_max_sessions(tmp_path, max_sessions, capsys):
     assert "--max-sessions" in capsys.readouterr().err
 
 
-@pytest.mark.parametrize("flag,value", [("--stream-max-points", "10"), ("--stream-max-points", "0"), ("--stream-max-fps", "0"), ("--stream-max-fps", "-1")])
+@pytest.mark.parametrize("flag,value", [("--stream-max-points", "10"), ("--stream-max-points", "0"), ("--stream-max-points", "1000"), ("--stream-max-fps", "0"), ("--stream-max-fps", "-1")])
 def test_cli_rejects_a_nonsense_stream_budget(tmp_path, flag, value, capsys):
     # Same reasoning as --max-sessions: reject at the CLI with a clear message
     # before create_app/uvicorn run, instead of a ValueError after "Gateway ready".

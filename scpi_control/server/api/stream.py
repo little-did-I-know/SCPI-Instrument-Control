@@ -11,11 +11,12 @@ from scpi_control.server.revocation import identity_is_live
 router = APIRouter(tags=["stream"])
 
 # Cap the per-connection outbox so a slow/paused client cannot make the event
-# loop buffer waveform frames without bound. Dense frames are up to ~400 kB
-# (100k float32), so 32 -- about 8 s at the ~4 frames/s a real scope serves,
-# 1.6 s at the mock's 20 fps cap -- bounds a stalled client at ~13 MB per
-# channel; _enqueue evicts the oldest waveform first, so a slow client stays
-# current rather than falling behind.
+# loop buffer waveform frames without bound. The outbox holds the UN-encoded
+# message -- a float64 ndarray, ~800 kB for a 100k-sample dense frame, not the
+# ~400 kB a float32 wire encoding would suggest -- so 32 -- about 8 s at the
+# ~4 frames/s a real scope serves, 1.6 s at the mock's 20 fps cap -- bounds a
+# stalled client at ~25 MB per channel; _enqueue evicts the oldest waveform
+# first, so a slow client stays current rather than falling behind.
 OUTBOX_MAXSIZE = 32
 
 # Wire encodings a client may ask for with ?format=. Absent means json.
@@ -135,15 +136,20 @@ async def stream(websocket: WebSocket, session_id: str):
         await websocket.close(code=4404)
         return
     fmt = websocket.query_params.get("format", "json")
-    if fmt not in FORMATS:
-        await websocket.close(code=CLOSE_UNKNOWN_FORMAT)
-        return
-    binary = fmt == "binary"
     # Echo the accept subprotocol back only when the client actually offered
     # it: echoing an unoffered subprotocol is invalid per RFC 6455 and browsers
     # fail the handshake either way -- offered-and-unechoed, or echoed-unoffered.
     subprotocol = WS_ACCEPT_SUBPROTOCOL if WS_ACCEPT_SUBPROTOCOL in websocket.scope.get("subprotocols", []) else None
     await websocket.accept(subprotocol=subprotocol)
+    # The format check must run AFTER accept: closing before accept surfaces
+    # to the client as a failed handshake (uvicorn returns HTTP 403, and the
+    # client never sees CLOSE_UNKNOWN_FORMAT -- only a generic 1006). Accepting
+    # first means a client that asked for a bogus ?format= can actually observe
+    # the 4400 close code this endpoint promises.
+    if fmt not in FORMATS:
+        await websocket.close(code=CLOSE_UNKNOWN_FORMAT)
+        return
+    binary = fmt == "binary"
 
     loop = asyncio.get_running_loop()
     outbox: "asyncio.Queue" = asyncio.Queue(maxsize=OUTBOX_MAXSIZE)
