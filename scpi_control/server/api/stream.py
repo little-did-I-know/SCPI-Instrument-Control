@@ -4,14 +4,26 @@ import contextlib
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
+from scpi_control.server import frames
 from scpi_control.server.auth import WS_ACCEPT_SUBPROTOCOL
 from scpi_control.server.revocation import identity_is_live
 
 router = APIRouter(tags=["stream"])
 
 # Cap the per-connection outbox so a slow/paused client cannot make the event
-# loop buffer waveform frames without bound. 256 frames ~= a minute at 4 Hz.
-OUTBOX_MAXSIZE = 256
+# loop buffer waveform frames without bound. Dense frames are up to ~400 kB
+# (100k float32), so 32 -- about 8 s at the ~4 frames/s a real scope serves,
+# 1.6 s at the mock's 20 fps cap -- bounds a stalled client at ~13 MB per
+# channel; _enqueue evicts the oldest waveform first, so a slow client stays
+# current rather than falling behind.
+OUTBOX_MAXSIZE = 32
+
+# Wire encodings a client may ask for with ?format=. Absent means json.
+FORMATS = ("json", "binary")
+
+# The client asked for a format this server does not speak. Distinct from
+# 4404/4410/4500 so a client can tell "fix your URL" from "the session went".
+CLOSE_UNKNOWN_FORMAT = 4400
 
 # Distinct from 4404 (unknown session) and 4410 (session ended): the socket was
 # accepted but this session's adapter could not produce its opening frame.
@@ -61,12 +73,32 @@ async def _receive_until_disconnect(websocket: WebSocket) -> None:
         return
 
 
-async def _send_from_outbox(websocket: WebSocket, outbox: "asyncio.Queue") -> None:
+def _encode(message, binary: bool):
+    """The wire payload for one message on one socket.
+
+    Sample messages (waveform / reference) are the only ones that differ by
+    format; every control frame is JSON in both modes. Encoding happens here,
+    per delivered frame, rather than in the adapter, because two sockets on the
+    same session may have negotiated different formats.
+    """
+    if binary and frames.is_sample_message(message):
+        return frames.to_binary(message)
+    return frames.to_json(message)
+
+
+async def _send(websocket: WebSocket, payload) -> None:
+    if isinstance(payload, (bytes, bytearray)):
+        await websocket.send_bytes(payload)
+    else:
+        await websocket.send_json(payload)
+
+
+async def _send_from_outbox(websocket: WebSocket, outbox: "asyncio.Queue", binary: bool) -> None:
     """Forward queued messages until the session closes or the socket errors."""
     try:
         while True:
             message = await outbox.get()
-            await websocket.send_json(message)
+            await _send(websocket, _encode(message, binary))
             if isinstance(message, dict) and message.get("type") == "closed":
                 await websocket.close(code=4410)
                 return
@@ -102,6 +134,11 @@ async def stream(websocket: WebSocket, session_id: str):
     if session is None:
         await websocket.close(code=4404)
         return
+    fmt = websocket.query_params.get("format", "json")
+    if fmt not in FORMATS:
+        await websocket.close(code=CLOSE_UNKNOWN_FORMAT)
+        return
+    binary = fmt == "binary"
     # Echo the accept subprotocol back only when the client actually offered
     # it: echoing an unoffered subprotocol is invalid per RFC 6455 and browsers
     # fail the handshake either way -- offered-and-unechoed, or echoed-unoffered.
@@ -159,11 +196,11 @@ async def stream(websocket: WebSocket, session_id: str):
                 await websocket.send_json({"type": "error", "detail": "initial frame failed: {0}".format(exc)})
                 await websocket.close(code=CLOSE_INITIAL_FRAME_FAILED)
             return
-        await websocket.send_json(initial)
+        await _send(websocket, _encode(initial, binary))
         # Run the receiver (disconnect detection) and sender concurrently; whichever
         # finishes first tears the connection down.
         receiver = asyncio.ensure_future(_receive_until_disconnect(websocket))
-        sender = asyncio.ensure_future(_send_from_outbox(websocket, outbox))
+        sender = asyncio.ensure_future(_send_from_outbox(websocket, outbox, binary))
         revocation = asyncio.ensure_future(revoked.wait())
         await asyncio.wait({receiver, sender, revocation}, return_when=asyncio.FIRST_COMPLETED)
         if revoked.is_set():
