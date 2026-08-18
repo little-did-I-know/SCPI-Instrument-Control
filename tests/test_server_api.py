@@ -391,6 +391,18 @@ def test_cli_rejects_non_positive_max_sessions(tmp_path, max_sessions, capsys):
     assert "--max-sessions" in capsys.readouterr().err
 
 
+@pytest.mark.parametrize("flag,value", [("--stream-max-points", "10"), ("--stream-max-points", "0"), ("--stream-max-fps", "0"), ("--stream-max-fps", "-1")])
+def test_cli_rejects_a_nonsense_stream_budget(tmp_path, flag, value, capsys):
+    # Same reasoning as --max-sessions: reject at the CLI with a clear message
+    # before create_app/uvicorn run, instead of a ValueError after "Gateway ready".
+    import scpi_control.server.__main__ as cli
+
+    with pytest.raises(SystemExit) as exc_info:
+        cli.main(["--config-dir", str(tmp_path), flag, value])
+    assert exc_info.value.code != 0
+    assert flag in capsys.readouterr().err
+
+
 class TestScreenshot:
     def test_screenshot_returns_png(self, client):
         sid = create_mock_session(client)["id"]

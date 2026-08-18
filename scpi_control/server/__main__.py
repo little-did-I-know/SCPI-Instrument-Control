@@ -9,6 +9,7 @@ from pathlib import Path
 
 import uvicorn
 
+from scpi_control.server.adapters import DEFAULT_STREAM_MAX_FPS, DENSE_MAX_POINTS
 from scpi_control.server.admin.app import DEFAULT_ADMIN_PORT, create_admin_app
 from scpi_control.server.app import create_app
 from scpi_control.server.auth import DEFAULT_CONFIG_DIR, TokenStore
@@ -148,6 +149,8 @@ def main(argv=None) -> None:
     # subcommand. --max-sessions has no subcommand use, so it is never added
     # to one.
     parser.add_argument("--max-sessions", type=int, default=8, help="maximum concurrent instrument sessions the gateway will hold open")
+    parser.add_argument("--stream-max-points", type=int, default=DENSE_MAX_POINTS, help="samples per live waveform frame on the binary stream (default: 100000; the JSON stream stays capped at 2000)")
+    parser.add_argument("--stream-max-fps", type=float, default=DEFAULT_STREAM_MAX_FPS, help="upper bound on live-view updates per second per scope session (default: 20; real instruments settle far below it)")
     _add_config_dir(parser)
 
     sub = parser.add_subparsers(dest="command")
@@ -229,6 +232,14 @@ def main(argv=None) -> None:
     if args.max_sessions < 1:
         parser.error("--max-sessions must be at least 1 (got {0})".format(args.max_sessions))
 
+    # Same reasoning as --max-sessions above: SessionManager itself rejects a
+    # nonsense stream budget, but that ValueError would surface after
+    # "Gateway ready" instead of before anything starts.
+    if args.stream_max_points < 100:
+        parser.error("--stream-max-points must be at least 100 (got {0})".format(args.stream_max_points))
+    if not args.stream_max_fps > 0:
+        parser.error("--stream-max-fps must be positive (got {0})".format(args.stream_max_fps))
+
     # Same reasoning as --max-sessions above: without this check, --port and
     # --admin-port colliding fails deep inside uvicorn's socket bind with a
     # bare traceback instead of a sentence explaining the mistake.
@@ -265,7 +276,15 @@ def main(argv=None) -> None:
     else:
         print("\nGateway ready at {0}\nAdmin panel (this machine only) at {1}\nHand out access with: scpi-web invite <name>\n".format(url, admin_url))
     allowed_ports = frozenset(args.allow_port) | DEFAULT_ALLOWED_PORTS if args.allow_port else None
-    main_app = create_app(token_store=store, invitation_store=invitations, abandon_after=args.abandon_after, allowed_ports=allowed_ports, max_sessions=args.max_sessions)
+    main_app = create_app(
+        token_store=store,
+        invitation_store=invitations,
+        abandon_after=args.abandon_after,
+        allowed_ports=allowed_ports,
+        max_sessions=args.max_sessions,
+        stream_max_points=args.stream_max_points,
+        stream_max_fps=args.stream_max_fps,
+    )
     admin_app = (
         None
         if args.no_admin

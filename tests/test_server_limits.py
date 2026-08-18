@@ -87,3 +87,21 @@ class TestCreateAppMutualExclusionGuard:
                 create_app(manager, max_sessions=4)
         finally:
             manager.close_all()
+
+    def test_manager_with_stream_options_raises(self):
+        manager = SessionManager()
+        try:
+            with pytest.raises(ValueError):
+                create_app(manager, stream_max_points=5000)
+            with pytest.raises(ValueError):
+                create_app(manager, stream_max_fps=4.0)
+        finally:
+            manager.close_all()
+
+    def test_create_app_seeds_the_manager_stream_budget(self):
+        app = create_app(stream_max_points=5000, stream_max_fps=4.0)
+        manager = app.state.manager
+        try:
+            assert manager.stream_max_points == 5000 and manager.stream_max_fps == 4.0
+        finally:
+            manager.close_all()
