@@ -34,7 +34,6 @@ export function useCanvasGestures(canvasRef: RefObject<HTMLCanvasElement | null>
     };
     const onDown = (e: PointerEvent) => {
       if (e.button !== 0 && e.pointerType === "mouse") return;
-      if (e.pointerType === "mouse") e.preventDefault(); // a mouse drag would otherwise select surrounding page text
       pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
       canvas.setPointerCapture?.(e.pointerId);
       if (pointers.size === 2) {

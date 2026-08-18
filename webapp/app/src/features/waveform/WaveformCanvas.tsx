@@ -255,7 +255,7 @@ export function WaveformCanvas() {
 
   return (
     <div ref={wrapRef} style={{ position: "relative", flex: 1, minHeight: 320, background: "#0d1117", border: "1px solid var(--scope-border-2)", borderRadius: "var(--lc-radius)" }}>
-      <canvas ref={canvasRef} style={{ touchAction: "none", cursor: view ? "grab" : "default" }} />
+      <canvas ref={canvasRef} style={{ touchAction: "none", userSelect: "none", WebkitUserSelect: "none", cursor: view ? "grab" : "default" }} />
       {view && (
         <button
           type="button"

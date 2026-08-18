@@ -64,4 +64,10 @@ describe("WaveformCanvas", () => {
     clearFrames();
     expect(currentRecord([1])).toBeNull();
   });
+
+  it("blocks text selection on the canvas via CSS instead of cancelling pointerdown", () => {
+    const { container } = render(<WaveformCanvas />);
+    const canvas = container.querySelector("canvas");
+    expect(canvas?.style.userSelect).toBe("none");
+  });
 });
