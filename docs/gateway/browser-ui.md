@@ -73,9 +73,10 @@ Once connected, the main canvas toggles between three modes:
   never asks the instrument for anything — and the window stays put as new
   acquisitions arrive; changing the timebase fits the view again. On a
   Siglent-modern instrument the trace updates once per completed
-  acquisition, not on a fixed timer, and a waveform read itself takes about
-  a quarter second on an SDS824X HD, so expect roughly four updates a second
-  with one channel enabled (about two with two) — at a slow timebase, slower
+  acquisition, not on a fixed timer, and a full-record read itself takes
+  about a quarter second on an SDS824X HD, so with one channel enabled at a
+  fast timebase expect on the order of one update a second, dropping roughly
+  in proportion as you enable more channels — at a slow timebase, slower
   still (a handful of seconds apart at 1 s/div is normal, not stalled),
   matching what the scope's own screen is doing. Other dialects have no way
   to ask the instrument whether a new acquisition has landed, so they poll

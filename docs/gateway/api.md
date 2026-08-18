@@ -221,7 +221,9 @@ instrument strides above that). The JSON path stays capped at 2 000 points.
 Measured on an SDS824X HD, a waveform read costs about 250 ms whether it
 returns 700 or 100 000 points, so density is free at the instrument; the
 update rate is what the instrument can serve (see the Siglent-modern note
-below), and `--stream-max-fps` (default 20) only bounds the mock and any
+below — on that scope, on the order of one full-record update a second per
+channel once the session's read-time backoff is accounted for), and
+`--stream-max-fps` (default 20) only bounds the mock and any
 instrument that could go faster.
 
 On a Siglent-modern instrument, a `waveform` frame for a real channel (not math/filter) is gated on the
