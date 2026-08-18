@@ -10,6 +10,7 @@ from scpi_control import Oscilloscope
 from scpi_control.connection.mock import MockConnection
 from scpi_control.exceptions import InvalidParameterError, SiglentTimeoutError
 from scpi_control.measurement import Measurement
+from scpi_control.server.frames import to_json
 from scpi_control.server.sessions import MAX_FRAME_POINTS, InstrumentSession, SessionError, _waveform_frame, read_state
 from scpi_control.waveform import WaveformData
 
@@ -63,8 +64,8 @@ def test_poll_publishes_waveform_frames_for_enabled_channels():
         assert len(frames) >= 2
         frame = frames[0]
         assert frame["channel"] == 1
-        assert 0 < len(frame["points"]) <= 2000
-        assert isinstance(frame["points"][0], float)
+        assert 0 < len(frame["samples"]) <= 100_000
+        assert to_json(frame)["points"] and isinstance(to_json(frame)["points"][0], float)
         assert frame["dt"] > 0
     finally:
         session.close()
@@ -115,7 +116,7 @@ class _StubScope:
     def __init__(self, n):
         self._data = WaveformData(time=np.linspace(0.0, 1.0, n), voltage=np.zeros(n), channel=1)
 
-    def get_waveform(self, channel, provenance=True):
+    def get_waveform(self, channel, provenance=True, stride=None):
         return self._data
 
 
@@ -155,7 +156,7 @@ def test_poll_publishes_math_frame_when_enabled():
         frames = collect(session, "waveform", n=4, timeout=8.0)
         math_frames = [f for f in frames if f["channel"] == "M1"]
         assert math_frames, "expected an M1 math frame"
-        assert 0 < len(math_frames[0]["points"]) <= 2000
+        assert 0 < len(math_frames[0]["samples"]) <= 100_000
     finally:
         session.close()
 
@@ -175,9 +176,9 @@ def test_poll_clears_math_frame_when_disabled():
 
         unsubscribe = session.subscribe(cb)
         deadline = time.time() + 8.0
-        while not any(len(f["points"]) > 0 for f in got) and time.time() < deadline:
+        while not any(len(f["samples"]) > 0 for f in got) and time.time() < deadline:
             time.sleep(0.02)
-        assert any(len(f["points"]) > 0 for f in got), "expected a non-empty M1 frame before disabling"
+        assert any(len(f["samples"]) > 0 for f in got), "expected a non-empty M1 frame before disabling"
 
         session.submit(lambda scope: scope.math1.disable()).result(timeout=5)
 
@@ -187,7 +188,7 @@ def test_poll_clears_math_frame_when_disabled():
         unsubscribe()
 
         # find the index of the first empty-points M1 frame after the disable call
-        empty_indices = [i for i, f in enumerate(got) if len(f["points"]) == 0]
+        empty_indices = [i for i, f in enumerate(got) if len(f["samples"]) == 0]
         assert empty_indices, "expected exactly one clear (empty-points) M1 frame after disabling"
         assert len(empty_indices) == 1, "expected exactly ONE clear frame, not repeated clears"
         clear_index = empty_indices[0]
@@ -252,7 +253,7 @@ def test_poll_publishes_filtered_trace():
         frames = collect(session, "waveform", n=6, timeout=8.0)
         f1 = [f for f in frames if f["channel"] == "F1"]
         assert f1, "expected an F1 filtered frame"
-        assert 0 < len(f1[0]["points"]) <= 2000
+        assert 0 < len(f1[0]["samples"]) <= 100_000
     finally:
         session.close()
 
@@ -263,7 +264,7 @@ def test_poll_clears_filtered_trace_when_disabled():
         session.adapter.filters = {**session.adapter.filters, 1: {**session.adapter.filters[1], "enabled": True, "cutoff_high": 100.0}}
         assert [f for f in collect(session, "waveform", n=6, timeout=8.0) if f["channel"] == "F1"]
         cleared = []
-        unsubscribe = session.subscribe(lambda m: cleared.append(m) if m["type"] == "waveform" and m["channel"] == "F1" and m["points"] == [] else None)
+        unsubscribe = session.subscribe(lambda m: cleared.append(m) if m["type"] == "waveform" and m["channel"] == "F1" and len(m["samples"]) == 0 else None)
         session.adapter.filters = {**session.adapter.filters, 1: {**session.adapter.filters[1], "enabled": False}}
         deadline = time.time() + 8.0
         while not cleared and time.time() < deadline:
@@ -284,8 +285,8 @@ def test_set_active_reference_broadcasts_overlay_and_clear():
         session.adapter.set_active_reference(None, None, None, session.publish)
         unsubscribe()
         assert got[0]["name"] == "golden" and got[0]["channel"] == 1
-        assert 0 < len(got[0]["points"]) <= 2000
-        assert got[1]["name"] is None and got[1]["points"] == []
+        assert 0 < len(got[0]["samples"])
+        assert got[1]["name"] is None and len(got[1]["samples"]) == 0
     finally:
         session.close()
 
