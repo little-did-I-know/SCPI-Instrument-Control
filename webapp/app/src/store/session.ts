@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import type { AwgState, LogStatus, MeasurementValue, PsuState, ReferenceStats, ScopeState, SessionInfo } from "../api/types";
+import type { View } from "../features/waveform/view";
 
 export type ConnStatus = "disconnected" | "connecting" | "connected" | "error";
 
@@ -8,6 +9,7 @@ type SessionStore = {
   scope: ScopeState | null;
   psu: PsuState | null;
   awg: AwgState | null;
+  view: View | null;
   status: ConnStatus;
   error: string | null;
   measurements: MeasurementValue[];
@@ -26,6 +28,7 @@ type SessionStore = {
   applyReference: (ref: { name: string; channel: number | null } | null) => void;
   applyReferenceStats: (stats: ReferenceStats | null) => void;
   applyLogStatus: (status: LogStatus | null) => void;
+  setView: (view: View | null) => void;
   setStatus: (status: ConnStatus) => void;
   setError: (error: string | null) => void;
   dismissError: () => void;
@@ -36,6 +39,7 @@ export const useSession = create<SessionStore>((set) => ({
   scope: null,
   psu: null,
   awg: null,
+  view: null,
   status: "disconnected",
   error: null,
   measurements: [],
@@ -48,7 +52,7 @@ export const useSession = create<SessionStore>((set) => ({
   // first frame is still in flight — and with repeat kinds, a psu→psu (or
   // awg→awg) switch would otherwise show the old instrument's state under the
   // new one's name.
-  setSession: (session) => set({ session, scope: null, psu: null, awg: null, status: "connected", error: null }),
+  setSession: (session) => set({ session, scope: null, psu: null, awg: null, view: null, status: "connected", error: null }),
   // Replaces the session record ONLY. setSession additionally clears every
   // instrument slice, which is right when you connect to a different
   // instrument and wrong when the same instrument merely changed hands: a
@@ -56,8 +60,10 @@ export const useSession = create<SessionStore>((set) => ({
   // blanking the readings would flash the panel empty for a poll interval
   // over a change that has nothing to do with them.
   applySessionInfo: (session) => set({ session }),
-  clearSession: () => set({ session: null, scope: null, psu: null, awg: null, status: "disconnected", error: null, measurements: [], measurementConfig: [], activeReference: null, referenceStats: null, logStatus: null }),
-  applyState: (scope) => set({ scope }),
+  clearSession: () => set({ session: null, scope: null, psu: null, awg: null, view: null, status: "disconnected", error: null, measurements: [], measurementConfig: [], activeReference: null, referenceStats: null, logStatus: null }),
+  // A new timebase makes the old zoom window meaningless (it was a range of
+  // seconds inside a record that no longer exists), so it resets to fitted.
+  applyState: (scope) => set((s) => ({ scope, view: s.scope && s.scope.timebase !== scope.timebase ? null : s.view })),
   applyPsuState: (psu) => set({ psu }),
   applyAwgState: (awg) => set({ awg }),
   applyMeasurements: (measurements) => set({ measurements }),
@@ -65,6 +71,7 @@ export const useSession = create<SessionStore>((set) => ({
   applyReference: (activeReference) => set({ activeReference }),
   applyReferenceStats: (referenceStats) => set({ referenceStats }),
   applyLogStatus: (logStatus) => set({ logStatus }),
+  setView: (view) => set({ view }),
   setStatus: (status) => set({ status }),
   setError: (error) => set({ error, status: error ? "error" : "connected" }),
   // Clears the message WITHOUT touching status. setError(null) sets status to
