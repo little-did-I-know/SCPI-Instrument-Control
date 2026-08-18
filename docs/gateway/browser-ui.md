@@ -62,13 +62,24 @@ Once connected, the main canvas toggles between three modes:
 
 - **Time** — live traces. Channels are drawn as solid lines, math traces
   (M1/M2) and filters (F1/F2) as dashed lines, and an active reference
-  waveform as a gray ghost trace overlaid on the live signal. On a
-  Siglent-modern instrument the trace updates once per completed acquisition,
-  not on a fixed timer — at a slow timebase that means slow updates (a
-  handful of seconds apart at 1 s/div is normal, not stalled), matching what
-  the scope's own screen is doing. Other dialects have no way to ask the
-  instrument whether a new acquisition has landed, so they poll adaptively
-  instead.
+  waveform as a gray ghost trace overlaid on the live signal. The canvas
+  receives the dense record (up to 100 000 samples per channel) and draws
+  it as a min/max envelope, so a single-sample glitch shows as a spike
+  instead of vanishing between drawn points. **Scroll to zoom** about the
+  pointer, **drag to pan**, **pinch** on a touch screen, and **double-click**
+  (or the **⟲ fit** button) to fit the whole record again; the readout in
+  the top-right shows the effective time/div and, while zoomed, the centre
+  offset. Zooming is client-side over the record already on screen — it
+  never asks the instrument for anything — and the window stays put as new
+  acquisitions arrive; changing the timebase fits the view again. On a
+  Siglent-modern instrument the trace updates once per completed
+  acquisition, not on a fixed timer, and a waveform read itself takes about
+  a quarter second on an SDS824X HD, so expect roughly four updates a second
+  with one channel enabled (about two with two) — at a slow timebase, slower
+  still (a handful of seconds apart at 1 s/div is normal, not stalled),
+  matching what the scope's own screen is doing. Other dialects have no way
+  to ask the instrument whether a new acquisition has landed, so they poll
+  adaptively instead.
 - **Spectrum** — a server-computed FFT of a chosen channel, with peak
   markers and a THD readout. If spectrum analysis is off, the canvas shows
   an **Enable** button instead of a plot.

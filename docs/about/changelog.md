@@ -26,6 +26,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `scripts/media/make_annotation_gif.py`, which executes the code it renders and
   holds the plots that execution produced. Same asset in both places, so there is
   nothing extra to regenerate.
+- **Dense binary waveform stream + zoomable live view.** The gateway's Time
+  canvas now receives the dense record (up to 100 000 samples per channel,
+  `--stream-max-points`) as compact binary WebSocket frames
+  (`?format=binary`; layout in the gateway API reference), draws it as a
+  glitch-true min/max envelope, and lets you scroll/pinch-zoom and drag-pan
+  into it client-side — no extra instrument read, and the window stays put
+  as new acquisitions arrive. The JSON WebSocket frames scripts consume are
+  unchanged (still ≤ 2000 points). `scpi_control.server.frames.decode_binary`
+  is the Python-side decoder. New `--stream-max-fps` (default 20) bounds the
+  live-view rate; on an SDS824X HD a waveform read costs ~250 ms regardless
+  of point count, so real hardware settles at ~4 updates/s per channel — the
+  density is what the instrument gives away for free.
+
+### Changed
+
+- Scope sessions no longer sit on a fixed quarter-second poll floor: the floor
+  is `1 / --stream-max-fps` and the instrument's own readiness gate and read
+  time set the pace. PSU/AWG sessions keep 0.25 s. `:WAVeform:MAXPoint?` is
+  asked once per session instead of every tick.
+- For embedders subscribing to `InstrumentSession.publish` directly: waveform
+  and reference messages now carry `samples` (a numpy array) and `seq`
+  instead of a `points` list; `scpi_control.server.frames.to_json()` converts
+  to the wire shape. The WebSocket JSON contract itself is unchanged.
 
 ### Fixed
 

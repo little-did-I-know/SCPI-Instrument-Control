@@ -73,8 +73,10 @@ ever plugging in an instrument.
 
 ## What it does
 
-- **Live waveform streaming** over a WebSocket, so the display updates as the
-  instrument acquires
+- **Live waveform streaming** over a WebSocket — the browser gets the dense
+  record (up to 100 000 samples per channel) as compact binary frames, draws
+  a glitch-true min/max envelope, and lets you zoom and pan into it without
+  another instrument read; scripts can keep the original JSON frames
 - **Channel, timebase, trigger, and run controls** (Run/Stop/Single/Auto)
   from the browser
 - **LAN discovery** and a dashboard home screen that lists reachable

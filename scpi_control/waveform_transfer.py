@@ -556,11 +556,12 @@ class ModernTransfer:
     delivered, which is the same space as :WAVeform:STARt only when nothing
     is being decimated). A stride > 1 therefore takes a DIFFERENT, narrower
     path below: a single, unlooped window sized to the (already strided)
-    record length, since the live view's <= MAX_FRAME_POINTS request is far
-    below any real :WAVeform:MAXPoint. If a strided record ever needed more
-    than one window, acquire() raises rather than mis-assemble it -- the
-    general chunking loop is deliberately NOT made stride-aware, so the
-    proven stride=1/export path is untouched.
+    record length, since the live view's request is <= the gateway's dense
+    budget (DENSE_MAX_POINTS, 100 000 by default) and always capped by
+    :WAVeform:MAXPoint? in the adapter, so it fits one window. If a strided
+    record ever needed more than one window, acquire() raises rather than
+    mis-assemble it -- the general chunking loop is deliberately NOT made
+    stride-aware, so the proven stride=1/export path is untouched.
     """
 
     def __init__(self, scope: "Oscilloscope"):
@@ -743,8 +744,9 @@ class ModernTransfer:
                 # second iteration would re-request source points the first window
                 # already delivered, silently duplicating a stretch of the record
                 # (and building `time` over the wrong `n`). The live view's request
-                # is always <= MAX_FRAME_POINTS, far below any real MAXPoint, so a
-                # single window covers every case it actually needs; a strided read
+                # is always <= the gateway's dense budget (DENSE_MAX_POINTS, 100 000
+                # by default) and always capped by :WAVeform:MAXPoint? in the
+                # adapter, so it fits one window; a strided read
                 # that would not fit raises instead of mis-assembling.
                 #
                 # The cap applies to what CROSSES THE WIRE, so it is compared

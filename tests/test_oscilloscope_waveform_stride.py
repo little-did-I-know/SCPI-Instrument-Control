@@ -1,7 +1,8 @@
 """Tests for asking the instrument to stride waveform data on the wire.
 
-The gateway's live view renders at most MAX_FRAME_POINTS per frame
-(server/adapters.py), but until now the driver always fetched the entire
+The gateway's JSON stream sends at most MAX_FRAME_POINTS per frame (the dense
+binary path uses DENSE_MAX_POINTS) (server/adapters.py), but until now the
+driver always fetched the entire
 record and strided it down after the transfer -- on a deep record that is
 megabytes crossing the wire to draw two thousand points, holding the
 session's single worker thread for the length of the transfer.
