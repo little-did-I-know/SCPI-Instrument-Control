@@ -72,3 +72,37 @@ describe("session store", () => {
     expect(useSession.getState().psu).toBeNull();
   });
 });
+
+describe("view slice", () => {
+  const STATE = { run_state: "STOP", timebase: 0.001, channels: {}, trigger: { mode: "AUTO", source: "C1", level: 0, slope: "POS", coupling: "DC" } };
+  beforeEach(() => useSession.getState().clearSession());
+
+  it("starts fitted and stores a view", () => {
+    expect(useSession.getState().view).toBeNull();
+    useSession.getState().setView({ tCenter: 0, tSpan: 1e-3 });
+    expect(useSession.getState().view).toEqual({ tCenter: 0, tSpan: 1e-3 });
+  });
+
+  it("keeps the view across a state update with the same timebase", () => {
+    useSession.getState().applyState(STATE);
+    useSession.getState().setView({ tCenter: 0, tSpan: 1e-3 });
+    useSession.getState().applyState({ ...STATE, run_state: "RUN" });
+    expect(useSession.getState().view).toEqual({ tCenter: 0, tSpan: 1e-3 });
+  });
+
+  it("resets the view when the timebase changes", () => {
+    useSession.getState().applyState(STATE);
+    useSession.getState().setView({ tCenter: 0, tSpan: 1e-3 });
+    useSession.getState().applyState({ ...STATE, timebase: 0.002 });
+    expect(useSession.getState().view).toBeNull();
+  });
+
+  it("resets the view on session change and clear", () => {
+    useSession.getState().setView({ tCenter: 0, tSpan: 1e-3 });
+    useSession.getState().setSession({ id: "x", label: "x", mock: true, address: null, state: "connected", idn: "", model: "", dialect: "legacy", num_channels: 4, viewers: 0, owner: "", kind: "scope" as const });
+    expect(useSession.getState().view).toBeNull();
+    useSession.getState().setView({ tCenter: 0, tSpan: 1e-3 });
+    useSession.getState().clearSession();
+    expect(useSession.getState().view).toBeNull();
+  });
+});

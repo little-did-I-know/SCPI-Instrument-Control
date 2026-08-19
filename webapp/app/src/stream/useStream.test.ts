@@ -11,7 +11,8 @@ class FakeWebSocket {
   static last: FakeWebSocket | null = null;
   url: string;
   protocols: string[] | undefined;
-  onmessage: ((event: { data: string }) => void) | null = null;
+  binaryType: string = "blob";
+  onmessage: ((event: { data: string | ArrayBuffer }) => void) | null = null;
   onclose: ((event: { code: number }) => void) | null = null;
   onerror: (() => void) | null = null;
   closed = false;
@@ -32,9 +33,23 @@ class FakeWebSocket {
     this.onmessage?.({ data: JSON.stringify(message) });
   }
 
+  emitBinary(buf: ArrayBuffer) {
+    this.onmessage?.({ data: buf } as unknown as { data: string });
+  }
+
   emitClose(code: number) {
     queueMicrotask(() => this.onclose?.({ code } as CloseEvent));
   }
+}
+
+function binaryFrame(header: Record<string, unknown>, samples: number[]): ArrayBuffer {
+  let head = new TextEncoder().encode(JSON.stringify({ ...header, n: samples.length, dtype: "f32" }));
+  if (head.length % 4 !== 0) head = new Uint8Array([...head, ...new Array(4 - (head.length % 4)).fill(0x20)]);
+  const buf = new ArrayBuffer(4 + head.length + samples.length * 4);
+  new DataView(buf).setUint32(0, head.length, true);
+  new Uint8Array(buf, 4, head.length).set(head);
+  new Uint8Array(buf, 4 + head.length).set(new Uint8Array(new Float32Array(samples).buffer));
+  return buf;
 }
 
 const SESSION = { id: "abc", label: "x", mock: true, address: null, state: "connected", idn: "", model: "", dialect: "legacy", num_channels: 4, viewers: 0, owner: "", kind: "scope" as const };
@@ -57,6 +72,52 @@ describe("useStream", () => {
 
     FakeWebSocket.last!.emit({ type: "state", state: STATE });
     await waitFor(() => expect(useSession.getState().scope?.timebase).toBe(0.001));
+  });
+
+  it("requests the binary format and arraybuffer payloads", () => {
+    renderHook(() => useStream("abc"));
+    expect(FakeWebSocket.last?.url).toContain("/api/sessions/abc/stream?format=binary");
+    expect(FakeWebSocket.last?.binaryType).toBe("arraybuffer");
+  });
+
+  it("stores a decoded binary waveform frame as a Float32Array with its seq", async () => {
+    renderHook(() => useStream("abc"));
+    FakeWebSocket.last!.emitBinary(binaryFrame({ type: "waveform", channel: 1, t0: 0.5, dt: 2e-6, seq: 7 }, [0.25, -0.5]));
+    await waitFor(() => expect(getFrame(1)?.seq).toBe(7));
+    const frame = getFrame(1)!;
+    expect(frame.points).toBeInstanceOf(Float32Array);
+    expect(Array.from(frame.points as Float32Array)).toEqual([0.25, -0.5]);
+    expect(frame.t0).toBe(0.5);
+  });
+
+  it("stores a binary reference frame under REF and applies the overlay name", async () => {
+    renderHook(() => useStream("abc"));
+    FakeWebSocket.last!.emitBinary(binaryFrame({ type: "reference", name: "golden", channel: 2, t0: 0, dt: 1 }, [1, 2]));
+    await waitFor(() => expect(getFrame("REF")?.points.length).toBe(2));
+    expect(useSession.getState().activeReference).toEqual({ name: "golden", channel: 2 });
+  });
+
+  it("drops a malformed binary frame without touching the store", async () => {
+    renderHook(() => useStream("abc"));
+    FakeWebSocket.last!.emit({ type: "state", state: STATE });
+    await waitFor(() => expect(useSession.getState().scope?.timebase).toBe(0.001));
+    FakeWebSocket.last!.emitBinary(new ArrayBuffer(2));
+    expect(getFrame(1)).toBeUndefined();
+    expect(useSession.getState().error).toBeNull();
+  });
+
+  it("drops a binary waveform frame with a null channel", async () => {
+    renderHook(() => useStream("abc"));
+    FakeWebSocket.last!.emitBinary(binaryFrame({ type: "waveform", channel: null, t0: 0, dt: 1 }, [1, 2]));
+    expect(getFrame(1)).toBeUndefined();
+    expect(getFrame("REF")).toBeUndefined();
+    expect(useSession.getState().error).toBeNull();
+  });
+
+  it("still accepts legacy JSON waveform frames", async () => {
+    renderHook(() => useStream("abc"));
+    FakeWebSocket.last!.emit({ type: "waveform", channel: 1, t0: 0, dt: 1e-6, points: [0, 1] });
+    await waitFor(() => expect(getFrame(1)?.points.length).toBe(2));
   });
 
   it("routes a psu state message to the psu store slot, not the scope slot", async () => {

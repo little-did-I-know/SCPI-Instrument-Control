@@ -11,7 +11,11 @@ These tests use a fake scope rather than a MockConnection-backed Oscilloscope:
 this is the adapter's decision logic under test, not SCPI wire behaviour.
 """
 
-from scpi_control.server.adapters import MAX_FRAME_POINTS, ScopeAdapter
+import numpy as np
+import pytest
+
+from scpi_control.server.adapters import DENSE_MAX_POINTS, MAX_FRAME_POINTS, ScopeAdapter
+from scpi_control.waveform import WaveformData
 
 
 class _FakeChannel:
@@ -32,27 +36,24 @@ class _FakeTrigger:
     coupling = "DC"
 
 
-class _FakeWaveform:
-    time = [0.0, 1.0]
-    voltage = [0.0, 1.0]
-
-
 class _FakeScope:
     """Records the stride it was asked for; answers new_acquisition_ready()
     from a fixed sequence, raising if asked more than once per tick (the
     underlying INR? register is read-and-clear -- a second read in the same
     tick would consume a real event and get a meaningless answer)."""
 
-    def __init__(self, ready, record_length=None, max_points=None):
+    def __init__(self, ready, record_length=None, max_points=None, waveform_len=2):
         self._ready = iter(ready)
         self._record_length = record_length
         self._max_points = max_points
+        self.max_points_queries = 0
         self.supported_channels = [1]
         self.math1 = None
         self.math2 = None
         self.last_stride = None
         self.timebase = 1e-3
         self.trigger = _FakeTrigger()
+        self._waveform_len = waveform_len
 
     def acquisition_status(self):
         return "STOP"
@@ -64,6 +65,7 @@ class _FakeScope:
         return self._record_length
 
     def waveform_max_points(self):
+        self.max_points_queries += 1
         return self._max_points
 
     def get_channel(self, n):
@@ -71,11 +73,14 @@ class _FakeScope:
 
     def get_waveform(self, channel, provenance=False, stride=None):
         self.last_stride = stride
-        return _FakeWaveform()
+        # A real WaveformData (a dataclass), not the old _FakeWaveform: the
+        # adapter's post-read cap uses dataclasses.replace() on it.
+        n = self._waveform_len
+        return WaveformData(time=np.arange(n) * 1e-6, voltage=np.arange(n, dtype=float), channel=channel)
 
 
-def _adapter(ready, record_length=None, max_points=None):
-    scope = _FakeScope(ready, record_length=record_length, max_points=max_points)
+def _adapter(ready, record_length=None, max_points=None, waveform_len=2):
+    scope = _FakeScope(ready, record_length=record_length, max_points=max_points, waveform_len=waveform_len)
     adapter = ScopeAdapter()
     published = []
     return adapter, scope, published
@@ -136,25 +141,81 @@ def test_a_new_viewer_gets_the_first_tick_exemption_again():
 
 
 def test_the_stride_is_sized_from_the_record_length():
-    adapter, scope, published = _adapter(ready=[True], record_length=200_000)
+    adapter, scope, published = _adapter(ready=[True], record_length=2_000_000)
     adapter.poll(scope, published.append, 1)
-    assert scope.last_stride == 100  # ceil(200000 / MAX_FRAME_POINTS)
+    assert scope.last_stride == 20  # ceil(2_000_000 / DENSE_MAX_POINTS)
 
 
 def test_the_stride_also_respects_the_instruments_transfer_cap():
-    # A stride sized against MAX_FRAME_POINTS alone can still exceed a low
+    # A stride sized against DENSE_MAX_POINTS alone can still exceed a low
     # :WAVeform:MAXPoint? cap, turning ModernTransfer's guard
     # (FeatureNotSupportedError, waveform_transfer.py) into a total live-view
-    # outage on a model that reports a cap below MAX_FRAME_POINTS. Size
-    # against min(MAX_FRAME_POINTS, max_points) instead, so the guard is
+    # outage on a model that reports a cap below the dense budget. Size
+    # against min(DENSE_MAX_POINTS, max_points) instead, so the guard is
     # unreachable by construction.
     adapter, scope, published = _adapter(ready=[True], record_length=200_000, max_points=500)
     adapter.poll(scope, published.append, 1)
-    assert scope.last_stride == 400  # ceil(200000 / min(2000, 500))
+    assert scope.last_stride == 400  # ceil(200000 / min(100000, 500))
 
 
-def test_max_frame_points_constant_is_what_the_stride_test_assumes():
-    # Pins the constant the two tests above compute their expectations from,
-    # so a change to it fails loudly here instead of silently invalidating
-    # the hand-computed assertions above.
+def test_the_caps_are_what_the_stride_tests_assume():
+    # Pins both constants the tests above compute their expectations from,
+    # so a change to either fails loudly here instead of silently invalidating
+    # the hand-computed assertions. MAX_FRAME_POINTS is the JSON wire cap and
+    # is a contract; DENSE_MAX_POINTS is the dense-path budget.
+    assert DENSE_MAX_POINTS == 100_000
     assert MAX_FRAME_POINTS == 2000
+
+
+def test_a_reintroduced_2000_point_budget_would_fail_here():
+    # Guard against the dense budget quietly regressing to the old JSON cap:
+    # a 100k record must be read at stride 1, not 50.
+    adapter, scope, published = _adapter(ready=[True], record_length=100_000)
+    adapter.poll(scope, published.append, 1)
+    assert scope.last_stride == 1
+
+
+def test_the_transfer_cap_is_asked_once_per_session_not_once_per_tick():
+    # :WAVeform:MAXPoint? is a per-model constant (5 000 000 on an SDS824X HD)
+    # and costs a ~10 ms round trip; asking it every tick was pure overhead.
+    adapter, scope, published = _adapter(ready=[True, True, True], record_length=100_000, max_points=5_000_000)
+    for tick in (1, 2, 3):
+        adapter.poll(scope, published.append, tick)
+    assert scope.max_points_queries == 1
+
+
+def test_an_unanswered_transfer_cap_is_asked_again_next_tick():
+    # None means "the dialect could not answer" (legacy Siglent) or a transient
+    # failure -- neither may be cached as a permanent answer.
+    adapter, scope, published = _adapter(ready=[True, True], record_length=100_000, max_points=None)
+    adapter.poll(scope, published.append, 1)
+    adapter.poll(scope, published.append, 2)
+    assert scope.max_points_queries == 2
+
+
+def test_a_record_that_still_exceeds_the_budget_is_capped_after_the_read():
+    # record_length() is None on legacy dialects, so no stride is requested and
+    # the whole record comes back; the frame must still respect the budget.
+    adapter, scope, published = _adapter(ready=[True], record_length=None, waveform_len=250_000)
+    adapter.configure_stream(max_points=100_000, max_fps=20.0)
+    adapter.poll(scope, published.append, 1)
+    frame = next(f for f in published if f["type"] == "waveform")
+    assert scope.last_stride is None
+    assert len(frame["samples"]) <= 100_000
+    assert frame["dt"] == pytest.approx(3e-6)  # stride 3 = ceil(250000/100000)
+
+
+def test_published_frames_carry_samples_and_a_seq_that_advances_per_acquisition():
+    adapter, scope, published = _adapter(ready=[True, True], record_length=100_000)
+    adapter.poll(scope, published.append, 1)
+    adapter.poll(scope, published.append, 2)
+    frames = [f for f in published if f["type"] == "waveform"]
+    assert all("samples" in f and "points" not in f for f in frames)
+    assert frames[0]["seq"] + 1 == frames[1]["seq"]
+
+
+def test_configure_stream_sets_the_scope_poll_interval_from_max_fps():
+    adapter = ScopeAdapter()
+    assert adapter.poll_interval == pytest.approx(1 / 20)  # default DEFAULT_STREAM_MAX_FPS
+    adapter.configure_stream(max_points=50_000, max_fps=4.0)
+    assert adapter.max_points == 50_000 and adapter.poll_interval == pytest.approx(0.25)

@@ -591,3 +591,59 @@ class TestAdapterLifecycleHooks:
             assert session._thread.is_alive(), "the worker must survive to report the failure"
         finally:
             session.close()
+
+
+def test_scope_sessions_poll_at_the_stream_fps_floor_and_psu_sessions_keep_a_quarter_second():
+    from scpi_control.server.sessions import InstrumentSession
+
+    scope = InstrumentSession.open("s", mock=True)
+    try:
+        assert scope._poll_interval == pytest.approx(1 / 20)
+    finally:
+        scope.close()
+    psu = InstrumentSession.open("p", kind="psu", mock=True)
+    try:
+        assert psu._poll_interval == pytest.approx(0.25)
+    finally:
+        psu.close()
+
+
+def test_open_honours_an_explicit_poll_interval_over_the_adapter_default():
+    from scpi_control.server.sessions import InstrumentSession
+
+    session = InstrumentSession.open("s", mock=True, poll_interval=0.05)
+    try:
+        assert session._poll_interval == pytest.approx(0.05)
+    finally:
+        session.close()
+
+
+def test_open_forwards_the_stream_budget_to_the_adapter():
+    from scpi_control.server.sessions import InstrumentSession
+
+    session = InstrumentSession.open("s", mock=True, stream_max_points=5000, stream_max_fps=4.0)
+    try:
+        assert session.adapter.max_points == 5000
+        assert session._poll_interval == pytest.approx(0.25)
+    finally:
+        session.close()
+
+
+def test_manager_forwards_the_stream_budget_to_every_session_it_creates():
+    from scpi_control.server.sessions import SessionManager
+
+    manager = SessionManager(stream_max_points=5000, stream_max_fps=4.0)
+    try:
+        session = manager.create("s", mock=True)
+        assert session.adapter.max_points == 5000
+        assert session._poll_interval == pytest.approx(0.25)
+    finally:
+        manager.close_all()
+
+
+@pytest.mark.parametrize("kwargs", [{"stream_max_points": 0}, {"stream_max_points": -1}, {"stream_max_points": 1000}, {"stream_max_fps": 0.0}, {"stream_max_fps": -2.0}])
+def test_manager_rejects_a_nonsense_stream_budget(kwargs):
+    from scpi_control.server.sessions import SessionManager
+
+    with pytest.raises(ValueError):
+        SessionManager(**kwargs)

@@ -65,7 +65,7 @@ def test_the_scope_adapter_publishes_frames_when_polled():
     finally:
         adapter.close(instrument)
     assert published, "a connected scope with an enabled channel must publish at least one frame"
-    assert any(message.get("type") == "frame" or "points" in message for message in published)
+    assert any(message.get("type") == "waveform" and "samples" in message for message in published)
 
 
 def test_a_non_mock_build_validates_the_target():

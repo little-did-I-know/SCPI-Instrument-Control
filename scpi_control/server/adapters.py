@@ -11,18 +11,31 @@ much worse failure than a little indirection.
 
 import logging
 import time
+from dataclasses import replace
 from typing import Any, Callable, Dict, List, Optional, Tuple
+
+import numpy as np
 
 from scpi_control import FunctionGenerator, Oscilloscope, PowerSupply
 from scpi_control.connection.mock import MockConnection
 from scpi_control.exceptions import InvalidParameterError, MeasurementUnavailableError, SiglentError
 from scpi_control.server import compute
+from scpi_control.server.frames import (  # noqa: F401  (MAX_FRAME_POINTS re-exported: sessions.py and tests import it from here)
+    DENSE_MAX_POINTS,
+    MAX_FRAME_POINTS,
+    reference_message,
+    to_json,
+    waveform_message,
+)
 from scpi_control.server.netpolicy import validate_target
 from scpi_control.server.recorder import TrendRecorder
 
 logger = logging.getLogger(__name__)
 
-MAX_FRAME_POINTS = 2000
+# Scope sessions poll no faster than this. On real hardware the INR? gate and
+# the measured-duration backoff (sessions._poll_if_due) throttle far below it
+# (~4 reads/s on an SDS824X HD); the mock, which has no such cost, hits it.
+DEFAULT_STREAM_MAX_FPS = 20.0
 MEASUREMENT_EVERY_N_POLLS = 4
 
 DEFAULT_MOCK_IDN = "Siglent Technologies,SDS1104X-E,MOCK0001,1.0.0.0"
@@ -130,17 +143,34 @@ def read_state(scope: Oscilloscope) -> Dict[str, Any]:
     }
 
 
-def _decimate_frame(channel, time_axis, voltage) -> Dict[str, Any]:
-    step = max(1, -(-len(voltage) // MAX_FRAME_POINTS))  # ceiling division keeps len(points) <= cap
-    points = voltage[::step]
-    t0 = float(time_axis[0]) if len(time_axis) else 0.0
-    dt = float(time_axis[1] - time_axis[0]) * step if len(time_axis) > 1 else 1.0
-    return {"type": "waveform", "channel": channel, "t0": t0, "dt": dt, "points": [float(v) for v in points]}
+def _cap_record(data, max_points: int):
+    """Stride-decimate a WaveformData that came back larger than the dense budget.
+
+    Normally unreachable: the stride requested from record_length() keeps the
+    read under the budget. But legacy dialects answer record_length() with
+    None (no stride is requested and the whole record comes back), and a
+    record_length() that lied would land here too. Cheap numpy slicing; the
+    frame budget is a promise to every subscriber's memory, so it holds
+    regardless of what the instrument did.
+    """
+    n = len(data.voltage)
+    if max_points <= 0 or n <= max_points:
+        return data
+    step = -(-n // max_points)
+    voltage = np.asarray(data.voltage)[::step]
+    return replace(
+        data,
+        time=np.asarray(data.time)[::step],
+        voltage=voltage,
+        record_length=len(voltage),
+        sample_rate=(data.sample_rate / step) if data.sample_rate else data.sample_rate,
+    )
 
 
 def _waveform_frame(scope: Oscilloscope, channel: int) -> Dict[str, Any]:
+    """Legacy helper: the JSON wire frame for one channel (kept for its importers)."""
     data = scope.get_waveform(channel, provenance=False)
-    return _decimate_frame(channel, data.time, data.voltage)
+    return to_json(waveform_message(channel, data.time, data.voltage))
 
 
 def make_mock_scope_connection(model: Optional[str]) -> MockConnection:
@@ -164,6 +194,15 @@ class InstrumentAdapter:
     """What a session needs to know about one kind of instrument."""
 
     kind = ""
+
+    # How often a session of this kind polls when nothing else throttles it.
+    # PSU/AWG polls are bursts of ~6 queries per output/channel and keep the
+    # historical quarter-second; ScopeAdapter derives its own from max_fps.
+    poll_interval = 0.25
+
+    def configure_stream(self, max_points: int, max_fps: float) -> None:
+        """Apply the gateway's stream budget. Only kinds that stream samples care."""
+        return None
 
     def build(self, address, port, mock, model, allowed_ports, connection) -> Any:
         raise NotImplementedError
@@ -217,6 +256,24 @@ class ScopeAdapter(InstrumentAdapter):
         # operation label -- see _safe()'s docstring. Worker-thread-only, like
         # self._shown: nothing else reads or writes it.
         self._poll_health: Dict[str, bool] = {}
+        self.max_points = DENSE_MAX_POINTS
+        self.poll_interval = 1.0 / DEFAULT_STREAM_MAX_FPS
+        # Acquisition counter: bumped once per tick that passes the readiness
+        # gate, stamped on every trace published from that tick so a client
+        # can tell "same acquisition, another channel" from "new acquisition".
+        self._seq = 0
+        # :WAVeform:MAXPoint? is a per-model constant, so ask it once and keep
+        # it. None is never cached: it means the dialect could not answer
+        # (legacy Siglent) or the query failed this tick, and the next tick
+        # must be free to try again. record_length() is deliberately NOT
+        # cached -- it changes with timebase and memory depth from either the
+        # gateway or the front panel, and a stale value would either trip the
+        # strided-read guard or let a deep record through as a full read.
+        self._transfer_cap: Optional[int] = None
+
+    def configure_stream(self, max_points: int, max_fps: float) -> None:
+        self.max_points = int(max_points)
+        self.poll_interval = 1.0 / float(max_fps)
 
     def build(self, address, port, mock, model, allowed_ports, connection):
         if mock:
@@ -261,25 +318,32 @@ class ScopeAdapter(InstrumentAdapter):
         if ready is False and self._published_a_frame:
             return
         # Size the stride from the full record length, capped by whichever is
-        # smaller: our own per-frame budget, or the instrument's own
-        # per-transfer limit (:WAVeform:MAXPoint?, via waveform_max_points()).
-        # Sizing against MAX_FRAME_POINTS alone can still overflow a low cap
-        # and turn ModernTransfer's strided-read guard (FeatureNotSupportedError)
-        # into a total live-view outage -- capping here makes that guard
+        # smaller: our own per-frame budget (self.max_points, DENSE_MAX_POINTS
+        # by default), or the instrument's own per-transfer limit
+        # (:WAVeform:MAXPoint?, via waveform_max_points()). Sizing against
+        # self.max_points alone can still overflow a low cap and turn
+        # ModernTransfer's strided-read guard (FeatureNotSupportedError) into
+        # a total live-view outage -- capping here makes that guard
         # unreachable by construction.
         points = _safe(lambda: scope.record_length(), default=None)
         stride = None
         if points:
-            cap = _safe(lambda: scope.waveform_max_points(), default=None)
-            limit = min(MAX_FRAME_POINTS, cap) if cap else MAX_FRAME_POINTS
+            cap = self._transfer_cap
+            if cap is None:
+                cap = _safe(lambda: scope.waveform_max_points(), default=None)
+                if cap:
+                    self._transfer_cap = cap
+            limit = min(self.max_points, cap) if cap else self.max_points
             stride = max(1, -(-points // limit))
+        self._seq += 1
+        seq = self._seq
         acquired = {}
         for n in scope.supported_channels:
             ch = scope.get_channel(n)
             if ch is not None and _safe(lambda: ch.enabled, default=False, label="channel {0} enabled".format(n), state=health):
-                data = scope.get_waveform(n, provenance=False, stride=stride)
+                data = _cap_record(scope.get_waveform(n, provenance=False, stride=stride), self.max_points)
                 acquired["C{0}".format(n)] = data
-                publish(_decimate_frame(n, data.time, data.voltage))
+                publish(waveform_message(n, data.time, data.voltage, seq=seq))
                 self._published_a_frame = True
         shown_now = set()
         for label, math in (("M1", scope.math1), ("M2", scope.math2)):
@@ -287,20 +351,20 @@ class ScopeAdapter(InstrumentAdapter):
             if math is not None and _safe(lambda: math.enabled, default=False, label="math {0} enabled".format(label), state=health):
                 result = _safe(lambda: math.compute(acquired), label="math {0} compute".format(label), state=health)
             if result is not None:
-                publish(_decimate_frame(label, result.time, result.voltage))
+                publish(waveform_message(label, result.time, result.voltage, seq=seq))
                 shown_now.add(label)
             elif label in shown:
-                publish(_decimate_frame(label, [], []))  # one-shot clear on transition
+                publish(waveform_message(label, [], [], seq=seq))  # one-shot clear on transition
         filters = self.filters
         for n in sorted(filters):
             config = filters[n]
             label = "F{0}".format(n)
             result = _quiet(lambda: compute.filtered_waveform(config, acquired)) if config["enabled"] else None
             if result is not None:
-                publish(_decimate_frame(label, result.time, result.voltage))
+                publish(waveform_message(label, result.time, result.voltage, seq=seq))
                 shown_now.add(label)
             elif label in shown:
-                publish(_decimate_frame(label, [], []))
+                publish(waveform_message(label, [], [], seq=seq))
         spectrum_config = self.spectrum_config
         frame = _quiet(lambda: compute.spectrum_frame(spectrum_config, acquired)) if spectrum_config["enabled"] else None
         if frame is not None:
@@ -369,15 +433,19 @@ class ScopeAdapter(InstrumentAdapter):
         publish({"type": "log_status", "state": status["state"], "started_at": status["started_at"], "row_count": status["row_count"], "columns": status["columns"]})
 
     def reference_overlay(self) -> Dict[str, Any]:
+        """The REST shape of the active overlay: JSON points, capped like every JSON frame."""
+        message = to_json(self._reference_message())
+        return {key: value for key, value in message.items() if key != "type"}
+
+    def _reference_message(self) -> Dict[str, Any]:
         active = self.active_reference
         if active is None:
-            return {"name": None, "channel": None, "t0": 0.0, "dt": 1.0, "points": []}
-        frame = _decimate_frame(active["channel"], active["data"]["time"], active["data"]["voltage"])
-        return {"name": active["name"], "channel": active["channel"], "t0": frame["t0"], "dt": frame["dt"], "points": frame["points"]}
+            return reference_message(None, None, [], [])
+        return reference_message(active["name"], active["channel"], active["data"]["time"], active["data"]["voltage"])
 
     def set_active_reference(self, name: Optional[str], channel: Optional[int], data: Optional[Dict[str, Any]], publish: Callable[[Dict[str, Any]], None]) -> None:
         self.active_reference = None if name is None else {"name": name, "channel": channel, "data": data}
-        publish({"type": "reference", **self.reference_overlay()})
+        publish(self._reference_message())
 
 
 MEASURED_KEYS = ("measured_voltage", "measured_current", "measured_power")

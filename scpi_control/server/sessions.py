@@ -19,7 +19,7 @@ from scpi_control.exceptions import SiglentConnectionError, SiglentError
 
 # Re-exported: all five were public names in this module in 5.7.1, and
 # api/scope.py plus several tests still import them from here.
-from scpi_control.server.adapters import ADAPTERS, DEFAULT_MOCK_IDN, MAX_FRAME_POINTS, MEASUREMENT_EVERY_N_POLLS, _waveform_frame, read_state  # noqa: F401
+from scpi_control.server.adapters import ADAPTERS, DEFAULT_MOCK_IDN, DEFAULT_STREAM_MAX_FPS, DENSE_MAX_POINTS, MAX_FRAME_POINTS, MEASUREMENT_EVERY_N_POLLS, _waveform_frame, read_state  # noqa: F401
 from scpi_control.server.adapters import make_mock_scope_connection as _make_mock_connection  # noqa: F401  (re-exported for backward compatibility)
 from scpi_control.server.discovery import classify
 
@@ -128,16 +128,23 @@ class InstrumentSession:
         port: int = 5025,
         mock: bool = False,
         model: Optional[str] = None,
-        poll_interval: float = 0.25,
+        poll_interval: Optional[float] = None,
         owner: str = "",
         allowed_ports: Optional[frozenset] = None,
+        stream_max_points: int = DENSE_MAX_POINTS,
+        stream_max_fps: float = DEFAULT_STREAM_MAX_FPS,
         _connection=None,
     ) -> "InstrumentSession":
         if kind not in ADAPTERS:
             raise SessionError("unknown instrument kind {0!r}".format(kind))
         adapter = ADAPTERS[kind]()
+        adapter.configure_stream(stream_max_points, stream_max_fps)
+        # None means "whatever this kind of instrument should poll at": a scope
+        # derives it from the stream fps cap, a PSU/AWG keeps its burst-friendly
+        # quarter second. An explicit value (tests, embedders) always wins.
+        interval = adapter.poll_interval if poll_interval is None else poll_interval
         instrument = adapter.build(address=address, port=port, mock=mock, model=model, allowed_ports=allowed_ports, connection=_connection)
-        session = cls(label, instrument, mock, address, poll_interval, adapter)
+        session = cls(label, instrument, mock, address, interval, adapter)
         session.kind = kind
         session.owner = owner
         session._thread.start()
@@ -373,7 +380,13 @@ class InstrumentSession:
 class SessionManager:
     """Registry of live sessions. create() connects before registering."""
 
-    def __init__(self, allowed_ports: Optional[frozenset] = None, max_sessions: int = 8) -> None:
+    def __init__(
+        self,
+        allowed_ports: Optional[frozenset] = None,
+        max_sessions: int = 8,
+        stream_max_points: int = DENSE_MAX_POINTS,
+        stream_max_fps: float = DEFAULT_STREAM_MAX_FPS,
+    ) -> None:
         if max_sessions < 1:
             # A cap below 1 doesn't disable the gateway -- it silently makes
             # every create() a 409 "session limit reached (0)", which reads
@@ -382,10 +395,22 @@ class SessionManager:
             # CLI to catch it, since SessionManager is also constructed
             # directly by embedders and tests.
             raise ValueError("max_sessions must be at least 1 (got {0})".format(max_sessions))
+        if stream_max_points < MAX_FRAME_POINTS:
+            # Floored at the JSON stream's own cap (2000), not an arbitrary
+            # sanity minimum: the dense adapter reads at most stream_max_points
+            # samples per transfer, and the JSON frame builder decimates
+            # whatever it's handed down to MAX_FRAME_POINTS -- a budget below
+            # that would silently give a JSON client fewer than the 2000
+            # points every prior release guaranteed.
+            raise ValueError("stream_max_points must be at least {0} (the JSON stream's own cap); got {1}".format(MAX_FRAME_POINTS, stream_max_points))
+        if not stream_max_fps > 0:
+            raise ValueError("stream_max_fps must be positive (got {0})".format(stream_max_fps))
         self._sessions: Dict[str, InstrumentSession] = {}
         self._lock = threading.Lock()
         self.allowed_ports = allowed_ports
         self.max_sessions = max_sessions
+        self.stream_max_points = stream_max_points
+        self.stream_max_fps = stream_max_fps
         # Slots claimed by an in-flight create() that hasn't registered yet.
         # Counted alongside len(self._sessions) under the same lock as the
         # cap check so the check and the reservation are one atomic step --
@@ -428,7 +453,19 @@ class SessionManager:
             self._pending += 1
         registered = False
         try:
-            session = InstrumentSession.open(label, kind=kind, address=address, port=port, mock=mock, model=model, owner=owner, allowed_ports=self.allowed_ports, _connection=_connection)
+            session = InstrumentSession.open(
+                label,
+                kind=kind,
+                address=address,
+                port=port,
+                mock=mock,
+                model=model,
+                owner=owner,
+                allowed_ports=self.allowed_ports,
+                stream_max_points=self.stream_max_points,
+                stream_max_fps=self.stream_max_fps,
+                _connection=_connection,
+            )
             with self._lock:
                 self._pending -= 1
                 self._sessions[session.id] = session

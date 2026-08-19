@@ -190,6 +190,47 @@ All paths under `/api/sessions/{id}/scope/`.
 | `error` | `{"type": "error", "detail": "connection lost"}` |
 | `closed` | `{"type": "closed"}` |
 
+### Dense binary frames (`?format=binary`)
+
+`GET /api/sessions/{id}/stream?format=binary` opts the socket into the dense
+path used by the browser UI. `format` absent or `json` is the contract above,
+unchanged; any other value closes the socket with code **4400** rather than
+falling back silently.
+
+In binary mode every `waveform` and `reference` message arrives as one
+WebSocket **binary** frame; every other message type (`state`, `measurements`,
+`spectrum`, `reference_stats`, `log_status`, `error`, `closed`, …) is still a
+JSON text frame on the same socket. Layout:
+
+| Offset | Size | Content |
+|---|---|---|
+| 0 | 4 | `header_len`, uint32 little-endian |
+| 4 | `header_len` | UTF-8 JSON header, space-padded to a multiple of 4 bytes |
+| 4 + `header_len` | 4 × `n` | `n` samples, float32 little-endian |
+
+Header: `{"type":"waveform","channel":1,"t0":-0.007,"dt":5e-8,"seq":17,"n":100000,"dtype":"f32"}` —
+`channel` is an int or `"M1"`/`"M2"`/`"F1"`/`"F2"`; `seq` counts acquisitions,
+so traces published from the same poll tick share it. A `reference` header
+carries `name` and `channel` instead of `seq`. A clear is `n: 0` with an empty
+payload. Because the payload starts 4-byte aligned, a browser can wrap it in a
+`Float32Array` view without copying; in Python,
+`scpi_control.server.frames.decode_binary(blob)` returns `(header, samples)`.
+
+A dense frame holds up to `--stream-max-points` samples (default 100 000; the
+instrument strides above that). The JSON path stays capped at 2 000 points,
+and `--stream-max-points` cannot be set below that cap (the gateway rejects a
+lower value at startup) — lowering it would silently give a JSON client fewer
+than the 2 000 points every prior release guaranteed.
+Measured on an SDS824X HD, a waveform read costs about 250 ms whether it
+returns 700 or 100 000 points, so density is free at the instrument; the
+per-channel update rate is unchanged from before this dense path existed —
+about 1.3 frames/s either way, since the read cost is per-transfer, not
+per-point (see the Siglent-modern note below — on that scope, on the order of
+one full-record update a second per channel once the session's read-time
+backoff is accounted for). What changed is resolution (2 000 → up to 100 000
+samples per frame), not rate. `--stream-max-fps` (default 20) only bounds the
+mock and any instrument that could go faster.
+
 On a Siglent-modern instrument, a `waveform` frame for a real channel (not math/filter) is gated on the
 instrument's own "new acquisition" flag (`INR?` bit 0): the poll loop asks that question every tick, and
 only fetches and publishes a frame when the answer is yes. In practice this means the live view updates

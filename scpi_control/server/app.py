@@ -13,6 +13,7 @@ from scpi_control.exceptions import InvalidParameterError, SiglentError, Siglent
 from scpi_control.server.api.join import FailureLimiter
 from scpi_control.server.auth import AuthMiddleware, TokenStore
 from scpi_control.server.invitations import InvitationStore
+from scpi_control.server.adapters import DEFAULT_STREAM_MAX_FPS, DENSE_MAX_POINTS
 from scpi_control.server.revocation import StreamRegistry
 from scpi_control.server.sessions import SessionError, SessionManager
 from scpi_control.server.spa import spa_response
@@ -33,6 +34,8 @@ def create_app(
     abandon_after: float = 300.0,
     allowed_ports: Optional[frozenset] = None,
     max_sessions: Optional[int] = None,
+    stream_max_points: Optional[int] = None,
+    stream_max_fps: Optional[float] = None,
 ) -> FastAPI:
     # allowed_ports and max_sessions only ever seed a manager create_app builds
     # itself: an explicitly-passed manager already carries its own policy (or
@@ -42,9 +45,20 @@ def create_app(
     # surprising to a caller who assumed they compose, and could leave the
     # gateway with no port policy or session cap at all. Refuse the ambiguous
     # combination instead of guessing.
-    if manager is not None and (allowed_ports is not None or max_sessions is not None):
-        raise ValueError("create_app() received both an explicit manager and allowed_ports/max_sessions; configure those on the manager (SessionManager(...)) instead.")
-    manager = manager if manager is not None else SessionManager(allowed_ports=allowed_ports, max_sessions=max_sessions if max_sessions is not None else 8)
+    if manager is not None and (allowed_ports is not None or max_sessions is not None or stream_max_points is not None or stream_max_fps is not None):
+        raise ValueError(
+            "create_app() received both an explicit manager and allowed_ports/max_sessions/stream_max_points/stream_max_fps; configure those on the manager (SessionManager(...)) instead."
+        )
+    manager = (
+        manager
+        if manager is not None
+        else SessionManager(
+            allowed_ports=allowed_ports,
+            max_sessions=max_sessions if max_sessions is not None else 8,
+            stream_max_points=stream_max_points if stream_max_points is not None else DENSE_MAX_POINTS,
+            stream_max_fps=stream_max_fps if stream_max_fps is not None else DEFAULT_STREAM_MAX_FPS,
+        )
+    )
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
