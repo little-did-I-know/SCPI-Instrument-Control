@@ -3706,8 +3706,10 @@ makes the gateway a good way to explore the library's capabilities before
 ever plugging in an instrument.</p>
 <h2 id="what-it-does">What it does<a class="headerlink" href="#what-it-does" title="Permanent link">&para;</a></h2>
 <ul>
-<li><strong>Live waveform streaming</strong> over a WebSocket, so the display updates as the
-  instrument acquires</li>
+<li><strong>Live waveform streaming</strong> over a WebSocket — the browser gets the dense
+  record (up to 100 000 samples per channel) as compact binary frames, draws
+  a glitch-true min/max envelope, and lets you zoom and pan into it without
+  another instrument read; scripts can keep the original JSON frames</li>
 <li><strong>Channel, timebase, trigger, and run controls</strong> (Run/Stop/Single/Auto)
   from the browser</li>
 <li><strong>LAN discovery</strong> and a dashboard home screen that lists reachable

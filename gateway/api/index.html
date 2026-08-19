@@ -1303,6 +1303,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="WebSocket">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#dense-binary-frames-formatbinary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dense binary frames (?format=binary)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -3759,6 +3776,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="WebSocket">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#dense-binary-frames-formatbinary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dense binary frames (?format=binary)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -4335,6 +4369,62 @@ the fact if the fetch turns out to have been oversized.</p>
 </tr>
 </tbody>
 </table>
+<h3 id="dense-binary-frames-formatbinary">Dense binary frames (<code>?format=binary</code>)<a class="headerlink" href="#dense-binary-frames-formatbinary" title="Permanent link">&para;</a></h3>
+<p><code>GET /api/sessions/{id}/stream?format=binary</code> opts the socket into the dense
+path used by the browser UI. <code>format</code> absent or <code>json</code> is the contract above,
+unchanged; any other value closes the socket with code <strong>4400</strong> rather than
+falling back silently.</p>
+<p>In binary mode every <code>waveform</code> and <code>reference</code> message arrives as one
+WebSocket <strong>binary</strong> frame; every other message type (<code>state</code>, <code>measurements</code>,
+<code>spectrum</code>, <code>reference_stats</code>, <code>log_status</code>, <code>error</code>, <code>closed</code>, …) is still a
+JSON text frame on the same socket. Layout:</p>
+<table>
+<thead>
+<tr>
+<th>Offset</th>
+<th>Size</th>
+<th>Content</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0</td>
+<td>4</td>
+<td><code>header_len</code>, uint32 little-endian</td>
+</tr>
+<tr>
+<td>4</td>
+<td><code>header_len</code></td>
+<td>UTF-8 JSON header, space-padded to a multiple of 4 bytes</td>
+</tr>
+<tr>
+<td>4 + <code>header_len</code></td>
+<td>4 × <code>n</code></td>
+<td><code>n</code> samples, float32 little-endian</td>
+</tr>
+</tbody>
+</table>
+<p>Header: <code>{"type":"waveform","channel":1,"t0":-0.007,"dt":5e-8,"seq":17,"n":100000,"dtype":"f32"}</code> —
+<code>channel</code> is an int or <code>"M1"</code>/<code>"M2"</code>/<code>"F1"</code>/<code>"F2"</code>; <code>seq</code> counts acquisitions,
+so traces published from the same poll tick share it. A <code>reference</code> header
+carries <code>name</code> and <code>channel</code> instead of <code>seq</code>. A clear is <code>n: 0</code> with an empty
+payload. Because the payload starts 4-byte aligned, a browser can wrap it in a
+<code>Float32Array</code> view without copying; in Python,
+<code>scpi_control.server.frames.decode_binary(blob)</code> returns <code>(header, samples)</code>.</p>
+<p>A dense frame holds up to <code>--stream-max-points</code> samples (default 100 000; the
+instrument strides above that). The JSON path stays capped at 2 000 points,
+and <code>--stream-max-points</code> cannot be set below that cap (the gateway rejects a
+lower value at startup) — lowering it would silently give a JSON client fewer
+than the 2 000 points every prior release guaranteed.
+Measured on an SDS824X HD, a waveform read costs about 250 ms whether it
+returns 700 or 100 000 points, so density is free at the instrument; the
+per-channel update rate is unchanged from before this dense path existed —
+about 1.3 frames/s either way, since the read cost is per-transfer, not
+per-point (see the Siglent-modern note below — on that scope, on the order of
+one full-record update a second per channel once the session's read-time
+backoff is accounted for). What changed is resolution (2 000 → up to 100 000
+samples per frame), not rate. <code>--stream-max-fps</code> (default 20) only bounds the
+mock and any instrument that could go faster.</p>
 <p>On a Siglent-modern instrument, a <code>waveform</code> frame for a real channel (not math/filter) is gated on the
 instrument's own "new acquisition" flag (<code>INR?</code> bit 0): the poll loop asks that question every tick, and
 only fetches and publishes a frame when the answer is yes. In practice this means the live view updates
