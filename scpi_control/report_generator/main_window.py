@@ -329,6 +329,10 @@ class MainWindow(QMainWindow):
             if applied:
                 logger.info(f"Applied {applied} saved annotation(s) from sidecar files")
 
+            # New waveforms mean any prior AI analysis no longer corresponds
+            # to the loaded data (audit H27).
+            self.ai_analysis_panel._clear_results()
+
             self.statusBar().showMessage(f"Imported {len(file_paths)} waveform file(s)")
 
         except Exception as e:
@@ -371,6 +375,9 @@ class MainWindow(QMainWindow):
         if reply == QMessageBox.StandardButton.Yes:
             self.waveforms.clear()
             self.waveform_list.clear()
+            # Any AI-generated content described the data that just left --
+            # it no longer corresponds to anything (audit H27).
+            self.ai_analysis_panel._clear_results()
             self.statusBar().showMessage("Data cleared")
 
     def _configure_llm(self):
