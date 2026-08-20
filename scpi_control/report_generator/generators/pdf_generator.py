@@ -360,7 +360,7 @@ class PDFReportGenerator(BaseReportGenerator):
         code_blocks = {}
 
         def save_code(match):
-            key = f"__CODE_{len(code_blocks)}__"
+            key = f"\x00CODE{len(code_blocks)}\x00"
             code_blocks[key] = match.group(1)
             return key
 
