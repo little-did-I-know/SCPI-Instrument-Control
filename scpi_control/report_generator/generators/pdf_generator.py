@@ -404,6 +404,24 @@ class PDFReportGenerator(BaseReportGenerator):
 
         return escape(text or "")
 
+    def _para(self, text: str, style, mode: str = "markdown") -> Paragraph:
+        """The only place a Paragraph flowable is constructed in this file.
+
+        mode="markdown": run through _markdown_to_reportlab (bold/italic/
+            code spans supported -- for AI/user prose).
+        mode="literal": run through _literal_cell_text (no markdown
+            interpretation -- for titles/names/labels, which shouldn't
+            support bold/italic anyway).
+        mode="preformatted": text is already escaped/composited by the
+            caller (its XML tags are ours, not user text) -- pass through
+            unchanged.
+        """
+        if mode == "preformatted":
+            escaped = text
+        else:
+            escaped = self._markdown_to_reportlab(text) if mode == "markdown" else self._literal_cell_text(text)
+        return Paragraph(escaped, style)
+
     def generate(self, report: TestReport, output_path: Path) -> bool:
         """
         Generate PDF report.
@@ -543,11 +561,11 @@ class PDFReportGenerator(BaseReportGenerator):
 
         # Company name
         if report.metadata.company_name:
-            story.append(Paragraph(report.metadata.company_name, self.styles["Normal"]))
+            story.append(self._para(report.metadata.company_name, self.styles["Normal"], mode="literal"))
             story.append(Spacer(1, 0.1 * inch))
 
         # Title
-        story.append(Paragraph(report.metadata.title, self.styles["ReportTitle"]))
+        story.append(self._para(report.metadata.title, self.styles["ReportTitle"], mode="literal"))
         story.append(Spacer(1, 0.3 * inch))
 
         return story
@@ -619,9 +637,11 @@ class PDFReportGenerator(BaseReportGenerator):
             text = f"<b>Overall Result: FAIL</b>"
         else:
             style = self.styles["Normal"]
-            text = f"<b>Overall Result: {overall}</b>"
+            # overall_result is a public TestReport field -- nothing constrains it
+            # to PASS/FAIL/INCONCLUSIVE, so it must be escaped like any other text.
+            text = f"<b>Overall Result: {self._literal_cell_text(overall)}</b>"
 
-        story.append(Paragraph(text, style))
+        story.append(self._para(text, style, mode="preformatted"))
 
         # Measurement summary
         measurements = report.get_all_measurements()
@@ -630,7 +650,7 @@ class PDFReportGenerator(BaseReportGenerator):
             failed = sum(1 for m in measurements if m.passed is False)
 
             summary_text = f"Measurements: {len(measurements)} total, {passed} passed, {failed} failed"
-            story.append(Paragraph(summary_text, self.styles["Normal"]))
+            story.append(self._para(summary_text, self.styles["Normal"], mode="preformatted"))
             story.append(Spacer(1, 0.2 * inch))
 
         return story
@@ -639,16 +659,16 @@ class PDFReportGenerator(BaseReportGenerator):
         """Generate executive summary section."""
         story = []
 
-        story.append(Paragraph("Executive Summary", self.styles["SectionHeading"]))
+        story.append(self._para("Executive Summary", self.styles["SectionHeading"], mode="preformatted"))
 
-        # Convert markdown to ReportLab XML
-        summary_text = self._markdown_to_reportlab(report.executive_summary)
-        story.append(Paragraph(summary_text, self.styles["Normal"]))
+        story.append(self._para(report.executive_summary, self.styles["Normal"], mode="markdown"))
 
+        # summary_attribution() returns one of two fixed, hardcoded strings or
+        # None (see ReportMetadata.summary_attribution) -- never user text.
         attribution = report.summary_attribution()
         if attribution:
             story.append(Spacer(1, 0.1 * inch))
-            story.append(Paragraph(f"<i>{attribution}</i>", self.styles["Normal"]))
+            story.append(self._para(f"<i>{attribution}</i>", self.styles["Normal"], mode="preformatted"))
 
         story.append(Spacer(1, 0.2 * inch))
 
@@ -658,17 +678,16 @@ class PDFReportGenerator(BaseReportGenerator):
         """Generate key findings section."""
         story = []
 
-        story.append(Paragraph("Key Findings", self.styles["SectionHeading"]))
+        story.append(self._para("Key Findings", self.styles["SectionHeading"], mode="preformatted"))
 
         for finding in report.key_findings:
-            # Convert markdown to ReportLab XML
             finding_text = self._markdown_to_reportlab(finding)
-            story.append(Paragraph(f"• {finding_text}", self.styles["Normal"]))
+            story.append(self._para(f"• {finding_text}", self.styles["Normal"], mode="preformatted"))
 
         findings_attribution = report.findings_attribution()
         if findings_attribution:
             story.append(Spacer(1, 0.1 * inch))
-            story.append(Paragraph(f"<i>{findings_attribution}</i>", self.styles["Normal"]))
+            story.append(self._para(f"<i>{findings_attribution}</i>", self.styles["Normal"], mode="preformatted"))
 
         story.append(Spacer(1, 0.2 * inch))
 
@@ -686,26 +705,24 @@ class PDFReportGenerator(BaseReportGenerator):
         """Generate a report section with progress tracking."""
         story = []
 
-        story.append(Paragraph(section.title, self.styles["SectionHeading"]))
+        story.append(self._para(section.title, self.styles["SectionHeading"], mode="literal"))
 
         if section.content:
-            content_text = section.content.replace("\n", "<br/>")
-            story.append(Paragraph(content_text, self.styles["Normal"]))
+            # mode="markdown" handles the \n -> <br/> conversion as part of
+            # its existing pipeline (it was previously done manually here,
+            # unescaped, before the text ever reached the Paragraph flowable).
+            story.append(self._para(section.content, self.styles["Normal"], mode="markdown"))
             story.append(Spacer(1, 0.1 * inch))
 
         # AI insights
         if section.ai_summary:
-            story.append(Paragraph("AI Analysis", self.styles["SubsectionHeading"]))
-            # Normalize Unicode characters from AI-generated text
-            ai_text = self._markdown_to_reportlab(section.ai_summary)
-            story.append(Paragraph(ai_text, self.styles["Normal"]))
+            story.append(self._para("AI Analysis", self.styles["SubsectionHeading"], mode="preformatted"))
+            story.append(self._para(section.ai_summary, self.styles["Normal"], mode="markdown"))
             story.append(Spacer(1, 0.1 * inch))
 
         if section.ai_insights:
-            story.append(Paragraph("AI Insights", self.styles["SubsectionHeading"]))
-            # Normalize Unicode characters from AI-generated text
-            insights_text = self._markdown_to_reportlab(section.ai_insights)
-            story.append(Paragraph(insights_text, self.styles["Normal"]))
+            story.append(self._para("AI Insights", self.styles["SubsectionHeading"], mode="preformatted"))
+            story.append(self._para(section.ai_insights, self.styles["Normal"], mode="markdown"))
             story.append(Spacer(1, 0.1 * inch))
 
         # Overlay plots (comparison/batch)
@@ -714,21 +731,22 @@ class PDFReportGenerator(BaseReportGenerator):
                 drawing = self._generate_overlay_plot(spec)
                 if drawing is not None:
                     channel_label = self._markdown_to_reportlab(spec.channel_label)
-                    grouped = [Paragraph(f"Channel {channel_label} — all runs", self.styles["SubsectionHeading"]), drawing]
+                    heading = self._para(f"Channel {channel_label} — all runs", self.styles["SubsectionHeading"], mode="preformatted")
+                    grouped = [heading, drawing]
                     if spec.caption:
-                        grouped.append(Paragraph(self._markdown_to_reportlab(spec.caption), self.styles["FigureCaption"]))
+                        grouped.append(self._para(spec.caption, self.styles["FigureCaption"], mode="markdown"))
                     story.append(KeepTogether(grouped))
                     story.append(Spacer(1, 0.1 * inch))
 
         # Comparison table
         if section.comparison_table:
-            story.append(Paragraph(section.comparison_table.title, self.styles["SubsectionHeading"]))
+            story.append(self._para(section.comparison_table.title, self.styles["SubsectionHeading"], mode="literal"))
             story.append(self._generate_comparison_table_element(section.comparison_table))
             story.append(Spacer(1, 0.1 * inch))
 
         # Waveforms
         if section.waveforms:
-            story.append(Paragraph("Waveforms", self.styles["SubsectionHeading"]))
+            story.append(self._para("Waveforms", self.styles["SubsectionHeading"], mode="preformatted"))
             for i, waveform in enumerate(section.waveforms):
                 # Calculate progress for this waveform
                 waveform_global_index = waveforms_processed_before + i
@@ -743,24 +761,24 @@ class PDFReportGenerator(BaseReportGenerator):
 
         # Measurements
         if section.measurements:
-            story.append(Paragraph("Measurements", self.styles["SubsectionHeading"]))
+            story.append(self._para("Measurements", self.styles["SubsectionHeading"], mode="preformatted"))
             story.append(self._generate_measurements_table(section.measurements))
             story.append(Spacer(1, 0.1 * inch))
 
         # FFT
         if section.include_fft and section.fft_frequency is not None:
-            story.append(Paragraph("FFT Analysis", self.styles["SubsectionHeading"]))
+            story.append(self._para("FFT Analysis", self.styles["SubsectionHeading"], mode="preformatted"))
             fft_img = self._generate_fft_plot(section.fft_frequency, section.fft_magnitude, section.fft_annotations)
             if fft_img:
                 fft_group = [fft_img]
                 if section.fft_caption:
-                    fft_group.append(Paragraph(self._markdown_to_reportlab(section.fft_caption), self.styles["FigureCaption"]))
+                    fft_group.append(self._para(section.fft_caption, self.styles["FigureCaption"], mode="markdown"))
                 story.append(KeepTogether(fft_group))
                 story.append(Spacer(1, 0.1 * inch))
 
         # Images
         if section.images:
-            story.append(Paragraph("Images", self.styles["SubsectionHeading"]))
+            story.append(self._para("Images", self.styles["SubsectionHeading"], mode="preformatted"))
             for img_path in section.images:
                 if Path(img_path).exists():
                     try:
@@ -772,7 +790,7 @@ class PDFReportGenerator(BaseReportGenerator):
 
         # Raw-data manifest
         if section.manifest:
-            story.append(Paragraph("Source Data Manifest", self.styles["SubsectionHeading"]))
+            story.append(self._para("Source Data Manifest", self.styles["SubsectionHeading"], mode="preformatted"))
             story.append(self._generate_manifest_table(section.manifest))
             story.append(Spacer(1, 0.1 * inch))
 
@@ -801,8 +819,8 @@ class PDFReportGenerator(BaseReportGenerator):
         keep_together_elements = []
 
         # Waveform title (e.g., "Waveform 1: CH1")
-        waveform_title = f"Waveform {index}: {waveform.label}"
-        keep_together_elements.append(Paragraph(waveform_title, self.styles["Heading4"]))
+        waveform_title = f"Waveform {index}: {self._literal_cell_text(waveform.label)}"
+        keep_together_elements.append(self._para(waveform_title, self.styles["Heading4"], mode="preformatted"))
         keep_together_elements.append(Spacer(1, 0.05 * inch))
 
         # Plot
@@ -811,7 +829,7 @@ class PDFReportGenerator(BaseReportGenerator):
             if plot_img:
                 keep_together_elements.append(plot_img)
                 if waveform.caption:
-                    keep_together_elements.append(Paragraph(self._markdown_to_reportlab(waveform.caption), self.styles["FigureCaption"]))
+                    keep_together_elements.append(self._para(waveform.caption, self.styles["FigureCaption"], mode="markdown"))
 
         # Use KeepTogether to prevent title and plot from being separated
         if keep_together_elements:
@@ -879,7 +897,7 @@ class PDFReportGenerator(BaseReportGenerator):
         story = []
 
         # Add header for regions section
-        story.append(Paragraph("Detailed Region Analysis", self.styles["Heading4"]))
+        story.append(self._para("Detailed Region Analysis", self.styles["Heading4"], mode="preformatted"))
         story.append(Spacer(1, 0.1 * inch))
 
         for i, region in enumerate(waveform.regions, 1):
@@ -909,12 +927,11 @@ class PDFReportGenerator(BaseReportGenerator):
 
         # Format region title with auto-detect indicator
         auto_indicator = " (Auto-detected)" if region.auto_detected else ""
-        region_title = f"Region {index}: {region.label}{auto_indicator}"
-        keep_elements.append(Paragraph(region_title, self.styles["Heading5"]))
+        region_title = f"Region {index}: {self._literal_cell_text(region.label)}{auto_indicator}"
+        keep_elements.append(self._para(region_title, self.styles["Heading5"], mode="preformatted"))
 
         if region.description:
-            desc_text = self._markdown_to_reportlab(region.description)
-            keep_elements.append(Paragraph(desc_text, self.styles["BodyText"]))
+            keep_elements.append(self._para(region.description, self.styles["BodyText"], mode="markdown"))
 
         keep_elements.append(Spacer(1, 0.05 * inch))
 
@@ -1011,7 +1028,7 @@ class PDFReportGenerator(BaseReportGenerator):
             else:
                 box_color = colors.HexColor("#e8f4f8")  # Light blue
 
-            recommendation_para = Paragraph(f"<b>Calibration Guidance:</b> {recommendation_text}", self.styles["BodyText"])
+            recommendation_para = self._para(f"<b>Calibration Guidance:</b> {recommendation_text}", self.styles["BodyText"], mode="preformatted")
 
             # Create a table for the colored box
             rec_table = Table([[recommendation_para]], colWidths=[5 * inch])
@@ -1033,9 +1050,8 @@ class PDFReportGenerator(BaseReportGenerator):
 
         # AI insights (if available)
         if region.ai_insights:
-            story.append(Paragraph("<b>AI Analysis:</b>", self.styles["Heading6"]))
-            insights_text = self._markdown_to_reportlab(region.ai_insights)
-            story.append(Paragraph(insights_text, self.styles["BodyText"]))
+            story.append(self._para("<b>AI Analysis:</b>", self.styles["Heading6"], mode="preformatted"))
+            story.append(self._para(region.ai_insights, self.styles["BodyText"], mode="markdown"))
             story.append(Spacer(1, 0.1 * inch))
 
         # Separator between regions
@@ -1341,7 +1357,7 @@ class PDFReportGenerator(BaseReportGenerator):
         small_style = ParagraphStyle("ManifestSmall", parent=self.styles["Normal"], fontSize=6.5, leading=8)
 
         def _cell(text: str) -> Paragraph:
-            return Paragraph(self._literal_cell_text(text) if text else "—", small_style)
+            return self._para(text or "—", small_style, mode="literal")
 
         data = [["Run", "File", "Size", "SHA-256", "Captured", "Instrument"]]
         for entry in manifest.entries:
@@ -1377,9 +1393,9 @@ class PDFReportGenerator(BaseReportGenerator):
             title = self._markdown_to_reportlab(role.title)
             name = f" {self._markdown_to_reportlab(role.name)}" if role.name else ""
             elements.append(Spacer(1, 0.25 * inch))
-            elements.append(Paragraph(f"<b>{title}:</b>{name}", self.styles["Normal"]))
+            elements.append(self._para(f"<b>{title}:</b>{name}", self.styles["Normal"], mode="preformatted"))
             elements.append(Spacer(1, 0.05 * inch))
-            elements.append(Paragraph("Signature: ________________________&nbsp;&nbsp;&nbsp;&nbsp;Date: ____________", self.styles["Normal"]))
+            elements.append(self._para("Signature: ________________________&nbsp;&nbsp;&nbsp;&nbsp;Date: ____________", self.styles["Normal"], mode="preformatted"))
         return KeepTogether(elements)
 
     def _generate_fft_plot(self, frequency: np.ndarray, magnitude: np.ndarray, annotations=None) -> Optional[Drawing]:
@@ -1408,17 +1424,16 @@ class PDFReportGenerator(BaseReportGenerator):
         """Generate recommendations section."""
         story = []
 
-        story.append(Paragraph("Recommendations", self.styles["SectionHeading"]))
+        story.append(self._para("Recommendations", self.styles["SectionHeading"], mode="preformatted"))
 
         for i, rec in enumerate(report.recommendations, 1):
-            # Convert markdown to ReportLab XML
             rec_text = self._markdown_to_reportlab(rec)
-            story.append(Paragraph(f"{i}. {rec_text}", self.styles["Normal"]))
+            story.append(self._para(f"{i}. {rec_text}", self.styles["Normal"], mode="preformatted"))
 
         recommendations_attribution = report.recommendations_attribution()
         if recommendations_attribution:
             story.append(Spacer(1, 0.1 * inch))
-            story.append(Paragraph(f"<i>{recommendations_attribution}</i>", self.styles["Normal"]))
+            story.append(self._para(f"<i>{recommendations_attribution}</i>", self.styles["Normal"], mode="preformatted"))
 
         story.append(Spacer(1, 0.2 * inch))
 
@@ -1432,8 +1447,8 @@ class PDFReportGenerator(BaseReportGenerator):
 
         footer_text = f"Report generated on {report.metadata.test_date.strftime('%Y-%m-%d at %H:%M:%S')}"
         if report.metadata.company_name:
-            footer_text += f" by {report.metadata.company_name}"
+            footer_text += f" by {self._literal_cell_text(report.metadata.company_name)}"
 
-        story.append(Paragraph(footer_text, self.styles["Normal"]))
+        story.append(self._para(footer_text, self.styles["Normal"], mode="preformatted"))
 
         return story
