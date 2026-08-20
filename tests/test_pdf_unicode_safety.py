@@ -26,3 +26,16 @@ def test_markdown_to_reportlab_output_is_winansi_safe():
 
     # And the known symbols are mapped to readable text, not silently dropped.
     assert "!" in out  # warning sign -> "!"
+
+
+def test_code_span_survives_alongside_bold_markdown():
+    """AUDIT.md H26: save_code() placeholders were __CODE_n__, and the bold
+    regex re.sub(r"__(.+?)__", ...) matched that placeholder itself (both are
+    double-underscore-delimited), corrupting or losing the code span."""
+    gen = PDFReportGenerator()
+    out = gen._markdown_to_reportlab("Vpp measured `1.2 V` vs limit `1.0 V`, **exceeds spec**")
+
+    assert '<font face="Courier">1.2 V</font>' in out
+    assert '<font face="Courier">1.0 V</font>' in out
+    assert "<b>exceeds spec</b>" in out
+    assert "CODE" not in out  # no leaked placeholder text

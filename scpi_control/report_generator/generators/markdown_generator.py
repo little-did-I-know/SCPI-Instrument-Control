@@ -6,6 +6,7 @@ converted to other formats, or committed to documentation repositories.
 """
 
 import logging
+import re
 from pathlib import Path
 from typing import List, Optional
 
@@ -442,6 +443,20 @@ class MarkdownReportGenerator(BaseReportGenerator):
 
         return "\n".join(lines)
 
+    _FILENAME_SAFE = re.compile(r"[^A-Za-z0-9._-]")
+
+    def _sanitize_plot_name(self, name: str) -> str:
+        """Allowlist a report-text-derived string for use in a filename.
+
+        Report text (section titles, channel labels parsed from imported run
+        files) reaches this class's plot-filename construction directly;
+        without sanitizing it a title like '../../etc/x' can escape
+        plots_path, '/' crashes the write, and ':' collides with NTFS
+        alternate-data-stream syntax (AUDIT.md H24).
+        """
+        sanitized = self._FILENAME_SAFE.sub("_", name)
+        return sanitized or "plot"
+
     def _generate_region_plot(self, waveform: WaveformData, region, base_path: Path, name: str) -> Optional[str]:
         """
         Generate and save a zoomed plot for a region.
@@ -461,8 +476,10 @@ class MarkdownReportGenerator(BaseReportGenerator):
             plots_path = base_path / self.plots_dir
             plots_path.mkdir(parents=True, exist_ok=True)
 
-            filename = f"{name.replace(' ', '_')}.png"
+            filename = f"{self._sanitize_plot_name(name)}.png"
             filepath = plots_path / filename
+            if not filepath.resolve().is_relative_to(plots_path.resolve()):
+                raise ValueError(f"resolved plot path {filepath} escapes {plots_path}")
 
             # Extract region data
             t, v = waveform.get_region_data(region)
@@ -549,8 +566,10 @@ class MarkdownReportGenerator(BaseReportGenerator):
         plots_path = base_path / self.plots_dir
         plots_path.mkdir(parents=True, exist_ok=True)
 
-        filename = f"{name.replace(' ', '_')}.png"
+        filename = f"{self._sanitize_plot_name(name)}.png"
         filepath = plots_path / filename
+        if not filepath.resolve().is_relative_to(plots_path.resolve()):
+            raise ValueError(f"resolved plot path {filepath} escapes {plots_path}")
 
         # Apply matplotlib style preset
         if self.plot_style.matplotlib_style != "default":
@@ -582,8 +601,10 @@ class MarkdownReportGenerator(BaseReportGenerator):
         plots_path = base_path / self.plots_dir
         plots_path.mkdir(parents=True, exist_ok=True)
 
-        filename = f"{name.replace(' ', '_')}_fft.png"
+        filename = f"{self._sanitize_plot_name(name)}_fft.png"
         filepath = plots_path / filename
+        if not filepath.resolve().is_relative_to(plots_path.resolve()):
+            raise ValueError(f"resolved plot path {filepath} escapes {plots_path}")
 
         # Apply matplotlib style preset
         if self.plot_style.matplotlib_style != "default":
@@ -650,8 +671,10 @@ class MarkdownReportGenerator(BaseReportGenerator):
         try:
             plots_path = base_path / self.plots_dir
             plots_path.mkdir(parents=True, exist_ok=True)
-            filename = f"{name.replace(' ', '_')}.png"
+            filename = f"{self._sanitize_plot_name(name)}.png"
             filepath = plots_path / filename
+            if not filepath.resolve().is_relative_to(plots_path.resolve()):
+                raise ValueError(f"resolved plot path {filepath} escapes {plots_path}")
 
             if self.plot_style.matplotlib_style != "default":
                 plt.style.use(self.plot_style.matplotlib_style)
