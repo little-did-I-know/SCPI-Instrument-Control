@@ -3445,6 +3445,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#security" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Security
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#changed" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5433,6 +5444,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#security" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Security
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#changed" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -7359,6 +7381,23 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   reading is per-transfer, not per-point. What changed is resolution
   (2000 → up to 100 000 samples per frame), not rate.</li>
 </ul>
+<h3 id="security">Security<a class="headerlink" href="#security" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Report-text-derived plot filenames could escape the plots directory.</strong>
+  A section title or channel label containing <code>..</code>, <code>/</code> or <code>:</code> reached the
+  saved PNG's filename unsanitized — on Windows, a <code>:</code> could silently write
+  to an NTFS alternate data stream instead of the intended file, and a <code>/</code>
+  or <code>..</code> could crash generation or write outside the report's plots
+  folder. Filenames are now built from an allowlist of the derived text,
+  with a second check confirming the resolved path stays under the plots
+  directory before anything is written.</li>
+<li><strong>PDF report text reached ReportLab's markup parser unescaped at most
+  call sites.</strong> Titles, section headings, channel labels, and comparison
+  table titles were passed straight to ReportLab's <code>Paragraph</code>, which
+  parses its input as XML mini-markup — a <code>&lt;</code>, <code>&gt;</code> or <code>&amp;</code> in any of them
+  could corrupt the page or silently drop content. Every text construction
+  in the PDF generator now routes through one escaping helper.</li>
+</ul>
 <h3 id="changed">Changed<a class="headerlink" href="#changed" title="Permanent link">&para;</a></h3>
 <ul>
 <li>Scope sessions no longer sit on a fixed quarter-second poll floor: the floor
@@ -7381,6 +7420,19 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   <code>svglib</code> already reads. PDF plots now render both at the alpha they were drawn
   with. Markdown reports were always correct, so PDF and Markdown output of the
   same report now match.</li>
+<li><strong>A code span next to bold text could corrupt or crash PDF generation.</strong>
+  The internal placeholder used to protect <code>`code`</code> spans while
+  markdown was converted to PDF markup was itself shaped like the bold
+  markdown it was being protected from, so the two collided. An AI-written
+  summary mixing a code span with <code>**bold**</code> text — an ordinary shape for
+  an LLM to produce — now renders both correctly instead of losing the
+  code span or failing generation outright.</li>
+<li><strong>AI-generated summary/findings could ship into a report built from
+  different data than they described.</strong> The AI Analysis panel's generated
+  content stayed attached after starting a new report or importing new
+  waveforms, so a report built afterward could silently include narrative
+  text about a previous dataset. It's now cleared whenever the underlying
+  waveforms change.</li>
 </ul>
 <h3 id="removed">Removed<a class="headerlink" href="#removed" title="Permanent link">&para;</a></h3>
 <ul>
