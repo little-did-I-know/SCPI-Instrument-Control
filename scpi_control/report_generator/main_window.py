@@ -325,13 +325,17 @@ class MainWindow(QMainWindow):
                 for waveform in waveforms:
                     self.waveform_list.addItem(f"{waveform.label} - {Path(file_path).name}")
 
+                # New waveforms mean any prior AI analysis no longer
+                # corresponds to the loaded data (audit H27). Clear as soon
+                # as self.waveforms has actually changed, inside the loop,
+                # so a later file in the batch failing to load (or
+                # load_annotations_into raising) still leaves stale AI
+                # content invalidated rather than surviving the exception.
+                self.ai_analysis_panel._clear_results()
+
             applied = load_annotations_into(self.waveforms)
             if applied:
                 logger.info(f"Applied {applied} saved annotation(s) from sidecar files")
-
-            # New waveforms mean any prior AI analysis no longer corresponds
-            # to the loaded data (audit H27).
-            self.ai_analysis_panel._clear_results()
 
             self.statusBar().showMessage(f"Imported {len(file_paths)} waveform file(s)")
 

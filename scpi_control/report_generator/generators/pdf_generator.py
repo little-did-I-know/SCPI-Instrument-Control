@@ -708,10 +708,14 @@ class PDFReportGenerator(BaseReportGenerator):
         story.append(self._para(section.title, self.styles["SectionHeading"], mode="literal"))
 
         if section.content:
-            # mode="markdown" handles the \n -> <br/> conversion as part of
-            # its existing pipeline (it was previously done manually here,
-            # unescaped, before the text ever reached the Paragraph flowable).
-            story.append(self._para(section.content, self.styles["Normal"], mode="markdown"))
+            # section.content is plain user/report text, not markdown -- it
+            # must render literally (no bold/italic interpretation of
+            # underscores in identifiers like C1_rise_time, audit M34) with
+            # only \n -> <br/> conversion, same as before this branch. Escape
+            # first via _literal_cell_text, then pass through unchanged with
+            # mode="preformatted" so _para doesn't escape it a second time.
+            content_text = self._literal_cell_text(section.content).replace("\n", "<br/>")
+            story.append(self._para(content_text, self.styles["Normal"], mode="preformatted"))
             story.append(Spacer(1, 0.1 * inch))
 
         # AI insights

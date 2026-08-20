@@ -77,6 +77,45 @@ def test_section_title_with_xml_specials_does_not_crash_generation(tmp_path):
     assert PDFReportGenerator().generate(report, out) is True
 
 
+def test_section_content_does_not_interpret_markdown():
+    """Regression for the whole-branch review finding (H26): section.content
+    is plain report/user text, not markdown. Before this fix it was routed
+    through mode="markdown", which italicised underscore-delimited text --
+    reintroducing the identifier-mangling defect (audit M34) where
+    C1_rise_time would render as C1<i>rise</i>time -- and downgraded
+    cp1252 symbols like deg that used to render fine as a literal degree
+    sign."""
+    gen = PDFReportGenerator()
+    section = TestSection(
+        title="Rise Time",
+        content="Measured C1_rise_time at 45°C\nsecond line",
+        waveforms=[],
+    )
+    story = gen._generate_section(section)
+    content_para = story[1]
+
+    assert "<i>" not in content_para.text
+    assert "<b>" not in content_para.text
+    assert "C1_rise_time" in content_para.text
+    assert "°" in content_para.text  # degree sign survives verbatim
+    assert " deg" not in content_para.text
+    assert "<br/>" in content_para.text  # \n -> <br/> conversion still happens
+
+
+def test_section_content_still_escapes_xml_specials():
+    """section.content must still be escaped for reportlab's mini-XML
+    (the H25 fix this whole branch exists for) even though it's no longer
+    routed through the markdown pipeline."""
+    gen = PDFReportGenerator()
+    section = TestSection(title="T", content="A & B < C > D", waveforms=[])
+    story = gen._generate_section(section)
+    content_para = story[1]
+
+    assert "&amp;" in content_para.text
+    assert "&lt;" in content_para.text
+    assert "&gt;" in content_para.text
+
+
 def test_paragraph_construction_only_happens_through__para():
     """Structural regression guard: a new call site that constructs
     Paragraph(...) directly (bypassing _para) reintroduces H25 by

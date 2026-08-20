@@ -90,3 +90,33 @@ def test_import_waveforms_invalidates_ai_content(window, monkeypatch):
     window._import_waveforms()
 
     assert not window.ai_analysis_panel.has_generated_content()
+
+
+def test_import_waveforms_partial_failure_still_invalidates_ai_content(window, monkeypatch):
+    """Regression for the whole-branch review finding (H27 partial-import
+    case): if WaveformLoader.load raises partway through a multi-file
+    import, self.waveforms already changed from the files loaded before
+    the failure, so stale AI content must still be invalidated even though
+    the overall _import_waveforms() call ends up reporting an error."""
+    _seed_ai_content(window)
+
+    file1 = Path("capture1.csv")
+    file2 = Path("corrupt2.csv")
+    monkeypatch.setattr(
+        QFileDialog,
+        "getOpenFileNames",
+        staticmethod(lambda *a, **k: ([str(file1), str(file2)], "")),
+    )
+
+    def _load(p):
+        if str(p) == str(file1):
+            return [_make_waveform("C1", file1)]
+        raise ValueError("corrupt waveform file")
+
+    monkeypatch.setattr(WaveformLoader, "load", staticmethod(_load))
+    monkeypatch.setattr(QMessageBox, "critical", lambda *a, **k: None)
+
+    window._import_waveforms()
+
+    assert len(window.waveforms) == 1  # file1's waveform was kept
+    assert not window.ai_analysis_panel.has_generated_content()
