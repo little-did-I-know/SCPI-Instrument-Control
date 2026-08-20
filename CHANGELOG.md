@@ -42,6 +42,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   reading is per-transfer, not per-point. What changed is resolution
   (2000 → up to 100 000 samples per frame), not rate.
 
+### Security
+
+- **Report-text-derived plot filenames could escape the plots directory.**
+  A section title or channel label containing `..`, `/` or `:` reached the
+  saved PNG's filename unsanitized — on Windows, a `:` could silently write
+  to an NTFS alternate data stream instead of the intended file, and a `/`
+  or `..` could crash generation or write outside the report's plots
+  folder. Filenames are now built from an allowlist of the derived text,
+  with a second check confirming the resolved path stays under the plots
+  directory before anything is written.
+- **PDF report text reached ReportLab's markup parser unescaped at most
+  call sites.** Titles, section headings, channel labels, and comparison
+  table titles were passed straight to ReportLab's `Paragraph`, which
+  parses its input as XML mini-markup — a `<`, `>` or `&` in any of them
+  could corrupt the page or silently drop content. Every text construction
+  in the PDF generator now routes through one escaping helper.
+
 ### Changed
 
 - Scope sessions no longer sit on a fixed quarter-second poll floor: the floor
@@ -64,6 +81,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `svglib` already reads. PDF plots now render both at the alpha they were drawn
   with. Markdown reports were always correct, so PDF and Markdown output of the
   same report now match.
+- **A code span next to bold text could corrupt or crash PDF generation.**
+  The internal placeholder used to protect `` `code` `` spans while
+  markdown was converted to PDF markup was itself shaped like the bold
+  markdown it was being protected from, so the two collided. An AI-written
+  summary mixing a code span with `**bold**` text — an ordinary shape for
+  an LLM to produce — now renders both correctly instead of losing the
+  code span or failing generation outright.
+- **AI-generated summary/findings could ship into a report built from
+  different data than they described.** The AI Analysis panel's generated
+  content stayed attached after starting a new report or importing new
+  waveforms, so a report built afterward could silently include narrative
+  text about a previous dataset. It's now cleared whenever the underlying
+  waveforms change.
 
 ### Removed
 
