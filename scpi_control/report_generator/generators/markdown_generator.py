@@ -151,32 +151,56 @@ class MarkdownReportGenerator(BaseReportGenerator):
 
         return "\n".join(lines)
 
+    _TABLE_CELL_ESCAPE = str.maketrans({"\\": "\\\\", "|": "\\|"})
+
+    def _escape_table_cell(self, text) -> str:
+        """Escape a value for use inside a `| ... |` Markdown table cell.
+
+        Report text (measurement names, technician/equipment metadata, criteria
+        labels, manifest entries, comparison-table cells) reaches table rows
+        directly; an unescaped '|' truncates the cell and corrupts the row
+        (AUDIT.md theme #4 follow-up -- the Markdown-text sibling of H25).
+        """
+        return str(text).translate(self._TABLE_CELL_ESCAPE)
+
+    _LINK_TEXT_ESCAPE = str.maketrans({"\\": "\\\\", "[": "\\[", "]": "\\]"})
+
+    def _escape_link_text(self, text) -> str:
+        """Escape a value for use as Markdown `[...]`/`![...]` link/alt text.
+
+        An unescaped ']' in report text (a waveform/region label, a channel
+        label) closes the link early and corrupts everything after it in the
+        rendered document (AUDIT.md theme #4 follow-up).
+        """
+        return str(text).translate(self._LINK_TEXT_ESCAPE)
+
     def _generate_metadata_section(self, report: TestReport) -> str:
         """Generate metadata table."""
         lines = []
         meta = report.metadata
+        esc = self._escape_table_cell
 
         lines.append("| Field | Value |")
         lines.append("|-------|-------|")
-        lines.append(f"| **Technician** | {meta.technician} |")
+        lines.append(f"| **Technician** | {esc(meta.technician)} |")
         lines.append(f"| **Date** | {meta.test_date.strftime('%Y-%m-%d %H:%M:%S')} |")
 
         if meta.equipment_model:
-            lines.append(f"| **Equipment** | {meta.equipment_model} |")
+            lines.append(f"| **Equipment** | {esc(meta.equipment_model)} |")
         if meta.equipment_id:
-            lines.append(f"| **Equipment ID** | {meta.equipment_id} |")
+            lines.append(f"| **Equipment ID** | {esc(meta.equipment_id)} |")
         if meta.test_procedure:
-            lines.append(f"| **Test Procedure** | {meta.test_procedure} |")
+            lines.append(f"| **Test Procedure** | {esc(meta.test_procedure)} |")
         if meta.project_name:
-            lines.append(f"| **Project** | {meta.project_name} |")
+            lines.append(f"| **Project** | {esc(meta.project_name)} |")
         if meta.customer:
-            lines.append(f"| **Customer** | {meta.customer} |")
+            lines.append(f"| **Customer** | {esc(meta.customer)} |")
         if meta.temperature:
-            lines.append(f"| **Temperature** | {meta.temperature} |")
+            lines.append(f"| **Temperature** | {esc(meta.temperature)} |")
         if meta.humidity:
-            lines.append(f"| **Humidity** | {meta.humidity} |")
+            lines.append(f"| **Humidity** | {esc(meta.humidity)} |")
         if meta.location:
-            lines.append(f"| **Location** | {meta.location} |")
+            lines.append(f"| **Location** | {esc(meta.location)} |")
 
         return "\n".join(lines)
 
@@ -206,10 +230,10 @@ class MarkdownReportGenerator(BaseReportGenerator):
 
         # Overlay plots (comparison/batch)
         if section.overlay_plots and self.include_plots:
-            for spec in section.overlay_plots:
-                plot_path = self._generate_overlay_plot(spec, base_path, f"{section.title}_overlay_{spec.channel_label}")
+            for i, spec in enumerate(section.overlay_plots):
+                plot_path = self._generate_overlay_plot(spec, base_path, f"{section.title}_overlay_{i}_{spec.channel_label}")
                 if plot_path:
-                    lines.append(f"![Overlay: {spec.channel_label}]({plot_path})")
+                    lines.append(f"![Overlay: {self._escape_link_text(spec.channel_label)}]({plot_path})")
                     if spec.caption:
                         lines.append("")
                         lines.append(f"*{spec.caption}*")
@@ -277,7 +301,7 @@ class MarkdownReportGenerator(BaseReportGenerator):
         # Generate plot if requested
         if self.include_plots:
             plot_path = self._generate_waveform_plot(waveform, base_path, name)
-            lines.append(f"![{waveform.label}]({plot_path})")
+            lines.append(f"![{self._escape_link_text(waveform.label)}]({plot_path})")
             if waveform.caption:
                 lines.append("")
                 lines.append(f"*{waveform.caption}*")
@@ -387,7 +411,7 @@ class MarkdownReportGenerator(BaseReportGenerator):
         if self.include_plots:
             plot_path = self._generate_region_plot(waveform, region, base_path, name)
             if plot_path:
-                lines.append(f"![{region.label} - Zoomed View]({plot_path})")
+                lines.append(f"![{self._escape_link_text(region.label)} - Zoomed View]({plot_path})")
                 lines.append("")
 
         # Region analysis table
@@ -445,6 +469,10 @@ class MarkdownReportGenerator(BaseReportGenerator):
 
     _FILENAME_SAFE = re.compile(r"[^A-Za-z0-9._-]")
 
+    # Windows reserved device names -- reserved for the filename segment
+    # before the FIRST '.', regardless of any extension appended after it.
+    _RESERVED_DEVICE_NAMES = frozenset({"CON", "PRN", "AUX", "NUL"} | {f"COM{d}" for d in range(1, 10)} | {f"LPT{d}" for d in range(1, 10)})
+
     def _sanitize_plot_name(self, name: str) -> str:
         """Allowlist a report-text-derived string for use in a filename.
 
@@ -453,9 +481,19 @@ class MarkdownReportGenerator(BaseReportGenerator):
         without sanitizing it a title like '../../etc/x' can escape
         plots_path, '/' crashes the write, and ':' collides with NTFS
         alternate-data-stream syntax (AUDIT.md H24).
+
+        A section title like 'NUL' or 'con' survives the allowlist above
+        unchanged and produces a filename ('NUL.png') that Windows treats as
+        a reference to the actual reserved device, regardless of extension
+        -- so the segment before the first '.' is checked against the
+        Windows reserved device names (CON, PRN, AUX, NUL, COM1-9, LPT1-9)
+        and disambiguated if it matches (AUDIT.md theme #4 follow-up).
         """
-        sanitized = self._FILENAME_SAFE.sub("_", name)
-        return sanitized or "plot"
+        sanitized = self._FILENAME_SAFE.sub("_", name) or "plot"
+        first_segment, sep, rest = sanitized.partition(".")
+        if first_segment.upper() in self._RESERVED_DEVICE_NAMES:
+            sanitized = f"{first_segment}_plot{sep}{rest}"
+        return sanitized
 
     def _generate_region_plot(self, waveform: WaveformData, region, base_path: Path, name: str) -> Optional[str]:
         """
@@ -536,11 +574,11 @@ class MarkdownReportGenerator(BaseReportGenerator):
         lines.append("|-------------|-------|--------|----------|")
 
         for meas in measurements:
-            name = meas.name
+            name = self._escape_table_cell(meas.name)
             if meas.channel:
-                name += f" ({meas.channel})"
+                name += f" ({self._escape_table_cell(meas.channel)})"
 
-            value = meas.format_value()
+            value = self._escape_table_cell(meas.format_value())
 
             status = meas.get_status_symbol()
             if meas.passed is True:
@@ -550,11 +588,12 @@ class MarkdownReportGenerator(BaseReportGenerator):
             else:
                 status = "—"
 
+            unit = self._escape_table_cell(meas.unit)
             criteria = []
             if meas.criteria_min is not None:
-                criteria.append(f"min: {meas.criteria_min:.6g} {meas.unit}")
+                criteria.append(f"min: {meas.criteria_min:.6g} {unit}")
             if meas.criteria_max is not None:
-                criteria.append(f"max: {meas.criteria_max:.6g} {meas.unit}")
+                criteria.append(f"max: {meas.criteria_max:.6g} {unit}")
             criteria_str = "<br>".join(criteria) if criteria else "—"
 
             lines.append(f"| {name} | {value} | {status} | {criteria_str} |")
@@ -633,12 +672,12 @@ class MarkdownReportGenerator(BaseReportGenerator):
 
     def _generate_comparison_table(self, table) -> str:
         lines = [f"### {table.title}", ""]
-        lines.append("| " + " | ".join(table.headers) + " |")
+        lines.append("| " + " | ".join(self._escape_table_cell(h) for h in table.headers) + " |")
         lines.append("|" + "|".join("---" for _ in table.headers) + "|")
         for row in table.rows:
             cells = []
             for cell in row:
-                text = cell.text
+                text = self._escape_table_cell(cell.text)
                 if cell.status == "pass":
                     text += " ✅"
                 elif cell.status == "fail":
@@ -654,7 +693,11 @@ class MarkdownReportGenerator(BaseReportGenerator):
         lines.append("| Run | File | Size (bytes) | SHA-256 | Captured | Instrument |")
         lines.append("|---|---|---|---|---|---|")
         for entry in manifest.entries:
-            lines.append(f"| {entry.run_label} | {entry.file_path} | {entry.size_bytes} | `{entry.sha256}` | {entry.capture_timestamp or 'unknown'} | {entry.instrument or '—'} |")
+            run_label = self._escape_table_cell(entry.run_label)
+            file_path = self._escape_table_cell(entry.file_path)
+            captured = self._escape_table_cell(entry.capture_timestamp) if entry.capture_timestamp else "unknown"
+            instrument = self._escape_table_cell(entry.instrument) if entry.instrument else "—"
+            lines.append(f"| {run_label} | {file_path} | {entry.size_bytes} | `{entry.sha256}` | {captured} | {instrument} |")
         return "\n".join(lines)
 
     def _generate_signoff(self, signoff) -> str:

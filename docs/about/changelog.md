@@ -58,6 +58,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   parses its input as XML mini-markup — a `<`, `>` or `&` in any of them
   could corrupt the page or silently drop content. Every text construction
   in the PDF generator now routes through one escaping helper.
+- **Markdown report text reached table cells and link/alt text unescaped.**
+  Technician/equipment metadata, measurement names and units, comparison-table
+  cells, and manifest entries were interpolated raw into `| ... |` table rows,
+  where an unescaped `|` truncated the cell and corrupted the row; waveform,
+  region, and overlay labels were interpolated raw into `![...]` alt text,
+  where an unescaped `]` closed the link early and corrupted everything after
+  it. Both are now escaped through dedicated helpers before reaching Markdown
+  syntax (the Markdown-text sibling of the PDF escaping fix above). Also
+  fixed in the Markdown generator: a section title equal to a Windows
+  reserved device name (`NUL`, `CON`, `COM1`, ...) could produce a plot
+  filename that Windows treats as a reference to the device itself regardless
+  of the `.png` extension, and two overlay plots in the same section whose
+  channel labels collapsed to the same sanitized filename (e.g. `A/B` and
+  `A:B`) could silently overwrite each other's PNG — the overlay filename now
+  includes a disambiguating index, matching the existing waveform/region plot
+  pattern.
 
 ### Changed
 
