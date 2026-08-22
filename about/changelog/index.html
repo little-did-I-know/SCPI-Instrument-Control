@@ -7397,6 +7397,22 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   parses its input as XML mini-markup — a <code>&lt;</code>, <code>&gt;</code> or <code>&amp;</code> in any of them
   could corrupt the page or silently drop content. Every text construction
   in the PDF generator now routes through one escaping helper.</li>
+<li><strong>Markdown report text reached table cells and link/alt text unescaped.</strong>
+  Technician/equipment metadata, measurement names and units, comparison-table
+  cells, and manifest entries were interpolated raw into <code>| ... |</code> table rows,
+  where an unescaped <code>|</code> truncated the cell and corrupted the row; waveform,
+  region, and overlay labels were interpolated raw into <code>![...]</code> alt text,
+  where an unescaped <code>]</code> closed the link early and corrupted everything after
+  it. Both are now escaped through dedicated helpers before reaching Markdown
+  syntax (the Markdown-text sibling of the PDF escaping fix above). Also
+  fixed in the Markdown generator: a section title equal to a Windows
+  reserved device name (<code>NUL</code>, <code>CON</code>, <code>COM1</code>, ...) could produce a plot
+  filename that Windows treats as a reference to the device itself regardless
+  of the <code>.png</code> extension, and two overlay plots in the same section whose
+  channel labels collapsed to the same sanitized filename (e.g. <code>A/B</code> and
+  <code>A:B</code>) could silently overwrite each other's PNG — the overlay filename now
+  includes a disambiguating index, matching the existing waveform/region plot
+  pattern.</li>
 </ul>
 <h3 id="changed">Changed<a class="headerlink" href="#changed" title="Permanent link">&para;</a></h3>
 <ul>
