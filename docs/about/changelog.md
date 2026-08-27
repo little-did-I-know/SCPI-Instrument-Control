@@ -88,6 +88,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`detect_edges` could crash with an `IndexError` on an edge near the end of
+  a waveform record.** Both the rising- and falling-edge loops clamped the
+  edge window's end index to `len(t)` instead of `len(t) - 1`, so a detected
+  edge whose derivative peak fell in the last ~2% of a record with 500 or
+  more samples could push `end_idx` one past the last valid sample, raising
+  `IndexError` and silently dropping all region analysis and transient
+  detection for that waveform. `end_idx` is now clamped to the last valid
+  index.
 - **Translucent fills reached the PDF fully opaque.** `svglib` honours
   `fill-opacity`/`stroke-opacity` but ignores a bare `opacity:`, which is what
   matplotlib writes for a translucent *patch* — so an annotation span drawn at

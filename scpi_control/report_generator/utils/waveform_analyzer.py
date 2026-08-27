@@ -1133,7 +1133,7 @@ class WaveformAnalyzer:
                 # Define edge region as ±5% around the peak
                 window = int(len(t) * 0.02)
                 start_idx = max(0, idx - window)
-                end_idx = min(len(t), idx + window)
+                end_idx = min(len(t) - 1, idx + window)
 
                 edge = WaveformRegion(
                     start_time=float(t[start_idx]),
@@ -1151,7 +1151,7 @@ class WaveformAnalyzer:
             if idx < len(t) - 10:
                 window = int(len(t) * 0.02)
                 start_idx = max(0, idx - window)
-                end_idx = min(len(t), idx + window)
+                end_idx = min(len(t) - 1, idx + window)
 
                 edge = WaveformRegion(
                     start_time=float(t[start_idx]),
