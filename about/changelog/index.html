@@ -7427,6 +7427,14 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 </ul>
 <h3 id="fixed">Fixed<a class="headerlink" href="#fixed" title="Permanent link">&para;</a></h3>
 <ul>
+<li><strong><code>detect_edges</code> could crash with an <code>IndexError</code> on an edge near the end of
+  a waveform record.</strong> Both the rising- and falling-edge loops clamped the
+  edge window's end index to <code>len(t)</code> instead of <code>len(t) - 1</code>, so a detected
+  edge whose derivative peak fell in the last ~2% of a record with 500 or
+  more samples could push <code>end_idx</code> one past the last valid sample, raising
+  <code>IndexError</code> and silently dropping all region analysis and transient
+  detection for that waveform. <code>end_idx</code> is now clamped to the last valid
+  index.</li>
 <li><strong>Translucent fills reached the PDF fully opaque.</strong> <code>svglib</code> honours
   <code>fill-opacity</code>/<code>stroke-opacity</code> but ignores a bare <code>opacity:</code>, which is what
   matplotlib writes for a translucent <em>patch</em> — so an annotation span drawn at
