@@ -69,23 +69,49 @@ class SignalSpec:
             off). PERIODIC_KINDS only (sine, square, triangle, ramp,
             multitone, exponential, pulse): "dc"/"noise" have no cycle
             structure and "chirp" has no stable period, so on those three
-            kinds this field is a no-op rather than an error. Each cycle gets
-            its own independent Gaussian time-shift and the WHOLE cycle --
-            not just its edge -- moves by it, so an enabled `ringing_frequency`
-            keys on the actual jittered edge, not the nominal one, with no
-            special-casing needed. Calibrated so `jitter_rms` IS the value a
-            caller gets back from measuring the output: the internal per-cycle
-            draw uses sigma = jitter_rms / sqrt(2), because a measured period
-            is the difference of two independent per-cycle deltas
-            (period[n] = T + delta[n+1] - delta[n]), so
-            std(period) = sigma * sqrt(2). See
+            kinds this field is a no-op rather than an error. Each cycle
+            BOUNDARY gets its own independent Gaussian time-shift, and every
+            sample's shift is the LINEAR INTERPOLATION between the two
+            boundaries straddling it -- a continuous warp, not a per-cycle
+            hard step -- so an enabled `ringing_frequency` keys on the actual
+            jittered edge, not the nominal one, with no special-casing needed.
+
+            What you actually measure back depends on WHERE your kind's
+            measurable edge sits within its cycle, because the interpolation
+            blends less of the "wrong" neighbor the closer the edge sits to a
+            boundary. Let f be that edge's fractional position in [0, 1)
+            (f=0 is the cycle boundary itself; _cycle_fraction computes the
+            same fraction for the underlying generator):
+              - An edge AT the cycle boundary (f=0 -- the ascending v50
+                crossing of "sine", "square", "multitone", and "pulse" (whose
+                edge sits within edge_time/2 of the boundary) at their default
+                phase=0.0) gets the full, unblended shift from the boundary on
+                each side, so period[n] = T + delta[n+1] - delta[n] exactly as
+                a per-cycle-constant model would give: measures `jitter_rms`
+                almost exactly (verified empirically: ratio 0.94-1.08 across
+                trials at 1-5% of the period).
+              - An edge at some other in-cycle fraction f gets a BLENDED shift
+                and measures LESS. Two verified examples: "triangle"'s
+                ascending crossing sits at f=0.25 (ratio measured ~0.66-0.68,
+                close to the 0.6614 the formula below predicts); "ramp"'s
+                zero crossing -- despite the ramp's own discontinuity sitting
+                at the boundary -- is itself a continuous ramp, so its v50
+                crossing actually sits at f=0.5, cycle CENTER, the point of
+                MAXIMUM attenuation (ratio measured ~0.50-0.52, matching the
+                formula's minimum of 0.5 almost exactly).
+              Both are consistent with
+              Var(period)/jitter_rms**2 = 0.5*[(1-2f)**2 + f**2 + (1-f)**2],
+              which is 1.0 at f=0 and a minimum of 0.25 (ratio 0.5) at f=0.5.
+            The internal per-boundary draw uses sigma = jitter_rms / sqrt(2),
+            which is what keeps the common f=0 case exactly calibrated. See
             docs/superpowers/specs/2026-08-28-signal-timing-jitter-design.md
             for the full derivation. KNOWN LIMITATION: stream() bumps
             spec.seed per chunk, so a cycle straddling a stream() chunk
             boundary draws two different deltas from the two chunk calls that
-            observe it -- a small, bounded discontinuity in that one cycle per
-            boundary; pinned by a test rather than hidden, see
-            tests/test_signal_impairments.py.
+            observe it -- a discontinuity in that one cycle's warp per
+            boundary, spread across the samples between the two control
+            points rather than landing as a single jump; pinned by a test
+            rather than hidden, see tests/test_signal_impairments.py.
     """
 
     kind: str = "sine"
@@ -413,47 +439,81 @@ def _impairment_rng(seed: Optional[int], stream_index: int) -> np.random.Generat
     return np.random.default_rng([seed, stream_index])
 
 
-def _jitter_cycle_rng(seed: Optional[int], cycle_index: int) -> np.random.Generator:
-    """An independent, seed-reproducible generator per jittered cycle.
+def _jitter_cycle_rng(seed: Optional[int], boundary_index: int) -> np.random.Generator:
+    """An independent, seed-reproducible generator per jittered cycle-BOUNDARY.
 
-    Keyed by CYCLE INDEX rather than by _impairment_rng's stream position: a
-    given cycle's time-shift must come out identically no matter which buffer
-    observes it -- in particular, ringing's extended lookback window (t_ext,
-    which starts decay_len samples before t0) must see the SAME delta for a
-    cycle that the plain (non-extended) buffer would have drawn for it, or the
-    two would disagree about where that cycle's edge sits. "2" is a fixed
-    namespace tag distinguishing this from the module's other seeded streams
-    (the bare `rng` in synthesize() is seeded directly off spec.seed;
-    _impairment_rng's glitch stream uses index 1), so a jitter draw can never
-    collide with another impairment's draw under the same seed.
+    Keyed by BOUNDARY INDEX rather than by _impairment_rng's stream position: a
+    given boundary's time-shift must come out identically no matter which
+    buffer observes it -- in particular, ringing's extended lookback window
+    (t_ext, which starts decay_len samples before t0) must see the SAME delta
+    for a boundary that the plain (non-extended) buffer would have drawn for
+    it, or the two would disagree about where an edge near that boundary sits.
+    "2" is a fixed namespace tag distinguishing this from the module's other
+    seeded streams (the bare `rng` in synthesize() is seeded directly off
+    spec.seed; _impairment_rng's glitch stream uses index 1), so a jitter draw
+    can never collide with another impairment's draw under the same seed.
+
+    Named "_cycle_rng" (not "_boundary_rng") for continuity with existing
+    callers/tests: a boundary index IS a cycle index -- boundary n is simply
+    the point in time cycle n begins -- this function's contract (one
+    reproducible draw per integer index) hasn't changed, only how
+    _apply_jitter combines two adjacent draws.
     """
     if seed is None:
         return np.random.default_rng()
-    # cycle_index can be negative: ringing's extended lookback window renders
-    # samples before t0, and t0 itself can be negative (a free-running mock's
-    # trigger-relative time base). SeedSequence entries must be non-negative,
-    # so reinterpret the signed 64-bit cycle index as its unsigned bit pattern
-    # -- a bijection, so distinct cycles (negative or not) still get distinct,
-    # deterministic seeds.
-    cycle_component = int(np.uint64(np.int64(cycle_index)))
-    return np.random.default_rng([seed, 2, cycle_component])
+    # boundary_index can be negative: ringing's extended lookback window
+    # renders samples before t0, and t0 itself can be negative (a free-running
+    # mock's trigger-relative time base). SeedSequence entries must be
+    # non-negative, so reinterpret the signed 64-bit index as its unsigned bit
+    # pattern -- a bijection, so distinct boundaries (negative or not) still
+    # get distinct, deterministic seeds.
+    boundary_component = int(np.uint64(np.int64(boundary_index)))
+    return np.random.default_rng([seed, 2, boundary_component])
 
 
 def _apply_jitter(spec: SignalSpec, t: np.ndarray) -> np.ndarray:
-    """Warp a time array so each cycle's samples land where a jittered edge
-    would actually fall.
+    """Warp a time array by linearly interpolating a jittered delta between
+    cycle-BOUNDARY control points, so every sample's shift varies continuously
+    (no hard steps) instead of jumping once per cycle.
 
-    Model: cycle n gets its own Gaussian time-shift delta[n] ~ N(0, sigma),
-    and EVERY sample in that cycle (not just its edge) is shifted by it --
-    t_effective = t - delta[cycle_index(t)], cycle_index(t) = floor(frequency
-    * t + phase / 2pi), the same cycle-counting math _cycle_fraction uses.
+    Model: boundary n (the instant cycle n begins) gets its own Gaussian
+    time-shift d[n] ~ N(0, sigma). For a sample at continuous cycle position
+    `pos = frequency*t + phase/2pi`, let n = floor(pos) and frac = pos - n in
+    [0, 1). The sample's delta is the linear blend of the two boundaries that
+    straddle it: delta(t) = d[n]*(1-frac) + d[n+1]*frac, and
+    t_effective = t - delta(t).
 
-    Calibration: a cycle's observed edge lands at n*T + delta[n], so
-    period[n] = T + delta[n+1] - delta[n]; delta[n] and delta[n+1] are
-    independent, so std(period) = sigma * sqrt(2). Using
-    sigma = jitter_rms / sqrt(2) here is what makes `jitter_rms` equal the
-    value a caller measures back out (see SignalSpec.jitter_rms and
-    docs/superpowers/specs/2026-08-28-signal-timing-jitter-design.md).
+    This replaces an earlier hard-step model (delta = d[cycle_index(t)], a
+    per-cycle constant) that was found to make t_effective NON-MONOTONIC --
+    going backward in time -- whenever |d[n+1]-d[n]| exceeded one sample
+    interval dt, which happens at ordinary jitter values and corrupted edge
+    detection (spurious double-edges, 10-30x measurement inflation) on 5 of
+    7 PERIODIC_KINDS. The interpolated model is C0-continuous everywhere, so
+    t_effective stays monotonic as long as |d[n+1]-d[n]| < T (one period) --
+    verified empirically to hold at the jitter magnitudes this feature
+    targets, a vastly higher bar than the old model's < dt.
+
+    Calibration is now EDGE-POSITION DEPENDENT, not a single constant. An
+    edge sitting exactly at a cycle boundary (frac=0, e.g. sine/square/
+    multitone/pulse's ascending v50 crossing at the default phase=0.0) gets
+    the full, unblended d[n] shift on one side and d[n+1] on the other, so
+    period[n] = T + d[n+1] - d[n] exactly as under the old model:
+    std(period) = sigma*sqrt(2) = jitter_rms, unchanged (verified empirically:
+    ratio 0.94-1.08 at 1-5% of the period). An edge at some other in-cycle
+    fraction f gets a BLENDED shift and consecutive such edges are no longer
+    independent; verified empirically at two more points --
+    Var(period)/jitter_rms**2 = 0.5*[(1-2f)**2 + f**2 + (1-f)**2] -- "triangle"
+    (f=0.25, measured ratio ~0.66-0.68 vs. the formula's 0.6614) and "ramp"
+    (whose v50 crossing, despite the RAMP's own hard discontinuity sitting at
+    the boundary, is itself continuous and actually sits at f=0.5, cycle
+    center: measured ratio ~0.50-0.52 vs. the formula's minimum of 0.5).
+    Using sigma = jitter_rms / sqrt(2) here keeps the frac=0 case exactly
+    calibrated, which is the common case (every PERIODIC_KINDS default phase
+    puts its edge at or within edge_time/2 of a boundary, except "triangle"
+    at f=0.25 and "ramp" at f=0.5). See SignalSpec.jitter_rms for the
+    caller-facing summary and
+    docs/superpowers/specs/2026-08-28-signal-timing-jitter-design.md for the
+    full derivation.
 
     A no-op (returns `t` unchanged, same object) when jitter_rms is 0 or the
     kind has no stable period -- PERIODIC_KINDS excludes "dc", "noise" (no
@@ -464,15 +524,21 @@ def _apply_jitter(spec: SignalSpec, t: np.ndarray) -> np.ndarray:
     """
     if spec.jitter_rms <= 0 or spec.kind not in PERIODIC_KINDS:
         return t
-    cycle_index = np.floor(spec.frequency * t + spec.phase / (2.0 * np.pi)).astype(np.int64)
+    pos = spec.frequency * t + spec.phase / (2.0 * np.pi)
+    n = np.floor(pos).astype(np.int64)
+    frac = pos - n
     sigma = spec.jitter_rms / np.sqrt(2.0)
-    # One generator per UNIQUE cycle index present in this buffer, not one per
-    # sample: this buffer's ringing extended-window call included, a typical
-    # buffer spans hundreds to low thousands of cycles, not samples, and this
-    # keeps every sample within a cycle reading the identical delta.
-    unique_cycles, inverse = np.unique(cycle_index, return_inverse=True)
-    deltas = np.array([_jitter_cycle_rng(spec.seed, cycle).normal(0.0, sigma) for cycle in unique_cycles])
-    return t - deltas[inverse]
+    # One generator per UNIQUE boundary index needed by this buffer -- the
+    # boundary before (n) and after (n + 1) each sample -- not one per sample:
+    # this buffer's ringing extended-window call included, a typical buffer
+    # spans hundreds to low thousands of cycles, not samples.
+    boundary_indices, inverse = np.unique(np.concatenate([n, n + 1]), return_inverse=True)
+    boundary_deltas = np.array([_jitter_cycle_rng(spec.seed, idx).normal(0.0, sigma) for idx in boundary_indices])
+    half = n.size
+    d_before = boundary_deltas[inverse[:half]]
+    d_after = boundary_deltas[inverse[half:]]
+    delta = d_before * (1.0 - frac) + d_after * frac
+    return t - delta
 
 
 def synthesize(spec: SignalSpec, sample_rate: float, n_points: int, t0: float = 0.0) -> np.ndarray:

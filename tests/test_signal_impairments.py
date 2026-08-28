@@ -243,10 +243,18 @@ def test_ringing_is_continuous_across_stream_chunks():
 
 # --- jitter_rms -------------------------------------------------------------
 #
-# Each cycle gets an independent Gaussian time-shift and the whole cycle moves
-# by it (see SignalSpec.jitter_rms and the design doc). Calibrated so
-# jitter_rms IS the value WaveformAnalyzer's own period-jitter measurement
-# reports back (sigma = jitter_rms / sqrt(2) internally).
+# Each cycle BOUNDARY gets an independent Gaussian time-shift, and every
+# sample's shift is the linear interpolation between the two boundaries that
+# straddle it (see SignalSpec.jitter_rms and the design doc). This replaced an
+# earlier hard-step-per-cycle model that made the warped time axis
+# non-monotonic at ordinary jitter values, corrupting edge detection (spurious
+# double-edges, 10-30x measurement inflation) on 5 of 7 PERIODIC_KINDS --
+# fixed by this file's tests below. Calibration is now EDGE-POSITION
+# DEPENDENT: an edge sitting exactly at a cycle boundary (fraction 0) measures
+# jitter_rms almost exactly (sigma = jitter_rms / sqrt(2) internally is tuned
+# for this case); an edge elsewhere in the cycle measures less, following
+# Var(period)/jitter_rms**2 = 0.5*[(1-2f)**2 + f**2 + (1-f)**2] -- verified
+# empirically below for f=0 (sine), f=0.25 (triangle), and f=0.5 (ramp).
 
 
 def test_jitter_rms_defaults_to_off():
@@ -284,13 +292,15 @@ def test_jitter_moves_the_measured_period_jitter_off_zero():
     merely "near" zero) -- proving the control is actually clean -- and
     enabling jitter_rms must move it well off that floor.
 
-    "triangle", not "sine": see
-    test_jitter_rms_matches_the_measured_period_jitter_within_statistical_tolerance
-    for why sine's rising zero-crossing is the wrong kind to measure jitter on
-    with this analyzer. At RATE=100_000/frequency=1_000 (an exact 100
-    samples/cycle), the clean triangle's ascending v50 crossing lands on the
-    identical sample index every cycle -- period is a constant integer, so
-    std(periods) is exactly 0.0, not just small.
+    "triangle": at RATE=100_000/frequency=1_000 (an exact 100 samples/cycle),
+    the clean signal's rising v50 crossing lands on the identical sample index
+    every cycle regardless of kind -- period is a constant integer, so
+    std(periods) is exactly 0.0, not just small. Triangle is used here (rather
+    than the default "sine") only because it is also the kind exercised by the
+    fraction-dependent-attenuation tests below; either kind demonstrates the
+    same off-zero behaviour equally well now that the interpolated model (see
+    the section comment above) makes every PERIODIC_KINDS measurement
+    reliable, not just this one.
     """
     spec_clean = SignalSpec(kind="triangle", frequency=1_000.0, amplitude=1.0, seed=4)
     spec_jittered = SignalSpec(kind="triangle", frequency=1_000.0, amplitude=1.0, jitter_rms=5e-6, seed=4)
@@ -307,22 +317,22 @@ def test_jitter_rms_matches_the_measured_period_jitter_within_statistical_tolera
     jittered signal must come back close to the INJECTED jitter_rms, not
     merely internally self-consistent with this module's own math.
 
-    Deliberately "triangle", not "sine" -- verified empirically, not assumed:
-    a sine's rising zero-crossing sits EXACTLY at fraction 0, the cycle wrap
-    where this feature's own per-cycle delta discontinuity lands (delta[n] is
-    used for every sample up to the wrap, delta[n+1] immediately after it).
-    Right at that steepest-slope point, a jump of |delta[n+1]-delta[n]|
-    comparable to one sample period can make the discretized sine
-    non-monotonic through the v50 threshold, producing a SPURIOUS extra
-    "rising edge" a couple of samples after the real one (reproduced: at
-    jitter_rms=1e-6 s here, sine gave 22/522 anomalous 2-6-sample "periods",
-    inflating measured jitter to ~20x the injected value). "triangle"'s
-    ascending v50 crossing sits at fraction 0.25 -- entirely inside one cycle,
-    using that cycle's single delta uniformly, nowhere near the fraction-0
-    wrap -- so the same delta discontinuity never lands anywhere close to the
-    measurement point (reproduced clean: 0 anomalous periods up to
-    jitter_rms=1e-5 s at this rate; the same 1e-6 s case that broke sine
-    measured ratio 1.08).
+    "sine" -- the DEFAULT kind -- is exactly the validation path the original
+    design doc's Testing section intended and the hard-step model's bug
+    blocked: a sine's rising zero-crossing sits EXACTLY at fraction 0, the
+    cycle boundary, where the OLD per-cycle-constant model's discontinuity
+    landed (a jump of |delta[n+1]-delta[n]| right at the steepest-slope point
+    made the discretized sine non-monotonic through the v50 threshold,
+    producing spurious extra "rising edges" -- reproduced pre-fix: 22/522
+    anomalous 2-6-sample "periods" at jitter_rms=1e-6 s, inflating measured
+    jitter to ~20x injected). The interpolated model (see this file's jitter
+    section comment) is continuous everywhere, so that failure mode is gone;
+    see test_jitter_produces_no_spurious_edges_on_previously_broken_kinds
+    below for the direct proof. Because a fraction-0 edge is also the
+    UNBLENDED case (SignalSpec.jitter_rms), sine is additionally the kind
+    where measured jitter should track injected jitter_rms most closely -- see
+    test_jitter_measured_ratio_depends_on_edge_fraction_within_the_cycle for
+    kinds whose edge sits elsewhere in the cycle.
 
     RATE=1 MHz, frequency=10 kHz -> 100 samples/cycle; N=50_000 -> 500 cycles,
     so calculate_quality_stats sees ~499 measured periods. Treating those as
@@ -335,16 +345,91 @@ def test_jitter_rms_matches_the_measured_period_jitter_within_statistical_tolera
     relative tolerance is >7 standard errors, comfortably ruling out random
     flakiness while still catching a wrong calibration constant -- a missing
     sqrt(2) would read ~41% high or ~29% low, both well outside this band.
-    Measured 1.0024x the injected value with these exact parameters.
+    Measured 0.9699x the injected value with these exact parameters (seed=21).
     """
     rate = 1_000_000.0
     n = 50_000
     jitter_rms = 3e-6
-    spec = SignalSpec(kind="triangle", frequency=10_000.0, amplitude=1.0, jitter_rms=jitter_rms, seed=21)
+    spec = SignalSpec(kind="sine", frequency=10_000.0, amplitude=1.0, jitter_rms=jitter_rms, seed=21)
     waveform = make_waveform(spec, rate, n)
     measured = WaveformAnalyzer.calculate_quality_stats(waveform)["jitter"]
     assert measured is not None
     assert measured == pytest.approx(jitter_rms, rel=0.25)
+
+
+@pytest.mark.parametrize("kind", ["sine", "square", "ramp", "multitone"])
+def test_jitter_produces_no_spurious_edges_on_previously_broken_kinds(kind):
+    """The direct proof the fix closes the gap the prior review found: under
+    the old hard-step-per-cycle model, sine/square/ramp/multitone/pulse (5 of
+    7 PERIODIC_KINDS) all produced spurious double-edges at ordinary jitter
+    values (reproduced pre-fix, e.g. sine: 22/522 anomalous periods at
+    jitter_rms = 1% of the period). An "anomalous" period here is one under
+    half the median -- a real, isolated Gaussian jitter draw essentially never
+    produces one (periods cluster tightly around T with std << T/2 at these
+    magnitudes), so any anomaly at all is symptomatic of the old bug, not
+    statistical noise.
+
+    RATE=1 MHz, frequency=10 kHz -> 100 samples/cycle, N=50_000 -> ~500 edges
+    per trial. Three seeds x three jitter levels (1%, 3%, 5% of the period --
+    covering and exceeding the levels that broke the old model) gives 9 trials
+    per kind, ~4500 edges total, with zero anomalies tolerated.
+    """
+    rate = 1_000_000.0
+    frequency = 10_000.0
+    period = 1.0 / frequency
+    n = 50_000
+    for pct in (0.01, 0.03, 0.05):
+        jitter_rms = pct * period
+        for seed in (1, 2, 3):
+            spec = SignalSpec(kind=kind, frequency=frequency, amplitude=1.0, jitter_rms=jitter_rms, seed=seed)
+            v = synthesize(spec, rate, n)
+            v50 = (float(np.max(v)) + float(np.min(v))) / 2.0
+            rising = np.flatnonzero((v[:-1] < v50) & (v[1:] >= v50))
+            assert rising.size > 400, f"{kind} pct={pct} seed={seed}: too few edges detected to judge -- test setup problem"
+            periods = np.diff(rising)
+            median = np.median(periods)
+            anomalies = np.sum(periods < median * 0.5)
+            assert anomalies == 0, f"{kind} pct={pct} seed={seed}: {anomalies} spurious short period(s) out of {periods.size} -- the old hard-step bug would reproduce here"
+
+
+@pytest.mark.parametrize(
+    "kind, edge_fraction, expected_ratio",
+    [
+        ("sine", 0.0, 1.0),
+        ("triangle", 0.25, 0.6614),
+        ("ramp", 0.5, 0.5),
+    ],
+)
+def test_jitter_measured_ratio_depends_on_edge_fraction_within_the_cycle(kind, edge_fraction, expected_ratio):
+    """Characterizes the real side effect of whole-cycle linear interpolation:
+    an edge's measured jitter depends on WHERE in the cycle it sits, per
+    Var(period)/jitter_rms**2 = 0.5*[(1-2f)**2 + f**2 + (1-f)**2] (see
+    SignalSpec.jitter_rms and _apply_jitter). f=0 (the cycle boundary --
+    "sine"'s ascending v50 crossing at the default phase=0.0) is the
+    UNBLENDED case, predicted ratio 1.0. "triangle"'s ascending crossing sits
+    at f=0.25 (predicted ratio sqrt(0.4375) ~= 0.6614). "ramp" is the
+    surprising one: its own hard discontinuity sits at the cycle boundary, but
+    that is a FALLING transition -- the analyzer's RISING v50 crossing is the
+    ramp's own continuous rise from -amplitude to +amplitude, which crosses
+    zero at f=0.5, cycle CENTER, the formula's minimum (predicted ratio 0.5).
+
+    RATE=1 MHz, frequency=10 kHz, N=50_000 (~500 cycles), jitter_rms = 3% of
+    the period, seed=0 -- chosen because it lands close to each kind's
+    respective mean across a 5-seed sample taken during verification (sine
+    0.96, triangle 0.688, ramp 0.537, vs. predicted 1.0/0.6614/0.5). A +/-20%
+    relative tolerance comfortably covers single-seed sampling variation at
+    ~500 cycles while still distinguishing the three fractions from each
+    other and from a same-for-every-kind (unfixed) model.
+    """
+    rate = 1_000_000.0
+    frequency = 10_000.0
+    n = 50_000
+    jitter_rms = 0.03 / frequency
+    spec = SignalSpec(kind=kind, frequency=frequency, amplitude=1.0, jitter_rms=jitter_rms, seed=0)
+    waveform = make_waveform(spec, rate, n)
+    measured = WaveformAnalyzer.calculate_quality_stats(waveform)["jitter"]
+    assert measured is not None
+    assert measured == pytest.approx(expected_ratio * jitter_rms, rel=0.20)
 
 
 def test_jitter_is_reproducible_under_a_seed():
@@ -379,13 +464,25 @@ def test_jitter_shifts_where_ringing_anchors():
     the physically-correct behaviour the design doc calls out as needing no
     special-casing in the ringing code path itself.
 
-    signal_synth._jitter_cycle_rng(seed, 0) is called directly to obtain
-    cycle 0's delta -- this is ground truth precisely because it is the same
-    seeded-generator call synthesize() itself makes internally for that cycle,
-    not an independent re-derivation of the math. ringing_damping=200_000 (vs.
-    the module's usual 5_000) is deliberate: it shrinks the decay kernel to
-    ~25 samples so the ring stays local to its own edge and cannot spill into
-    -- or be confused with -- ringing from a neighbouring cycle's edge.
+    Targets the RISING edge at the cycle-1 BOUNDARY (nominal sample 1000, not
+    cycle 0's falling duty-threshold edge at sample 500 used before this fix):
+    under the old per-cycle-constant model, EVERY sample in a cycle shifted by
+    that cycle's single delta, so predicting any edge from one delta value was
+    exact. Under the new interpolated model that is only true again AT a
+    boundary sample (frac=0 by construction: delta = d[n]*(1-0) + d[n+1]*0 =
+    d[n] exactly), which is why this test now targets a boundary-fraction edge
+    specifically -- see
+    test_jitter_measured_ratio_depends_on_edge_fraction_within_the_cycle for
+    why an interior-fraction edge (e.g. the OLD test's duty=0.5 target) would
+    no longer be a simple single-delta prediction.
+
+    signal_synth._jitter_cycle_rng(seed, 1) is called directly to obtain
+    boundary 1's delta -- this is ground truth precisely because it is the
+    same seeded-generator call synthesize() itself makes internally for that
+    boundary, not an independent re-derivation of the math. ringing_damping=
+    200_000 (vs. the module's usual 5_000) is deliberate: it shrinks the decay
+    kernel to ~25 samples so the ring stays local to its own edge and cannot
+    spill into -- or be confused with -- ringing from a neighbouring edge.
     """
     rate = 1_000_000.0
     n = 4_000
@@ -398,35 +495,35 @@ def test_jitter_shifts_where_ringing_anchors():
     rung_jittered = synthesize(SignalSpec(jitter_rms=jitter_rms, ringing_frequency=50_000.0, ringing_damping=200_000.0, **base), rate, n)
 
     sigma = jitter_rms / np.sqrt(2.0)
-    delta0 = signal_synth._jitter_cycle_rng(seed, 0).normal(0.0, sigma)
-    # Cycle 0's own falling (duty-threshold) edge is nominally at sample 500
-    # (duty * samples-per-cycle = 0.5 * 1000) and, being entirely inside
-    # cycle 0, shifts by cycle 0's own delta alone.
-    predicted_edge = 500 + delta0 * rate
+    delta1 = signal_synth._jitter_cycle_rng(seed, 1).normal(0.0, sigma)
+    # Boundary 1 (the rising transition into cycle 1) is nominally at sample
+    # 1000 (1 * samples-per-cycle); a sample exactly at a boundary is the
+    # UNBLENDED case, so it shifts by that boundary's own delta alone.
+    predicted_edge = 1000 + delta1 * rate
 
-    nominal_falling = np.flatnonzero(np.diff(clean) < 0)[0] + 1
-    assert nominal_falling == 500, "sanity check on the nominal edge position"
-    assert abs(predicted_edge - 500) > 30, "test parameters should produce a shift large enough to be unambiguous -- widen jitter_rms if this ever fails"
+    nominal_rising = np.flatnonzero(np.diff(clean) > 0)[0] + 1
+    assert nominal_rising == 1000, "sanity check on the nominal edge position"
+    assert abs(predicted_edge - 1000) > 20, "test parameters should produce a shift large enough to be unambiguous -- widen jitter_rms if this ever fails"
 
     # Search a window centered on the PREDICTED position, not a blind scan of
     # the whole cycle -- ringing's own damped oscillation produces many small
-    # sample-to-sample sign flips as it decays, so "first negative diff
+    # sample-to-sample sign flips as it decays, so "first positive diff
     # anywhere" is not a safe way to find the real transition once ringing is
     # on; anchoring the search to the predicted location is.
     lo = int(predicted_edge) - 30
-    falling_in_window = np.flatnonzero(np.diff(rung_jittered[lo : lo + 60]) < 0)
-    assert falling_in_window.size > 0, "expected a falling edge near the predicted jittered position"
-    actual_edge = lo + falling_in_window[0] + 1
+    rising_in_window = np.flatnonzero(np.diff(rung_jittered[lo : lo + 60]) > 0)
+    assert rising_in_window.size > 0, "expected a rising edge near the predicted jittered position"
+    actual_edge = lo + rising_in_window[0] + 1
 
-    assert actual_edge == pytest.approx(predicted_edge, abs=2.0), "the edge must land at the jittered position, not the nominal grid position 500"
+    assert actual_edge == pytest.approx(predicted_edge, abs=3.0), "the edge must land at the jittered position, not the nominal grid position 1000"
 
     # And the ring itself (an edge impairment) must be anchored at that ACTUAL
     # edge: the samples right after it should show much more oscillation than
-    # the same-width window sitting at the now-wrong nominal position 500,
+    # the same-width window sitting at the now-wrong nominal position 1000,
     # where (with this short a decay kernel) the ring has already fully died
-    # out by the time cycle 0's real transition happens elsewhere.
+    # out by the time cycle 1's real transition happens elsewhere.
     ring_at_actual = rung_jittered[actual_edge : actual_edge + 15]
-    ring_at_nominal = rung_jittered[500:515]
+    ring_at_nominal = rung_jittered[1000:1015]
     assert np.std(ring_at_actual) > 0.1
     assert np.std(ring_at_nominal) == 0.0, "sanity check: this short ringing kernel should have fully settled by the (now-empty) nominal edge position"
 
@@ -436,23 +533,37 @@ def test_jitter_across_a_stream_chunk_boundary_is_a_pinned_known_limitation():
     stream() bumps spec.seed by chunk_index per chunk (existing, deliberate
     behaviour -- see stream()'s own docstring). A cycle that straddles a
     stream() chunk boundary is rendered by TWO different synthesize() calls --
-    one per chunk -- each using a different seed, so
-    _jitter_cycle_rng(seed, cycle) draws a DIFFERENT, uncorrelated delta for
-    the SAME cycle depending on which half of it is being rendered.
+    one per chunk -- each computing this cycle's two boundary deltas
+    (_jitter_cycle_rng(seed, n) and (..., n + 1)) under a DIFFERENT seed, so
+    the SAME nominal cycle gets two different, uncorrelated control-point
+    pairs depending on which half of it is being rendered.
 
     This is NOT merely "the jump at this boundary looks bigger than average":
     a jump between one cycle and the next is EXPECTED and normal everywhere in
     this model (that is what produces jitter's period variation in the first
     place -- see SignalSpec.jitter_rms), so an ordinary between-cycle jump is
     no evidence of anything wrong. The actual defect is narrower: a
-    within-cycle inconsistency where two samples that belong to the SAME
-    nominal cycle (cyc_before == cyc_after below) get shifted by two DIFFERENT
-    deltas, only because stream() happened to cut the buffer there. This test
-    pins that precisely by reproducing, from the seeded generators directly,
-    exactly which two deltas produced the streamed samples on either side of
-    each chunk boundary -- and contrasting that with `contiguous`, where the
-    same cycle uses a SINGLE delta (spec.seed, unbumped) throughout, so it has
-    no such inconsistency.
+    within-cycle inconsistency where two ADJACENT samples that belong to the
+    SAME nominal cycle (n_before == n_after below) get interpolated deltas
+    computed from two DIFFERENT boundary-delta pairs, only because stream()
+    happened to cut the buffer there.
+
+    Under the OLD hard-step model this showed up as a single-sample jump of a
+    constant size (one delta difference). Under the NEW interpolated model the
+    shape changed: the jump size now also depends on WHERE in the cycle the
+    stream boundary happens to fall (the frac-weighted blend of two
+    independent delta differences, not one) -- reproduced below at
+    frequency=997.0/chunk_size=1_000: the streamed reconstruction's delta jump
+    at each of the three probed boundaries is ~1e-5, roughly two orders of
+    magnitude larger than the SAME two adjacent samples' delta difference
+    under one contiguous call (~4e-7, the ordinary sub-sample drift of a
+    smooth interpolation -- not a defect, ~4e-7 s corresponds to well under
+    half a sample at RATE=100_000). This test pins that precisely by
+    reproducing, from the seeded generators directly, exactly which boundary
+    deltas produced the streamed samples on either side of each chunk
+    boundary -- and contrasting that with `contiguous`, where every sample
+    uses boundary deltas from a SINGLE seed throughout, so it has no such
+    inconsistency.
 
     frequency=997.0 and chunk_size=1_000 (as in the ringing continuity test
     above) put a chunk boundary in the middle of most cycles, not on one.
@@ -467,33 +578,60 @@ def test_jitter_across_a_stream_chunk_boundary_is_a_pinned_known_limitation():
     sigma = spec.jitter_rms / np.sqrt(2.0)
     dt = 1.0 / RATE
     chunk_size = 1_000
+
+    def boundary_delta(seed_offset, idx):
+        return signal_synth._jitter_cycle_rng(spec.seed + seed_offset, idx).normal(0.0, sigma)
+
     boundaries_straddling_one_cycle = 0
     for b in (1_000, 2_000, 3_000):
         t_before, t_after = (b - 1) * dt, b * dt
-        cyc_before = int(np.floor(spec.frequency * t_before))
-        cyc_after = int(np.floor(spec.frequency * t_after))
-        if cyc_before != cyc_after:
+        pos_before = spec.frequency * t_before + spec.phase / (2.0 * np.pi)
+        pos_after = spec.frequency * t_after + spec.phase / (2.0 * np.pi)
+        n_before = int(np.floor(pos_before))
+        n_after = int(np.floor(pos_after))
+        if n_before != n_after:
             continue  # this particular boundary happened to land exactly on a cycle wrap -- nothing to pin
         boundaries_straddling_one_cycle += 1
+        frac_before = pos_before - n_before
+        frac_after = pos_after - n_after
 
         chunk_before, chunk_after = (b - 1) // chunk_size, b // chunk_size
-        delta_before = signal_synth._jitter_cycle_rng(spec.seed + chunk_before, cyc_before).normal(0.0, sigma)
-        delta_after = signal_synth._jitter_cycle_rng(spec.seed + chunk_after, cyc_after).normal(0.0, sigma)
-        assert delta_before != delta_after, "the whole point of the limitation: the SAME cycle drew two different deltas"
 
-        # The streamed reconstruction must match the TWO-delta (inconsistent)
+        d_before_n = boundary_delta(chunk_before, n_before)
+        d_before_n1 = boundary_delta(chunk_before, n_before + 1)
+        d_after_n = boundary_delta(chunk_after, n_after)
+        d_after_n1 = boundary_delta(chunk_after, n_after + 1)
+        assert (d_before_n, d_before_n1) != (d_after_n, d_after_n1), "the whole point of the limitation: the SAME cycle's boundary deltas differ depending on which chunk rendered them"
+
+        delta_before = d_before_n * (1.0 - frac_before) + d_before_n1 * frac_before
+        delta_after = d_after_n * (1.0 - frac_after) + d_after_n1 * frac_after
+
+        # The streamed reconstruction must match the TWO-CHUNK (inconsistent)
         # prediction, sample for sample.
         predicted_before = spec.amplitude * np.sin(2 * np.pi * spec.frequency * (t_before - delta_before) + spec.phase)
         predicted_after = spec.amplitude * np.sin(2 * np.pi * spec.frequency * (t_after - delta_after) + spec.phase)
         assert streamed[b - 1] == pytest.approx(predicted_before, abs=1e-9)
         assert streamed[b] == pytest.approx(predicted_after, abs=1e-9)
 
-        # Whereas the single contiguous call used ONE delta (unbumped
-        # spec.seed) for this entire cycle -- no within-cycle jump.
-        delta_whole_cycle = signal_synth._jitter_cycle_rng(spec.seed, cyc_before).normal(0.0, sigma)
-        predicted_contiguous_before = spec.amplitude * np.sin(2 * np.pi * spec.frequency * (t_before - delta_whole_cycle) + spec.phase)
-        predicted_contiguous_after = spec.amplitude * np.sin(2 * np.pi * spec.frequency * (t_after - delta_whole_cycle) + spec.phase)
-        assert contiguous[b - 1] == pytest.approx(predicted_contiguous_before, abs=1e-9)
-        assert contiguous[b] == pytest.approx(predicted_contiguous_after, abs=1e-9)
+        # Whereas the single contiguous call used boundary deltas from ONE
+        # seed (unbumped spec.seed) throughout -- its own before/after delta
+        # difference is just the ordinary smooth interpolation drift over one
+        # sample, not a chunk-seam artifact.
+        d_contig_n = boundary_delta(0, n_before)
+        d_contig_n1 = boundary_delta(0, n_before + 1)
+        delta_contig_before = d_contig_n * (1.0 - frac_before) + d_contig_n1 * frac_before
+        delta_contig_after = d_contig_n * (1.0 - frac_after) + d_contig_n1 * frac_after
+        predicted_contig_before = spec.amplitude * np.sin(2 * np.pi * spec.frequency * (t_before - delta_contig_before) + spec.phase)
+        predicted_contig_after = spec.amplitude * np.sin(2 * np.pi * spec.frequency * (t_after - delta_contig_after) + spec.phase)
+        assert contiguous[b - 1] == pytest.approx(predicted_contig_before, abs=1e-9)
+        assert contiguous[b] == pytest.approx(predicted_contig_after, abs=1e-9)
+
+        # Characterizes the "spread-out ramp, not a hard jump" shape change:
+        # the streamed seam's delta discontinuity is real and an order of
+        # magnitude (or more) larger than the ordinary one-sample drift the
+        # same two samples show under one contiguous, self-consistent call.
+        jump_streamed = abs(delta_after - delta_before)
+        jump_contiguous = abs(delta_contig_after - delta_contig_before)
+        assert jump_streamed > 10 * jump_contiguous, "the chunk-boundary discontinuity should dwarf ordinary within-cycle interpolation drift"
 
     assert boundaries_straddling_one_cycle > 0, "test setup should produce at least one boundary that actually straddles a single cycle"
