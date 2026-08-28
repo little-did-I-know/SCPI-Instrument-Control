@@ -61,7 +61,7 @@ def test_the_new_fields_are_appended_and_do_not_move_the_existing_ones():
         "ringing_frequency",
         "ringing_damping",
     ]
-    assert names[14:] == ["end_frequency", "sweep_time", "sweep_log", "tau", "pulse_width", "edge_time", "harmonics"]
+    assert names[14:] == ["end_frequency", "sweep_time", "sweep_log", "tau", "pulse_width", "edge_time", "harmonics", "jitter_rms"]
 
 
 def _bin_amplitudes(samples, rate):

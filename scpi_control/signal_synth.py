@@ -65,6 +65,27 @@ class SignalSpec:
             harmonic. `amplitude` is the FUNDAMENTAL's amplitude, so the peak
             of the sum is higher; that is deliberate, since normalizing would
             make the THD of a multitone depend on its harmonic set.
+        jitter_rms: Std-dev of period-to-period timing jitter, in seconds (0 =
+            off). PERIODIC_KINDS only (sine, square, triangle, ramp,
+            multitone, exponential, pulse): "dc"/"noise" have no cycle
+            structure and "chirp" has no stable period, so on those three
+            kinds this field is a no-op rather than an error. Each cycle gets
+            its own independent Gaussian time-shift and the WHOLE cycle --
+            not just its edge -- moves by it, so an enabled `ringing_frequency`
+            keys on the actual jittered edge, not the nominal one, with no
+            special-casing needed. Calibrated so `jitter_rms` IS the value a
+            caller gets back from measuring the output: the internal per-cycle
+            draw uses sigma = jitter_rms / sqrt(2), because a measured period
+            is the difference of two independent per-cycle deltas
+            (period[n] = T + delta[n+1] - delta[n]), so
+            std(period) = sigma * sqrt(2). See
+            docs/superpowers/specs/2026-08-28-signal-timing-jitter-design.md
+            for the full derivation. KNOWN LIMITATION: stream() bumps
+            spec.seed per chunk, so a cycle straddling a stream() chunk
+            boundary draws two different deltas from the two chunk calls that
+            observe it -- a small, bounded discontinuity in that one cycle per
+            boundary; pinned by a test rather than hidden, see
+            tests/test_signal_impairments.py.
     """
 
     kind: str = "sine"
@@ -99,6 +120,10 @@ class SignalSpec:
         0.1,
         0.05,
     )  # "multitone": relative amplitudes of the 2nd, 3rd, ... harmonic; non-empty by default so SignalSpec(kind="multitone") is not a bit-identical duplicate of "sine"
+    # Appended after harmonics -- the last of the kind-specific fields -- for the
+    # same don't-reorder-positional-construction reason as every field above it,
+    # NOT next to the other impairments where it reads better.
+    jitter_rms: float = 0.0  # seconds of period-to-period timing jitter (0 = off); PERIODIC_KINDS only -- see the docstring above for the model and the sqrt(2) calibration
 
 
 # How close to a whole cycle a sample may sit and still count as landing exactly
@@ -372,6 +397,8 @@ def _validate(spec: SignalSpec, sample_rate: float, n_points: int) -> None:
         raise exceptions.InvalidParameterError(f"ringing_frequency must be non-negative: {spec.ringing_frequency}")
     if spec.ringing_damping < 0:
         raise exceptions.InvalidParameterError(f"ringing_damping must be non-negative: {spec.ringing_damping}")
+    if not np.isfinite(spec.jitter_rms) or spec.jitter_rms < 0:
+        raise exceptions.InvalidParameterError(f"jitter_rms must be a non-negative, finite number: {spec.jitter_rms}")
 
 
 def _impairment_rng(seed: Optional[int], stream_index: int) -> np.random.Generator:
@@ -384,6 +411,68 @@ def _impairment_rng(seed: Optional[int], stream_index: int) -> np.random.Generat
     if seed is None:
         return np.random.default_rng()
     return np.random.default_rng([seed, stream_index])
+
+
+def _jitter_cycle_rng(seed: Optional[int], cycle_index: int) -> np.random.Generator:
+    """An independent, seed-reproducible generator per jittered cycle.
+
+    Keyed by CYCLE INDEX rather than by _impairment_rng's stream position: a
+    given cycle's time-shift must come out identically no matter which buffer
+    observes it -- in particular, ringing's extended lookback window (t_ext,
+    which starts decay_len samples before t0) must see the SAME delta for a
+    cycle that the plain (non-extended) buffer would have drawn for it, or the
+    two would disagree about where that cycle's edge sits. "2" is a fixed
+    namespace tag distinguishing this from the module's other seeded streams
+    (the bare `rng` in synthesize() is seeded directly off spec.seed;
+    _impairment_rng's glitch stream uses index 1), so a jitter draw can never
+    collide with another impairment's draw under the same seed.
+    """
+    if seed is None:
+        return np.random.default_rng()
+    # cycle_index can be negative: ringing's extended lookback window renders
+    # samples before t0, and t0 itself can be negative (a free-running mock's
+    # trigger-relative time base). SeedSequence entries must be non-negative,
+    # so reinterpret the signed 64-bit cycle index as its unsigned bit pattern
+    # -- a bijection, so distinct cycles (negative or not) still get distinct,
+    # deterministic seeds.
+    cycle_component = int(np.uint64(np.int64(cycle_index)))
+    return np.random.default_rng([seed, 2, cycle_component])
+
+
+def _apply_jitter(spec: SignalSpec, t: np.ndarray) -> np.ndarray:
+    """Warp a time array so each cycle's samples land where a jittered edge
+    would actually fall.
+
+    Model: cycle n gets its own Gaussian time-shift delta[n] ~ N(0, sigma),
+    and EVERY sample in that cycle (not just its edge) is shifted by it --
+    t_effective = t - delta[cycle_index(t)], cycle_index(t) = floor(frequency
+    * t + phase / 2pi), the same cycle-counting math _cycle_fraction uses.
+
+    Calibration: a cycle's observed edge lands at n*T + delta[n], so
+    period[n] = T + delta[n+1] - delta[n]; delta[n] and delta[n+1] are
+    independent, so std(period) = sigma * sqrt(2). Using
+    sigma = jitter_rms / sqrt(2) here is what makes `jitter_rms` equal the
+    value a caller measures back out (see SignalSpec.jitter_rms and
+    docs/superpowers/specs/2026-08-28-signal-timing-jitter-design.md).
+
+    A no-op (returns `t` unchanged, same object) when jitter_rms is 0 or the
+    kind has no stable period -- PERIODIC_KINDS excludes "dc", "noise" (no
+    cycle structure) and "chirp" (frequency sweeps, so "cycle index" is
+    undefined). That fast path is also what keeps a disabled jitter_rms
+    byte-identical to this feature never having existed: the generator sees
+    the exact same time array it always did.
+    """
+    if spec.jitter_rms <= 0 or spec.kind not in PERIODIC_KINDS:
+        return t
+    cycle_index = np.floor(spec.frequency * t + spec.phase / (2.0 * np.pi)).astype(np.int64)
+    sigma = spec.jitter_rms / np.sqrt(2.0)
+    # One generator per UNIQUE cycle index present in this buffer, not one per
+    # sample: this buffer's ringing extended-window call included, a typical
+    # buffer spans hundreds to low thousands of cycles, not samples, and this
+    # keeps every sample within a cycle reading the identical delta.
+    unique_cycles, inverse = np.unique(cycle_index, return_inverse=True)
+    deltas = np.array([_jitter_cycle_rng(spec.seed, cycle).normal(0.0, sigma) for cycle in unique_cycles])
+    return t - deltas[inverse]
 
 
 def synthesize(spec: SignalSpec, sample_rate: float, n_points: int, t0: float = 0.0) -> np.ndarray:
@@ -400,6 +489,12 @@ def synthesize(spec: SignalSpec, sample_rate: float, n_points: int, t0: float = 
     """
     _validate(spec, sample_rate, n_points)
     rng = np.random.default_rng(spec.seed)
+    # `t` stays the NOMINAL time array all the way through this function --
+    # drift below is deliberately a function of absolute time, unwarped. Jitter
+    # (_apply_jitter) is applied only at the two _GENERATORS[...] call sites
+    # below (the plain one and, inside the ringing branch, the extended-window
+    # one), so ringing's own edge detection sees the jittered edge position,
+    # not the nominal one.
     t = t0 + np.arange(n_points) / sample_rate
     if spec.ringing_frequency > 0:
         # A damped sinusoid triggered at each edge. Real probe/scope front-ends
@@ -433,7 +528,7 @@ def synthesize(spec: SignalSpec, sample_rate: float, n_points: int, t0: float = 
         # (verified: this happened at every chunk boundary in the drift-style
         # continuity test below until reordered this way).
         t_ext = t0 + (np.arange(n_points + decay_len) - decay_len) / sample_rate
-        samples_ext = _GENERATORS[spec.kind](spec, t_ext, rng) + spec.offset
+        samples_ext = _GENERATORS[spec.kind](spec, _apply_jitter(spec, t_ext), rng) + spec.offset
         # ANY nonzero sample-to-sample change is an edge here, not just a
         # discontinuity: on a continuous kind every sample qualifies, so this
         # becomes a derivative-weighted filter rather than a no-op. That is
@@ -464,7 +559,7 @@ def synthesize(spec: SignalSpec, sample_rate: float, n_points: int, t0: float = 
         else:
             samples = samples_ext[decay_len:]
     else:
-        samples = _GENERATORS[spec.kind](spec, t, rng) + spec.offset
+        samples = _GENERATORS[spec.kind](spec, _apply_jitter(spec, t), rng) + spec.offset
     if spec.drift_amplitude > 0:
         # Time-based, NOT a random walk: stream() re-seeds per chunk, so a walk
         # would reset at every chunk boundary and a live view would show sawtooth
