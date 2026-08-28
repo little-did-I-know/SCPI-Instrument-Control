@@ -101,6 +101,10 @@ report-generator = [
     "psutil>=5.9.0",
     "nvidia-ml-py>=12.0.0",
 ]
+uncertainty = [
+    "pint>=0.24",
+    "uncertainties>=3.2",
+]
 # Experimental features (BETA - v0.4.0-beta.1)
 # Power supply control - no additional dependencies required
 # Included for explicit feature installation and documentation
@@ -140,6 +144,8 @@ all = [
     "PyMuPDF>=1.23.0",
     "psutil>=5.9.0",
     "nvidia-ml-py>=12.0.0",
+    "pint>=0.24",
+    "uncertainties>=3.2",
     # Note: Experimental features not included in 'all'
     # Install explicitly with [power-supply-beta] or [experimental]
 ]
