@@ -105,13 +105,24 @@ class SignalSpec:
             The internal per-boundary draw uses sigma = jitter_rms / sqrt(2),
             which is what keeps the common f=0 case exactly calibrated. See
             docs/superpowers/specs/2026-08-28-signal-timing-jitter-design.md
-            for the full derivation. KNOWN LIMITATION: stream() bumps
-            spec.seed per chunk, so a cycle straddling a stream() chunk
-            boundary draws two different deltas from the two chunk calls that
-            observe it -- a discontinuity in that one cycle's warp per
-            boundary, spread across the samples between the two control
-            points rather than landing as a single jump; pinned by a test
-            rather than hidden, see tests/test_signal_impairments.py.
+            for the full derivation. stream() chunk-boundary continuity: a
+            cycle straddling a stream() chunk boundary now draws the SAME
+            deltas regardless of which chunk's call renders it -- see
+            `jitter_seed` below and
+            docs/superpowers/specs/2026-08-28-jitter-stream-continuity-design.md.
+        jitter_seed: Decouples jitter's per-boundary randomness from `seed`.
+            None (the default) falls back to `seed`, so a one-shot
+            `synthesize()`/`make_waveform()` call behaves exactly as if this
+            field didn't exist. `stream()` auto-fills it with the ORIGINAL,
+            pre-chunk-bump `seed` on every chunk whose spec left it None --
+            `seed` itself keeps bumping per chunk (so noise/glitches keep
+            varying chunk-to-chunk, unaffected), but every chunk of one
+            stream() run now shares the same jitter entropy source, which is
+            what makes a cycle straddling a chunk boundary resolve to
+            identical boundary deltas no matter which chunk renders it. Set
+            explicitly on a spec passed to `stream()` to opt out of the
+            auto-fill and choose jitter's entropy source independently of
+            `seed`.
     """
 
     kind: str = "sine"
@@ -150,6 +161,9 @@ class SignalSpec:
     # same don't-reorder-positional-construction reason as every field above it,
     # NOT next to the other impairments where it reads better.
     jitter_rms: float = 0.0  # seconds of period-to-period timing jitter (0 = off); PERIODIC_KINDS only -- see the docstring above for the model and the sqrt(2) calibration
+    # Appended after jitter_rms -- the current last field -- for the same
+    # don't-reorder-positional-construction reason as every field above it.
+    jitter_seed: Optional[int] = None  # decouples jitter's boundary RNG from `seed`; None falls back to `seed`. stream() auto-fills this with the pre-bump `seed` per chunk -- see the docstring above
 
 
 # How close to a whole cycle a sample may sit and still count as landing exactly
@@ -533,7 +547,8 @@ def _apply_jitter(spec: SignalSpec, t: np.ndarray) -> np.ndarray:
     # this buffer's ringing extended-window call included, a typical buffer
     # spans hundreds to low thousands of cycles, not samples.
     boundary_indices, inverse = np.unique(np.concatenate([n, n + 1]), return_inverse=True)
-    boundary_deltas = np.array([_jitter_cycle_rng(spec.seed, idx).normal(0.0, sigma) for idx in boundary_indices])
+    jitter_seed = spec.jitter_seed if spec.jitter_seed is not None else spec.seed
+    boundary_deltas = np.array([_jitter_cycle_rng(jitter_seed, idx).normal(0.0, sigma) for idx in boundary_indices])
     half = n.size
     d_before = boundary_deltas[inverse[:half]]
     d_after = boundary_deltas[inverse[half:]]
@@ -690,7 +705,18 @@ def stream(
         wall_start = None
         while total is None or produced < total:
             n = chunk_size if total is None else min(chunk_size, total - produced)
-            chunk_spec = spec if spec.seed is None else replace(spec, seed=spec.seed + index)
+            if spec.seed is None:
+                chunk_spec = spec
+            else:
+                # jitter_seed=spec.seed (the pre-bump value) only when the caller
+                # left it None -- so every chunk of this run shares the same
+                # jitter entropy source (closing the stream()-chunk-boundary
+                # discontinuity, see SignalSpec.jitter_seed) while `seed` itself
+                # keeps bumping per chunk, unchanged, so noise/glitches keep
+                # their existing non-repeating-across-chunks behavior. A caller
+                # who set jitter_seed explicitly keeps their own choice.
+                jitter_seed = spec.jitter_seed if spec.jitter_seed is not None else spec.seed
+                chunk_spec = replace(spec, seed=spec.seed + index, jitter_seed=jitter_seed)
             chunk = synthesize(chunk_spec, sample_rate, n, t0=start_time + produced / sample_rate)
             if realtime:
                 if wall_start is None:

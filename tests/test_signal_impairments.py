@@ -6,6 +6,8 @@ default-off test below is the load-bearing one, because turning them on by
 default would silently change what every existing mock-based test measures.
 """
 
+from dataclasses import replace
+
 import numpy as np
 import pytest
 
@@ -551,110 +553,144 @@ def test_jitter_shifts_where_ringing_anchors():
     assert np.std(ring_at_nominal) == 0.0, "sanity check: this short ringing kernel should have fully settled by the (now-empty) nominal edge position"
 
 
-def test_jitter_across_a_stream_chunk_boundary_is_a_pinned_known_limitation():
-    """Documents (does not hide) the design's accepted "Known limitation":
-    stream() bumps spec.seed by chunk_index per chunk (existing, deliberate
-    behaviour -- see stream()'s own docstring). A cycle that straddles a
-    stream() chunk boundary is rendered by TWO different synthesize() calls --
-    one per chunk -- each computing this cycle's two boundary deltas
-    (_jitter_cycle_rng(seed, n) and (..., n + 1)) under a DIFFERENT seed, so
-    the SAME nominal cycle gets two different, uncorrelated control-point
-    pairs depending on which half of it is being rendered.
+def test_jitter_is_continuous_across_a_stream_chunk_boundary():
+    """Replaces test_jitter_across_a_stream_chunk_boundary_is_a_pinned_known_limitation
+    (see docs/superpowers/specs/2026-08-28-jitter-stream-continuity-design.md): the
+    fix gives jitter its own `jitter_seed` field, and stream() auto-fills it on
+    every chunk with the pre-bump `spec.seed` (unless the caller already set an
+    explicit jitter_seed), so every chunk of one stream() run now shares the
+    same jitter entropy source instead of each chunk's bumped `seed` producing
+    a different one.
 
-    This is NOT merely "the jump at this boundary looks bigger than average":
-    a jump between one cycle and the next is EXPECTED and normal everywhere in
-    this model (that is what produces jitter's period variation in the first
-    place -- see SignalSpec.jitter_rms), so an ordinary between-cycle jump is
-    no evidence of anything wrong. The actual defect is narrower: a
-    within-cycle inconsistency where two ADJACENT samples that belong to the
-    SAME nominal cycle (n_before == n_after below) get interpolated deltas
-    computed from two DIFFERENT boundary-delta pairs, only because stream()
-    happened to cut the buffer there.
-
-    Under the OLD hard-step model this showed up as a single-sample jump of a
-    constant size (one delta difference). Under the NEW interpolated model the
-    shape changed: the jump size now also depends on WHERE in the cycle the
-    stream boundary happens to fall (the frac-weighted blend of two
-    independent delta differences, not one) -- reproduced below at
-    frequency=997.0/chunk_size=1_000: the streamed reconstruction's delta jump
-    at each of the three probed boundaries is ~1e-5, roughly two orders of
-    magnitude larger than the SAME two adjacent samples' delta difference
-    under one contiguous call (~4e-7, the ordinary sub-sample drift of a
-    smooth interpolation -- not a defect, ~4e-7 s corresponds to well under
-    half a sample at RATE=100_000). This test pins that precisely by
-    reproducing, from the seeded generators directly, exactly which boundary
-    deltas produced the streamed samples on either side of each chunk
-    boundary -- and contrasting that with `contiguous`, where every sample
-    uses boundary deltas from a SINGLE seed throughout, so it has no such
-    inconsistency.
-
-    frequency=997.0 and chunk_size=1_000 (as in the ringing continuity test
-    above) put a chunk boundary in the middle of most cycles, not on one.
+    frequency=1_000 Hz at RATE=100_000 Sa/s gives exactly 100 samples/cycle;
+    chunk_size=1_000 makes every chunk boundary (sample 1_000, 2_000, 3_000)
+    land exactly on a cycle boundary (n=10, 20, 30) rather than mid-cycle --
+    the sharpest version of this test, since a cycle-boundary sample is the
+    UNBLENDED case (delta = d[n] alone, no interpolation to smear a residual
+    mismatch between chunks).
     """
     from scpi_control.signal_synth import stream
 
-    spec = SignalSpec(kind="sine", frequency=997.0, amplitude=1.0, jitter_rms=3e-5, seed=2)
-    contiguous = synthesize(spec, RATE, N)
-    streamed = np.concatenate(list(stream(spec, RATE, 1_000, duration=N / RATE)))
-    assert not np.array_equal(streamed, contiguous), "stream()'s per-chunk seed bump must actually change jittered output vs. one contiguous call"
-
-    sigma = spec.jitter_rms / np.sqrt(2.0)
-    dt = 1.0 / RATE
+    spec = SignalSpec(kind="sine", frequency=1_000.0, amplitude=1.0, jitter_rms=3e-5, seed=2)
     chunk_size = 1_000
+    contiguous = synthesize(spec, RATE, N)
+    streamed = np.concatenate(list(stream(spec, RATE, chunk_size, duration=N / RATE)))
 
-    def boundary_delta(seed_offset, idx):
-        return signal_synth._jitter_cycle_rng(spec.seed + seed_offset, idx).normal(0.0, sigma)
+    dt = 1.0 / RATE
+    sigma = spec.jitter_rms / np.sqrt(2.0)
 
-    boundaries_straddling_one_cycle = 0
+    boundaries_checked = 0
     for b in (1_000, 2_000, 3_000):
-        t_before, t_after = (b - 1) * dt, b * dt
-        pos_before = spec.frequency * t_before + spec.phase / (2.0 * np.pi)
-        pos_after = spec.frequency * t_after + spec.phase / (2.0 * np.pi)
-        n_before = int(np.floor(pos_before))
-        n_after = int(np.floor(pos_after))
-        if n_before != n_after:
-            continue  # this particular boundary happened to land exactly on a cycle wrap -- nothing to pin
-        boundaries_straddling_one_cycle += 1
-        frac_before = pos_before - n_before
-        frac_after = pos_after - n_after
+        t_boundary = b * dt
+        pos = spec.frequency * t_boundary + spec.phase / (2.0 * np.pi)
+        n_boundary = int(round(pos))
+        assert pos == pytest.approx(n_boundary, abs=1e-9), "sanity: this chunk boundary must land exactly on a cycle boundary"
+        boundaries_checked += 1
 
-        chunk_before, chunk_after = (b - 1) // chunk_size, b // chunk_size
+        # Ground truth, reproduced directly from the seeded generator the fix
+        # routes jitter through: boundary n_boundary's delta now comes from a
+        # SINGLE jitter_seed (the auto-filled, unbumped spec.seed) no matter
+        # which chunk's synthesize() call renders it -- there is no longer a
+        # "which chunk observed it" distinction to reproduce, which is the
+        # fix itself. Calling it twice, once "as chunk (b // chunk_size) - 1
+        # would see it" and once "as chunk b // chunk_size would see it",
+        # both resolve to the same call now.
+        delta_from_earlier_chunks_view = signal_synth._jitter_cycle_rng(spec.seed, n_boundary).normal(0.0, sigma)
+        delta_from_later_chunks_view = signal_synth._jitter_cycle_rng(spec.seed, n_boundary).normal(0.0, sigma)
+        assert delta_from_earlier_chunks_view == delta_from_later_chunks_view, "both chunks must resolve this boundary's delta identically now"
 
-        d_before_n = boundary_delta(chunk_before, n_before)
-        d_before_n1 = boundary_delta(chunk_before, n_before + 1)
-        d_after_n = boundary_delta(chunk_after, n_after)
-        d_after_n1 = boundary_delta(chunk_after, n_after + 1)
-        assert (d_before_n, d_before_n1) != (d_after_n, d_after_n1), "the whole point of the limitation: the SAME cycle's boundary deltas differ depending on which chunk rendered them"
+        predicted = spec.amplitude * np.sin(2 * np.pi * spec.frequency * (t_boundary - delta_from_earlier_chunks_view) + spec.phase)
+        assert streamed[b] == pytest.approx(predicted, abs=1e-9)
+        assert streamed[b] == pytest.approx(contiguous[b], abs=1e-9), "the boundary sample must match the un-chunked call"
 
-        delta_before = d_before_n * (1.0 - frac_before) + d_before_n1 * frac_before
-        delta_after = d_after_n * (1.0 - frac_after) + d_after_n1 * frac_after
+    assert boundaries_checked == 3
 
-        # The streamed reconstruction must match the TWO-CHUNK (inconsistent)
-        # prediction, sample for sample.
-        predicted_before = spec.amplitude * np.sin(2 * np.pi * spec.frequency * (t_before - delta_before) + spec.phase)
-        predicted_after = spec.amplitude * np.sin(2 * np.pi * spec.frequency * (t_after - delta_after) + spec.phase)
-        assert streamed[b - 1] == pytest.approx(predicted_before, abs=1e-9)
-        assert streamed[b] == pytest.approx(predicted_after, abs=1e-9)
+    # And it is not just the boundary samples: the whole streamed
+    # reconstruction now matches a single, un-chunked synthesize() call over
+    # the same absolute time range -- to within ordinary float-rounding
+    # tolerance, not necessarily bit-for-bit. `t` itself is accumulated
+    # differently between the two paths (chunked t0 + local arange() vs. one
+    # contiguous arange()), a pre-existing, orthogonal quantization artifact
+    # already documented on test_ringing_is_continuous_across_stream_chunks;
+    # jitter's continuous interpolation propagates that ULP-level `t` noise
+    # into `delta(t)` everywhere, not just at boundaries (observed max ~8e-14,
+    # five orders of magnitude below the ~1e-5 discontinuity the old,
+    # pre-fix chunk-boundary bug produced). atol=1e-9 matches this file's
+    # existing jitter-sample tolerance and is still four-plus orders of
+    # magnitude tighter than that old discontinuity.
+    np.testing.assert_allclose(streamed, contiguous, atol=1e-9)
 
-        # Whereas the single contiguous call used boundary deltas from ONE
-        # seed (unbumped spec.seed) throughout -- its own before/after delta
-        # difference is just the ordinary smooth interpolation drift over one
-        # sample, not a chunk-seam artifact.
-        d_contig_n = boundary_delta(0, n_before)
-        d_contig_n1 = boundary_delta(0, n_before + 1)
-        delta_contig_before = d_contig_n * (1.0 - frac_before) + d_contig_n1 * frac_before
-        delta_contig_after = d_contig_n * (1.0 - frac_after) + d_contig_n1 * frac_after
-        predicted_contig_before = spec.amplitude * np.sin(2 * np.pi * spec.frequency * (t_before - delta_contig_before) + spec.phase)
-        predicted_contig_after = spec.amplitude * np.sin(2 * np.pi * spec.frequency * (t_after - delta_contig_after) + spec.phase)
-        assert contiguous[b - 1] == pytest.approx(predicted_contig_before, abs=1e-9)
-        assert contiguous[b] == pytest.approx(predicted_contig_after, abs=1e-9)
 
-        # Characterizes the "spread-out ramp, not a hard jump" shape change:
-        # the streamed seam's delta discontinuity is real and an order of
-        # magnitude (or more) larger than the ordinary one-sample drift the
-        # same two samples show under one contiguous, self-consistent call.
-        jump_streamed = abs(delta_after - delta_before)
-        jump_contiguous = abs(delta_contig_after - delta_contig_before)
-        assert jump_streamed > 10 * jump_contiguous, "the chunk-boundary discontinuity should dwarf ordinary within-cycle interpolation drift"
+def test_stream_noise_and_glitches_still_vary_across_chunks_with_jitter_enabled():
+    """jitter_seed decouples jitter's own randomness from stream()'s
+    chunk-bumped `seed`, but noise and glitches must be UNAFFECTED by this
+    change -- they still key off the bumped `seed` (via `rng` and
+    `_impairment_rng` respectively), so they must keep varying chunk-to-chunk
+    exactly as before this fix.
 
-    assert boundaries_straddling_one_cycle > 0, "test setup should produce at least one boundary that actually straddles a single cycle"
+    Isolates the noise+glitch residual by subtracting a reconstruction of
+    each chunk's noise/glitch-free signal, built with the SAME chunk_spec
+    fields (bumped seed, auto-filled jitter_seed) stream() itself now uses --
+    the jittered base signal alone is now chunk-invariant (see
+    test_jitter_is_continuous_across_a_stream_chunk_boundary), so it cannot
+    be the source of any residual difference found below.
+    """
+    from scpi_control.signal_synth import stream
+
+    spec = SignalSpec(kind="sine", frequency=1_000.0, amplitude=1.0, jitter_rms=3e-5, noise_rms=0.05, glitch_rate=2_000.0, glitch_amplitude=2.0, seed=4)
+    chunk_size = 1_000
+    n_chunks = 3
+    chunks = list(stream(spec, RATE, chunk_size, duration=n_chunks * chunk_size / RATE))
+    assert len(chunks) == n_chunks
+
+    clean_spec = replace(spec, noise_rms=0.0, glitch_rate=0.0, glitch_amplitude=0.0)
+    residuals = []
+    for i, chunk in enumerate(chunks):
+        chunk_clean_spec = replace(clean_spec, seed=spec.seed + i, jitter_seed=spec.seed)
+        clean_chunk = synthesize(chunk_clean_spec, RATE, chunk_size, t0=i * chunk_size / RATE)
+        residuals.append(chunk - clean_chunk)
+
+    assert not np.array_equal(residuals[0], residuals[1]), "noise/glitches must still differ chunk-to-chunk"
+    assert not np.array_equal(residuals[1], residuals[2]), "noise/glitches must still differ chunk-to-chunk"
+
+
+def test_default_jitter_seed_falls_back_to_spec_seed_byte_identical():
+    """jitter_seed's default None must behave EXACTLY as if it were set to
+    spec.seed -- the only behavior _jitter_cycle_rng had before this field
+    existed. Proves one-shot synthesize()/make_waveform() calls (the
+    overwhelming majority of usage, jitter_seed never touched) are
+    byte-identical to before this change."""
+    spec = SignalSpec(kind="sine", frequency=1_000.0, amplitude=1.0, jitter_rms=3e-5, seed=6)
+    assert spec.jitter_seed is None
+
+    default = synthesize(spec, RATE, N)
+    explicit_fallback = synthesize(replace(spec, jitter_seed=spec.seed), RATE, N)
+    np.testing.assert_array_equal(default, explicit_fallback)
+
+    waveform_default = make_waveform(spec, RATE, N)
+    waveform_explicit = make_waveform(replace(spec, jitter_seed=spec.seed), RATE, N)
+    np.testing.assert_array_equal(waveform_default.voltage, waveform_explicit.voltage)
+
+
+def test_stream_respects_an_explicit_jitter_seed_override():
+    """A caller who wants jitter's randomness genuinely decoupled from `seed`
+    can set jitter_seed explicitly on the spec passed to stream(); the
+    auto-fill (jitter_seed=spec.seed on every chunk when the caller left it
+    None) must not silently overwrite that explicit choice."""
+    from scpi_control.signal_synth import stream
+
+    base = dict(kind="sine", frequency=1_000.0, amplitude=1.0, jitter_rms=3e-5, seed=8)
+    chunk_size = 1_000
+    n_chunks = 3
+
+    auto_filled = np.concatenate(list(stream(SignalSpec(**base), RATE, chunk_size, duration=n_chunks * chunk_size / RATE)))
+    explicit = np.concatenate(list(stream(SignalSpec(jitter_seed=99, **base), RATE, chunk_size, duration=n_chunks * chunk_size / RATE)))
+
+    assert not np.array_equal(auto_filled, explicit), "an explicit jitter_seed must actually change the jittered output, not be silently overwritten by the auto-fill"
+
+    # And it must still be internally continuous under the explicit override
+    # -- same mechanism, different (caller-chosen) seed source. atol=1e-9 for
+    # the same reason as test_jitter_is_continuous_across_a_stream_chunk_boundary:
+    # ordinary float-rounding noise from how `t` is accumulated, not a defect.
+    contiguous_explicit = synthesize(SignalSpec(jitter_seed=99, **base), RATE, n_chunks * chunk_size)
+    np.testing.assert_allclose(explicit, contiguous_explicit, atol=1e-9)
