@@ -4802,9 +4802,9 @@ appended only for SQUARE/PULSE, <code>SYM</code> only for RAMP (p.29-30 paramete
 <tr>
 <td><code>get_phase</code></td>
 <td><code>C{ch}:BSWV?</code></td>
-<td><code>&lt;channel&gt;:BaSic_WaVe?</code> returns every BSWV parameter as one comma-joined reply; <code>PHSE</code> read out of it</td>
+<td><code>&lt;channel&gt;:BaSic_WaVe?</code> returns every BSWV parameter as one comma-joined reply; <code>PHSE</code> only present when WVTP is not NOISE/PULSE/DC, read out of it</td>
 <td>VERIFIED</td>
-<td>PG02-E05B p.31</td>
+<td>PG02-E05B p.31, p.29-30</td>
 </tr>
 <tr>
 <td><code>get_pulse_duty</code></td>
@@ -4900,7 +4900,7 @@ appended only for SQUARE/PULSE, <code>SYM</code> only for RAMP (p.29-30 paramete
 <tr>
 <td><code>set_phase</code></td>
 <td><code>C{ch}:BSWV PHSE,{phase}</code></td>
-<td><code>&lt;channel&gt;:BaSic_WaVe PHSE,&lt;phase&gt;</code></td>
+<td><code>&lt;channel&gt;:BaSic_WaVe PHSE,&lt;phase&gt;</code>; not valid when WVTP is NOISE, PULSE, or DC</td>
 <td>VERIFIED</td>
 <td>PG02-E05B p.29-30, p.31</td>
 </tr>
