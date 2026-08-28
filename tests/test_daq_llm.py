@@ -10,6 +10,7 @@ from datetime import datetime
 from unittest.mock import MagicMock
 
 import numpy as np
+import pytest
 
 from scpi_control.report_generator.llm._prompt_helpers import _GROUNDING
 from scpi_control.report_generator.llm.context_builder import ContextBuilder
@@ -17,6 +18,8 @@ from scpi_control.report_generator.llm.daq_analyzer import DAQAnalyzer
 from scpi_control.report_generator.llm.daq_context_builder import DAQContextBuilder
 from scpi_control.report_generator.llm.daq_prompts import get_daq_system_prompt
 from scpi_control.report_generator.models.report_data import ReportMetadata, TestReport, TestSection, WaveformData
+
+pytestmark = pytest.mark.llm
 
 _KEYS = ["expert", "trends", "thresholds", "summary", "chat"]
 

@@ -4,9 +4,13 @@ READ THE FIXTURE'S DOCSTRING (tests/conftest.py:ollama_sdk). LLMClient.__init__
 probes a live Ollama server, and there is one running on the dev machine.
 """
 
+import pytest
+
 from scpi_control.report_generator.llm.client import LLMClient, LLMConfig
 
 from tests.conftest import ollama_sdk
+
+pytestmark = pytest.mark.llm
 
 
 def ollama_config(model="llama3.2", timeout=60):

@@ -184,6 +184,7 @@ markers = [
     "hardware: tests that require actual oscilloscope hardware",
     "gui: tests that require GUI dependencies (PyQt6)",
     "slow: tests that run examples as subprocesses (deselect with -m 'not slow')",
+    "llm: tests that exercise the optional LLM-analysis feature; skipped by default, run with --run-llm",
 ]
 filterwarnings = [
     "ignore::DeprecationWarning",

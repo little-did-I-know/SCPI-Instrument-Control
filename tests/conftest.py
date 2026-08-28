@@ -11,6 +11,24 @@ import pytest
 from scpi_control.report_generator.models.report_data import WaveformData
 
 
+def pytest_addoption(parser):
+    parser.addoption(
+        "--run-llm",
+        action="store_true",
+        default=False,
+        help="run tests marked 'llm' (exercise the optional LLM-analysis feature; skipped by default since most installs don't use it)",
+    )
+
+
+def pytest_collection_modifyitems(config, items):
+    if config.getoption("--run-llm"):
+        return
+    skip_llm = pytest.mark.skip(reason="LLM tests skipped by default -- pass --run-llm to include them")
+    for item in items:
+        if "llm" in item.keywords:
+            item.add_marker(skip_llm)
+
+
 def _event_loop_state():
     """(holder, loop, set_called) for this thread's current-event-loop state.
 

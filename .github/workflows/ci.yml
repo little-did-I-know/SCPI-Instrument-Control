@@ -209,7 +209,7 @@ jobs:
 
       - name: Run tests with coverage
         run: |
-          pytest tests/ --cov=scpi_control --cov-report=xml --cov-report=term-missing -v
+          pytest tests/ --run-llm --cov=scpi_control --cov-report=xml --cov-report=term-missing -v
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v7
