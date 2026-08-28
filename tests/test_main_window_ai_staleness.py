@@ -10,6 +10,7 @@ tests/test_main_window_annotations.py.
 
 import os
 from pathlib import Path
+from unittest.mock import MagicMock
 
 import numpy as np
 import pytest
@@ -119,4 +120,25 @@ def test_import_waveforms_partial_failure_still_invalidates_ai_content(window, m
     window._import_waveforms()
 
     assert len(window.waveforms) == 1  # file1's waveform was kept
+    assert not window.ai_analysis_panel.has_generated_content()
+
+
+def test_annotating_a_waveform_invalidates_ai_content(window, monkeypatch):
+    """Annotating a waveform mutates its .annotations/.caption in place
+    (AnnotationDialog), so any previously-generated AI content could
+    describe a state that no longer matches -- same staleness class as
+    import/clear (AUDIT.md H27), just for a third trigger."""
+    waveform = _make_waveform("C1", Path("capture.csv"))
+    window.waveforms.append(waveform)
+    window.waveform_list.addItem(f"{waveform.channel} - {waveform.source_file.name}")
+    window.waveform_list.setCurrentRow(0)
+
+    _seed_ai_content(window)
+
+    dialog_instance = MagicMock()
+    dialog_spy = MagicMock(return_value=dialog_instance)
+    monkeypatch.setattr(mw_module, "AnnotationDialog", dialog_spy)
+
+    window._on_annotate_waveform()
+
     assert not window.ai_analysis_panel.has_generated_content()

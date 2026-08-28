@@ -568,6 +568,10 @@ class AIAnalysisPanel(QWidget):
         self.clear_button.setEnabled(False)
         self._update_status_display()
 
+    def invalidate_results(self) -> None:
+        """Public entry point for external callers (e.g. MainWindow) to invalidate stale AI content (audit H27)."""
+        self._clear_results()
+
     def get_generated_content(self) -> Dict:
         """
         Get generated AI content.

@@ -331,7 +331,7 @@ class MainWindow(QMainWindow):
                 # so a later file in the batch failing to load (or
                 # load_annotations_into raising) still leaves stale AI
                 # content invalidated rather than surviving the exception.
-                self.ai_analysis_panel._clear_results()
+                self.ai_analysis_panel.invalidate_results()
 
             applied = load_annotations_into(self.waveforms)
             if applied:
@@ -353,6 +353,8 @@ class MainWindow(QMainWindow):
             QMessageBox.information(self, "No waveform selected", "Select a waveform in the list to annotate it.")
             return
         AnnotationDialog(self.waveforms[row], self).exec()
+        # Annotation/caption edits can make existing AI narrative stale (audit H27).
+        self.ai_analysis_panel.invalidate_results()
 
     def _import_images(self):
         """Import image files."""
@@ -381,7 +383,7 @@ class MainWindow(QMainWindow):
             self.waveform_list.clear()
             # Any AI-generated content described the data that just left --
             # it no longer corresponds to anything (audit H27).
-            self.ai_analysis_panel._clear_results()
+            self.ai_analysis_panel.invalidate_results()
             self.statusBar().showMessage("Data cleared")
 
     def _configure_llm(self):
