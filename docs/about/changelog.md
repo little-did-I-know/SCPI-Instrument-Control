@@ -45,16 +45,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the setting (~0.66-0.68 for triangle, ~0.50-0.52 for ramp -- see
   `SignalSpec.jitter_rms`'s docstring and
   `docs/superpowers/specs/2026-08-28-signal-timing-jitter-design.md` for the
-  full calibration table and derivation). **Known limitation:** `stream()`
-  bumps `spec.seed` by chunk index on every call (existing, deliberate
-  behavior), so a cycle that happens to straddle a `stream()` chunk boundary
-  gets two different jitter draws from the two chunk calls that observe it --
-  a small, bounded discontinuity affecting at most that one cycle. Single
+  full calibration table and derivation). `stream()` bumps `spec.seed` by
+  chunk index on every call (existing, deliberate behavior), which initially
+  meant a cycle straddling a `stream()` chunk boundary got two different
+  jitter draws from the two chunk calls that observe it -- a small, bounded
+  discontinuity affecting at most that one cycle. This is now resolved: a new
+  `SignalSpec.jitter_seed` field (default `None`, falls back to `spec.seed`)
+  decouples jitter's randomness from the per-chunk-bumped `seed`, and
+  `stream()` auto-fills it with the pre-bump seed on every chunk so a whole
+  stream shares one jitter entropy source -- noise/glitches still key off the
+  bumped `seed` and keep varying per chunk as before. Single
   `synthesize()`/`make_waveform()` calls -- mock oscilloscope waveform
-  queries, and essentially all test/example usage -- are completely
-  unaffected; only a long-running `stream()` consumer would ever see it, and
-  only at chunk boundaries. True stream-continuity for jitter is an explicit
-  next feature, not part of this one.
+  queries, and essentially all test/example usage -- were never affected
+  either way.
 
 ### Fixed
 
