@@ -113,6 +113,52 @@ MarkdownReportGenerator().generate(report, out / "report.md")
 [`examples/report_annotations_advanced.py`](examples/report_annotations_advanced.py)
 is the whole thing, runnable with no instrument attached.
 
+## Every waveform kind, synthesized
+
+The mock scope behind every example above isn't limited to one signal shape.
+`scpi_control.signal_synth` ships ten synthetic kinds — the same generator
+functions `MockConnection` couples to a scope's timebase, volts/division and
+trigger state — and each one below is a live scrolling-scope capture of it,
+built by streaming a `SignalSpec` through `signal_synth.stream()` chunk by
+chunk, the way a real acquisition loop would. Nothing here is a hand-drawn
+sketch of a waveform shape.
+
+<p align="center">
+  <!-- Same main-pinned form as the sections above, and the same gotcha: a
+       brand-new image 404s (renders as blank space, not a broken-image icon)
+       until this branch merges, so pin to this branch's commit SHA to review
+       it pre-merge, then switch back to main afterward. -->
+  <table align="center">
+    <tr>
+      <td align="center"><img src="https://raw.githubusercontent.com/little-did-I-know/SCPI-Instrument-Control/0a28ab6d1a08acc3b6e47de2381cf0a8b07d4432/docs/images/signal-sine.gif" alt="Scrolling trace of a synthesized 1 kHz sine wave, looping seamlessly" width="320"><br><sub><b>sine</b></sub></td>
+      <td align="center"><img src="https://raw.githubusercontent.com/little-did-I-know/SCPI-Instrument-Control/0a28ab6d1a08acc3b6e47de2381cf0a8b07d4432/docs/images/signal-square.gif" alt="Scrolling trace of a synthesized 500 Hz square wave, looping seamlessly" width="320"><br><sub><b>square</b></sub></td>
+    </tr>
+    <tr>
+      <td align="center"><img src="https://raw.githubusercontent.com/little-did-I-know/SCPI-Instrument-Control/0a28ab6d1a08acc3b6e47de2381cf0a8b07d4432/docs/images/signal-triangle.gif" alt="Scrolling trace of a synthesized 800 Hz triangle wave, looping seamlessly" width="320"><br><sub><b>triangle</b></sub></td>
+      <td align="center"><img src="https://raw.githubusercontent.com/little-did-I-know/SCPI-Instrument-Control/0a28ab6d1a08acc3b6e47de2381cf0a8b07d4432/docs/images/signal-ramp.gif" alt="Scrolling trace of a synthesized 300 Hz sawtooth ramp, looping seamlessly" width="320"><br><sub><b>ramp</b></sub></td>
+    </tr>
+    <tr>
+      <td align="center"><img src="https://raw.githubusercontent.com/little-did-I-know/SCPI-Instrument-Control/0a28ab6d1a08acc3b6e47de2381cf0a8b07d4432/docs/images/signal-dc.gif" alt="Scrolling trace of a synthesized 2.5 V DC level with a touch of noise" width="320"><br><sub><b>dc</b></sub></td>
+      <td align="center"><img src="https://raw.githubusercontent.com/little-did-I-know/SCPI-Instrument-Control/0a28ab6d1a08acc3b6e47de2381cf0a8b07d4432/docs/images/signal-noise.gif" alt="Scrolling trace of synthesized Gaussian noise" width="320"><br><sub><b>noise</b></sub></td>
+    </tr>
+    <tr>
+      <td align="center"><img src="https://raw.githubusercontent.com/little-did-I-know/SCPI-Instrument-Control/0a28ab6d1a08acc3b6e47de2381cf0a8b07d4432/docs/images/signal-multitone.gif" alt="Scrolling trace of a synthesized multitone signal — a fundamental plus two coherent harmonics, looping seamlessly" width="320"><br><sub><b>multitone</b></sub></td>
+      <td align="center"><img src="https://raw.githubusercontent.com/little-did-I-know/SCPI-Instrument-Control/0a28ab6d1a08acc3b6e47de2381cf0a8b07d4432/docs/images/signal-exponential.gif" alt="Scrolling trace of a synthesized RC charge/discharge (exponential) waveform, looping seamlessly" width="320"><br><sub><b>exponential</b></sub></td>
+    </tr>
+    <tr>
+      <td align="center"><img src="https://raw.githubusercontent.com/little-did-I-know/SCPI-Instrument-Control/0a28ab6d1a08acc3b6e47de2381cf0a8b07d4432/docs/images/signal-pulse.gif" alt="Scrolling trace of a synthesized trapezoidal pulse train, looping seamlessly" width="320"><br><sub><b>pulse</b></sub></td>
+      <td align="center"><img src="https://raw.githubusercontent.com/little-did-I-know/SCPI-Instrument-Control/0a28ab6d1a08acc3b6e47de2381cf0a8b07d4432/docs/images/signal-chirp.gif" alt="Scrolling trace of a synthesized 500 Hz to 4.5 kHz chirp, looping seamlessly at its own retrace" width="320"><br><sub><b>chirp</b></sub></td>
+    </tr>
+  </table>
+</p>
+
+Every trace above is a fixed-window, fixed-axis scroll — no autoscaling
+jitter frame to frame — and every one built from `PERIODIC_KINDS` (plus
+`chirp`, at its own retrace boundary) loops with no visible phase jump: the
+generator script advances an exact whole number of periods across all its
+frames and verifies the wrap-around numerically before writing the GIF.
+`dc` and `noise` have no cycle to align to and simply restart.
+
 ## What you get
 
 |  | |

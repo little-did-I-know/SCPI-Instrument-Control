@@ -58,6 +58,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `synthesize()`/`make_waveform()` calls -- mock oscilloscope waveform
   queries, and essentially all test/example usage -- were never affected
   either way.
+- **A 10-GIF signal-synthesis gallery on the README ("Every waveform kind,
+  synthesized").** One small looping GIF per `scpi_control.signal_synth` kind
+  -- sine, square, triangle, ramp, dc, noise, multitone, exponential, pulse,
+  chirp -- each a live scrolling-scope trace driven chunk-by-chunk through the
+  real `signal_synth.stream()` (the same generator `MockConnection` couples to
+  a scope's timebase, volts/division, and trigger state) and styled with the
+  report generator's own `PlotStyle`, not a static or hand-drawn mockup. New
+  `scripts/media/make_signal_gallery_gifs.py` renders the ten
+  `docs/images/signal-<kind>.gif` assets, matching
+  `make_annotation_gif.py`'s atomic-write, per-file size-budget, and
+  fail-loudly conventions. Frame count and chunk size are chosen per periodic
+  kind (chirp included, at its own `sweep_time` retrace) so the total time
+  advanced across all frames is an exact whole number of periods, and the
+  script verifies the wrap-around numerically before writing each GIF, so
+  every seamless kind loops with no visible phase jump; `dc` and `noise` have
+  no cycle structure to align to and simply restart.
 
 ### Fixed
 

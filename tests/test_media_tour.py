@@ -6,11 +6,13 @@ regex so it is immune to quote style, tuple arity, and reformatting.
 """
 
 import ast
+import re
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 GENERATOR = REPO_ROOT / "scripts" / "media" / "make_demo_gif.py"
 ANNOTATION_GENERATOR = REPO_ROOT / "scripts" / "media" / "make_annotation_gif.py"
+GALLERY_GENERATOR = REPO_ROOT / "scripts" / "media" / "make_signal_gallery_gifs.py"
 SMOKE = REPO_ROOT / "tests" / "test_examples_smoke.py"
 
 
@@ -119,3 +121,53 @@ def test_annotation_gif_snippet_names_that_example():
     example = _table(ANNOTATION_GENERATOR, "EXAMPLE")
     snippet = ANNOTATION_GENERATOR.read_text(encoding="utf-8")
     assert Path(example).name in snippet, f"the annotation GIF's snippet no longer names {example}"
+
+
+def _gallery_kinds():
+    return _table(GALLERY_GENERATOR, "KINDS")
+
+
+def _gallery_kind_names():
+    return {entry["kind"] for entry in _gallery_kinds()}
+
+
+def test_gallery_kinds_cover_every_signal_synth_generator():
+    """The signal gallery must show every kind signal_synth actually has.
+
+    Imports scpi_control.signal_synth directly rather than parsing it -- that
+    module has no Pillow dependency, so unlike the gallery generator itself,
+    a real import is both safe and the more faithful source of truth for
+    "what kinds exist".
+    """
+    from scpi_control.signal_synth import _GENERATORS
+
+    names = _gallery_kind_names()
+    assert names == set(_GENERATORS), f"the signal gallery's KINDS table covers {sorted(names)} but signal_synth._GENERATORS has {sorted(_GENERATORS)} -- add or remove a gallery entry to match"
+
+
+def test_gallery_kinds_table_is_not_empty():
+    assert _gallery_kinds(), "parsed no KINDS entries -- the table shape changed"
+
+
+def test_gallery_kinds_have_no_duplicate_or_missing_names():
+    entries = _gallery_kinds()
+    names = [entry["kind"] for entry in entries]
+    assert len(names) == len(set(names)), f"KINDS has duplicate kind names: {names}"
+    assert all(names), "KINDS has an entry with an empty/falsy kind name"
+
+
+def test_readme_signal_gallery_matches_the_generator_exactly():
+    """The README's gallery must embed exactly the GIFs the script writes.
+
+    Regex over the README rather than a fixed count: this fails the moment
+    someone adds a kind to KINDS without adding its <img> (or vice versa), or
+    typos a filename, rather than silently shipping a stale gallery.
+    """
+    readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
+    referenced = re.findall(r"docs/images/signal-([a-z0-9]+)\.gif", readme)
+
+    kind_names = _gallery_kind_names()
+    assert referenced, "README has no docs/images/signal-*.gif references -- was the gallery section removed?"
+    assert len(referenced) == len(kind_names), f"README references {len(referenced)} signal-*.gif images but KINDS has {len(kind_names)} entries"
+    assert set(referenced) == kind_names, f"README's signal gallery images {sorted(set(referenced))} don't match KINDS {sorted(kind_names)}"
+    assert len(referenced) == len(set(referenced)), f"README references a signal-*.gif image more than once: {referenced}"
