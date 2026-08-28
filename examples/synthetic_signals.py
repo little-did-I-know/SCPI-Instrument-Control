@@ -15,8 +15,10 @@ stats, (2) opens a mock oscilloscope session, acquires, then changes TDIV and
 VDIV over SCPI to show the capture's length and clipping respond, (3) saves
 one synthesized capture and reloads it with load_waveform() to show the chain
 composes, (4) synthesizes a multitone and compares its measured THD to the
-analytically expected value, and (5) synthesizes a chirp and measures its
-start/end frequency from zero crossings.
+analytically expected value, (5) synthesizes a chirp and measures its
+start/end frequency from zero crossings, and (6) synthesizes a sine with
+known timing jitter and compares its measured period jitter to the injected
+value.
 
 Requirements: SCPI-Instrument-Control (core install) -- runs entirely against
 a mock connection, no instrument needed.
@@ -29,6 +31,7 @@ import numpy as np
 from scpi_control.analysis import FFTAnalyzer
 from scpi_control.connection import MockConnection
 from scpi_control.oscilloscope import Oscilloscope
+from scpi_control.report_generator.utils.waveform_analyzer import WaveformAnalyzer
 from scpi_control.signal_synth import SignalSpec, make_waveform
 from scpi_control.waveform_io import load_waveform
 
@@ -160,12 +163,36 @@ def demo_chirp() -> None:
     print(f"chirp: measured start = {start_freq:.1f} Hz  measured end = {end_freq:.1f} Hz")
 
 
+def demo_jitter() -> None:
+    """Synthesize a jittered sine and compare its measured period jitter to
+    the injected jitter_rms, via the same WaveformAnalyzer call path the
+    tests use.
+
+    jitter_rms is per-kind-calibrated (see
+    docs/superpowers/specs/2026-08-28-signal-timing-jitter-design.md's Model
+    section): a kind whose measured rising edge sits exactly at a cycle
+    boundary -- sine, square, multitone, pulse -- measures close to the
+    nominal value, as demonstrated here. triangle/ramp measure a smaller,
+    but stable and documented, fraction of it (~0.66x and ~0.5x
+    respectively) because their measured edge sits mid-cycle, where
+    neighboring cycles' jitter draws partially cancel.
+    """
+    print()
+    print("=== Part 6: jitter -- measured vs. injected period jitter (sine) ===")
+    jitter_rms = 3e-6  # seconds
+    spec = SignalSpec(kind="sine", frequency=10_000.0, amplitude=1.0, jitter_rms=jitter_rms, seed=21)
+    waveform = make_waveform(spec, sample_rate=1_000_000.0, n_points=50_000)
+    measured_jitter = WaveformAnalyzer.calculate_quality_stats(waveform)["jitter"]
+    print(f"jitter: injected jitter_rms = {jitter_rms * 1e6:.2f} us  " f"measured = {measured_jitter * 1e6:.2f} us")
+
+
 def main() -> None:
     demo_make_waveform()
     demo_mock_session()
     demo_reload()
     demo_multitone()
     demo_chirp()
+    demo_jitter()
 
 
 if __name__ == "__main__":
