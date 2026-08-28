@@ -7475,6 +7475,22 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   <code>synthesize()</code>/<code>make_waveform()</code> calls -- mock oscilloscope waveform
   queries, and essentially all test/example usage -- were never affected
   either way.</li>
+<li><strong>A 10-GIF signal-synthesis gallery on the README ("Every waveform kind,
+  synthesized").</strong> One small looping GIF per <code>scpi_control.signal_synth</code> kind
+  -- sine, square, triangle, ramp, dc, noise, multitone, exponential, pulse,
+  chirp -- each a live scrolling-scope trace driven chunk-by-chunk through the
+  real <code>signal_synth.stream()</code> (the same generator <code>MockConnection</code> couples to
+  a scope's timebase, volts/division, and trigger state) and styled with the
+  report generator's own <code>PlotStyle</code>, not a static or hand-drawn mockup. New
+  <code>scripts/media/make_signal_gallery_gifs.py</code> renders the ten
+  <code>docs/images/signal-&lt;kind&gt;.gif</code> assets, matching
+  <code>make_annotation_gif.py</code>'s atomic-write, per-file size-budget, and
+  fail-loudly conventions. Frame count and chunk size are chosen per periodic
+  kind (chirp included, at its own <code>sweep_time</code> retrace) so the total time
+  advanced across all frames is an exact whole number of periods, and the
+  script verifies the wrap-around numerically before writing each GIF, so
+  every seamless kind loops with no visible phase jump; <code>dc</code> and <code>noise</code> have
+  no cycle structure to align to and simply restart.</li>
 </ul>
 <h3 id="fixed">Fixed<a class="headerlink" href="#fixed" title="Permanent link">&para;</a></h3>
 <ul>
