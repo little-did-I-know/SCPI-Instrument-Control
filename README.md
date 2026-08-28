@@ -124,30 +124,31 @@ chunk, the way a real acquisition loop would. Nothing here is a hand-drawn
 sketch of a waveform shape.
 
 <p align="center">
-  <!-- Same main-pinned form as the sections above, and the same gotcha: a
-       brand-new image 404s (renders as blank space, not a broken-image icon)
-       until this branch merges, so pin to this branch's commit SHA to review
-       it pre-merge, then switch back to main afterward. -->
+  <!-- Same main-pinned form as the sections above. Worth knowing when adding a
+       NEW image: a main-pinned URL 404s until the file reaches main, and GitHub
+       renders that as blank space rather than a broken-image icon, so it cannot
+       be reviewed on the branch that adds it. Pin such an image to its commit
+       SHA until merge, then switch here. -->
   <table align="center">
     <tr>
-      <td align="center"><img src="https://raw.githubusercontent.com/little-did-I-know/SCPI-Instrument-Control/0a28ab6d1a08acc3b6e47de2381cf0a8b07d4432/docs/images/signal-sine.gif" alt="Scrolling trace of a synthesized 1 kHz sine wave, looping seamlessly" width="320"><br><sub><b>sine</b></sub></td>
-      <td align="center"><img src="https://raw.githubusercontent.com/little-did-I-know/SCPI-Instrument-Control/0a28ab6d1a08acc3b6e47de2381cf0a8b07d4432/docs/images/signal-square.gif" alt="Scrolling trace of a synthesized 500 Hz square wave, looping seamlessly" width="320"><br><sub><b>square</b></sub></td>
+      <td align="center"><img src="https://raw.githubusercontent.com/little-did-I-know/SCPI-Instrument-Control/main/docs/images/signal-sine.gif" alt="Scrolling trace of a synthesized 1 kHz sine wave, looping seamlessly" width="320"><br><sub><b>sine</b></sub></td>
+      <td align="center"><img src="https://raw.githubusercontent.com/little-did-I-know/SCPI-Instrument-Control/main/docs/images/signal-square.gif" alt="Scrolling trace of a synthesized 500 Hz square wave, looping seamlessly" width="320"><br><sub><b>square</b></sub></td>
     </tr>
     <tr>
-      <td align="center"><img src="https://raw.githubusercontent.com/little-did-I-know/SCPI-Instrument-Control/0a28ab6d1a08acc3b6e47de2381cf0a8b07d4432/docs/images/signal-triangle.gif" alt="Scrolling trace of a synthesized 800 Hz triangle wave, looping seamlessly" width="320"><br><sub><b>triangle</b></sub></td>
-      <td align="center"><img src="https://raw.githubusercontent.com/little-did-I-know/SCPI-Instrument-Control/0a28ab6d1a08acc3b6e47de2381cf0a8b07d4432/docs/images/signal-ramp.gif" alt="Scrolling trace of a synthesized 300 Hz sawtooth ramp, looping seamlessly" width="320"><br><sub><b>ramp</b></sub></td>
+      <td align="center"><img src="https://raw.githubusercontent.com/little-did-I-know/SCPI-Instrument-Control/main/docs/images/signal-triangle.gif" alt="Scrolling trace of a synthesized 800 Hz triangle wave, looping seamlessly" width="320"><br><sub><b>triangle</b></sub></td>
+      <td align="center"><img src="https://raw.githubusercontent.com/little-did-I-know/SCPI-Instrument-Control/main/docs/images/signal-ramp.gif" alt="Scrolling trace of a synthesized 300 Hz sawtooth ramp, looping seamlessly" width="320"><br><sub><b>ramp</b></sub></td>
     </tr>
     <tr>
-      <td align="center"><img src="https://raw.githubusercontent.com/little-did-I-know/SCPI-Instrument-Control/0a28ab6d1a08acc3b6e47de2381cf0a8b07d4432/docs/images/signal-dc.gif" alt="Scrolling trace of a synthesized 2.5 V DC level with a touch of noise" width="320"><br><sub><b>dc</b></sub></td>
-      <td align="center"><img src="https://raw.githubusercontent.com/little-did-I-know/SCPI-Instrument-Control/0a28ab6d1a08acc3b6e47de2381cf0a8b07d4432/docs/images/signal-noise.gif" alt="Scrolling trace of synthesized Gaussian noise" width="320"><br><sub><b>noise</b></sub></td>
+      <td align="center"><img src="https://raw.githubusercontent.com/little-did-I-know/SCPI-Instrument-Control/main/docs/images/signal-dc.gif" alt="Scrolling trace of a synthesized 2.5 V DC level with a touch of noise" width="320"><br><sub><b>dc</b></sub></td>
+      <td align="center"><img src="https://raw.githubusercontent.com/little-did-I-know/SCPI-Instrument-Control/main/docs/images/signal-noise.gif" alt="Scrolling trace of synthesized Gaussian noise" width="320"><br><sub><b>noise</b></sub></td>
     </tr>
     <tr>
-      <td align="center"><img src="https://raw.githubusercontent.com/little-did-I-know/SCPI-Instrument-Control/0a28ab6d1a08acc3b6e47de2381cf0a8b07d4432/docs/images/signal-multitone.gif" alt="Scrolling trace of a synthesized multitone signal — a fundamental plus two coherent harmonics, looping seamlessly" width="320"><br><sub><b>multitone</b></sub></td>
-      <td align="center"><img src="https://raw.githubusercontent.com/little-did-I-know/SCPI-Instrument-Control/0a28ab6d1a08acc3b6e47de2381cf0a8b07d4432/docs/images/signal-exponential.gif" alt="Scrolling trace of a synthesized RC charge/discharge (exponential) waveform, looping seamlessly" width="320"><br><sub><b>exponential</b></sub></td>
+      <td align="center"><img src="https://raw.githubusercontent.com/little-did-I-know/SCPI-Instrument-Control/main/docs/images/signal-multitone.gif" alt="Scrolling trace of a synthesized multitone signal — a fundamental plus two coherent harmonics, looping seamlessly" width="320"><br><sub><b>multitone</b></sub></td>
+      <td align="center"><img src="https://raw.githubusercontent.com/little-did-I-know/SCPI-Instrument-Control/main/docs/images/signal-exponential.gif" alt="Scrolling trace of a synthesized RC charge/discharge (exponential) waveform, looping seamlessly" width="320"><br><sub><b>exponential</b></sub></td>
     </tr>
     <tr>
-      <td align="center"><img src="https://raw.githubusercontent.com/little-did-I-know/SCPI-Instrument-Control/0a28ab6d1a08acc3b6e47de2381cf0a8b07d4432/docs/images/signal-pulse.gif" alt="Scrolling trace of a synthesized trapezoidal pulse train, looping seamlessly" width="320"><br><sub><b>pulse</b></sub></td>
-      <td align="center"><img src="https://raw.githubusercontent.com/little-did-I-know/SCPI-Instrument-Control/0a28ab6d1a08acc3b6e47de2381cf0a8b07d4432/docs/images/signal-chirp.gif" alt="Scrolling trace of a synthesized 500 Hz to 4.5 kHz chirp, looping seamlessly at its own retrace" width="320"><br><sub><b>chirp</b></sub></td>
+      <td align="center"><img src="https://raw.githubusercontent.com/little-did-I-know/SCPI-Instrument-Control/main/docs/images/signal-pulse.gif" alt="Scrolling trace of a synthesized trapezoidal pulse train, looping seamlessly" width="320"><br><sub><b>pulse</b></sub></td>
+      <td align="center"><img src="https://raw.githubusercontent.com/little-did-I-know/SCPI-Instrument-Control/main/docs/images/signal-chirp.gif" alt="Scrolling trace of a synthesized 500 Hz to 4.5 kHz chirp, looping seamlessly at its own retrace" width="320"><br><sub><b>chirp</b></sub></td>
     </tr>
   </table>
 </p>
