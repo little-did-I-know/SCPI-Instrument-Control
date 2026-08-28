@@ -23,6 +23,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   populated entries, since only programming guides (not datasheets with
   accuracy tables) are in this repo; real formulas are added later from
   real datasheet citations. No existing method's return type changed.
+- **Timing/period jitter for mock signal synthesis.** `SignalSpec` gains a new
+  `jitter_rms` field (seconds, default `0.0` = off) that injects period-to-period
+  timing jitter into synthesized signals -- the "random jitter" (RJ) definition
+  `WaveformAnalyzer._calculate_quality_stats` already computes as
+  `std(diff(edge_indices)) * dt`, previously unexercised because nothing in this
+  codebase could produce a signal with nonzero period jitter to measure. Applies
+  to `PERIODIC_KINDS` only (sine, square, triangle, ramp, multitone,
+  exponential, pulse); `dc`/`noise` have no cycle structure and `chirp` has no
+  stable period, so `jitter_rms` is a no-op on those three. Each cycle boundary
+  draws an independent Gaussian time-shift, and every sample's shift is the
+  linear interpolation between the two boundaries straddling it -- a continuous
+  time warp, not a per-cycle hard step -- so an enabled `ringing_frequency`
+  keys on the actual jittered edge rather than the nominal one, with no
+  special-casing needed. What comes back through `WaveformAnalyzer` depends on
+  where a kind's measured edge sits within its cycle: for `sine`, `square`,
+  `multitone`, and `pulse`, whose measured edge sits at the cycle boundary,
+  measured jitter matches the injected `jitter_rms` almost exactly (ratio
+  0.94-1.08 across trials); for `triangle` and `ramp`, whose measured edge
+  sits mid-cycle, measured jitter is a smaller, stable, documented fraction of
+  the setting (~0.66-0.68 for triangle, ~0.50-0.52 for ramp -- see
+  `SignalSpec.jitter_rms`'s docstring and
+  `docs/superpowers/specs/2026-08-28-signal-timing-jitter-design.md` for the
+  full calibration table and derivation). **Known limitation:** `stream()`
+  bumps `spec.seed` by chunk index on every call (existing, deliberate
+  behavior), so a cycle that happens to straddle a `stream()` chunk boundary
+  gets two different jitter draws from the two chunk calls that observe it --
+  a small, bounded discontinuity affecting at most that one cycle. Single
+  `synthesize()`/`make_waveform()` calls -- mock oscilloscope waveform
+  queries, and essentially all test/example usage -- are completely
+  unaffected; only a long-running `stream()` consumer would ever see it, and
+  only at chunk boundaries. True stream-continuity for jitter is an explicit
+  next feature, not part of this one.
 
 ### Fixed
 
