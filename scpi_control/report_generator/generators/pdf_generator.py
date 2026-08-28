@@ -1125,6 +1125,16 @@ class PDFReportGenerator(BaseReportGenerator):
         # Build table data based on enabled categories
         data = [["Statistic", "Value"]]  # Header
 
+        def _stat_row(label: str, name: str) -> None:
+            """Append one [label, value] row, preferring an uncertainty-
+            carrying Quantity over the plain-float stats dict when present."""
+            if waveform.uncertain_statistics and name in waveform.uncertain_statistics:
+                from scpi_control.quantities import format_quantity  # local: keeps `uncertainty` optional
+
+                data.append([label, format_quantity(waveform.uncertain_statistics[name])])
+            elif stats.get(name) is not None:
+                data.append([label, WaveformAnalyzer.format_stat_value(name, stats[name])])
+
         # Signal Type (always show if detected)
         if stats.get("signal_type"):
             signal_type_str = WaveformAnalyzer.format_stat_value("signal_type", stats["signal_type"])
@@ -1135,62 +1145,40 @@ class PDFReportGenerator(BaseReportGenerator):
 
         # Frequency and Period
         if self.report_options.include_frequency_stats:
-            if stats.get("frequency") is not None:
-                data.append(["Frequency:", WaveformAnalyzer.format_stat_value("frequency", stats["frequency"])])
-            if stats.get("period") is not None:
-                data.append(["Period:", WaveformAnalyzer.format_stat_value("period", stats["period"])])
+            _stat_row("Frequency:", "frequency")
+            _stat_row("Period:", "period")
 
         # Amplitude Measurements
         if self.report_options.include_amplitude_stats:
-            if stats.get("vmax") is not None:
-                data.append(["Vmax:", WaveformAnalyzer.format_stat_value("vmax", stats["vmax"])])
-            if stats.get("vmin") is not None:
-                data.append(["Vmin:", WaveformAnalyzer.format_stat_value("vmin", stats["vmin"])])
-            if stats.get("vpp") is not None:
-                data.append(["Vpp:", WaveformAnalyzer.format_stat_value("vpp", stats["vpp"])])
-            if stats.get("vmean") is not None:
-                data.append(["Vmean:", WaveformAnalyzer.format_stat_value("vmean", stats["vmean"])])
-            if stats.get("vrms") is not None:
-                data.append(["Vrms:", WaveformAnalyzer.format_stat_value("vrms", stats["vrms"])])
-            if stats.get("vamp") is not None:
-                data.append(["Vamp:", WaveformAnalyzer.format_stat_value("vamp", stats["vamp"])])
-            if stats.get("dc_offset") is not None:
-                data.append(["DC Offset:", WaveformAnalyzer.format_stat_value("dc_offset", stats["dc_offset"])])
+            _stat_row("Vmax:", "vmax")
+            _stat_row("Vmin:", "vmin")
+            _stat_row("Vpp:", "vpp")
+            _stat_row("Vmean:", "vmean")
+            _stat_row("Vrms:", "vrms")
+            _stat_row("Vamp:", "vamp")
+            _stat_row("DC Offset:", "dc_offset")
 
         # Timing Measurements
         if self.report_options.include_timing_stats:
-            if stats.get("rise_time") is not None:
-                data.append(["Rise Time:", WaveformAnalyzer.format_stat_value("rise_time", stats["rise_time"])])
-            if stats.get("fall_time") is not None:
-                data.append(["Fall Time:", WaveformAnalyzer.format_stat_value("fall_time", stats["fall_time"])])
-            if stats.get("pulse_width") is not None:
-                data.append(["Pulse Width:", WaveformAnalyzer.format_stat_value("pulse_width", stats["pulse_width"])])
-            if stats.get("duty_cycle") is not None:
-                data.append(["Duty Cycle:", WaveformAnalyzer.format_stat_value("duty_cycle", stats["duty_cycle"])])
+            _stat_row("Rise Time:", "rise_time")
+            _stat_row("Fall Time:", "fall_time")
+            _stat_row("Pulse Width:", "pulse_width")
+            _stat_row("Duty Cycle:", "duty_cycle")
 
         # Signal Quality Metrics
         if self.report_options.include_quality_stats:
-            if stats.get("noise_level") is not None:
-                data.append(["Noise Level:", WaveformAnalyzer.format_stat_value("noise_level", stats["noise_level"])])
-            if stats.get("snr") is not None:
-                data.append(["SNR:", WaveformAnalyzer.format_stat_value("snr", stats["snr"])])
-            if stats.get("thd") is not None:
-                data.append(["THD:", WaveformAnalyzer.format_stat_value("thd", stats["thd"])])
-            if stats.get("overshoot") is not None:
-                data.append(["Overshoot:", WaveformAnalyzer.format_stat_value("overshoot", stats["overshoot"])])
-            if stats.get("undershoot") is not None:
-                data.append(["Undershoot:", WaveformAnalyzer.format_stat_value("undershoot", stats["undershoot"])])
-            if stats.get("jitter") is not None:
-                data.append(["Jitter:", WaveformAnalyzer.format_stat_value("jitter", stats["jitter"])])
+            _stat_row("Noise Level:", "noise_level")
+            _stat_row("SNR:", "snr")
+            _stat_row("THD:", "thd")
+            _stat_row("Overshoot:", "overshoot")
+            _stat_row("Undershoot:", "undershoot")
+            _stat_row("Jitter:", "jitter")
 
         # Plateau Stability (if enabled and calculated)
         if self.report_options.include_plateau_stability:
-            if stats.get("plateau_stability") is not None:
-                data.append(["Plateau Stability:", WaveformAnalyzer.format_stat_value("plateau_stability", stats["plateau_stability"])])
-            if stats.get("plateau_high_noise") is not None:
-                data.append(["High Plateau Noise:", WaveformAnalyzer.format_stat_value("plateau_high_noise", stats["plateau_high_noise"])])
-            if stats.get("plateau_low_noise") is not None:
-                data.append(["Low Plateau Noise:", WaveformAnalyzer.format_stat_value("plateau_low_noise", stats["plateau_low_noise"])])
+            _stat_row("Plateau Stability:", "plateau_stability")
+            _stat_row("High Plateau Noise:", "plateau_high_noise")
+            _stat_row("Low Plateau Noise:", "plateau_low_noise")
 
         # If only header row exists, don't create table
         if len(data) <= 1:
