@@ -7462,16 +7462,19 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   the setting (~0.66-0.68 for triangle, ~0.50-0.52 for ramp -- see
   <code>SignalSpec.jitter_rms</code>'s docstring and
   <code>docs/superpowers/specs/2026-08-28-signal-timing-jitter-design.md</code> for the
-  full calibration table and derivation). <strong>Known limitation:</strong> <code>stream()</code>
-  bumps <code>spec.seed</code> by chunk index on every call (existing, deliberate
-  behavior), so a cycle that happens to straddle a <code>stream()</code> chunk boundary
-  gets two different jitter draws from the two chunk calls that observe it --
-  a small, bounded discontinuity affecting at most that one cycle. Single
+  full calibration table and derivation). <code>stream()</code> bumps <code>spec.seed</code> by
+  chunk index on every call (existing, deliberate behavior), which initially
+  meant a cycle straddling a <code>stream()</code> chunk boundary got two different
+  jitter draws from the two chunk calls that observe it -- a small, bounded
+  discontinuity affecting at most that one cycle. This is now resolved: a new
+  <code>SignalSpec.jitter_seed</code> field (default <code>None</code>, falls back to <code>spec.seed</code>)
+  decouples jitter's randomness from the per-chunk-bumped <code>seed</code>, and
+  <code>stream()</code> auto-fills it with the pre-bump seed on every chunk so a whole
+  stream shares one jitter entropy source -- noise/glitches still key off the
+  bumped <code>seed</code> and keep varying per chunk as before. Single
   <code>synthesize()</code>/<code>make_waveform()</code> calls -- mock oscilloscope waveform
-  queries, and essentially all test/example usage -- are completely
-  unaffected; only a long-running <code>stream()</code> consumer would ever see it, and
-  only at chunk boundaries. True stream-continuity for jitter is an explicit
-  next feature, not part of this one.</li>
+  queries, and essentially all test/example usage -- were never affected
+  either way.</li>
 </ul>
 <h3 id="fixed">Fixed<a class="headerlink" href="#fixed" title="Permanent link">&para;</a></h3>
 <ul>
