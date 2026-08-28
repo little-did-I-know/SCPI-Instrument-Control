@@ -803,6 +803,9 @@ class MockConnection(BaseConnection):
             # appends them when the channel's current function calls for them
             # (H5 follow-up: the mock used to always emit DUTY,SYM and never
             # HLEV,LLEV, a shape the manual never shows for any waveform type).
+            # PHSE is likewise conditional: p.29-30 says "Not valid when WVTP
+            # is NOISE, PULSE or DC" -- unlike DUTY/SYM this was missed on the
+            # first pass and appended unconditionally until this fix.
             if match := re.match(r"C(\d+):BSWV\?$", upper):
                 ch = int(match.group(1))
                 c = self.awg_channels.get(ch, {})
@@ -814,15 +817,10 @@ class MockConnection(BaseConnection):
                 hlev = offset + amplitude / 2
                 llev = offset - amplitude / 2
                 response = (
-                    f"C{ch}:BSWV WVTP,{function},"
-                    f"FRQ,{frequency:.10g}HZ,"
-                    f"PERI,{period:.10g}S,"
-                    f"AMP,{amplitude:.10g}V,"
-                    f"OFST,{offset:.10g}V,"
-                    f"HLEV,{hlev:.10g}V,"
-                    f"LLEV,{llev:.10g}V,"
-                    f"PHSE,{c.get('phase', 0.0):.10g}"
+                    f"C{ch}:BSWV WVTP,{function}," f"FRQ,{frequency:.10g}HZ," f"PERI,{period:.10g}S," f"AMP,{amplitude:.10g}V," f"OFST,{offset:.10g}V," f"HLEV,{hlev:.10g}V," f"LLEV,{llev:.10g}V"
                 )
+                if function not in ("NOISE", "PULSE", "DC"):
+                    response += f",PHSE,{c.get('phase', 0.0):.10g}"
                 if function in ("SQUARE", "PULSE"):
                     response += f",DUTY,{c.get('pulse_duty', 50.0):.10g}"
                 elif function == "RAMP":

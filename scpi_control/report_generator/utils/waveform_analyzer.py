@@ -1127,7 +1127,7 @@ class WaveformAnalyzer:
         edges = []
 
         # Find rising edges
-        rising_peaks, _ = scipy_signal.find_peaks(derivative, height=threshold, distance=int(len(t) * 0.05))
+        rising_peaks, _ = scipy_signal.find_peaks(derivative, height=threshold, distance=max(1, int(len(t) * 0.05)))
         for idx in rising_peaks[: max_edges // 2]:
             if idx < len(t) - 10:
                 # Define edge region as ±5% around the peak
@@ -1146,7 +1146,7 @@ class WaveformAnalyzer:
                 edges.append(edge)
 
         # Find falling edges
-        falling_peaks, _ = scipy_signal.find_peaks(-derivative, height=threshold, distance=int(len(t) * 0.05))
+        falling_peaks, _ = scipy_signal.find_peaks(-derivative, height=threshold, distance=max(1, int(len(t) * 0.05)))
         for idx in falling_peaks[: max_edges // 2]:
             if idx < len(t) - 10:
                 window = int(len(t) * 0.02)

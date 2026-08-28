@@ -388,7 +388,7 @@ appended only for SQUARE/PULSE, `SYM` only for RAMP (p.29-30 parameter table).
 | `get_output` | `C{ch}:OUTP?` | `<channel>:OUTPut?` returns `ON\|OFF,LOAD,<load>,PLRT,<polarity>` together; `STATE` read out of it | VERIFIED | PG02-E05B p.27-28 |
 | `get_output_load` | `C{ch}:OUTP?` | same whole-list `<channel>:OUTPut?` reply as `get_output`; dead code (no caller), verified at command-table/mock level only | VERIFIED | PG02-E05B p.27-28 |
 | `get_output_polarity` | `C{ch}:OUTP?` | same whole-list `<channel>:OUTPut?` reply as `get_output`; dead code (no caller), verified at command-table/mock level only | VERIFIED | PG02-E05B p.27-28 |
-| `get_phase` | `C{ch}:BSWV?` | `<channel>:BaSic_WaVe?` returns every BSWV parameter as one comma-joined reply; `PHSE` read out of it | VERIFIED | PG02-E05B p.31 |
+| `get_phase` | `C{ch}:BSWV?` | `<channel>:BaSic_WaVe?` returns every BSWV parameter as one comma-joined reply; `PHSE` only present when WVTP is not NOISE/PULSE/DC, read out of it | VERIFIED | PG02-E05B p.31, p.29-30 |
 | `get_pulse_duty` | `C{ch}:BSWV?` | `<channel>:BaSic_WaVe?` returns every BSWV parameter as one comma-joined reply; `DUTY` only present when WVTP is SQUARE/PULSE, read out of it | VERIFIED | PG02-E05B p.31, p.29 |
 | `get_ramp_symmetry` | `C{ch}:BSWV?` | `<channel>:BaSic_WaVe?` returns every BSWV parameter as one comma-joined reply; `SYM` only present when WVTP is RAMP, read out of it | VERIFIED | PG02-E05B p.31, p.30 |
 | `get_sweep_state` | `C{ch}:SWWV?` | bare `<channel>:SWeepWaVe?`; future-expansion command, no getter/mock/parser wired, request-only | VERIFIED | PG02-E05B p.38 |
@@ -402,7 +402,7 @@ appended only for SQUARE/PULSE, `SYM` only for RAMP (p.29-30 parameter table).
 | `set_output` | `C{ch}:OUTP {state}` | `<channel>:OUTPut ON\|OFF` (state independently settable per the worked EXAMPLEs) | VERIFIED | PG02-E05B p.28 |
 | `set_output_load` | `C{ch}:OUTP LOAD,{load}` | `<channel>:OUTPut LOAD,<load>`; not mocked | VERIFIED | PG02-E05B p.28 |
 | `set_output_polarity` | `C{ch}:OUTP PLRT,{polarity}` | `<channel>:OUTPut PLRT,<polarity>`; not mocked, dead code (no caller) | VERIFIED | PG02-E05B p.28 |
-| `set_phase` | `C{ch}:BSWV PHSE,{phase}` | `<channel>:BaSic_WaVe PHSE,<phase>` | VERIFIED | PG02-E05B p.29-30, p.31 |
+| `set_phase` | `C{ch}:BSWV PHSE,{phase}` | `<channel>:BaSic_WaVe PHSE,<phase>`; not valid when WVTP is NOISE, PULSE, or DC | VERIFIED | PG02-E05B p.29-30, p.31 |
 | `set_pulse_duty` | `C{ch}:BSWV DUTY,{duty}` | `<channel>:BaSic_WaVe DUTY,<duty>` | VERIFIED | PG02-E05B p.29-30 |
 | `set_ramp_symmetry` | `C{ch}:BSWV SYM,{symmetry}` | `<channel>:BaSic_WaVe SYM,<symmetry>` | VERIFIED | PG02-E05B p.29-30 |
 | `set_sweep_state` | `C{ch}:SWWV STATE,{state}` | `<channel>:SweepWaVe STATE,<state>`; not mocked, dead code (no caller) | VERIFIED | PG02-E05B p.37, p.39 |
