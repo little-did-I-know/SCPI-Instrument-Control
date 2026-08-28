@@ -102,6 +102,7 @@ def test_field_order_is_the_library_core_then_report_concerns():
         "signal_type",
         "signal_type_confidence",
         "statistics",
+        "uncertain_statistics",
         "regions",
         "annotations",
         "caption",

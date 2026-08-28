@@ -8,13 +8,16 @@ including waveform data, measurements, metadata, and report sections.
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 import numpy as np
 
 from scpi_control.waveform import WaveformData as CaptureWaveform
 from scpi_control.report_generator.models.annotations import PlotAnnotation
 from scpi_control.report_generator.models.report_elements import ComparisonTable, DataManifest, OverlayPlotSpec, SignoffBlock
+
+if TYPE_CHECKING:
+    from scpi_control.quantities import Quantity
 
 SUMMARY_SOURCE_MANUAL = "manual"
 SUMMARY_SOURCE_AI = "ai"
@@ -221,6 +224,13 @@ class WaveformData(CaptureWaveform):
     signal_type_confidence: Optional[float] = None
     statistics: Optional[Dict[str, Any]] = None
 
+    # Uncertainty-carrying statistics, additive alongside `statistics` above.
+    # Never set by analyze() (a single capture has no spread to measure) --
+    # a caller populates this from WaveformAnalyzer.compute_statistical_quantity
+    # across repeated captures. String-annotated so this file never needs the
+    # optional `uncertainty` extra just to import.
+    uncertain_statistics: Optional[Dict[str, "Quantity"]] = None
+
     # Regions of interest for detailed analysis
     regions: List[WaveformRegion] = field(default_factory=list)
 
@@ -380,6 +390,18 @@ class WaveformData(CaptureWaveform):
                         stats_serializable[key] = value
             if stats_serializable:
                 data["statistics"] = stats_serializable
+
+        # Add uncertain_statistics (each Quantity -> a JSON-safe {value, uncertainty, unit} dict)
+        if self.uncertain_statistics:
+            uncertain_serializable = {}
+            for key, q in self.uncertain_statistics.items():
+                magnitude = q.magnitude
+                if hasattr(magnitude, "nominal_value"):
+                    value, uncertainty = float(magnitude.nominal_value), float(magnitude.std_dev)
+                else:
+                    value, uncertainty = float(magnitude), None
+                uncertain_serializable[key] = {"value": value, "uncertainty": uncertainty, "unit": format(q.units, "~")}
+            data["uncertain_statistics"] = uncertain_serializable
 
         # Add regions
         if self.regions:

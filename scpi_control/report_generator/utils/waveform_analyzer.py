@@ -6,12 +6,13 @@ from oscilloscope waveform data.
 """
 
 import logging
-from typing import Dict, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 from scipy import signal as scipy_signal
 from scipy.fft import fft, fftfreq, irfft, rfft
 
+from scpi_control.exceptions import InvalidParameterError
 from scpi_control.report_generator.models.report_data import WaveformData, WaveformRegion
 
 logger = logging.getLogger(__name__)
@@ -36,6 +37,32 @@ _MIN_MEASURABLE_NOISE_RATIO = 1e-9
 # fraction of the spectrum, too little signal-free spectrum remains to estimate
 # noise, so _estimate_noise returns None rather than a fabricated near-zero value.
 _MAX_NOTCHED_FRACTION = 0.9
+
+# Base units for compute_statistical_quantity's Quantity output. Scoped to
+# exactly the stat names format_stat_value (below) already recognizes and
+# groups the same way -- kept in this same file, next to that function, so
+# a future reader sees both. Not unified into one shared table: that would
+# touch format_stat_value's working, tested display logic for no behavior
+# change (see the design spec's Open risks).
+_STAT_BASE_UNITS = {
+    "vmax": "V",
+    "vmin": "V",
+    "vpp": "V",
+    "vmean": "V",
+    "vrms": "V",
+    "vamp": "V",
+    "dc_offset": "V",
+    "frequency": "Hz",
+    "period": "s",
+    "rise_time": "s",
+    "fall_time": "s",
+    "pulse_width": "s",
+    "jitter": "s",
+    "duty_cycle": "percent",
+    "overshoot": "percent",
+    "undershoot": "percent",
+    "top_flatness": "percent",
+}
 
 
 class SignalType:
@@ -364,6 +391,46 @@ class WaveformAnalyzer:
                 "undershoot": None,
                 "jitter": None,
             }
+
+    @staticmethod
+    def compute_statistical_quantity(waveforms: List[WaveformData], stat_name: str) -> "Quantity":  # noqa: F821
+        """Mean +/- sample stddev of one named statistic across N repeated captures.
+
+        Each waveform must already have `.statistics` populated (call
+        `.analyze()` on each first). Pure function of its arguments -- does
+        not know or care whether the waveforms came from batch_capture,
+        a manual loop, or files loaded from disk.
+
+        Args:
+            waveforms: At least 2 repeated captures of (nominally) the same
+                signal.
+            stat_name: A key already present in every waveform's
+                `.statistics`, and a key in `_STAT_BASE_UNITS`.
+
+        Returns:
+            A Quantity whose magnitude is an `uncertainties.ufloat(mean, stddev)`,
+            in `stat_name`'s base unit.
+
+        Raises:
+            InvalidParameterError: Fewer than 2 waveforms, an unrecognized
+                `stat_name`, or a waveform missing that statistic.
+        """
+        from scpi_control.quantities import quantity  # local: keeps `uncertainty` optional
+
+        if len(waveforms) < 2:
+            raise InvalidParameterError(f"compute_statistical_quantity needs at least 2 waveforms to measure a spread, got {len(waveforms)}")
+        if stat_name not in _STAT_BASE_UNITS:
+            raise InvalidParameterError(f"Unknown statistic {stat_name!r}; no base unit is registered for it. Known statistics: {sorted(_STAT_BASE_UNITS)}")
+
+        values = []
+        for index, waveform in enumerate(waveforms):
+            if not waveform.statistics or waveform.statistics.get(stat_name) is None:
+                raise InvalidParameterError(f"Waveform {index} has no {stat_name!r} statistic. Call .analyze() on every waveform first.")
+            values.append(float(waveform.statistics[stat_name]))
+
+        mean = float(np.mean(values))
+        stddev = float(np.std(values, ddof=1))
+        return quantity(mean, _STAT_BASE_UNITS[stat_name], uncertainty=stddev)
 
     @staticmethod
     def _estimate_noise(waveform: WaveformData) -> Optional[float]:

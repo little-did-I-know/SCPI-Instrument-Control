@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Measurement uncertainty and unit-aware quantities**, opt-in via the new
+  `uncertainty` extra (`pip install "SCPI-Instrument-Control[uncertainty]"`,
+  adds `pint`/`uncertainties`). `WaveformAnalyzer.compute_statistical_quantity`
+  computes mean ± sample standard deviation across N repeated captures of
+  the same measurement (e.g. `vpp` across several `batch_capture` triggers)
+  as a unit-aware `Quantity` (`scpi_control.quantities`). Attach the result
+  to a waveform's new `uncertain_statistics` field and both the PDF and
+  Markdown report generators render it as "1.23 ± 0.012 V" in place of the
+  plain value, with no other change to existing reports. Also new: a
+  pluggable per-instrument accuracy-spec registry
+  (`scpi_control.instrument_specs`) — ships with real structure and zero
+  populated entries, since only programming guides (not datasheets with
+  accuracy tables) are in this repo; real formulas are added later from
+  real datasheet citations. No existing method's return type changed.
+
 ### Fixed
 
 - **`detect_edges` crashed with `ValueError: 'distance' must be greater or equal to 1`

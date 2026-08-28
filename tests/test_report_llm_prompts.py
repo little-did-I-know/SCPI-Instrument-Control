@@ -5,6 +5,8 @@ import pytest
 
 from scpi_control.report_generator.llm.prompts import _GROUNDING, get_system_prompt
 
+pytestmark = pytest.mark.llm
+
 ALL_PROMPTS = ["expert", "summary", "analysis", "interpretation", "chat", "chat_tools"]
 
 

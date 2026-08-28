@@ -6,9 +6,13 @@ docstring for why nothing else works for the SDK path.
 
 from unittest.mock import MagicMock
 
+import pytest
+
 from scpi_control.report_generator.llm.client import LLMClient, LLMConfig
 
 from tests.conftest import ollama_sdk
+
+pytestmark = pytest.mark.llm
 
 
 def reply(content=None, tool_calls=None):

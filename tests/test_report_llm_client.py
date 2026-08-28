@@ -6,6 +6,8 @@ import pytest
 
 from scpi_control.report_generator.llm.client import LLMClient, LLMConfig
 
+pytestmark = pytest.mark.llm
+
 
 def test_create_daq_analyzer_constructs():
     """It raised TypeError on every call: LLMClient takes a config, not kwargs.
