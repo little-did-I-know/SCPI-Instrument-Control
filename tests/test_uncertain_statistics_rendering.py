@@ -62,3 +62,36 @@ def test_pdf_renders_plus_minus_when_vpp_has_uncertainty():
     table = PDFReportGenerator()._generate_statistics_table(wf)
     rows = {row[0]: row[1] for row in table._cellvalues}
     assert rows["Vpp:"] == "4 ± 0.05 V"
+
+
+def _unanalyzed_waveform():
+    """A WaveformData that never had .analyze() called, so .statistics is
+    still None -- the representative-waveform pattern the design spec
+    documents for attaching uncertain_statistics (see docs/superpowers/specs/
+    2026-08-27-measurement-uncertainty-design.md)."""
+    n, rate = 10_000, 1e6
+    t = np.arange(n) / rate
+    v = 2.0 * np.sin(2 * np.pi * 10_000 * t)
+    wf = WaveformData(channel="C1", time=t, voltage=v, sample_rate=rate, record_length=n)
+    assert wf.statistics is None
+    return wf
+
+
+def test_markdown_renders_uncertain_stat_even_when_waveform_never_analyzed():
+    wf = _unanalyzed_waveform()
+    wf.uncertain_statistics = {"vpp": quantity(4.0, "V", uncertainty=0.05)}
+    text = MarkdownReportGenerator()._generate_waveform_info(wf, Path("."), "CH1")
+    assert "**Signal Statistics:**" in text
+    assert "| VPP | 4 ± 0.05 V |" in text
+
+
+def test_markdown_and_pdf_agree_when_waveform_never_analyzed():
+    wf = _unanalyzed_waveform()
+    wf.uncertain_statistics = {"vpp": quantity(4.0, "V", uncertainty=0.05)}
+
+    md_text = MarkdownReportGenerator()._generate_waveform_info(wf, Path("."), "CH1")
+    pdf_table = PDFReportGenerator()._generate_statistics_table(wf)
+    pdf_rows = {row[0]: row[1] for row in pdf_table._cellvalues}
+
+    assert "| VPP | 4 ± 0.05 V |" in md_text
+    assert pdf_rows["Vpp:"] == "4 ± 0.05 V"
