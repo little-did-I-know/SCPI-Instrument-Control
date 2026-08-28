@@ -13,6 +13,7 @@ import pytest
 
 pytest.importorskip("pint")
 pytest.importorskip("uncertainties")
+pytest.importorskip("reportlab")
 
 from scpi_control.quantities import quantity
 from scpi_control.report_generator.generators.markdown_generator import MarkdownReportGenerator

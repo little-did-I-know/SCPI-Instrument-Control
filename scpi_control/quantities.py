@@ -54,9 +54,17 @@ def format_quantity(q: Quantity, precision: int = 3) -> str:
             uncertainty (independently -- matches how each is individually
             meaningful, not a shared decimal-place count).
     """
-    compact = q.to_compact()
-    magnitude = compact.magnitude
-    unit_str = format(compact.units, "~")
+    magnitude = q.magnitude
     if hasattr(magnitude, "nominal_value"):
-        return f"{magnitude.nominal_value:.{precision}g} ± {magnitude.std_dev:.{precision}g} {unit_str}"
-    return f"{magnitude:.{precision}g} {unit_str}"
+        # pint's to_compact() internally does an implicit float() conversion
+        # to pick a scale, which `uncertainties` deliberately forbids on a
+        # ufloat. Compact using the plain nominal value only, then convert
+        # the std_dev into whatever unit that picked -- never hand a ufloat
+        # magnitude to to_compact() itself.
+        nominal_compact = _REGISTRY.Quantity(magnitude.nominal_value, q.units).to_compact()
+        unit_str = format(nominal_compact.units, "~")
+        std_dev_converted = _REGISTRY.Quantity(magnitude.std_dev, q.units).to(nominal_compact.units)
+        return f"{nominal_compact.magnitude:.{precision}g} ± {std_dev_converted.magnitude:.{precision}g} {unit_str}"
+    compact = q.to_compact()
+    unit_str = format(compact.units, "~")
+    return f"{compact.magnitude:.{precision}g} {unit_str}"
