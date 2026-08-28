@@ -132,14 +132,20 @@ sketch of a waveform shape.
     <tr>
       <td align="center"><img src="https://raw.githubusercontent.com/little-did-I-know/SCPI-Instrument-Control/0a28ab6d1a08acc3b6e47de2381cf0a8b07d4432/docs/images/signal-sine.gif" alt="Scrolling trace of a synthesized 1 kHz sine wave, looping seamlessly" width="160"><br><sub><b>sine</b></sub></td>
       <td align="center"><img src="https://raw.githubusercontent.com/little-did-I-know/SCPI-Instrument-Control/0a28ab6d1a08acc3b6e47de2381cf0a8b07d4432/docs/images/signal-square.gif" alt="Scrolling trace of a synthesized 500 Hz square wave, looping seamlessly" width="160"><br><sub><b>square</b></sub></td>
-      <td align="center"><img src="https://raw.githubusercontent.com/little-did-I-know/SCPI-Instrument-Control/0a28ab6d1a08acc3b6e47de2381cf0a8b07d4432/docs/images/signal-triangle.gif" alt="Scrolling trace of a synthesized 800 Hz triangle wave, looping seamlessly" width="160"><br><sub><b>triangle</b></sub></td>
-      <td align="center"><img src="https://raw.githubusercontent.com/little-did-I-know/SCPI-Instrument-Control/0a28ab6d1a08acc3b6e47de2381cf0a8b07d4432/docs/images/signal-ramp.gif" alt="Scrolling trace of a synthesized 300 Hz sawtooth ramp, looping seamlessly" width="160"><br><sub><b>ramp</b></sub></td>
-      <td align="center"><img src="https://raw.githubusercontent.com/little-did-I-know/SCPI-Instrument-Control/0a28ab6d1a08acc3b6e47de2381cf0a8b07d4432/docs/images/signal-dc.gif" alt="Scrolling trace of a synthesized 2.5 V DC level with a touch of noise" width="160"><br><sub><b>dc</b></sub></td>
     </tr>
     <tr>
+      <td align="center"><img src="https://raw.githubusercontent.com/little-did-I-know/SCPI-Instrument-Control/0a28ab6d1a08acc3b6e47de2381cf0a8b07d4432/docs/images/signal-triangle.gif" alt="Scrolling trace of a synthesized 800 Hz triangle wave, looping seamlessly" width="160"><br><sub><b>triangle</b></sub></td>
+      <td align="center"><img src="https://raw.githubusercontent.com/little-did-I-know/SCPI-Instrument-Control/0a28ab6d1a08acc3b6e47de2381cf0a8b07d4432/docs/images/signal-ramp.gif" alt="Scrolling trace of a synthesized 300 Hz sawtooth ramp, looping seamlessly" width="160"><br><sub><b>ramp</b></sub></td>
+    </tr>
+    <tr>
+      <td align="center"><img src="https://raw.githubusercontent.com/little-did-I-know/SCPI-Instrument-Control/0a28ab6d1a08acc3b6e47de2381cf0a8b07d4432/docs/images/signal-dc.gif" alt="Scrolling trace of a synthesized 2.5 V DC level with a touch of noise" width="160"><br><sub><b>dc</b></sub></td>
       <td align="center"><img src="https://raw.githubusercontent.com/little-did-I-know/SCPI-Instrument-Control/0a28ab6d1a08acc3b6e47de2381cf0a8b07d4432/docs/images/signal-noise.gif" alt="Scrolling trace of synthesized Gaussian noise" width="160"><br><sub><b>noise</b></sub></td>
+    </tr>
+    <tr>
       <td align="center"><img src="https://raw.githubusercontent.com/little-did-I-know/SCPI-Instrument-Control/0a28ab6d1a08acc3b6e47de2381cf0a8b07d4432/docs/images/signal-multitone.gif" alt="Scrolling trace of a synthesized multitone signal — a fundamental plus two coherent harmonics, looping seamlessly" width="160"><br><sub><b>multitone</b></sub></td>
       <td align="center"><img src="https://raw.githubusercontent.com/little-did-I-know/SCPI-Instrument-Control/0a28ab6d1a08acc3b6e47de2381cf0a8b07d4432/docs/images/signal-exponential.gif" alt="Scrolling trace of a synthesized RC charge/discharge (exponential) waveform, looping seamlessly" width="160"><br><sub><b>exponential</b></sub></td>
+    </tr>
+    <tr>
       <td align="center"><img src="https://raw.githubusercontent.com/little-did-I-know/SCPI-Instrument-Control/0a28ab6d1a08acc3b6e47de2381cf0a8b07d4432/docs/images/signal-pulse.gif" alt="Scrolling trace of a synthesized trapezoidal pulse train, looping seamlessly" width="160"><br><sub><b>pulse</b></sub></td>
       <td align="center"><img src="https://raw.githubusercontent.com/little-did-I-know/SCPI-Instrument-Control/0a28ab6d1a08acc3b6e47de2381cf0a8b07d4432/docs/images/signal-chirp.gif" alt="Scrolling trace of a synthesized 500 Hz to 4.5 kHz chirp, looping seamlessly at its own retrace" width="160"><br><sub><b>chirp</b></sub></td>
     </tr>
