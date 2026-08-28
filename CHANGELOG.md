@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`detect_edges` crashed with `ValueError: 'distance' must be greater or equal to 1`
+  on short waveform records.** The function's only length guard was `len(v) < 10`, so
+  records with 10-19 samples reached `scipy.signal.find_peaks(..., distance=int(len(t)
+  * 0.05))`, which truncates to `0` in that range and scipy rejects `distance < 1`. Any
+  such record with a genuine edge for `find_peaks` to detect (rather than a flat signal
+  that never got that far) crashed edge detection and silently dropped all region
+  analysis for the report. Both `find_peaks` calls in `detect_edges` now clamp
+  `distance=max(1, int(len(t) * 0.05))`.
+- **Mock AWG's `C{ch}:BSWV?` response included a `PHSE` field even for waveform
+  types the SDG manual documents it as invalid for.** Siglent's SDG programming guide
+  (PG02-E05B, p.29-30) states `PHSE` is "Not valid when WVTP is NOISE, PULSE or DC," but
+  the mock appended `PHSE,<value>` to the response unconditionally, so any channel set to
+  one of those three functions answered a query shape the manual explicitly excludes --
+  the same conditional-response-format defect class already fixed for `DUTY`/`SYM`. The
+  mock now omits `PHSE` from the response when the channel's function is `NOISE`,
+  `PULSE`, or `DC`.
+
 ## [7.2.0] - 2026-08-27
 
 ### Added

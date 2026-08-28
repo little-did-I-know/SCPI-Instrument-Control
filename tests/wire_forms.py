@@ -1926,7 +1926,7 @@ WIRE_FORMS: List[WireForm] = [
         op="get_pulse_duty",
         params={"ch": 1},
         request="C1:BSWV?",
-        response="C1:BSWV WVTP,PULSE,FRQ,1000HZ,PERI,0.001S,AMP,1V,OFST,0V,HLEV,0.5V,LLEV,-0.5V,PHSE,0,DUTY,50",
+        response="C1:BSWV WVTP,PULSE,FRQ,1000HZ,PERI,0.001S,AMP,1V,OFST,0V,HLEV,0.5V,LLEV,-0.5V,DUTY,50",
         parsed=50.0,
         source=f"{SDG_GUIDE} p.31, p.29",
         mock_kwargs={
@@ -1941,7 +1941,12 @@ WIRE_FORMS: List[WireForm] = [
             "channel is configured PULSE via mock_kwargs to get a response "
             "shape the manual actually documents as containing DUTY. On the "
             "default SINE channel this getter now honestly raises "
-            "CommandError (no DUTY field), matching real hardware."
+            "CommandError (no DUTY field), matching real hardware. PHSE is "
+            "also absent here -- fix wave 2 follow-up: the same p.29-30 "
+            "table says PHSE is 'Not valid when WVTP is NOISE, PULSE or DC', "
+            "and the mock used to append it unconditionally regardless of "
+            "function; this response pins the corrected PULSE shape with no "
+            "PHSE token."
         ),
     ),
     # p.29-30 parameter table: "SYM <symmetry> := {0 to 100}. Symmetry of "

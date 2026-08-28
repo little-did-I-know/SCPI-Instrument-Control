@@ -70,3 +70,33 @@ def test_detect_edges_survives_an_edge_near_the_end_of_the_record():
     assert edge.region_type == "edge_rising"
     assert np.isfinite(edge.end_time)
     assert t[0] <= edge.end_time <= t[-1]
+
+
+def test_detect_edges_survives_a_short_record_with_a_genuine_edge():
+    """Both find_peaks calls pass distance=int(len(t) * 0.05), which truncates
+    to 0 for any record with 10 <= len(t) <= 19 -- the function's only length
+    guard is `if len(v) < 10: return []`, so records in that range reach
+    find_peaks. scipy.signal.find_peaks requires distance >= 1 and raises
+    ValueError('distance must be greater or equal to 1') for distance=0,
+    which is a different root cause than H29's IndexError (this one is
+    rejected before any indexing happens) despite living in the same
+    function and same failure family.
+
+    A 15-sample record with a step edge at index 3 gives a single, sharp
+    derivative peak (idx=2) well above the height threshold, so find_peaks
+    has something to find and actually reaches the distance=0 call. This
+    pins the fix: distance must clamp to max(1, int(len(t) * 0.05)).
+    """
+    n, rate = 15, 1e6
+    t = np.arange(n) / rate
+    v = np.zeros(n)
+    v[3:] = 5.0  # step edge whose derivative peak lands at idx=2
+    waveform = WaveformData(channel="C1", time=t, voltage=v, sample_rate=rate, record_length=n)
+
+    edges = WaveformAnalyzer.detect_edges(waveform)
+
+    assert len(edges) == 1
+    edge = edges[0]
+    assert edge.region_type == "edge_rising"
+    assert np.isfinite(edge.end_time)
+    assert t[0] <= edge.end_time <= t[-1]

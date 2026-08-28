@@ -287,6 +287,48 @@ class TestAWGOutput:
         assert config["enabled"] is True
 
 
+class TestBSWVResponsePhaseConditional:
+    """C{ch}:BSWV? must not carry a PHSE token for functions the manual
+    says it's invalid for.
+
+    SDG_ProgrammingGuide_PG02-E05B.pdf p.29-30, BaSic_WaVe parameter table:
+    "PHSE <phase> := {0 to 360}. The unit is 'degree'. Not valid when WVTP
+    is NOISE, PULSE or DC." The mock used to append PHSE unconditionally to
+    the base response string, so any channel set to one of those three
+    functions answered a query shape the manual explicitly excludes --
+    same conditional-response-format defect class DUTY/SYM were already
+    fixed for (H5 follow-up), just missed for PHSE.
+    """
+
+    @pytest.fixture
+    def mock_awg(self):
+        """Create mock AWG connection."""
+        conn = MockConnection(
+            awg_mode=True,
+            awg_idn="Siglent Technologies,SDG1032X,SDG1XXXXX,2.01.01.37R1",
+        )
+        awg = FunctionGenerator("mock", connection=conn)
+        awg.connect()
+        return awg
+
+    def test_sine_response_still_includes_phse(self, mock_awg):
+        """Control case: SINE is not in the excluded set, so PHSE stays."""
+        mock_awg.channel1.function = "SINE"
+
+        response = mock_awg.query("C1:BSWV?")
+
+        assert "PHSE," in response
+
+    @pytest.mark.parametrize("function", ["PULSE", "NOISE", "DC"])
+    def test_excluded_functions_omit_phse(self, mock_awg, function):
+        """PHSE must not appear when WVTP is NOISE, PULSE, or DC (p.29-30)."""
+        mock_awg.channel1.function = function
+
+        response = mock_awg.query("C1:BSWV?")
+
+        assert "PHSE," not in response, f"{function} response should not carry PHSE: {response!r}"
+
+
 class TestFunctionGeneratorOperations:
     """Test overall AWG operations."""
 
