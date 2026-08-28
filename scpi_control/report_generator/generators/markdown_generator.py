@@ -21,6 +21,16 @@ from scpi_control.report_generator.models.report_data import MeasurementResult, 
 logger = logging.getLogger(__name__)
 
 
+def _format_stat(waveform: WaveformData, stat: str) -> str:
+    """Prefer an uncertainty-carrying Quantity when the caller attached one
+    for this stat; fall back to the existing plain-float formatting."""
+    if waveform.uncertain_statistics and stat in waveform.uncertain_statistics:
+        from scpi_control.quantities import format_quantity  # local: keeps `uncertainty` optional
+
+        return format_quantity(waveform.uncertain_statistics[stat])
+    return waveform.format_statistic(stat)
+
+
 class MarkdownReportGenerator(BaseReportGenerator):
     """Generator for Markdown format reports."""
 
@@ -336,28 +346,28 @@ class MarkdownReportGenerator(BaseReportGenerator):
             # Amplitude measurements
             for stat in ["vmax", "vmin", "vpp", "vrms", "vmean", "dc_offset"]:
                 if stat in waveform.statistics and waveform.statistics[stat] is not None:
-                    formatted = waveform.format_statistic(stat)
+                    formatted = _format_stat(waveform, stat)
                     stat_label = stat.upper() if len(stat) <= 4 else stat.replace("_", " ").title()
                     lines.append(f"| {stat_label} | {formatted} |")
 
             # Frequency and timing
             for stat in ["frequency", "period", "rise_time", "fall_time", "pulse_width", "duty_cycle"]:
                 if stat in waveform.statistics and waveform.statistics[stat] is not None:
-                    formatted = waveform.format_statistic(stat)
+                    formatted = _format_stat(waveform, stat)
                     stat_label = stat.replace("_", " ").title()
                     lines.append(f"| {stat_label} | {formatted} |")
 
             # Quality metrics
             for stat in ["snr", "thd", "noise_level", "overshoot", "undershoot", "jitter"]:
                 if stat in waveform.statistics and waveform.statistics[stat] is not None:
-                    formatted = waveform.format_statistic(stat)
+                    formatted = _format_stat(waveform, stat)
                     stat_label = stat.upper() if stat in ["snr", "thd"] else stat.replace("_", " ").title()
                     lines.append(f"| {stat_label} | {formatted} |")
 
             # Plateau stability metrics (if calculated)
             for stat in ["plateau_stability", "plateau_high_noise", "plateau_low_noise"]:
                 if stat in waveform.statistics and waveform.statistics[stat] is not None:
-                    formatted = waveform.format_statistic(stat)
+                    formatted = _format_stat(waveform, stat)
                     stat_label = stat.replace("_", " ").title()
                     lines.append(f"| {stat_label} | {formatted} |")
 
