@@ -33,6 +33,9 @@ def _analyzed_waveform():
 
 
 def test_markdown_uses_plain_formatting_when_uncertain_statistics_unset():
+    """Checks determinism (two runs match) AND specific known-correct content
+    (real stat rows for the 10 kHz/4 Vpp sine, verified against actual
+    generator output rather than assumed)."""
     wf = _analyzed_waveform()
     baseline = MarkdownReportGenerator()._generate_waveform_info(wf, Path("."), "CH1")
 
@@ -40,6 +43,14 @@ def test_markdown_uses_plain_formatting_when_uncertain_statistics_unset():
     with_field_but_empty = MarkdownReportGenerator()._generate_waveform_info(wf2, Path("."), "CH1")
     assert with_field_but_empty == baseline
     assert "±" not in baseline
+
+    assert "**Signal Statistics:**" in baseline
+    assert "| VMAX | 2.000 V |" in baseline
+    assert "| VMIN | -2.000 V |" in baseline
+    assert "| VPP | 4.000 V |" in baseline
+    assert "| VRMS | 1.414 V |" in baseline
+    assert "| Frequency | 10.000 kHz |" in baseline
+    assert "| Period | 100.000 µs |" in baseline
 
 
 def test_markdown_renders_plus_minus_when_vpp_has_uncertainty():
@@ -50,11 +61,22 @@ def test_markdown_renders_plus_minus_when_vpp_has_uncertainty():
 
 
 def test_pdf_uses_plain_formatting_when_uncertain_statistics_unset():
+    """Checks determinism (two runs match) AND specific known-correct content
+    (real stat rows for the 10 kHz/4 Vpp sine, verified against actual
+    generator output rather than assumed)."""
     wf = _analyzed_waveform()
     baseline_table = PDFReportGenerator()._generate_statistics_table(wf)
     wf2 = _analyzed_waveform()
     same_table = PDFReportGenerator()._generate_statistics_table(wf2)
     assert baseline_table._cellvalues == same_table._cellvalues
+
+    rows = {row[0]: row[1] for row in baseline_table._cellvalues}
+    assert rows["Vmax:"] == "2.000 V"
+    assert rows["Vmin:"] == "-2.000 V"
+    assert rows["Vpp:"] == "4.000 V"
+    assert rows["Vrms:"] == "1.414 V"
+    assert rows["Frequency:"] == "10.000 kHz"
+    assert rows["Period:"] == "100.000 µs"
 
 
 def test_pdf_renders_plus_minus_when_vpp_has_uncertainty():

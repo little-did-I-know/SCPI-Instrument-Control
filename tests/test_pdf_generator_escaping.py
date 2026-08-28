@@ -14,6 +14,7 @@ import pytest
 pytest.importorskip("reportlab")
 
 from scpi_control.report_generator.generators.pdf_generator import PDFReportGenerator  # noqa: E402
+from scpi_control.report_generator.generators import pdf_generator as pdf_generator_module  # noqa: E402
 from scpi_control.report_generator.models.report_data import (  # noqa: E402
     ReportMetadata,
     TestReport,
@@ -122,6 +123,6 @@ def test_paragraph_construction_only_happens_through__para():
     forgetting to escape. Exactly one occurrence of the literal substring
     is expected -- the `return Paragraph(escaped, style)` inside _para
     itself."""
-    src = Path("scpi_control/report_generator/generators/pdf_generator.py").read_text(encoding="utf-8")
+    src = Path(pdf_generator_module.__file__).read_text(encoding="utf-8")
     count = src.count("Paragraph(")
     assert count == 1, f"expected exactly 1 direct Paragraph(...) call (inside _para), found {count}"

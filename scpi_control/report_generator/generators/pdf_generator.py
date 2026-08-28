@@ -13,7 +13,7 @@ import logging
 import re
 from datetime import datetime
 from pathlib import Path
-from typing import Callable, List, Optional, Tuple
+from typing import Callable, List, Literal, Optional, Tuple
 
 try:
     from reportlab.lib import colors
@@ -404,7 +404,7 @@ class PDFReportGenerator(BaseReportGenerator):
 
         return escape(text or "")
 
-    def _para(self, text: str, style, mode: str = "markdown") -> Paragraph:
+    def _para(self, text: str, style, mode: Literal["markdown", "literal", "preformatted"] = "markdown") -> Paragraph:
         """The only place a Paragraph flowable is constructed in this file.
 
         mode="markdown": run through _markdown_to_reportlab (bold/italic/
