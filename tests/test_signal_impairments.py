@@ -357,7 +357,16 @@ def test_jitter_rms_matches_the_measured_period_jitter_within_statistical_tolera
     assert measured == pytest.approx(jitter_rms, rel=0.25)
 
 
-@pytest.mark.parametrize("kind", ["sine", "square", "ramp", "multitone"])
+# "pulse"'s rising v50 crossing sits at edge_time/2 into the cycle (see
+# _pulse), not exactly at the boundary like "square"'s -- but at the default
+# 10 us edge_time and a 100 us period (frequency=10 kHz below) that is
+# f=edge_time/(2*period)=0.005, close enough to f=0 to belong in this group.
+# pulse_width/edge_time are scaled down (same 20%/1% duty ratio as the
+# dataclass defaults) so the trapezoid still fits inside that 100 us period.
+_PULSE_KWARGS = {"pulse_width": 2e-5, "edge_time": 1e-6}
+
+
+@pytest.mark.parametrize("kind", ["sine", "square", "ramp", "multitone", "pulse"])
 def test_jitter_produces_no_spurious_edges_on_previously_broken_kinds(kind):
     """The direct proof the fix closes the gap the prior review found: under
     the old hard-step-per-cycle model, sine/square/ramp/multitone/pulse (5 of
@@ -378,10 +387,11 @@ def test_jitter_produces_no_spurious_edges_on_previously_broken_kinds(kind):
     frequency = 10_000.0
     period = 1.0 / frequency
     n = 50_000
+    extra_kwargs = _PULSE_KWARGS if kind == "pulse" else {}
     for pct in (0.01, 0.03, 0.05):
         jitter_rms = pct * period
         for seed in (1, 2, 3):
-            spec = SignalSpec(kind=kind, frequency=frequency, amplitude=1.0, jitter_rms=jitter_rms, seed=seed)
+            spec = SignalSpec(kind=kind, frequency=frequency, amplitude=1.0, jitter_rms=jitter_rms, seed=seed, **extra_kwargs)
             v = synthesize(spec, rate, n)
             v50 = (float(np.max(v)) + float(np.min(v))) / 2.0
             rising = np.flatnonzero((v[:-1] < v50) & (v[1:] >= v50))
@@ -398,6 +408,7 @@ def test_jitter_produces_no_spurious_edges_on_previously_broken_kinds(kind):
         ("sine", 0.0, 1.0),
         ("triangle", 0.25, 0.6614),
         ("ramp", 0.5, 0.5),
+        ("pulse", 0.005, 1.0),
     ],
 )
 def test_jitter_measured_ratio_depends_on_edge_fraction_within_the_cycle(kind, edge_fraction, expected_ratio):
@@ -412,20 +423,32 @@ def test_jitter_measured_ratio_depends_on_edge_fraction_within_the_cycle(kind, e
     that is a FALLING transition -- the analyzer's RISING v50 crossing is the
     ramp's own continuous rise from -amplitude to +amplitude, which crosses
     zero at f=0.5, cycle CENTER, the formula's minimum (predicted ratio 0.5).
+    "pulse"'s rising v50 crossing sits at edge_time/2 into the cycle (see
+    _pulse's docstring), not exactly at the boundary -- with the scaled-down
+    `_PULSE_KWARGS` (pulse_width=2e-5 s, edge_time=1e-6 s) at this test's 100
+    us period that is f=1e-6/(2e-4)=0.005, close enough to f=0 that the
+    formula predicts ratio sqrt(0.5*(0.99**2+0.005**2+0.995**2))~=0.9925 --
+    indistinguishable from sine's f=0 at this test's tolerance, which is
+    exactly the point: this is the "verified" half of the CHANGELOG's ~1.0
+    claim for "pulse" that was previously untested (measured 0.95-1.03 across
+    a 6-seed sample taken during verification, comfortably inside the
+    documented 0.94-1.08 band).
 
     RATE=1 MHz, frequency=10 kHz, N=50_000 (~500 cycles), jitter_rms = 3% of
     the period, seed=0 -- chosen because it lands close to each kind's
     respective mean across a 5-seed sample taken during verification (sine
-    0.96, triangle 0.688, ramp 0.537, vs. predicted 1.0/0.6614/0.5). A +/-20%
-    relative tolerance comfortably covers single-seed sampling variation at
-    ~500 cycles while still distinguishing the three fractions from each
-    other and from a same-for-every-kind (unfixed) model.
+    0.96, triangle 0.688, ramp 0.537, pulse 0.968, vs. predicted
+    1.0/0.6614/0.5/0.9925). A +/-20% relative tolerance comfortably covers
+    single-seed sampling variation at ~500 cycles while still distinguishing
+    the fractions from each other and from a same-for-every-kind (unfixed)
+    model.
     """
     rate = 1_000_000.0
     frequency = 10_000.0
     n = 50_000
     jitter_rms = 0.03 / frequency
-    spec = SignalSpec(kind=kind, frequency=frequency, amplitude=1.0, jitter_rms=jitter_rms, seed=0)
+    extra_kwargs = _PULSE_KWARGS if kind == "pulse" else {}
+    spec = SignalSpec(kind=kind, frequency=frequency, amplitude=1.0, jitter_rms=jitter_rms, seed=0, **extra_kwargs)
     waveform = make_waveform(spec, rate, n)
     measured = WaveformAnalyzer.calculate_quality_stats(waveform)["jitter"]
     assert measured is not None
