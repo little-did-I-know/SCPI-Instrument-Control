@@ -330,20 +330,42 @@ def _build_batch_report(
         useful to test against now.
 
     Raises:
-        ValueError: via `RunSet.validate()` -- fewer than 2 runs survived
-            (e.g. too many `"error"` entries), or the RunSet is otherwise
-            structurally invalid.
+        ValueError: raised directly by this function -- fewer than 2 entries
+            survived AND at least one exclusion was due to an `"error"` key
+            -- naming the total entry count, how many failed, a sample of
+            the actual capture-error text, and how many runs would have
+            resulted; or via `RunSet.validate()` for any other structural
+            problem (e.g. duplicate labels, or too few entries with none of
+            them having failed).
         ComparisonAnalysisError: via `ComparisonAnalyzer.analyze` -- e.g. a
             saved file could not be reloaded.
     """
     saved_files = collector.save_batch(batch_results, output_dir, format=format)
 
     runs: List[Run] = []
+    failures: List[str] = []
     for index, (entry, entry_files) in enumerate(zip(batch_results, saved_files)):
         if "error" in entry:
             logger.warning(f"Batch entry {index} excluded from the RunSet (capture failed): {entry['error']}")
+            failures.append(entry["error"])
             continue
         runs.append(_build_batch_run(index, entry, entry_files))
+
+    # RunSet.validate() (below) would also catch this, but its message is a
+    # generic "needs at least 2 runs, got N" with no link back to why runs
+    # went missing -- and the reason (batch_capture() failures) lives only in
+    # the warnings logged above, which a caller may not have visibility into
+    # depending on logging configuration. Raise our own actionable error
+    # first whenever failed entries are the (likely) cause, so it's the only
+    # thing a caller needs to see.
+    if len(runs) < 2 and failures:
+        sample = "; ".join(failures[:2])
+        raise ValueError(
+            f"Batch capture yielded too few successful runs to build a RunSet "
+            f"(needs at least 2): {len(batch_results)} entries total, "
+            f"{len(failures)} failed, {len(runs)} would survive. "
+            f"Sample failure(s): {sample}"
+        )
 
     runset = RunSet(runs=runs, mode=mode, criteria_set=criteria_set)
     runset.validate()

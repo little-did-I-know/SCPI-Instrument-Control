@@ -314,16 +314,56 @@ def test_batch_report_excludes_error_entries_with_a_logged_warning(tmp_path, cap
 
 def test_batch_report_raises_when_too_few_runs_survive_errors(tmp_path):
     """Every entry failing must not silently produce a degenerate/empty
-    report -- `RunSet.validate()`'s >=2-runs rule surfaces it as a clear
-    error instead."""
+    report, nor surface only `RunSet.validate()`'s generic "needs at least
+    2 runs, got 0" -- that message has no link back to WHY, and the real
+    cause (batch_capture() failures) otherwise lives only in logs a caller
+    may not have visibility into. `_build_batch_report` must raise its own
+    actionable `ValueError` naming the total entry count, how many failed,
+    a sample of the actual failure text, and how many runs would survive."""
     dc = _batch_collector()
     try:
-        batch_results = dc.batch_capture([1, 2], triggers_per_config=2)
+        batch_results = dc.batch_capture([1, 2], triggers_per_config=3)
+        assert len(batch_results) == 3
         for entry in batch_results:
-            entry["error"] = "simulated failure"
+            entry["error"] = "simulated capture timeout"
             entry["waveforms"] = {}
 
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError) as excinfo:
             _build_batch_report(dc, batch_results, str(tmp_path / "allfail"), _metadata(), mode=MODE_BATCH)
     finally:
         dc.disconnect()
+
+    message = str(excinfo.value)
+    # This is the crux of the regression this test guards against: the
+    # generic RunSet.validate() message alone ("needs at least 2 runs, got
+    # 0") would satisfy pytest.raises(ValueError) but say nothing about why.
+    assert "needs at least 2 runs, got 0" not in message
+    assert "simulated capture timeout" in message
+    assert "3" in message  # total entries
+    assert "0" in message  # runs that would survive
+
+
+def test_batch_report_raises_names_partial_failures_too_few_to_reach_minimum(tmp_path):
+    """A batch where SOME entries survive, but not enough to reach the
+    RunSet minimum of 2, must still name the failure(s) that caused it --
+    not just the count that failed."""
+    dc = _batch_collector()
+    try:
+        batch_results = dc.batch_capture([1, 2], triggers_per_config=3)
+        assert len(batch_results) == 3
+        batch_results[0]["error"] = "instrument busy"
+        batch_results[0]["waveforms"] = {}
+        batch_results[1]["error"] = "simulated capture timeout"
+        batch_results[1]["waveforms"] = {}
+
+        with pytest.raises(ValueError) as excinfo:
+            _build_batch_report(dc, batch_results, str(tmp_path / "partial"), _metadata(), mode=MODE_BATCH)
+    finally:
+        dc.disconnect()
+
+    message = str(excinfo.value)
+    assert "instrument busy" in message
+    assert "simulated capture timeout" in message
+    assert "3" in message  # total entries
+    assert "2" in message  # failed count
+    assert "1" in message  # runs that would survive
