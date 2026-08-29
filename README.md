@@ -188,6 +188,33 @@ summed with no shared state — the same seamless-loop verification as the
 gallery above applies wherever every component is periodic; `sine + noise`
 restarts instead, since noise has no cycle to align to.
 
+## Clipping and saturation
+
+`SignalSpec.clip_level`/`clip_softness` model a non-linear output stage
+(an amplifier or probe front-end driven into its rails) clipping whatever
+signal reaches it. It is kind-agnostic — like `noise_rms`/`drift_amplitude` —
+and applied LAST, after drift, glitches, and noise, so a noisy sample that
+happens to land past the rail gets flattened too. `clip_softness` blends
+between an exact hard clip (`clip_softness=0.0`, flat-topped at
+±`clip_level`) and pure `clip_level * tanh(v / clip_level)` soft saturation
+(`clip_softness=1.0`).
+
+<p align="center">
+  <!-- Same main-pinned form as the sections above; see that section's comment
+       about main-pinned URLs 404ing until merge. -->
+  <table align="center">
+    <tr>
+      <td align="center"><img src="https://raw.githubusercontent.com/little-did-I-know/SCPI-Instrument-Control/main/docs/images/clipping-hard_clip.gif" alt="Scrolling trace of a synthesized 1 kHz sine wave hard-clipped at 1 V, showing an obviously flat-topped waveform" width="320"><br><sub><b>hard clip</b></sub></td>
+      <td align="center"><img src="https://raw.githubusercontent.com/little-did-I-know/SCPI-Instrument-Control/main/docs/images/clipping-soft_saturation.gif" alt="Scrolling trace of the same 1 kHz sine wave with tanh-based soft saturation at 1 V, showing smoothly rounded compression near the peaks" width="320"><br><sub><b>soft saturation</b></sub></td>
+    </tr>
+  </table>
+</p>
+
+Both demos clip the same 1 kHz, 1.5 V-amplitude sine at a 1 V `clip_level` —
+only `clip_softness` differs. Clipping is a memoryless, per-sample
+nonlinearity, so it does not change the signal's period; both loops are
+seamless the same way the galleries above are.
+
 ## What you get
 
 |  | |
