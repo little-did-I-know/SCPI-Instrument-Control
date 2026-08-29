@@ -23,7 +23,16 @@ import pytest
 
 from scpi_control.automation import DataCollector
 from scpi_control.connection.mock import MockConnection
-from scpi_control.pipeline import _build_batch_report, _build_single_run_report, _to_report_waveform
+from scpi_control.pipeline import (
+    REPORT_FORMAT_BOTH,
+    REPORT_FORMAT_MARKDOWN,
+    REPORT_FORMAT_PDF,
+    PipelineResult,
+    _build_batch_report,
+    _build_single_run_report,
+    _to_report_waveform,
+    run_capture_pipeline,
+)
 from scpi_control.report_generator.analysis.comparison_analyzer import ComparisonAnalyzer
 from scpi_control.report_generator.comparison_report_builder import build_comparison_report
 from scpi_control.report_generator.generators.markdown_generator import MarkdownReportGenerator
@@ -367,3 +376,184 @@ def test_batch_report_raises_names_partial_failures_too_few_to_reach_minimum(tmp
     assert "3" in message  # total entries
     assert "2" in message  # failed count
     assert "1" in message  # runs that would survive
+
+
+# --------------------------------------------------------------------------
+# Task 4: report generation wiring + the single public entry point
+# --------------------------------------------------------------------------
+
+
+def _single_run_collector() -> DataCollector:
+    """Mirrors `_capture_square_waves`'s signal, but returns the connected
+    `DataCollector` itself (not a captured dict) -- `run_capture_pipeline`
+    owns calling `batch_capture()` internally."""
+    conn = MockConnection(
+        channel_states={1: True, 2: True},
+        sample_rate=100_000.0,
+        timebase=1e-3,
+        signals={
+            1: SignalSpec(kind="square", frequency=_FREQUENCY_HZ, amplitude=_AMPLITUDE_V, noise_rms=0.0, seed=7),
+            2: SignalSpec(kind="square", frequency=_FREQUENCY_HZ, amplitude=_AMPLITUDE_V, noise_rms=0.0, seed=8),
+        },
+    )
+    dc = DataCollector("mock", connection=conn)
+    dc.connect()
+    return dc
+
+
+def _reportlab_available() -> bool:
+    try:
+        import reportlab  # noqa: F401
+    except ImportError:
+        return False
+    return True
+
+
+def test_run_capture_pipeline_routes_plain_call_to_single_run_path(tmp_path):
+    """A caller who passes no sweep parameters at all -- just channels, an
+    output dir, and metadata -- must land on the single-run path
+    automatically, with no `ComparisonResult` and exactly one `TestReport`
+    section per channel."""
+    dc = _single_run_collector()
+    try:
+        result = run_capture_pipeline(dc, [1, 2], str(tmp_path), _metadata())
+    finally:
+        dc.disconnect()
+
+    assert isinstance(result, PipelineResult)
+    assert result.comparison is None
+    assert len(result.report.sections) == 2
+    assert {s.title for s in result.report.sections} == {"Channel 1", "Channel 2"}
+    assert result.report_paths.keys() == {REPORT_FORMAT_MARKDOWN}
+
+    md_path = result.report_paths[REPORT_FORMAT_MARKDOWN]
+    assert md_path.exists()
+    assert md_path.stat().st_size > 0
+
+
+def test_run_capture_pipeline_single_run_passing_criteria(tmp_path):
+    dc = _single_run_collector()
+    try:
+        result = run_capture_pipeline(dc, [1, 2], str(tmp_path), _metadata(), criteria_set=_passing_vpp_criteria())
+    finally:
+        dc.disconnect()
+
+    assert result.comparison is None
+    assert result.report.overall_result == "PASS"
+    assert result.report_paths[REPORT_FORMAT_MARKDOWN].exists()
+
+
+def test_run_capture_pipeline_single_run_failing_criteria(tmp_path):
+    dc = _single_run_collector()
+    try:
+        result = run_capture_pipeline(dc, [1, 2], str(tmp_path), _metadata(), criteria_set=_failing_frequency_criteria())
+    finally:
+        dc.disconnect()
+
+    assert result.comparison is None
+    assert result.report.overall_result == "FAIL"
+    assert result.report_paths[REPORT_FORMAT_MARKDOWN].exists()
+
+
+def test_run_capture_pipeline_single_run_generates_pdf_when_reportlab_available(tmp_path):
+    if not _reportlab_available():
+        pytest.skip("reportlab not installed")
+
+    dc = _single_run_collector()
+    try:
+        result = run_capture_pipeline(dc, [1, 2], str(tmp_path), _metadata(), report_format=REPORT_FORMAT_BOTH)
+    finally:
+        dc.disconnect()
+
+    assert result.report_paths.keys() == {REPORT_FORMAT_MARKDOWN, REPORT_FORMAT_PDF}
+    pdf_path = result.report_paths[REPORT_FORMAT_PDF]
+    assert pdf_path.exists()
+    assert pdf_path.stat().st_size > 0
+
+
+def test_run_capture_pipeline_pdf_only_skips_gracefully_without_reportlab(tmp_path, caplog):
+    """When `reportlab` genuinely is not installed, requesting PDF must not
+    raise -- it should log a clear warning and simply omit "pdf" from
+    `report_paths`, matching this repo's optional-dependency convention."""
+    if _reportlab_available():
+        pytest.skip("reportlab is installed in this environment; this test needs it absent")
+
+    dc = _single_run_collector()
+    try:
+        with caplog.at_level("WARNING", logger="scpi_control.pipeline"):
+            result = run_capture_pipeline(dc, [1, 2], str(tmp_path), _metadata(), report_format=REPORT_FORMAT_PDF)
+    finally:
+        dc.disconnect()
+
+    assert REPORT_FORMAT_PDF not in result.report_paths
+    assert any("reportlab" in msg.lower() for msg in caplog.messages)
+
+
+def test_run_capture_pipeline_routes_sweep_call_to_batch_path(tmp_path):
+    """A caller who passes `triggers_per_config=3` (2+ expected results)
+    must land on the batch/comparison path automatically: a populated
+    `ComparisonResult` is returned alongside the `TestReport`, and it
+    matches what calling the internal batch path directly would produce for
+    the identical underlying captures."""
+    dc = _batch_collector()
+    try:
+        result = run_capture_pipeline(dc, [1, 2], str(tmp_path / "auto"), _metadata(), triggers_per_config=3, mode=MODE_BATCH)
+    finally:
+        dc.disconnect()
+
+    assert isinstance(result, PipelineResult)
+    assert result.comparison is not None
+    assert [run.label for run in result.comparison.runset.runs] == ["capture_0000", "capture_0001", "capture_0002"]
+    assert result.comparison.matched_channels == ["1", "2"]
+    assert result.report.overall_result == build_comparison_report(result.comparison, _metadata()).overall_result
+    assert result.report_paths[REPORT_FORMAT_MARKDOWN].exists()
+    assert result.report_paths[REPORT_FORMAT_MARKDOWN].stat().st_size > 0
+
+
+def test_run_capture_pipeline_batch_mode_comparison(tmp_path):
+    dc = _batch_collector()
+    try:
+        result = run_capture_pipeline(dc, [1, 2], str(tmp_path), _metadata(), triggers_per_config=2, mode=MODE_COMPARISON)
+    finally:
+        dc.disconnect()
+
+    assert result.comparison is not None
+    assert result.comparison.runset.mode == MODE_COMPARISON
+    assert result.comparison.deltas, "MODE_COMPARISON should populate deltas vs. the baseline run"
+    assert result.report_paths[REPORT_FORMAT_MARKDOWN].exists()
+
+
+def test_run_capture_pipeline_rejects_unknown_report_format(tmp_path):
+    dc = _single_run_collector()
+    try:
+        with pytest.raises(ValueError, match="report_format"):
+            run_capture_pipeline(dc, [1, 2], str(tmp_path), _metadata(), report_format="xml")
+    finally:
+        dc.disconnect()
+
+
+def test_run_capture_pipeline_rejects_unknown_mode(tmp_path):
+    dc = _single_run_collector()
+    try:
+        with pytest.raises(ValueError, match="mode"):
+            run_capture_pipeline(dc, [1, 2], str(tmp_path), _metadata(), mode="not-a-real-mode")
+    finally:
+        dc.disconnect()
+
+
+def test_run_capture_pipeline_single_capture_error_raises_instead_of_empty_report(tmp_path, monkeypatch):
+    """An exactly-one-result batch whose sole entry failed (an `"error"`
+    key) must raise rather than silently producing a zero-section
+    `TestReport` that would look like a trivial pass."""
+    dc = _single_run_collector()
+
+    def _failing_batch_capture(channels, **kwargs):
+        return [{"waveforms": {}, "config": {}, "trigger_num": 0, "error": "simulated capture timeout"}]
+
+    monkeypatch.setattr(dc, "batch_capture", _failing_batch_capture)
+
+    try:
+        with pytest.raises(RuntimeError, match="simulated capture timeout"):
+            run_capture_pipeline(dc, [1, 2], str(tmp_path), _metadata())
+    finally:
+        dc.disconnect()

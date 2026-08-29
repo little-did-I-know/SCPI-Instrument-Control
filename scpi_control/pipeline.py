@@ -9,10 +9,15 @@ This module closes a gap confirmed by research before this feature started:
 never been imported into each other anywhere in the codebase.
 
 Task 2/3 status: both the single-run path (`_build_single_run_report`) and
-the batch/comparison path (`_build_batch_report`) are implemented. The single
-public entry point that routes between them by result count (Task 4) does
-not exist yet -- everything here is intentionally internal (leading
-underscore) until both paths exist and can share one public API.
+the batch/comparison path (`_build_batch_report`) are implemented; they stay
+internal (leading underscore) helpers.
+
+Task 4 status: `run_capture_pipeline` is the single public entry point. It
+captures via `batch_capture()` uniformly, routes to one of the two internal
+paths above by result count (see the empirical finding below), generates the
+requested report format(s) via the existing, unmodified generators, and
+returns a `PipelineResult` bundling the `TestReport`, the `ComparisonResult`
+(batch/comparison path only), and the generated file path(s).
 
 --------------------------------------------------------------------------
 Empirical finding: does batch_capture() degenerate to capture_single()?
@@ -69,13 +74,16 @@ its provenance snapshot.
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, NamedTuple, Optional, Tuple
 
 from scpi_control.automation import DataCollector
 from scpi_control.report_generator.analysis.comparison_analyzer import ComparisonAnalyzer, evaluate_measurements
 from scpi_control.report_generator.comparison_report_builder import build_comparison_report
+from scpi_control.report_generator.generators.markdown_generator import MarkdownReportGenerator
+from scpi_control.report_generator.generators.pdf_generator import PDFReportGenerator
 from scpi_control.report_generator.models.comparison import (
     MODE_BATCH,
+    MODE_COMPARISON,
     ComparisonResult,
     Run,
     RunMetadata,
@@ -373,3 +381,213 @@ def _build_batch_report(
     result = ComparisonAnalyzer.analyze(runset)
     report = build_comparison_report(result, metadata)
     return result, report
+
+
+# --------------------------------------------------------------------------
+# Task 4: report generation wiring + the single public entry point
+# --------------------------------------------------------------------------
+
+#: `report_format` values accepted by `run_capture_pipeline`.
+REPORT_FORMAT_MARKDOWN = "markdown"
+REPORT_FORMAT_PDF = "pdf"
+REPORT_FORMAT_BOTH = "both"
+_VALID_REPORT_FORMATS = frozenset({REPORT_FORMAT_MARKDOWN, REPORT_FORMAT_PDF, REPORT_FORMAT_BOTH})
+
+#: `mode` values accepted by `run_capture_pipeline` (meaningful only when the
+#: batch/comparison path is taken -- see `_build_batch_report`).
+_VALID_MODES = frozenset({MODE_BATCH, MODE_COMPARISON})
+
+# Basename (no extension) for generated report files -- each generator's
+# `get_file_extension()` supplies the extension. Fixed rather than derived
+# from `metadata.title` so a rerun into the same `output_dir` predictably
+# overwrites the previous report instead of accumulating slug variants.
+_REPORT_BASENAME = "capture_pipeline_report"
+
+
+class PipelineResult(NamedTuple):
+    """What `run_capture_pipeline` hands back -- enough for both interactive
+    use (the generated file path(s)) and programmatic use (the `TestReport`,
+    and, for the batch/comparison path, the `ComparisonResult` too, so a
+    caller can inspect `overall_result`/`yield_passed`/deltas without
+    re-parsing a generated file). A `NamedTuple` rather than a bare tuple:
+    `result.report.overall_result` reads unambiguously at a call site, where
+    `result[1].overall_result` (or worse, `result[0]` for the single-run path
+    but `result[1]` for batch, since a bare tuple's shape would otherwise
+    have to vary by path) would not.
+
+    Attributes:
+        report: The `TestReport` built by whichever internal path handled
+            this capture (`_build_single_run_report` or, via
+            `_build_batch_report`, `build_comparison_report`).
+        comparison: The `ComparisonResult` from the batch/comparison path
+            (deltas, aggregates, yield). `None` for the single-run path --
+            there is no `RunSet`/`ComparisonResult` to speak of when exactly
+            one capture was made (see this module's docstring and the design
+            doc's routing rationale).
+        report_paths: Format name (`"markdown"`/`"pdf"`) -> the `Path`
+            written for that format. Only formats that were both requested
+            AND actually produced a file appear here -- a requested PDF that
+            was skipped because `reportlab` is not installed is simply
+            absent from this dict, not present with a `None`/placeholder
+            value (see `run_capture_pipeline`'s docstring for that skip
+            behavior).
+    """
+
+    report: TestReport
+    comparison: Optional[ComparisonResult]
+    report_paths: Dict[str, Path]
+
+
+def run_capture_pipeline(
+    collector: DataCollector,
+    channels: List[int],
+    output_dir: str,
+    metadata: ReportMetadata,
+    *,
+    timebase_scales: Optional[List[str]] = None,
+    voltage_scales: Optional[Dict[int, List[str]]] = None,
+    triggers_per_config: int = 1,
+    criteria_set: Optional[CriteriaSet] = None,
+    report_format: str = REPORT_FORMAT_MARKDOWN,
+    mode: str = MODE_BATCH,
+    save_format: Optional[str] = None,
+    progress_callback: Optional[Callable[[int, int, str], None]] = None,
+    max_consecutive_failures: Optional[int] = 3,
+) -> PipelineResult:
+    """Capture, analyze, and report -- the single public entry point this
+    module exists to provide (see the design doc's "Fix" section).
+
+    Captures uniformly via `collector.batch_capture()` (per this module's
+    docstring: with no `timebase_scales`/`voltage_scales` and the default
+    `triggers_per_config=1`, that degenerates to exactly one capture, the
+    same effective call `capture_single()` would make), then routes by
+    result count -- the caller does not need to know or decide which path
+    applies:
+
+    - Exactly 1 result -> `_build_single_run_report` (no `RunSet` involved;
+      `RunSet.validate()` requires at least 2 runs).
+    - 2+ results -> `_build_batch_report` (auto-constructed `RunSet` ->
+      `ComparisonAnalyzer.analyze` -> `build_comparison_report`).
+
+    Args:
+        collector: An already-connected `DataCollector` (constructed the
+            same way every other example in this repo does, e.g.
+            `DataCollector(host, connection=...)` then `.connect()`, or via
+            its context manager). Not constructed here -- connection setup
+            (mock vs. real instrument, host/port) is the caller's concern,
+            not this pipeline's.
+        channels: Channel numbers to capture, passed straight through to
+            `batch_capture()`.
+        output_dir: Directory for both the batch path's saved capture files
+            (via `save_batch()`, unchanged) AND the generated report
+            file(s) -- both generators' `generate(report, output_path)`
+            need a concrete destination path, so the single-run path also
+            writes here even though it saves no raw capture files. Created
+            (with parents) if it does not already exist.
+        metadata: Report metadata (title, technician, test date, ...).
+        timebase_scales: Optional sweep, passed through to `batch_capture()`.
+            Leaving this (and `voltage_scales`) unset is what naturally
+            routes to the single-run path.
+        voltage_scales: Optional sweep, passed through to `batch_capture()`.
+        triggers_per_config: Passed through to `batch_capture()`. The
+            default of 1 (with no scales swept) is what naturally routes to
+            the single-run path; 2+ triggers (or any scale swept) produces
+            2+ results and routes to the batch/comparison path instead.
+        criteria_set: Optional pass/fail criteria, applied identically on
+            both paths via the shared `evaluate_measurements` helper
+            (Task 1) -- directly on the single-run path, and through
+            `ComparisonAnalyzer.analyze` on the batch/comparison path.
+        report_format: One of `REPORT_FORMAT_MARKDOWN` ("markdown"),
+            `REPORT_FORMAT_PDF` ("pdf"), or `REPORT_FORMAT_BOTH` ("both").
+            A PDF request is skipped gracefully -- logged as a warning, no
+            exception raised, no "pdf" key in the returned `report_paths` --
+            when `reportlab` is not installed, matching this repo's
+            optional-dependency convention elsewhere (e.g.
+            `examples/report_generation_example.py`'s own try/except
+            ImportError around `PDFReportGenerator`).
+        mode: `MODE_BATCH` (default, cross-run aggregates) or
+            `MODE_COMPARISON` (deltas vs. a baseline run, index 0) --
+            meaningful only when the batch/comparison path is taken (2+
+            results); ignored on the single-run path.
+        save_format: Passed through to `_build_batch_report` ->
+            `collector.save_batch()` (file format override for saved
+            captures); ignored on the single-run path, which saves no raw
+            capture files.
+        progress_callback: Passed through to `batch_capture()`.
+        max_consecutive_failures: Passed through to `batch_capture()`.
+
+    Returns:
+        A `PipelineResult` -- see its own docstring for field details.
+
+    Raises:
+        ValueError: `report_format` is not one of the three accepted
+            values; or, on the batch/comparison path, too few runs survived
+            capture errors to form a `RunSet` (see `_build_batch_report`).
+        RuntimeError: exactly one capture was attempted and it failed (an
+            `"error"` entry from `batch_capture()`) -- raised here rather
+            than silently building a zero-section `TestReport` from an
+            empty waveform dict, which would be a report that looks like a
+            real (if trivial) pass/fail result but actually reflects no
+            successful capture at all.
+        ComparisonAnalysisError: via `ComparisonAnalyzer.analyze`, on the
+            batch/comparison path.
+    """
+    if report_format not in _VALID_REPORT_FORMATS:
+        raise ValueError(f"report_format must be one of {sorted(_VALID_REPORT_FORMATS)}, got {report_format!r}")
+    if mode not in _VALID_MODES:
+        raise ValueError(f"mode must be one of {sorted(_VALID_MODES)}, got {mode!r}")
+
+    batch_results = collector.batch_capture(
+        channels,
+        timebase_scales=timebase_scales,
+        voltage_scales=voltage_scales,
+        triggers_per_config=triggers_per_config,
+        progress_callback=progress_callback,
+        max_consecutive_failures=max_consecutive_failures,
+    )
+
+    comparison: Optional[ComparisonResult] = None
+    if len(batch_results) == 1:
+        entry = batch_results[0]
+        if "error" in entry:
+            raise RuntimeError(f"Capture failed, no report can be built: {entry['error']}")
+        report = _build_single_run_report(entry["waveforms"], metadata, criteria_set=criteria_set)
+    else:
+        comparison, report = _build_batch_report(
+            collector,
+            batch_results,
+            output_dir,
+            metadata,
+            mode=mode,
+            criteria_set=criteria_set,
+            format=save_format,
+        )
+
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+
+    report_paths: Dict[str, Path] = {}
+    if report_format in (REPORT_FORMAT_MARKDOWN, REPORT_FORMAT_BOTH):
+        md_path = output_path / f"{_REPORT_BASENAME}{MarkdownReportGenerator().get_file_extension()}"
+        if MarkdownReportGenerator().generate(report, md_path):
+            report_paths[REPORT_FORMAT_MARKDOWN] = md_path
+        else:
+            # generate() returns False only for an environmental I/O failure
+            # (see its own docstring) -- a programming error propagates
+            # instead. Logged, not raised: a Markdown failure should not
+            # prevent a PDF that was also requested from still being tried.
+            logger.error(f"Markdown report generation failed writing to {md_path}; no file produced")
+
+    if report_format in (REPORT_FORMAT_PDF, REPORT_FORMAT_BOTH):
+        try:
+            pdf_generator = PDFReportGenerator()
+        except ImportError:
+            logger.warning("Skipping PDF report generation: reportlab is not installed. Install with: pip install reportlab")
+        else:
+            pdf_path = output_path / f"{_REPORT_BASENAME}{pdf_generator.get_file_extension()}"
+            if pdf_generator.generate(report, pdf_path):
+                report_paths[REPORT_FORMAT_PDF] = pdf_path
+            else:
+                logger.error(f"PDF report generation failed writing to {pdf_path}; no file produced")
+
+    return PipelineResult(report=report, comparison=comparison, report_paths=report_paths)
