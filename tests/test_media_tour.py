@@ -14,6 +14,7 @@ GENERATOR = REPO_ROOT / "scripts" / "media" / "make_demo_gif.py"
 ANNOTATION_GENERATOR = REPO_ROOT / "scripts" / "media" / "make_annotation_gif.py"
 GALLERY_GENERATOR = REPO_ROOT / "scripts" / "media" / "make_signal_gallery_gifs.py"
 SUPERPOSITION_GALLERY_GENERATOR = REPO_ROOT / "scripts" / "media" / "make_superposition_gallery_gifs.py"
+CLIPPING_GALLERY_GENERATOR = REPO_ROOT / "scripts" / "media" / "make_clipping_gallery_gifs.py"
 SMOKE = REPO_ROOT / "tests" / "test_examples_smoke.py"
 
 
@@ -209,3 +210,41 @@ def test_readme_superposition_gallery_matches_the_generator_exactly():
     assert len(referenced) == len(combo_names), f"README references {len(referenced)} superposition-*.gif images but COMBOS has {len(combo_names)} entries"
     assert set(referenced) == combo_names, f"README's superposition gallery images {sorted(set(referenced))} don't match COMBOS {sorted(combo_names)}"
     assert len(referenced) == len(set(referenced)), f"README references a superposition-*.gif image more than once: {referenced}"
+
+
+def _clipping_demos():
+    return _table(CLIPPING_GALLERY_GENERATOR, "DEMOS")
+
+
+def _clipping_demo_names():
+    return {entry["name"] for entry in _clipping_demos()}
+
+
+def test_clipping_demos_table_is_not_empty():
+    assert _clipping_demos(), "parsed no DEMOS entries -- the table shape changed"
+
+
+def test_clipping_demos_have_no_duplicate_or_missing_names():
+    entries = _clipping_demos()
+    names = [entry["name"] for entry in entries]
+    assert len(names) == len(set(names)), f"DEMOS has duplicate demo names: {names}"
+    assert all(names), "DEMOS has an entry with an empty/falsy name"
+
+
+def test_readme_clipping_gallery_matches_the_generator_exactly():
+    """The README's clipping gallery must embed exactly the GIFs the script writes.
+
+    Regex over the README rather than a fixed count, mirroring
+    test_readme_signal_gallery_matches_the_generator_exactly and
+    test_readme_superposition_gallery_matches_the_generator_exactly: this fails
+    the moment someone adds a demo to DEMOS without adding its <img> (or vice
+    versa), or typos a filename, rather than silently shipping a stale gallery.
+    """
+    readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
+    referenced = re.findall(r"docs/images/clipping-([a-z0-9_]+)\.gif", readme)
+
+    demo_names = _clipping_demo_names()
+    assert referenced, "README has no docs/images/clipping-*.gif references -- was the gallery section removed?"
+    assert len(referenced) == len(demo_names), f"README references {len(referenced)} clipping-*.gif images but DEMOS has {len(demo_names)} entries"
+    assert set(referenced) == demo_names, f"README's clipping gallery images {sorted(set(referenced))} don't match DEMOS {sorted(demo_names)}"
+    assert len(referenced) == len(set(referenced)), f"README references a clipping-*.gif image more than once: {referenced}"
