@@ -229,3 +229,99 @@ def test_make_waveform_combined():
     assert wf.sample_rate == pytest.approx(100_000.0)
     assert wf.record_length == 2_000
     np.testing.assert_allclose(wf.voltage, 1.5)
+
+
+def test_clip_level_zero_is_a_true_no_op_regardless_of_softness():
+    base = dict(kind="sine", frequency=1_000.0, amplitude=1.0, noise_rms=0.05, drift_amplitude=0.1, seed=7)
+    unclipped = synthesize(SignalSpec(**base), 1_000_000.0, 5_000)
+    off_hard = synthesize(SignalSpec(clip_level=0.0, clip_softness=0.0, **base), 1_000_000.0, 5_000)
+    off_soft = synthesize(SignalSpec(clip_level=0.0, clip_softness=1.0, **base), 1_000_000.0, 5_000)
+    np.testing.assert_array_equal(unclipped, off_hard)
+    np.testing.assert_array_equal(unclipped, off_soft)
+
+
+def test_hard_clip_flat_tops_the_rail():
+    spec = SignalSpec(kind="sine", frequency=100.0, amplitude=2.0, clip_level=1.0, clip_softness=0.0, seed=1)
+    v = synthesize(spec, sample_rate=1_000_000.0, n_points=100_000)
+    assert np.max(np.abs(v)) == pytest.approx(1.0, abs=1e-9)
+    at_rail = np.isclose(v, 1.0, atol=1e-9) | np.isclose(v, -1.0, atol=1e-9)
+    # Evidence of genuine flat-topping, not merely a peak touch: many samples
+    # pinned to the rail, and specifically several of them consecutive.
+    assert at_rail.sum() > 10
+    consecutive = np.diff(np.flatnonzero(at_rail))
+    assert np.any(consecutive == 1), "no consecutive flat-topped samples found -- not a genuine flat top"
+
+
+def test_soft_clip_matches_independent_tanh_reconstruction():
+    spec_clean = SignalSpec(kind="sine", frequency=100.0, amplitude=2.0, seed=1)
+    spec_clipped = SignalSpec(kind="sine", frequency=100.0, amplitude=2.0, clip_level=1.0, clip_softness=1.0, seed=1)
+    pre_clip = synthesize(spec_clean, sample_rate=100_000.0, n_points=5_000)
+    actual = synthesize(spec_clipped, sample_rate=100_000.0, n_points=5_000)
+    expected = 1.0 * np.tanh(pre_clip / 1.0)
+    np.testing.assert_allclose(actual, expected, rtol=0, atol=1e-12)
+
+
+def test_intermediate_softness_is_the_linear_blend_of_hard_and_soft():
+    clip_level = 1.0
+    softness = 0.5
+    spec_clean = SignalSpec(kind="sine", frequency=100.0, amplitude=2.0, seed=1)
+    spec_clipped = SignalSpec(kind="sine", frequency=100.0, amplitude=2.0, clip_level=clip_level, clip_softness=softness, seed=1)
+    pre_clip = synthesize(spec_clean, sample_rate=100_000.0, n_points=5_000)
+    actual = synthesize(spec_clipped, sample_rate=100_000.0, n_points=5_000)
+    u = pre_clip / clip_level
+    hard = np.clip(u, -1.0, 1.0)
+    soft = np.tanh(u)
+    expected = clip_level * ((1.0 - softness) * hard + softness * soft)
+    np.testing.assert_allclose(actual, expected, rtol=0, atol=1e-12)
+
+
+def test_clipping_applies_after_noise_not_before():
+    # A clean DC level that never itself approaches clip_level, but with
+    # noise_rms large enough that some noisy samples exceed it -- if clipping
+    # were applied to the clean signal BEFORE noise was added, those samples
+    # would come out as an unclipped offset+noise value instead of exactly
+    # clamped to the rail.
+    base = SignalSpec(kind="dc", offset=0.2, noise_rms=0.5, seed=11)
+    clipped = SignalSpec(kind="dc", offset=0.2, noise_rms=0.5, clip_level=0.4, clip_softness=0.0, seed=11)
+    pre_clip = synthesize(base, 10_000.0, 20_000)
+    actual = synthesize(clipped, 10_000.0, 20_000)
+    exceeded = np.abs(pre_clip) > 0.4
+    assert exceeded.sum() > 0, "test setup didn't actually produce any samples that exceed clip_level"
+    np.testing.assert_allclose(actual[exceeded], np.clip(pre_clip[exceeded], -0.4, 0.4), rtol=0, atol=1e-12)
+    np.testing.assert_allclose(actual[~exceeded], pre_clip[~exceeded], rtol=0, atol=1e-12)
+
+
+def test_negative_clip_level_raises():
+    with pytest.raises(exceptions.InvalidParameterError):
+        synthesize(SignalSpec(clip_level=-0.1), 1_000.0, 100)
+
+
+@pytest.mark.parametrize("bad_softness", [-0.1, 1.1])
+def test_clip_softness_out_of_range_raises(bad_softness):
+    with pytest.raises(exceptions.InvalidParameterError):
+        synthesize(SignalSpec(clip_level=1.0, clip_softness=bad_softness), 1_000.0, 100)
+
+
+def test_clipping_raises_thd_via_odd_harmonic_distortion():
+    """The actual point of the feature: clipping is a classic distortion source.
+
+    Compares THD of a clean sine against a hard-clipped version of the SAME
+    sine (same seed/frequency/amplitude) via the repo's own canonical THD
+    entry point, scpi_control.analysis.FFTAnalyzer.thd_of_waveform.
+    """
+    from scpi_control.analysis import FFTAnalyzer
+
+    sample_rate = 1_000_000.0
+    n_points = 50_000
+    clean_spec = SignalSpec(kind="sine", frequency=1_000.0, amplitude=2.0, seed=1)
+    clipped_spec = SignalSpec(kind="sine", frequency=1_000.0, amplitude=2.0, clip_level=1.0, clip_softness=0.0, seed=1)
+
+    clean_wf = make_waveform(clean_spec, sample_rate=sample_rate, n_points=n_points)
+    clipped_wf = make_waveform(clipped_spec, sample_rate=sample_rate, n_points=n_points)
+
+    thd_clean = FFTAnalyzer.thd_of_waveform(clean_wf)
+    thd_clipped = FFTAnalyzer.thd_of_waveform(clipped_wf)
+
+    assert thd_clean is not None
+    assert thd_clipped is not None
+    assert thd_clipped > thd_clean * 10, f"expected clipping to measurably raise THD: clean={thd_clean!r}%, clipped={thd_clipped!r}%"

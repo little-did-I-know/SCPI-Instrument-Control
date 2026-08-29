@@ -126,6 +126,25 @@ class SignalSpec:
             explicitly on a spec passed to `stream()` to opt out of the
             auto-fill and choose jitter's entropy source independently of
             `seed`.
+        clip_level: Volts, symmetric clipping/saturation threshold (0 = off).
+            Models a non-linear output stage (an amplifier or probe front-end
+            driven into its rails) clipping whatever signal reaches it, so --
+            unlike every kind-specific field above -- it is KIND-AGNOSTIC,
+            same as noise_rms/drift_amplitude/glitch_rate: it applies equally
+            to "sine", "dc", a jittered/ringing edge, or anything else this
+            module can produce. It is also the LAST impairment `synthesize()`
+            applies, after drift, glitches, and noise, so a noisy sample that
+            happens to land past the rail gets flattened too, exactly as a
+            real saturating stage would clip the noise riding on its input --
+            deliberate, not a bug. See `clip_softness` for the shape of the
+            clip curve.
+        clip_softness: 0 = hard clip (an exact flat top at +/-clip_level,
+            `np.clip`); blends toward `clip_level * tanh(v / clip_level)`
+            soft saturation as it approaches 1.0, which is pure tanh. The
+            blend is linear in the two curves' own output, not in some other
+            parameterization: `clip_level * ((1 - clip_softness) * hard +
+            clip_softness * soft)`. Must be in [0, 1]; only used when
+            clip_level > 0.
     """
 
     kind: str = "sine"
@@ -167,6 +186,10 @@ class SignalSpec:
     # Appended after jitter_rms -- the current last field -- for the same
     # don't-reorder-positional-construction reason as every field above it.
     jitter_seed: Optional[int] = None  # decouples jitter's boundary RNG from `seed`; None falls back to `seed`. stream() auto-fills this with the pre-bump `seed` per chunk -- see the docstring above
+    # Appended after jitter_seed -- the current last field -- for the same
+    # don't-reorder-positional-construction reason as every field above it.
+    clip_level: float = 0.0  # volts, symmetric clipping/saturation threshold (0 = off); kind-agnostic, applied LAST -- see the docstring above
+    clip_softness: float = 0.0  # 0 = hard clip, blends toward tanh-based soft saturation as it approaches 1.0; only used when clip_level > 0
 
 
 @dataclass(frozen=True)
@@ -474,6 +497,10 @@ def _validate(spec: SignalSpec, sample_rate: float, n_points: int) -> None:
         raise exceptions.InvalidParameterError(f"ringing_damping must be non-negative: {spec.ringing_damping}")
     if not np.isfinite(spec.jitter_rms) or spec.jitter_rms < 0:
         raise exceptions.InvalidParameterError(f"jitter_rms must be a non-negative, finite number: {spec.jitter_rms}")
+    if spec.clip_level < 0:
+        raise exceptions.InvalidParameterError(f"clip_level must be non-negative: {spec.clip_level}")
+    if not 0.0 <= spec.clip_softness <= 1.0:
+        raise exceptions.InvalidParameterError(f"clip_softness must be between 0 and 1: {spec.clip_softness}")
 
 
 def _impairment_rng(seed: Optional[int], stream_index: int) -> np.random.Generator:
@@ -695,6 +722,17 @@ def synthesize(spec: SignalSpec, sample_rate: float, n_points: int, t0: float = 
             np.add.at(samples, positions, signs * spec.glitch_amplitude)
     if spec.noise_rms > 0:
         samples = samples + rng.normal(0.0, spec.noise_rms, n_points)
+    if spec.clip_level > 0:
+        # LAST impairment, deliberately: a real saturating output stage clips
+        # whatever reaches it, drift/glitches/noise included -- so noise near
+        # the rail gets visibly flattened too. See SignalSpec.clip_level.
+        # clip_softness=0 -> exact np.clip (flat-topped hard clip);
+        # clip_softness=1 -> exact clip_level*tanh(u) soft saturation;
+        # anything between is the linear blend of those two curves' outputs.
+        u = samples / spec.clip_level
+        hard = np.clip(u, -1.0, 1.0)
+        soft = np.tanh(u)
+        samples = spec.clip_level * ((1.0 - spec.clip_softness) * hard + spec.clip_softness * soft)
     return samples
 
 
