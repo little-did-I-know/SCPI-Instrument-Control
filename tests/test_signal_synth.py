@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 
 from scpi_control import exceptions
-from scpi_control.signal_synth import SignalSpec, make_waveform, stream, synthesize
+from scpi_control.signal_synth import SignalSpec, SuperposedSignal, make_waveform, make_waveform_combined, stream, synthesize, synthesize_combined
 
 
 def _dominant_frequency(voltage, sample_rate):
@@ -189,3 +189,43 @@ def test_stream_validates_at_call_time():
         stream(SignalSpec(), 1_000.0, 100, duration=-1.0)
     with pytest.raises(exceptions.InvalidParameterError):
         stream(SignalSpec(kind="sawtooth"), 1_000.0, 100)
+
+
+def test_superposed_dc_components_sum():
+    signal = SuperposedSignal((SignalSpec(kind="dc", offset=1.0), SignalSpec(kind="dc", offset=0.5)))
+    v = synthesize_combined(signal, 1_000.0, 100)
+    np.testing.assert_allclose(v, 1.5)
+
+
+def test_superposed_noise_reflects_the_noisy_components_variance():
+    quiet = SignalSpec(kind="dc", offset=0.0, noise_rms=0.0)
+    noisy = SignalSpec(kind="dc", offset=0.0, noise_rms=0.5, seed=1)
+    signal = SuperposedSignal((quiet, noisy))
+    v = synthesize_combined(signal, 1_000.0, 50_000)
+    assert np.std(v) == pytest.approx(0.5, rel=0.05)
+
+
+def test_superposed_independently_seeded_components_are_reproducible():
+    signal = SuperposedSignal(
+        (
+            SignalSpec(kind="sine", frequency=1_000.0, noise_rms=0.02, seed=5),
+            SignalSpec(kind="sine", frequency=3_000.0, noise_rms=0.02, seed=9),
+        )
+    )
+    a = synthesize_combined(signal, 1_000_000.0, 2_000)
+    b = synthesize_combined(signal, 1_000_000.0, 2_000)
+    np.testing.assert_array_equal(a, b)
+
+
+def test_superposed_signal_requires_at_least_two_components():
+    with pytest.raises(exceptions.InvalidParameterError):
+        SuperposedSignal(components=(SignalSpec(),))
+
+
+def test_make_waveform_combined():
+    signal = SuperposedSignal((SignalSpec(kind="dc", offset=1.0), SignalSpec(kind="dc", offset=0.5)))
+    wf = make_waveform_combined(signal, sample_rate=100_000.0, n_points=2_000, channel=2)
+    assert wf.channel == 2
+    assert wf.sample_rate == pytest.approx(100_000.0)
+    assert wf.record_length == 2_000
+    np.testing.assert_allclose(wf.voltage, 1.5)

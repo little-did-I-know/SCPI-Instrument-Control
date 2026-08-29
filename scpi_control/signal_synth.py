@@ -8,7 +8,7 @@ docs and tests; the mock coupling and code-conversion layers are kind-agnostic.
 
 import time
 from dataclasses import dataclass, replace
-from typing import Callable, Dict, Iterator, Optional, Tuple, Union
+from typing import Any, Callable, Dict, Iterator, Optional, Tuple, Union
 
 import numpy as np
 
@@ -164,6 +164,38 @@ class SignalSpec:
     # Appended after jitter_rms -- the current last field -- for the same
     # don't-reorder-positional-construction reason as every field above it.
     jitter_seed: Optional[int] = None  # decouples jitter's boundary RNG from `seed`; None falls back to `seed`. stream() auto-fills this with the pre-bump `seed` per chunk -- see the docstring above
+
+
+@dataclass(frozen=True)
+class SuperposedSignal:
+    """Two or more independently-synthesized signals summed into one trace.
+
+    Each component keeps its own full SignalSpec -- kind, impairments, seed --
+    and is synthesized in isolation; the combined waveform is their plain
+    elementwise sum, with no state shared between components. Useful for
+    modeling e.g. a tone riding on an independently-seeded noise floor, or two
+    unrelated tones summed onto one channel.
+
+    Attributes:
+        components: Two or more SignalSpecs to sum. synthesize_combined() and
+            make_waveform_combined() dispatch each one exactly as
+            synthesize()/make_waveform() would on its own, so a bad component
+            parameter surfaces as the same InvalidParameterError it always has.
+        dut: Optional device-under-test model (e.g. dut.RCLowPass), applied to
+            the SUMMED signal rather than to any one component. Mirrors
+            connection/mock/loopback.py's AwgLoopback.dut: stored here so a
+            caller can carry a DUT alongside a signal source, but only
+            connection/mock/synth.py's raw_volts actually applies it (it is
+            the only layer that knows the sample rate and can render the
+            filter's lead-in).
+    """
+
+    components: Tuple[SignalSpec, ...]
+    dut: Optional[Any] = None
+
+    def __post_init__(self) -> None:
+        if len(self.components) < 2:
+            raise exceptions.InvalidParameterError(f"SuperposedSignal needs at least 2 components to combine, got {len(self.components)}")
 
 
 # How close to a whole cycle a sample may sit and still count as landing exactly
@@ -663,6 +695,31 @@ def synthesize(spec: SignalSpec, sample_rate: float, n_points: int, t0: float = 
     return samples
 
 
+def synthesize_combined(signal: SuperposedSignal, sample_rate: float, n_points: int, t0: float = 0.0) -> np.ndarray:
+    """Generate voltage samples for a SuperposedSignal: the sum of its components.
+
+    Each component is synthesized independently -- via synthesize(), so it
+    keeps its own full impairments (noise, drift, glitches, jitter, seed) -- and
+    the results are summed elementwise. No state is shared between components.
+    A bad component parameter is caught by synthesize()'s own _validate(), the
+    same way it always is; the SuperposedSignal itself was already validated at
+    construction (SuperposedSignal.__post_init__).
+
+    Args:
+        signal: The components to sum.
+        sample_rate: Samples per second.
+        n_points: Number of samples.
+        t0: Time of the first sample in seconds (shifts periodic signals).
+
+    Returns:
+        float64 voltage array of length n_points.
+    """
+    total = synthesize(signal.components[0], sample_rate, n_points, t0=t0)
+    for component in signal.components[1:]:
+        total = total + synthesize(component, sample_rate, n_points, t0=t0)
+    return total
+
+
 def stream(
     spec: SignalSpec,
     sample_rate: float,
@@ -740,5 +797,15 @@ def make_waveform(spec: SignalSpec, sample_rate: float, n_points: int, channel: 
     from scpi_control.waveform import WaveformData
 
     voltage = synthesize(spec, sample_rate, n_points)
+    time = np.arange(n_points) / sample_rate
+    return WaveformData(time=time, voltage=voltage, channel=channel, sample_rate=sample_rate)
+
+
+def make_waveform_combined(signal: SuperposedSignal, sample_rate: float, n_points: int, channel: int = 1):
+    """Generate a WaveformData from a SuperposedSignal, mirroring make_waveform()."""
+    # Function-level import: see make_waveform()'s identical import above.
+    from scpi_control.waveform import WaveformData
+
+    voltage = synthesize_combined(signal, sample_rate, n_points)
     time = np.arange(n_points) / sample_rate
     return WaveformData(time=time, voltage=voltage, channel=channel, sample_rate=sample_rate)
