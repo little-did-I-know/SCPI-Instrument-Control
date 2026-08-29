@@ -424,3 +424,24 @@ def test_superposed_signal_dut_visibly_smooths_a_square_component():
     soft_scope.disconnect()
 
     assert np.max(np.abs(np.diff(filtered))) < np.max(np.abs(np.diff(unfiltered)))
+
+
+def test_spec_for_rejects_a_superposed_signal():
+    """spec_for()'s contract is a plain SignalSpec -- it was never taught about
+    SuperposedSignal, which raw_volts' own isinstance check keeps upstream of
+    every real call site. Calling spec_for() directly on a channel configured
+    with a SuperposedSignal must fail loudly (InvalidParameterError) rather
+    than silently handing back a SuperposedSignal where a SignalSpec was
+    promised."""
+    from scpi_control import exceptions
+    from scpi_control.connection.mock.synth import spec_for
+
+    signal = SuperposedSignal(
+        (
+            SignalSpec(kind="sine", frequency=1_000.0, amplitude=1.0),
+            SignalSpec(kind="dc", offset=0.1),
+        )
+    )
+    _, conn = _scope(signals={1: signal})
+    with pytest.raises(exceptions.InvalidParameterError):
+        spec_for(conn, 1)

@@ -9,10 +9,11 @@ does not model offset (include_offset=False).
 """
 
 from dataclasses import replace
-from typing import TYPE_CHECKING, Dict, Optional
+from typing import TYPE_CHECKING, Any, Callable, Dict, Optional
 
 import numpy as np
 
+from scpi_control import exceptions
 from scpi_control.signal_synth import PERIODIC_KINDS, SignalSpec, SuperposedSignal, synthesize, synthesize_combined
 
 if TYPE_CHECKING:
@@ -65,7 +66,13 @@ def _trigger_crossing(spec: SignalSpec, level: float, rising: bool) -> Optional[
     return float(indices[0] + 1) * (period / n)
 
 
-def spec_for(conn: "MockConnection", channel: int) -> SignalSpec:
+# Sentinel distinguishing "no source given, look it up" from "source is None"
+# (a channel with nothing configured is a legitimate, common case that must
+# still resolve to a default spec below).
+_UNRESOLVED = object()
+
+
+def spec_for(conn: "MockConnection", channel: int, source: Any = _UNRESOLVED) -> SignalSpec:
     """The signal a channel 'sees': user-specified, else the channel default.
 
     A stored value is either a SignalSpec or a zero-argument callable returning
@@ -74,11 +81,33 @@ def spec_for(conn: "MockConnection", channel: int) -> SignalSpec:
     captures between captures. Everything downstream (point_count, raw_volts, the
     trigger-crossing search, the three vendor personalities) keeps receiving a
     plain SignalSpec and never learns the difference.
+
+    Does NOT handle SuperposedSignal: a channel's stored value can also be a
+    SuperposedSignal (raw_volts' own combined-signal branch), which has no
+    single SignalSpec to hand back. Callers must check for that case
+    themselves -- via `isinstance(source, SuperposedSignal)` -- BEFORE calling
+    this function, exactly as raw_volts() does upstream of its call here. If a
+    SuperposedSignal reaches this function anyway, it raises rather than
+    silently handing one back where a SignalSpec was promised.
+
+    Args:
+        source: The already-resolved `conn._signals.get(channel)` value, when
+            a caller has one on hand (raw_volts does, to avoid looking the
+            dict up twice per acquisition). Omit to have this function do the
+            lookup itself.
+
+    Raises:
+        exceptions.InvalidParameterError: if the resolved value is a
+            SuperposedSignal.
     """
-    source = conn._signals.get(channel)
+    if source is _UNRESOLVED:
+        source = conn._signals.get(channel)
     if source is None:
         return _DEFAULT_SPECS.get(channel, _FALLBACK_SPEC)
-    return source() if callable(source) else source
+    resolved = source() if callable(source) else source
+    if isinstance(resolved, SuperposedSignal):
+        raise exceptions.InvalidParameterError(f"channel {channel} is configured with a SuperposedSignal, which has no single SignalSpec -- check for SuperposedSignal before calling spec_for()")
+    return resolved
 
 
 def point_count(conn: "MockConnection", channel: int) -> int:
@@ -88,6 +117,44 @@ def point_count(conn: "MockConnection", channel: int) -> int:
         return len(explicit)
     window = DIVISIONS * conn.timebase
     return max(2, min(MAX_POINTS, int(round(conn.sample_rate * window))))
+
+
+def _bump_seed(spec: SignalSpec, count: int) -> SignalSpec:
+    """Advance `spec.seed` by the acquisition count, unless it's None (fresh
+    randomness every call -- a seed of None + count is still None, so there's
+    nothing to bump)."""
+    return spec if spec.seed is None else replace(spec, seed=spec.seed + count)
+
+
+def _render_with_dut(render: Callable[[int, float], np.ndarray], dut: Optional[Any], sample_rate: float, n: int, t0: float) -> np.ndarray:
+    """Render `n` samples starting at `t0`, running them through `dut` (if any).
+
+    `render(n_points, t0)` synthesizes exactly that many seed-bumped samples --
+    a thunk over synthesize() or synthesize_combined() plus whatever spec/
+    SuperposedSignal the caller already bumped, so this helper stays agnostic
+    to which one is in play.
+
+    A DUT filter is STATEFUL, unlike every generator in signal_synth. Filtering
+    the bare capture would start from y=0 and put a settling transient at the
+    head of every acquisition, so when a dut is given, a lead-in is rendered
+    BEFORE t0, the whole extended window is filtered, and the lead-in is
+    sliced back off -- the same fix, for the same reason, as the ringing
+    impairment's pre-t0 window (signal_synth.py's ringing branch).
+
+    Note the extended t0 is computed as a subtraction (`t0 - warmup /
+    sample_rate`) rather than by shifting the index range the way the ringing
+    path does, so the sample at index `warmup` can land a few ULP from `t0`.
+    That is deliberate: the output is low-pass filtered and then quantized, and
+    the relevant grid -- the FINER of the two callers feeding this function --
+    is many orders of magnitude coarser than a sub-femtosecond timebase
+    difference. See dut._WARMUP_TIME_CONSTANTS for the measured numbers behind
+    the lead-in's depth.
+    """
+    if dut is None:
+        return render(n, t0)
+    warmup = dut.warmup_samples(sample_rate)
+    extended = render(n + warmup, t0 - warmup / sample_rate)
+    return dut.apply(extended, sample_rate)[warmup:]
 
 
 def raw_volts(conn: "MockConnection", channel: int, n_override: Optional[int] = None) -> np.ndarray:
@@ -128,51 +195,33 @@ def raw_volts(conn: "MockConnection", channel: int, n_override: Optional[int] = 
         # count-based rule the single-spec path applies below, then the
         # per-acquisition components are recombined into a new SuperposedSignal
         # so synthesize_combined() sees the bumped seeds.
-        per_acquisition_components = tuple(component if component.seed is None else replace(component, seed=component.seed + count) for component in source.components)
+        per_acquisition_components = tuple(_bump_seed(component, count) for component in source.components)
         per_acquisition = replace(source, components=per_acquisition_components)
-        # NOT the getattr(conn._signals.get(channel), "dut", None) lookup the
-        # single-spec path uses below: that reads the same object here too
-        # (a SuperposedSignal is never wrapped in a callable), but `source`
-        # is already resolved above, so read `.dut` off it directly.
-        dut = source.dut
-        if dut is None:
-            return synthesize_combined(per_acquisition, conn.sample_rate, n, t0=t0)
-        # See the single-spec DUT branch below for why a lead-in is rendered
-        # and sliced off; the only difference here is synthesize_combined()
-        # sums every component over that same extended window before filtering.
-        warmup = dut.warmup_samples(conn.sample_rate)
-        extended = synthesize_combined(per_acquisition, conn.sample_rate, n + warmup, t0=t0 - warmup / conn.sample_rate)
-        return dut.apply(extended, conn.sample_rate)[warmup:]
+        # `source` is already resolved above (a SuperposedSignal is never
+        # wrapped in a callable), so read `.dut` off it directly.
+        return _render_with_dut(
+            lambda n_, t0_: synthesize_combined(per_acquisition, conn.sample_rate, n_, t0=t0_),
+            source.dut,
+            conn.sample_rate,
+            n,
+            t0,
+        )
 
-    spec = spec_for(conn, channel)
+    spec = spec_for(conn, channel, source)
     crossing = _trigger_crossing(spec, conn.trigger_level.get(channel, 0.0), _is_rising(conn.trigger_slope))
     if crossing is not None:
         t0 = crossing - (n / conn.sample_rate) / 2.0  # center of the SAMPLED span (may be shorter than the nominal window when MAX_POINTS clamps)
     else:
         t0 = count * window * _DRIFT_FRACTION  # untriggerable: free-run drift
-    per_acquisition = spec if spec.seed is None else replace(spec, seed=spec.seed + count)
-    dut = getattr(conn._signals.get(channel), "dut", None)
-    if dut is None:
-        return synthesize(per_acquisition, conn.sample_rate, n, t0=t0)
-    # A DUT filter is STATEFUL, unlike every generator in signal_synth. Filtering
-    # the bare capture would start from y=0 and put a settling transient at the
-    # head of every acquisition, so render a lead-in BEFORE t0, filter across the
-    # whole extended window, then slice the lead-in off -- the same fix, for the
-    # same reason, as the ringing impairment's pre-t0 window (signal_synth.py:381).
-    #
-    # Note the extended t0 is computed as a subtraction rather than by shifting
-    # the index range the way the ringing path does, so the sample at index
-    # `warmup` can land a few ULP from `t0`. That is deliberate here: the output
-    # is low-pass filtered and then quantized. The relevant grid is the FINER of
-    # the two this function feeds -- not the int8 path's 25 codes/div (~0.04 V at
-    # 1 V/div) but the modern dialect's WORD path at 6400 codes/div
-    # (siglent.py's _MODERN_CODE_PER_DIV_WORD), i.e. 0.15625 mV/LSB. A
-    # sub-femtosecond timebase difference is still many orders of magnitude below
-    # even that. The lead-in's DEPTH is sized against the same WORD grid rather
-    # than int8 -- see dut._WARMUP_TIME_CONSTANTS for the measured numbers.
-    warmup = dut.warmup_samples(conn.sample_rate)
-    extended = synthesize(per_acquisition, conn.sample_rate, n + warmup, t0=t0 - warmup / conn.sample_rate)
-    return dut.apply(extended, conn.sample_rate)[warmup:]
+    per_acquisition = _bump_seed(spec, count)
+    dut = getattr(source, "dut", None)
+    return _render_with_dut(
+        lambda n_, t0_: synthesize(per_acquisition, conn.sample_rate, n_, t0=t0_),
+        dut,
+        conn.sample_rate,
+        n,
+        t0,
+    )
 
 
 def payload_for(conn: "MockConnection", channel: int, *, include_offset: bool) -> bytes:
