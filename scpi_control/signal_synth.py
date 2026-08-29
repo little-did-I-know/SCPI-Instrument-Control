@@ -8,11 +8,14 @@ docs and tests; the mock coupling and code-conversion layers are kind-agnostic.
 
 import time
 from dataclasses import dataclass, replace
-from typing import Any, Callable, Dict, Iterator, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Any, Callable, Dict, Iterator, Optional, Tuple, Union
 
 import numpy as np
 
 from scpi_control import exceptions
+
+if TYPE_CHECKING:
+    from scpi_control.waveform import WaveformData
 
 
 @dataclass(frozen=True)
@@ -801,7 +804,7 @@ def make_waveform(spec: SignalSpec, sample_rate: float, n_points: int, channel: 
     return WaveformData(time=time, voltage=voltage, channel=channel, sample_rate=sample_rate)
 
 
-def make_waveform_combined(signal: SuperposedSignal, sample_rate: float, n_points: int, channel: int = 1):
+def make_waveform_combined(signal: SuperposedSignal, sample_rate: float, n_points: int, channel: int = 1) -> "WaveformData":
     """Generate a WaveformData from a SuperposedSignal, mirroring make_waveform()."""
     # Function-level import: see make_waveform()'s identical import above.
     from scpi_control.waveform import WaveformData
