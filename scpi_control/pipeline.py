@@ -629,8 +629,9 @@ def run_capture_pipeline(
 
     report_paths: Dict[str, Path] = {}
     if report_format in (REPORT_FORMAT_MARKDOWN, REPORT_FORMAT_BOTH):
-        md_path = output_path / f"{_REPORT_BASENAME}{MarkdownReportGenerator().get_file_extension()}"
-        if MarkdownReportGenerator().generate(report, md_path):
+        markdown_generator = MarkdownReportGenerator()
+        md_path = output_path / f"{_REPORT_BASENAME}{markdown_generator.get_file_extension()}"
+        if markdown_generator.generate(report, md_path):
             report_paths[REPORT_FORMAT_MARKDOWN] = md_path
         else:
             # generate() returns False for an environmental I/O failure OR a
