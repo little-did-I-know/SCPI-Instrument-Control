@@ -215,10 +215,13 @@ def test_to_report_waveform_defaults_probe_ratio_and_coupling_when_provenance_mi
 # --------------------------------------------------------------------------
 
 
-def _batch_collector() -> DataCollector:
+def _connected_two_channel_collector() -> DataCollector:
     """A connected mock-backed DataCollector with distinct per-channel
     signals, so a channel/label mix-up in either construction path would be
-    caught by the equivalence check below."""
+    caught by the equivalence check below. Shared by both the batch/
+    comparison tests and the single-run (Task 4) tests below -- their
+    MockConnection setups were previously two byte-for-byte identical copies
+    (`_batch_collector`/`_single_run_collector`)."""
     conn = MockConnection(
         channel_states={1: True, 2: True},
         sample_rate=100_000.0,
@@ -257,7 +260,7 @@ def test_batch_report_matches_hand_built_runset_in_mode_batch(tmp_path):
     `batch_capture()` + `_build_batch_report` must produce the SAME
     `ComparisonResult` a hand-built `RunSet` (examples/batch_report.py's
     pattern) produces for the identical underlying captures."""
-    dc = _batch_collector()
+    dc = _connected_two_channel_collector()
     try:
         batch_results = dc.batch_capture([1, 2], triggers_per_config=3)
         assert len(batch_results) == 3
@@ -282,7 +285,7 @@ def test_batch_report_matches_hand_built_runset_in_mode_batch(tmp_path):
 
 
 def test_batch_report_mode_comparison_produces_deltas_vs_baseline(tmp_path):
-    dc = _batch_collector()
+    dc = _connected_two_channel_collector()
     try:
         batch_results = dc.batch_capture([1, 2], triggers_per_config=2)
         assert len(batch_results) == 2
@@ -306,7 +309,7 @@ def test_batch_report_excludes_error_entries_with_a_logged_warning(tmp_path, cap
     carrying `"error"`) must not be silently included as if it had
     succeeded. Chosen handling: skip it from the RunSet and log a warning
     naming the entry and its capture error."""
-    dc = _batch_collector()
+    dc = _connected_two_channel_collector()
     try:
         batch_results = dc.batch_capture([1, 2], triggers_per_config=3)
         assert len(batch_results) == 3
@@ -331,7 +334,7 @@ def test_batch_report_raises_when_too_few_runs_survive_errors(tmp_path):
     actionable `PipelineCaptureError` naming the total entry count, how many
     failed, a sample of the actual failure text, and how many runs would
     survive."""
-    dc = _batch_collector()
+    dc = _connected_two_channel_collector()
     try:
         batch_results = dc.batch_capture([1, 2], triggers_per_config=3)
         assert len(batch_results) == 3
@@ -358,7 +361,7 @@ def test_batch_report_raises_names_partial_failures_too_few_to_reach_minimum(tmp
     """A batch where SOME entries survive, but not enough to reach the
     RunSet minimum of 2, must still name the failure(s) that caused it --
     not just the count that failed."""
-    dc = _batch_collector()
+    dc = _connected_two_channel_collector()
     try:
         batch_results = dc.batch_capture([1, 2], triggers_per_config=3)
         assert len(batch_results) == 3
@@ -385,24 +388,6 @@ def test_batch_report_raises_names_partial_failures_too_few_to_reach_minimum(tmp
 # --------------------------------------------------------------------------
 
 
-def _single_run_collector() -> DataCollector:
-    """Mirrors `_capture_square_waves`'s signal, but returns the connected
-    `DataCollector` itself (not a captured dict) -- `run_capture_pipeline`
-    owns calling `batch_capture()` internally."""
-    conn = MockConnection(
-        channel_states={1: True, 2: True},
-        sample_rate=100_000.0,
-        timebase=1e-3,
-        signals={
-            1: SignalSpec(kind="square", frequency=_FREQUENCY_HZ, amplitude=_AMPLITUDE_V, noise_rms=0.0, seed=7),
-            2: SignalSpec(kind="square", frequency=_FREQUENCY_HZ, amplitude=_AMPLITUDE_V, noise_rms=0.0, seed=8),
-        },
-    )
-    dc = DataCollector("mock", connection=conn)
-    dc.connect()
-    return dc
-
-
 def _reportlab_available() -> bool:
     try:
         import reportlab  # noqa: F401
@@ -416,7 +401,7 @@ def test_run_capture_pipeline_routes_plain_call_to_single_run_path(tmp_path):
     output dir, and metadata -- must land on the single-run path
     automatically, with no `ComparisonResult` and exactly one `TestReport`
     section per channel."""
-    dc = _single_run_collector()
+    dc = _connected_two_channel_collector()
     try:
         result = run_capture_pipeline(dc, [1, 2], str(tmp_path), _metadata())
     finally:
@@ -434,7 +419,7 @@ def test_run_capture_pipeline_routes_plain_call_to_single_run_path(tmp_path):
 
 
 def test_run_capture_pipeline_single_run_passing_criteria(tmp_path):
-    dc = _single_run_collector()
+    dc = _connected_two_channel_collector()
     try:
         result = run_capture_pipeline(dc, [1, 2], str(tmp_path), _metadata(), criteria_set=_passing_vpp_criteria())
     finally:
@@ -446,7 +431,7 @@ def test_run_capture_pipeline_single_run_passing_criteria(tmp_path):
 
 
 def test_run_capture_pipeline_single_run_failing_criteria(tmp_path):
-    dc = _single_run_collector()
+    dc = _connected_two_channel_collector()
     try:
         result = run_capture_pipeline(dc, [1, 2], str(tmp_path), _metadata(), criteria_set=_failing_frequency_criteria())
     finally:
@@ -461,7 +446,7 @@ def test_run_capture_pipeline_single_run_generates_pdf_when_reportlab_available(
     if not _reportlab_available():
         pytest.skip("reportlab not installed")
 
-    dc = _single_run_collector()
+    dc = _connected_two_channel_collector()
     try:
         result = run_capture_pipeline(dc, [1, 2], str(tmp_path), _metadata(), report_format=REPORT_FORMAT_BOTH)
     finally:
@@ -480,7 +465,7 @@ def test_run_capture_pipeline_pdf_only_skips_gracefully_without_reportlab(tmp_pa
     if _reportlab_available():
         pytest.skip("reportlab is installed in this environment; this test needs it absent")
 
-    dc = _single_run_collector()
+    dc = _connected_two_channel_collector()
     try:
         with caplog.at_level("WARNING", logger="scpi_control.pipeline"):
             result = run_capture_pipeline(dc, [1, 2], str(tmp_path), _metadata(), report_format=REPORT_FORMAT_PDF)
@@ -497,7 +482,7 @@ def test_run_capture_pipeline_routes_sweep_call_to_batch_path(tmp_path):
     `ComparisonResult` is returned alongside the `TestReport`, and it
     matches what calling the internal batch path directly would produce for
     the identical underlying captures."""
-    dc = _batch_collector()
+    dc = _connected_two_channel_collector()
     try:
         result = run_capture_pipeline(dc, [1, 2], str(tmp_path / "auto"), _metadata(), triggers_per_config=3, mode=MODE_BATCH)
     finally:
@@ -513,7 +498,7 @@ def test_run_capture_pipeline_routes_sweep_call_to_batch_path(tmp_path):
 
 
 def test_run_capture_pipeline_batch_mode_comparison(tmp_path):
-    dc = _batch_collector()
+    dc = _connected_two_channel_collector()
     try:
         result = run_capture_pipeline(dc, [1, 2], str(tmp_path), _metadata(), triggers_per_config=2, mode=MODE_COMPARISON)
     finally:
@@ -526,7 +511,7 @@ def test_run_capture_pipeline_batch_mode_comparison(tmp_path):
 
 
 def test_run_capture_pipeline_rejects_unknown_report_format(tmp_path):
-    dc = _single_run_collector()
+    dc = _connected_two_channel_collector()
     try:
         with pytest.raises(ValueError, match="report_format"):
             run_capture_pipeline(dc, [1, 2], str(tmp_path), _metadata(), report_format="xml")
@@ -535,7 +520,7 @@ def test_run_capture_pipeline_rejects_unknown_report_format(tmp_path):
 
 
 def test_run_capture_pipeline_rejects_unknown_mode(tmp_path):
-    dc = _single_run_collector()
+    dc = _connected_two_channel_collector()
     try:
         with pytest.raises(ValueError, match="mode"):
             run_capture_pipeline(dc, [1, 2], str(tmp_path), _metadata(), mode="not-a-real-mode")
@@ -547,7 +532,7 @@ def test_run_capture_pipeline_single_capture_error_raises_instead_of_empty_repor
     """An exactly-one-result batch whose sole entry failed (an `"error"`
     key) must raise rather than silently producing a zero-section
     `TestReport` that would look like a trivial pass."""
-    dc = _single_run_collector()
+    dc = _connected_two_channel_collector()
 
     def _failing_batch_capture(channels, **kwargs):
         return [{"waveforms": {}, "config": {}, "trigger_num": 0, "error": "simulated capture timeout"}]
@@ -573,7 +558,7 @@ def test_pipeline_capture_error_unifies_single_run_and_batch_failure_types(tmp_p
     caught: list = []
 
     # Single-run path: the sole capture attempt fails.
-    single_dc = _single_run_collector()
+    single_dc = _connected_two_channel_collector()
 
     def _failing_batch_capture(channels, **kwargs):
         return [{"waveforms": {}, "config": {}, "trigger_num": 0, "error": "simulated capture timeout"}]
@@ -588,7 +573,7 @@ def test_pipeline_capture_error_unifies_single_run_and_batch_failure_types(tmp_p
         single_dc.disconnect()
 
     # Batch path: every entry fails, dropping below the RunSet minimum.
-    batch_dc = _batch_collector()
+    batch_dc = _connected_two_channel_collector()
     try:
         batch_results = batch_dc.batch_capture([1, 2], triggers_per_config=3)
         for entry in batch_results:
