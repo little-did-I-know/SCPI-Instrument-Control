@@ -197,6 +197,7 @@ pip install "SCPI-Instrument-Control[all]"   # everything below
 | `[usb]` | USB-TMC, GPIB, and serial instruments via PyVISA |
 | `[hdf5]` | `.h5` waveform export |
 | `[fun]` | Vector graphics / XY-mode drawing |
+| `[mock]` | Nothing new -- names the mock/synthetic-signal tooling already in core, for discoverability |
 
 Requires Python 3.9+. The core install needs only NumPy, SciPy, and Matplotlib.
 
