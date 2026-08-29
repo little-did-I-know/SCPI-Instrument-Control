@@ -160,6 +160,34 @@ generator script advances an exact whole number of periods across all its
 frames and verifies the wrap-around numerically before writing the GIF.
 `dc` and `noise` have no cycle to align to and simply restart.
 
+## Combining signals on one channel
+
+Real channels rarely carry just one clean shape. `scpi_control.signal_synth`'s
+`SuperposedSignal` sums two or more independently-synthesized `SignalSpec`s —
+each with its own kind, impairments, and seed — onto a single channel via
+`synthesize_combined()`/`make_waveform_combined()`, the same way `MockConnection`
+can model a tone riding on a noise floor, two unrelated tones on one wire, or
+an interferer on top of a clean signal.
+
+<p align="center">
+  <!-- Same main-pinned form as the sections above; see that section's comment
+       about main-pinned URLs 404ing until merge. -->
+  <table align="center">
+    <tr>
+      <td align="center"><img src="https://raw.githubusercontent.com/little-did-I-know/SCPI-Instrument-Control/main/docs/images/superposition-sine_plus_noise.gif" alt="Scrolling trace of a synthesized 1 kHz sine wave with additive Gaussian noise" width="320"><br><sub><b>sine + noise</b></sub></td>
+      <td align="center"><img src="https://raw.githubusercontent.com/little-did-I-know/SCPI-Instrument-Control/main/docs/images/superposition-two_tone_beat.gif" alt="Scrolling trace of two summed sine waves, 1000 Hz and 1050 Hz, showing a 50 Hz beat envelope, looping seamlessly" width="320"><br><sub><b>two-tone beat</b></sub></td>
+    </tr>
+    <tr>
+      <td align="center"><img src="https://raw.githubusercontent.com/little-did-I-know/SCPI-Instrument-Control/main/docs/images/superposition-square_plus_spur.gif" alt="Scrolling trace of a synthesized 500 Hz square wave with a smaller 2.5 kHz sine spur riding on it, looping seamlessly" width="320"><br><sub><b>square + spur</b></sub></td>
+    </tr>
+  </table>
+</p>
+
+Each component keeps its own full `SignalSpec`, synthesized independently and
+summed with no shared state — the same seamless-loop verification as the
+gallery above applies wherever every component is periodic; `sine + noise`
+restarts instead, since noise has no cycle to align to.
+
 ## What you get
 
 |  | |
