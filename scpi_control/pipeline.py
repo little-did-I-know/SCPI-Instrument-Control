@@ -58,7 +58,11 @@ against the subclass, and only the subclass carries `.statistics`/`.label`.
 A conversion step is therefore required; `_to_report_waveform` below copies
 the physical-capture fields (time, voltage, channel, sample_rate,
 record_length, timebase, voltage_scale, voltage_offset, provenance) across
-without recomputing anything.
+without recomputing anything. It also pulls `probe_ratio`/`coupling` out of
+`provenance.channels[channel]` (a `Dict[int, ChannelSettings]`, see
+`scpi_control/provenance.py`) -- these are report-relevant instrument
+metadata that the captured `WaveformData` does not carry directly, only via
+its provenance snapshot.
 """
 
 import logging
@@ -83,10 +87,23 @@ def _to_report_waveform(waveform: CapturedWaveformData) -> ReportWaveformData:
     report package's `WaveformData` subclass (see the type-conversion note
     in this module's docstring for why the two are not the same type).
 
-    Copies only the physical-capture fields already present on the source;
-    report-only fields (`label`, `statistics`, `signal_type`, ...) are left
-    at their dataclass defaults for the caller to populate via `.analyze()`.
+    Copies the physical-capture fields already present on the source, plus
+    `probe_ratio`/`coupling` recovered from `waveform.provenance.channels`
+    (keyed by the ORIGINAL int channel number -- looked up here, before the
+    report `WaveformData.__post_init__` stringifies `channel`). Provenance,
+    or that channel's entry within it, may legitimately be absent (e.g. a
+    capture made with `provenance=False`, or a snapshot that failed --
+    `Waveform.acquire` logs a warning and returns provenance=None rather
+    than raising, per its own docstring); this conversion is no stricter
+    than that and simply leaves `probe_ratio`/`coupling` at their `None`
+    defaults in that case.
+
+    Remaining report-only fields (`label`, `statistics`, `signal_type`, ...)
+    are left at their dataclass defaults for the caller to populate via
+    `.analyze()`.
     """
+    channel_settings = waveform.provenance.channels.get(waveform.channel) if waveform.provenance is not None else None
+
     return ReportWaveformData(
         time=waveform.time,
         voltage=waveform.voltage,
@@ -97,6 +114,8 @@ def _to_report_waveform(waveform: CapturedWaveformData) -> ReportWaveformData:
         voltage_scale=waveform.voltage_scale,
         voltage_offset=waveform.voltage_offset,
         provenance=waveform.provenance,
+        probe_ratio=channel_settings.probe_ratio if channel_settings is not None else None,
+        coupling=channel_settings.coupling if channel_settings is not None else None,
     )
 
 

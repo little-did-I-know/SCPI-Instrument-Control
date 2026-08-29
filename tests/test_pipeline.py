@@ -11,12 +11,14 @@ value; the routing-by-result-count decision itself is Task 4's concern.
 """
 
 from datetime import datetime
+from pathlib import Path
 
 import pytest
 
 from scpi_control.automation import DataCollector
 from scpi_control.connection.mock import MockConnection
-from scpi_control.pipeline import _build_single_run_report
+from scpi_control.pipeline import _build_single_run_report, _to_report_waveform
+from scpi_control.report_generator.generators.markdown_generator import MarkdownReportGenerator
 from scpi_control.report_generator.models.criteria import ComparisonType, CriteriaSet, MeasurementCriteria
 from scpi_control.report_generator.models.report_data import ReportMetadata
 from scpi_control.signal_synth import SignalSpec
@@ -130,3 +132,60 @@ def test_no_criteria_set_still_populates_statistics_but_no_verdict():
         assert section.measurements == []
     assert report.get_all_measurements() == []
     assert report.overall_result == "INCONCLUSIVE"
+
+
+def test_to_report_waveform_carries_probe_ratio_and_coupling_from_provenance():
+    """`_to_report_waveform` must pull `probe_ratio`/`coupling` out of the
+    captured waveform's `provenance.channels` (keyed by the original int
+    channel number) -- these are silently dropped otherwise, even though
+    `markdown_generator.py` renders a "Probe Ratio" row from them and
+    `examples/report_generation_example.py` sets both fields deliberately."""
+    conn = MockConnection(
+        channel_states={1: True},
+        sample_rate=100_000.0,
+        timebase=1e-3,
+        signals={1: SignalSpec(kind="square", frequency=_FREQUENCY_HZ, amplitude=_AMPLITUDE_V, noise_rms=0.0, seed=7)},
+    )
+    dc = DataCollector("mock", connection=conn)
+    dc.connect()
+    try:
+        dc.scope.channel1.probe_ratio = 10.0
+        dc.scope.channel1.coupling = "AC"
+        waveforms = dc.capture_single([1])
+    finally:
+        dc.disconnect()
+
+    captured = waveforms[1]
+    assert captured.provenance is not None
+    assert captured.provenance.channels[1].probe_ratio == 10.0
+    assert captured.provenance.channels[1].coupling == "AC"
+
+    report_waveform = _to_report_waveform(captured)
+
+    assert report_waveform.probe_ratio == 10.0
+    assert report_waveform.coupling == "AC"
+    # channel is stringified by ReportWaveformData.__post_init__ -- the
+    # provenance lookup inside _to_report_waveform must happen against the
+    # ORIGINAL int channel, before that stringification.
+    assert report_waveform.channel == "1"
+
+    report_waveform.analyze()
+    rendered = MarkdownReportGenerator(include_plots=False)._generate_waveform_info(report_waveform, Path("."), "waveform")
+    assert "Probe Ratio" in rendered
+    assert "10.0:1" in rendered
+
+
+def test_to_report_waveform_defaults_probe_ratio_and_coupling_when_provenance_missing():
+    """A capture without provenance (or without that channel's entry) is a
+    real, valid case elsewhere (`Waveform.acquire(provenance=False)`, or a
+    failed snapshot that logs a warning and leaves `.provenance = None`) --
+    this conversion must not be stricter than that: it should fall back to
+    the field's own `None` default rather than raising."""
+    waveforms = _capture_square_waves()
+    captured = waveforms[1]
+    captured.provenance = None
+
+    report_waveform = _to_report_waveform(captured)
+
+    assert report_waveform.probe_ratio is None
+    assert report_waveform.coupling is None
