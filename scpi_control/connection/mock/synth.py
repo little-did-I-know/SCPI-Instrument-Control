@@ -130,7 +130,11 @@ def raw_volts(conn: "MockConnection", channel: int, n_override: Optional[int] = 
         # so synthesize_combined() sees the bumped seeds.
         per_acquisition_components = tuple(component if component.seed is None else replace(component, seed=component.seed + count) for component in source.components)
         per_acquisition = replace(source, components=per_acquisition_components)
-        dut = source.dut  # NOT the getattr(conn._signals.get(channel), "dut", None) lookup below: for a bare SuperposedSignal that reads the same object, but a SuperposedSignal is never wrapped in a callable, so `source` (already resolved above) is the right place to read it from directly.
+        # NOT the getattr(conn._signals.get(channel), "dut", None) lookup the
+        # single-spec path uses below: that reads the same object here too
+        # (a SuperposedSignal is never wrapped in a callable), but `source`
+        # is already resolved above, so read `.dut` off it directly.
+        dut = source.dut
         if dut is None:
             return synthesize_combined(per_acquisition, conn.sample_rate, n, t0=t0)
         # See the single-spec DUT branch below for why a lead-in is rendered
