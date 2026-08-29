@@ -18,7 +18,7 @@ from scpi_control.models import detect_model_from_idn
 if TYPE_CHECKING:
     import numpy as np
 
-    from scpi_control.signal_synth import SignalSpec
+    from scpi_control.signal_synth import SignalSpec, SuperposedSignal
 
 _PERSONALITIES = {
     "siglent": siglent,
@@ -74,7 +74,7 @@ class MockConnection(BaseConnection):
         # response the mock could not otherwise produce -- e.g. one with no
         # block header, to prove a BLOCK declaration against it is rejected.
         mock_raw_response: Optional[bytes] = None,
-        signals: Optional[Dict[int, Union["SignalSpec", Callable[[], "SignalSpec"]]]] = None,
+        signals: Optional[Dict[int, Union["SignalSpec", "SuperposedSignal", Callable[[], "SignalSpec"]]]] = None,
         sample_rate: float = 1_000.0,
         timebase: float = 1e-3,
         trigger_status: Optional[List[str]] = None,
@@ -129,7 +129,7 @@ class MockConnection(BaseConnection):
         # underscore-prefixed) because tests set it directly, mid-test, after
         # the write() that would otherwise select a response.
         self.mock_raw_response: Optional[bytes] = mock_raw_response
-        self._signals: Dict[int, Union["SignalSpec", Callable[[], "SignalSpec"]]] = dict(signals) if signals else {}
+        self._signals: Dict[int, Union["SignalSpec", "SuperposedSignal", Callable[[], "SignalSpec"]]] = dict(signals) if signals else {}
         self._acquisition_counts: Dict[int, int] = {}
         # Coupling default is dialect-specific: modern wire vocabulary is
         # {DC,AC,GND} (scpi_commands.py's _COUPLING_FROM_WIRE); legacy/LeCroy

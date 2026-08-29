@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING, Dict, Optional
 
 import numpy as np
 
-from scpi_control.signal_synth import PERIODIC_KINDS, SignalSpec, synthesize
+from scpi_control.signal_synth import PERIODIC_KINDS, SignalSpec, SuperposedSignal, synthesize, synthesize_combined
 
 if TYPE_CHECKING:
     from scpi_control.connection.mock.base import MockConnection
@@ -107,11 +107,40 @@ def raw_volts(conn: "MockConnection", channel: int, n_override: Optional[int] = 
             FULL record must still be synthesized as one call so a caller can
             slice consistent windows out of it afterwards.
     """
-    spec = spec_for(conn, channel)
+    source = conn._signals.get(channel)
     n = point_count(conn, channel) if n_override is None else n_override
     count = conn._acquisition_counts.get(channel, 0)
     conn._acquisition_counts[channel] = count + 1
     window = DIVISIONS * conn.timebase
+
+    if isinstance(source, SuperposedSignal):
+        # components[0] is the PRIMARY component: it alone drives trigger-level
+        # detection, exactly like the single-spec path below does with its one
+        # spec -- a SuperposedSignal has no single "kind", so _trigger_crossing
+        # cannot be asked about the combination as a whole.
+        primary = source.components[0]
+        crossing = _trigger_crossing(primary, conn.trigger_level.get(channel, 0.0), _is_rising(conn.trigger_slope))
+        if crossing is not None:
+            t0 = crossing - (n / conn.sample_rate) / 2.0  # center of the SAMPLED span (may be shorter than the nominal window when MAX_POINTS clamps)
+        else:
+            t0 = count * window * _DRIFT_FRACTION  # untriggerable: free-run drift
+        # Each component bumps its OWN seed independently by the same
+        # count-based rule the single-spec path applies below, then the
+        # per-acquisition components are recombined into a new SuperposedSignal
+        # so synthesize_combined() sees the bumped seeds.
+        per_acquisition_components = tuple(component if component.seed is None else replace(component, seed=component.seed + count) for component in source.components)
+        per_acquisition = replace(source, components=per_acquisition_components)
+        dut = source.dut  # NOT the getattr(conn._signals.get(channel), "dut", None) lookup below: for a bare SuperposedSignal that reads the same object, but a SuperposedSignal is never wrapped in a callable, so `source` (already resolved above) is the right place to read it from directly.
+        if dut is None:
+            return synthesize_combined(per_acquisition, conn.sample_rate, n, t0=t0)
+        # See the single-spec DUT branch below for why a lead-in is rendered
+        # and sliced off; the only difference here is synthesize_combined()
+        # sums every component over that same extended window before filtering.
+        warmup = dut.warmup_samples(conn.sample_rate)
+        extended = synthesize_combined(per_acquisition, conn.sample_rate, n + warmup, t0=t0 - warmup / conn.sample_rate)
+        return dut.apply(extended, conn.sample_rate)[warmup:]
+
+    spec = spec_for(conn, channel)
     crossing = _trigger_crossing(spec, conn.trigger_level.get(channel, 0.0), _is_rising(conn.trigger_slope))
     if crossing is not None:
         t0 = crossing - (n / conn.sample_rate) / 2.0  # center of the SAMPLED span (may be shorter than the nominal window when MAX_POINTS clamps)
