@@ -7426,6 +7426,33 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 <h2 id="unreleased">[Unreleased]<a class="headerlink" href="#unreleased" title="Permanent link">&para;</a></h2>
 <h3 id="added">Added<a class="headerlink" href="#added" title="Permanent link">&para;</a></h3>
 <ul>
+<li><strong><code>scpi_control.pipeline</code>, a capture-to-report pipeline.</strong> Previously
+  <code>DataCollector</code> (capture) and <code>report_generator</code> (analysis + reporting) had
+  never been wired together anywhere in the codebase -- turning a capture into
+  a report meant hand-writing the <code>WaveformData</code> conversion, <code>TestReport</code>/
+  <code>RunSet</code> construction, and criteria evaluation yourself, as
+  <code>examples/report_generation_example.py</code> and <code>examples/batch_report.py</code> do.
+  The new <code>run_capture_pipeline(collector, channels, output_dir, metadata,
+  ...)</code> entry point does this in one call: it captures via
+  <code>DataCollector.batch_capture()</code>, then routes automatically by how many
+  results come back -- exactly one (no timebase/voltage sweep, one trigger)
+  builds a single-run <code>TestReport</code> directly, two or more auto-constructs a
+  <code>Run</code>/<code>RunSet</code> and goes through the existing <code>ComparisonAnalyzer</code> -&gt;
+  <code>build_comparison_report</code> path (<code>MODE_BATCH</code> or <code>MODE_COMPARISON</code>, caller's
+  choice) -- so a caller never has to decide which path applies. Generates
+  Markdown and/or PDF via the existing, unmodified generators and returns a
+  <code>PipelineResult</code> bundling the <code>TestReport</code>, the batch/comparison path's
+  <code>ComparisonResult</code>, and the generated file path(s), for both interactive
+  and programmatic use. A shared <code>evaluate_measurements</code> helper (extracted
+  from <code>ComparisonAnalyzer._apply_criteria</code>, behavior-preserving) applies an
+  optional <code>CriteriaSet</code> identically on both paths, so the single-run path
+  and <code>ComparisonAnalyzer</code> cannot drift apart on pass/fail semantics. Too few
+  successful captures to produce a report (a failed single capture, or a
+  batch dropping below the <code>RunSet</code> minimum of 2 surviving runs) raises a
+  single <code>PipelineCaptureError</code> from either path, rather than two different
+  exception types for the same underlying failure. See
+  <code>examples/capture_pipeline.py</code> for a runnable, mock-only demonstration of
+  both paths, including a deliberately failing measurement.</li>
 <li><strong>Measurement uncertainty and unit-aware quantities</strong>, opt-in via the new
   <code>uncertainty</code> extra (<code>pip install "SCPI-Instrument-Control[uncertainty]"</code>,
   adds <code>pint</code>/<code>uncertainties</code>). <code>WaveformAnalyzer.compute_statistical_quantity</code>
