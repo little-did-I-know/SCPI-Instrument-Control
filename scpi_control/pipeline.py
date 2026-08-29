@@ -8,10 +8,11 @@ This module closes a gap confirmed by research before this feature started:
 `DataCollector` (capture) and `report_generator` (analysis + reporting) had
 never been imported into each other anywhere in the codebase.
 
-Task 2 status: the single-run path below is implemented. The batch/comparison
-path (Task 3) and the single public entry point that routes between them
-(Task 4) do not exist yet -- everything here is intentionally internal
-(leading underscore) until both paths exist and can share one public API.
+Task 2/3 status: both the single-run path (`_build_single_run_report`) and
+the batch/comparison path (`_build_batch_report`) are implemented. The single
+public entry point that routes between them by result count (Task 4) does
+not exist yet -- everything here is intentionally internal (leading
+underscore) until both paths exist and can share one public API.
 
 --------------------------------------------------------------------------
 Empirical finding: does batch_capture() degenerate to capture_single()?
@@ -66,9 +67,20 @@ its provenance snapshot.
 """
 
 import logging
-from typing import Dict, List, Optional
+from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
 
-from scpi_control.report_generator.analysis.comparison_analyzer import evaluate_measurements
+from scpi_control.automation import DataCollector
+from scpi_control.report_generator.analysis.comparison_analyzer import ComparisonAnalyzer, evaluate_measurements
+from scpi_control.report_generator.comparison_report_builder import build_comparison_report
+from scpi_control.report_generator.models.comparison import (
+    MODE_BATCH,
+    ComparisonResult,
+    Run,
+    RunMetadata,
+    RunSet,
+)
 from scpi_control.report_generator.models.criteria import CriteriaSet
 from scpi_control.report_generator.models.report_data import (
     MeasurementResult,
@@ -188,3 +200,154 @@ def _build_single_run_report(
 
     report.overall_result = report.calculate_overall_result()
     return report
+
+
+# --------------------------------------------------------------------------
+# Task 3: batch/comparison capture-to-report path
+# --------------------------------------------------------------------------
+#
+# `save_batch`'s return-value question (see the design doc's "Batch/comparison
+# path" subsection and the plan's Task 3): does `DataCollector.save_batch`
+# need to start RETURNING the paths it wrote, so this module can build
+# `Run.files` from that return value instead of independently reconstructing
+# `save_batch`'s filename convention (`capture_{i:04d}_ch{ch}_{config_str}_
+# trig{trigger_num}.{ext}`, automation.py:652 at the time of writing) and
+# risking drift from it?
+#
+# Decision: YES, changed `save_batch` to return `List[Dict[int, Path]]` (one
+# dict per `batch_results` entry, channel -> saved Path; empty dict for an
+# entry with no waveforms, e.g. a failed/"error" capture). This was a clean,
+# small change -- one new local list, one append per channel already being
+# saved, one `return` -- and it is backward compatible: `save_batch` returned
+# `None` before, every existing call site (`examples/batch_capture.py`,
+# `docs/examples/intermediate.md`, `tests/test_automation_save.py`) ignores
+# the return value and is unaffected by a function that now returns something
+# where it returned nothing. The alternative (reconstructing the filename
+# convention here) would require this module to duplicate five moving parts
+# --i.e. the index, `config_str`'s join/replace logic, `trigger_num`, `ch`,
+# and the extension-selection rule -- any one of which drifting out of sync
+# with `save_batch` would silently point `Run.files` at nonexistent paths.
+# Preferring the return-value approach, per the design doc's stated
+# preference, avoids that entirely.
+
+
+def _build_batch_run(index: int, entry: Dict[str, Any], saved_files: Dict[int, Path]) -> Run:
+    """Build one `Run` for one `batch_capture()` entry that was saved to disk.
+
+    Label: `capture_{index:04d}`, matching `save_batch`'s own per-entry file
+    numbering (`automation.py`'s `capture_{i:04d}_ch{ch}_..."` convention) so
+    a Run's label and its saved filenames correlate directly -- useful for a
+    human matching a report row back to a file on disk, and also what makes
+    the equivalence test in `tests/test_pipeline.py` able to hand-build an
+    identical `RunSet` using the exact same scheme.
+
+    `RunMetadata`: `condition` and `notes` are derived from the entry's
+    `"config"` (the batch_capture configuration dict -- timebase/voltage-scale
+    overrides, empty for a plain multi-trigger batch) and `"trigger_num"`;
+    `dut_id`/`operator` are left `None` -- `batch_capture()` output carries no
+    per-DUT or per-operator identity to draw them from (unlike
+    `examples/batch_report.py`'s synthetic DUTs, which invent one). A caller
+    with real DUT identities should set `run.metadata.dut_id` after this
+    function returns, or bypass it and hand-build `Run`s directly.
+    """
+    config = entry.get("config") or {}
+    trigger_num = entry.get("trigger_num")
+
+    condition = ", ".join(f"{k}={v}" for k, v in config.items()) or None
+    notes = f"trigger {trigger_num}" if trigger_num is not None else None
+
+    timestamp: Optional[datetime] = None
+    raw_timestamp = entry.get("timestamp")
+    if raw_timestamp:
+        try:
+            timestamp = datetime.fromisoformat(raw_timestamp)
+        except ValueError:
+            # Malformed/foreign timestamp string: leave it unset rather than
+            # fail the whole run over a cosmetic metadata field.
+            logger.warning(f"Batch entry {index}: could not parse timestamp {raw_timestamp!r}")
+
+    files = [saved_files[ch] for ch in sorted(saved_files)]
+    return Run(
+        label=f"capture_{index:04d}",
+        files=files,
+        metadata=RunMetadata(condition=condition, notes=notes, timestamp=timestamp),
+    )
+
+
+def _build_batch_report(
+    collector: DataCollector,
+    batch_results: List[Dict[str, Any]],
+    output_dir: str,
+    metadata: ReportMetadata,
+    *,
+    mode: str = MODE_BATCH,
+    criteria_set: Optional[CriteriaSet] = None,
+    format: Optional[str] = None,
+) -> Tuple[ComparisonResult, TestReport]:
+    """Turn `batch_capture()`'s output (2+ results) into a comparison/batch
+    report, auto-constructing `Run`/`RunSet` rather than requiring the caller
+    to hand-build them (see this module's docstring and the design doc's
+    "Batch/comparison path" subsection).
+
+    Saves every entry via `collector.save_batch()` first -- `ComparisonAnalyzer`
+    only accepts file-based `Run`s (`_load_run` calls `WaveformLoader.load`
+    per `run.files` entry; there is no in-memory path), so writing to disk is
+    a genuine prerequisite here, not an incidental step.
+
+    Entries carrying an `"error"` key (a failed capture within the batch,
+    see `DataCollector.batch_capture`) are SKIPPED -- not included as if they
+    had succeeded, and not silently dropped either: each is logged as a
+    warning naming its index and the capture error, and `save_batch` still
+    writes whatever that entry's (empty) `"waveforms"` dict contains, i.e.
+    nothing, so no stray file is created for it. `RunSet.validate()` (called
+    below) then still enforces the >=2-runs structural minimum against
+    whatever survives.
+
+    Args:
+        collector: The (connected) `DataCollector` that produced
+            `batch_results` -- reused to call `save_batch`, which needs the
+            instrument's `save_waveform` to serialize each channel.
+        batch_results: `DataCollector.batch_capture()`'s return value, with
+            2 or more entries (see this module's docstring for why exactly-1
+            routes to `_build_single_run_report` instead).
+        output_dir: Where `save_batch` writes the per-run capture files.
+        metadata: Report metadata (title, technician, test date, ...).
+        mode: `MODE_BATCH` (default, cross-run aggregates) or
+            `MODE_COMPARISON` (deltas vs. `runset.baseline`, run index 0).
+        criteria_set: Optional pass/fail criteria, applied identically to
+            both this path and `_build_single_run_report` via the shared
+            `evaluate_measurements` helper (Task 1) -- through
+            `ComparisonAnalyzer.analyze` here, since that's the analyzer this
+            path already uses, unmodified.
+        format: Passed through to `save_batch` (file format override).
+
+    Returns:
+        `(result, report)`: the `ComparisonResult` (deltas/aggregates/yield,
+        useful for direct programmatic inspection or an equivalence check
+        against a hand-built `RunSet`) and the `TestReport` built from it via
+        `build_comparison_report` -- both, since Task 4 has not yet finalized
+        which one the public entry point returns and either is independently
+        useful to test against now.
+
+    Raises:
+        ValueError: via `RunSet.validate()` -- fewer than 2 runs survived
+            (e.g. too many `"error"` entries), or the RunSet is otherwise
+            structurally invalid.
+        ComparisonAnalysisError: via `ComparisonAnalyzer.analyze` -- e.g. a
+            saved file could not be reloaded.
+    """
+    saved_files = collector.save_batch(batch_results, output_dir, format=format)
+
+    runs: List[Run] = []
+    for index, (entry, entry_files) in enumerate(zip(batch_results, saved_files)):
+        if "error" in entry:
+            logger.warning(f"Batch entry {index} excluded from the RunSet (capture failed): {entry['error']}")
+            continue
+        runs.append(_build_batch_run(index, entry, entry_files))
+
+    runset = RunSet(runs=runs, mode=mode, criteria_set=criteria_set)
+    runset.validate()
+
+    result = ComparisonAnalyzer.analyze(runset)
+    report = build_comparison_report(result, metadata)
+    return result, report
