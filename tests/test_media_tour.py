@@ -13,6 +13,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 GENERATOR = REPO_ROOT / "scripts" / "media" / "make_demo_gif.py"
 ANNOTATION_GENERATOR = REPO_ROOT / "scripts" / "media" / "make_annotation_gif.py"
 GALLERY_GENERATOR = REPO_ROOT / "scripts" / "media" / "make_signal_gallery_gifs.py"
+SUPERPOSITION_GALLERY_GENERATOR = REPO_ROOT / "scripts" / "media" / "make_superposition_gallery_gifs.py"
 SMOKE = REPO_ROOT / "tests" / "test_examples_smoke.py"
 
 
@@ -171,3 +172,40 @@ def test_readme_signal_gallery_matches_the_generator_exactly():
     assert len(referenced) == len(kind_names), f"README references {len(referenced)} signal-*.gif images but KINDS has {len(kind_names)} entries"
     assert set(referenced) == kind_names, f"README's signal gallery images {sorted(set(referenced))} don't match KINDS {sorted(kind_names)}"
     assert len(referenced) == len(set(referenced)), f"README references a signal-*.gif image more than once: {referenced}"
+
+
+def _superposition_combos():
+    return _table(SUPERPOSITION_GALLERY_GENERATOR, "COMBOS")
+
+
+def _superposition_combo_names():
+    return {entry["name"] for entry in _superposition_combos()}
+
+
+def test_superposition_combos_table_is_not_empty():
+    assert _superposition_combos(), "parsed no COMBOS entries -- the table shape changed"
+
+
+def test_superposition_combos_have_no_duplicate_or_missing_names():
+    entries = _superposition_combos()
+    names = [entry["name"] for entry in entries]
+    assert len(names) == len(set(names)), f"COMBOS has duplicate combo names: {names}"
+    assert all(names), "COMBOS has an entry with an empty/falsy name"
+
+
+def test_readme_superposition_gallery_matches_the_generator_exactly():
+    """The README's superposition gallery must embed exactly the GIFs the script writes.
+
+    Regex over the README rather than a fixed count, mirroring
+    test_readme_signal_gallery_matches_the_generator_exactly: this fails the
+    moment someone adds a combo to COMBOS without adding its <img> (or vice
+    versa), or typos a filename, rather than silently shipping a stale gallery.
+    """
+    readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
+    referenced = re.findall(r"docs/images/superposition-([a-z0-9_]+)\.gif", readme)
+
+    combo_names = _superposition_combo_names()
+    assert referenced, "README has no docs/images/superposition-*.gif references -- was the gallery section removed?"
+    assert len(referenced) == len(combo_names), f"README references {len(referenced)} superposition-*.gif images but COMBOS has {len(combo_names)} entries"
+    assert set(referenced) == combo_names, f"README's superposition gallery images {sorted(set(referenced))} don't match COMBOS {sorted(combo_names)}"
+    assert len(referenced) == len(set(referenced)), f"README references a superposition-*.gif image more than once: {referenced}"
