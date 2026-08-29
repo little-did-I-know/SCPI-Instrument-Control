@@ -608,7 +608,7 @@ class DataCollector:
             self.scope.waveform.save_waveform(waveform, ch_filename, format=format)
             logger.info(f"Saved channel {ch} to {ch_filename}")
 
-    def save_batch(self, batch_results: List[Dict[str, Any]], output_dir: str, format: Optional[str] = None) -> None:
+    def save_batch(self, batch_results: List[Dict[str, Any]], output_dir: str, format: Optional[str] = None) -> List[Dict[int, Path]]:
         """Save batch capture results to directory.
 
         Args:
@@ -618,9 +618,21 @@ class DataCollector:
                 If None (default), the format is auto-detected from each generated
                 filename's extension.
 
+        Returns:
+            One dict per entry in ``batch_results`` (same order and length),
+            mapping channel number -> the ``Path`` that channel's waveform was
+            saved to. An entry with no waveforms (e.g. one carrying an
+            ``"error"`` key from a failed capture -- see `batch_capture`) maps
+            to an empty dict. Additive, backward-compatible: existing callers
+            that ignore the return value are unaffected. Added so downstream
+            code (`scpi_control.pipeline`) can build `Run.files` from the
+            paths actually written, rather than independently reconstructing
+            this method's filename convention and risking drift from it.
+
         Example:
             >>> results = collector.batch_capture(...)
-            >>> collector.save_batch(results, 'batch_output')
+            >>> saved = collector.save_batch(results, 'batch_output')
+            >>> saved[0][1]  # Path to config/trigger 0's channel-1 file
         """
         output_path = Path(output_dir)
         output_path.mkdir(parents=True, exist_ok=True)
@@ -643,17 +655,22 @@ class DataCollector:
                 f.write(f"  {i+1}. {config}\n")
 
         # Save waveforms
+        saved_paths: List[Dict[int, Path]] = []
         for i, result in enumerate(batch_results):
             config_str = "_".join([f"{k}={v}" for k, v in result["config"].items()]).replace("/", "-")
             trigger_num = result["trigger_num"]
 
             ext = format or "npz"
+            entry_paths: Dict[int, Path] = {}
             for ch, waveform in result["waveforms"].items():
                 filename = f"capture_{i:04d}_ch{ch}_{config_str}_trig{trigger_num}.{ext}"
                 filepath = output_path / filename
                 self.scope.waveform.save_waveform(waveform, str(filepath), format=format)
+                entry_paths[ch] = filepath
+            saved_paths.append(entry_paths)
 
         logger.info(f"Saved {len(batch_results)} captures to {output_path}")
+        return saved_paths
 
     def analyze_waveform(self, waveform: WaveformData) -> Dict[str, float]:
         """Analyze a waveform and extract common measurements.

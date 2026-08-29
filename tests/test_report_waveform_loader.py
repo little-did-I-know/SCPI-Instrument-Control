@@ -8,6 +8,7 @@ corrupted data.
 import numpy as np
 import pytest
 
+from scpi_control.provenance import AcquisitionProvenance, ChannelSettings
 from scpi_control.report_generator.utils.waveform_loader import WaveformLoader
 from scpi_control.waveform import Waveform, WaveformData
 
@@ -55,6 +56,42 @@ def test_npz_timestamp_never_shadows_time(tmp_path):
     assert got.time.ndim == 1
     assert len(got.time) == 100
     assert not isinstance(got.time.dtype.type(), np.str_)
+
+
+def test_npz_round_trip_carries_probe_ratio_and_coupling_from_provenance(tmp_path):
+    """`_from_loaded` (the adapter every native-format load path -- NPZ, MAT,
+    HDF5 -- funnels through) must pull `probe_ratio`/`coupling` out of the
+    reloaded `AcquisitionProvenance.channels`, keyed by the original int
+    channel number, exactly like `pipeline._to_report_waveform` already does
+    for the single-run path. Before this fix these two fields stayed at
+    their `None` defaults for every batch/comparison report, regardless of
+    what the instrument was actually set to."""
+    provenance = AcquisitionProvenance(channels={1: ChannelSettings(channel=1, probe_ratio=10.0, coupling="AC")})
+    wf = WaveformData(time=np.arange(100) / SAMPLE_RATE, voltage=np.sin(np.arange(100)), channel=1, sample_rate=SAMPLE_RATE, record_length=100, provenance=provenance)
+    p = tmp_path / "cap.npz"
+    saver()._save_npy(wf, str(p))
+
+    got = WaveformLoader.load(p)[0]
+
+    assert got.channel == "1"
+    assert got.probe_ratio == 10.0
+    assert got.coupling == "AC"
+
+
+def test_npz_round_trip_defaults_probe_ratio_and_coupling_when_channel_missing_from_provenance(tmp_path):
+    """A capture whose provenance exists but has no entry for THIS channel
+    (e.g. provenance was snapshotted for a different channel set) must not
+    raise -- it should fall back to the field's own `None` default, same as
+    when provenance is absent entirely."""
+    provenance = AcquisitionProvenance(channels={2: ChannelSettings(channel=2, probe_ratio=1.0, coupling="DC")})
+    wf = WaveformData(time=np.arange(100) / SAMPLE_RATE, voltage=np.sin(np.arange(100)), channel=1, sample_rate=SAMPLE_RATE, record_length=100, provenance=provenance)
+    p = tmp_path / "cap.npz"
+    saver()._save_npy(wf, str(p))
+
+    got = WaveformLoader.load(p)[0]
+
+    assert got.probe_ratio is None
+    assert got.coupling is None
 
 
 def test_npz_meta_keys_do_not_disturb_the_schema_path(tmp_path):

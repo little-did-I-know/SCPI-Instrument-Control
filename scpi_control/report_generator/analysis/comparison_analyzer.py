@@ -8,7 +8,7 @@ when fewer than two runs survive or the comparison baseline itself is lost.
 
 import logging
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 
@@ -21,7 +21,7 @@ from scpi_control.report_generator.models.comparison import (
     RunSet,
 )
 from scpi_control.report_generator.models.criteria import CriteriaSet
-from scpi_control.report_generator.models.report_data import MeasurementResult
+from scpi_control.report_generator.models.report_data import MeasurementResult, WaveformData
 from scpi_control.report_generator.utils.waveform_loader import WaveformLoader
 
 logger = logging.getLogger(__name__)
@@ -131,55 +131,12 @@ class ComparisonAnalyzer:
     @staticmethod
     def _apply_criteria(run: Run, criteria_set: Optional[CriteriaSet], warnings: List[str]) -> None:
         """Build run.measurements from criteria (resolved to stat keys) and set
-        run.passed / run.incomplete. Only `critical` criteria gate the verdict;
-        un-evaluable criteria are surfaced as warnings, never silently dropped."""
-        run.measurements = []
-        run.incomplete = False
-        if criteria_set is None:
-            run.passed = None
-            return
-        critical_pass: List[bool] = []
-        critical_unevaluable = False
-        for wf in run.waveforms:
-            stats = wf.statistics or {}
-            for criteria in criteria_set.criteria_list:
-                if criteria.channel is not None and criteria.channel != wf.label:
-                    continue
-                is_critical = (criteria.severity or "").lower() == "critical"
-                key = ComparisonAnalyzer._resolve_stat_key(criteria.measurement_name, stats)
-                value = stats.get(key) if key is not None else None
-                if value is None or not isinstance(value, (int, float)) or isinstance(value, bool):
-                    warnings.append(f"Run '{run.label}': criterion '{criteria.measurement_name}' on '{wf.label}' could not be evaluated (no numeric statistic)")
-                    if is_critical:
-                        critical_unevaluable = True
-                    continue
-                outcome = criteria.validate(float(value))
-                run.measurements.append(
-                    MeasurementResult(
-                        name=criteria.measurement_name,
-                        value=float(value),
-                        unit=STAT_UNITS.get(key, ""),
-                        channel=wf.label,
-                        passed=outcome.passed,
-                        criteria_min=criteria.min_value,
-                        criteria_max=criteria.max_value,
-                    )
-                )
-                if outcome.passed is None:
-                    warnings.append(f"Run '{run.label}': criterion '{criteria.measurement_name}' on '{wf.label}' is not fully specified; not evaluated")
-                    if is_critical:
-                        critical_unevaluable = True
-                elif is_critical:
-                    critical_pass.append(outcome.passed)
-        if any(p is False for p in critical_pass):
-            run.passed = False
-        elif critical_unevaluable:
-            run.passed = None
-            run.incomplete = True
-        elif critical_pass:
-            run.passed = True
-        else:
-            run.passed = None
+        run.passed / run.incomplete. Thin wrapper around the standalone
+        `evaluate_measurements` (below), which holds the actual logic so a future
+        single-run pipeline path can reuse it without duplicating criteria
+        evaluation. Only `critical` criteria gate the verdict; un-evaluable
+        criteria are surfaced as warnings, never silently dropped."""
+        run.measurements, run.passed, run.incomplete = evaluate_measurements(run.waveforms, criteria_set, warnings, label=f"Run '{run.label}'")
 
     @staticmethod
     def _match_channels(runs: List[Run]):
@@ -263,3 +220,92 @@ class ComparisonAnalyzer:
             result.yield_passed = sum(1 for run in evaluated if run.passed)
             result.yield_total = len(evaluated)
         result.yield_incomplete = sum(1 for run in runset.runs if run.incomplete)
+
+
+def evaluate_measurements(
+    waveforms: List[WaveformData],
+    criteria_set: Optional[CriteriaSet],
+    warnings: List[str],
+    *,
+    label: str,
+) -> Tuple[List[MeasurementResult], Optional[bool], bool]:
+    """Turn waveforms' `.statistics` plus a `CriteriaSet` into `MeasurementResult`
+    objects, and compute the resulting pass/fail verdict.
+
+    This is the shared core of `ComparisonAnalyzer._apply_criteria`, extracted so
+    a single-capture (non-comparison) reporting path can apply the exact same
+    criteria-evaluation semantics without a second, divergent implementation.
+
+    Only `critical`-severity criteria gate the verdict; `warning`/`info` criteria
+    still produce `MeasurementResult`s but never flip `passed` or `incomplete`.
+    A criterion that cannot be evaluated (missing/non-numeric statistic, or not
+    fully specified e.g. no min/max set) is surfaced as an entry appended to the
+    caller-supplied, mutable `warnings` list -- never silently dropped. If such a
+    criterion is critical, the verdict becomes `incomplete` rather than a false
+    PASS or FAIL.
+
+    Args:
+        waveforms: Waveforms to evaluate; each must already have `.statistics`
+            populated (i.e. `.analyze()` already called).
+        criteria_set: Criteria to apply, or None to skip evaluation entirely.
+        warnings: Mutable list that un-evaluable-criterion messages are appended
+            to, matching `ComparisonAnalyzer.analyze`'s shared-warnings-list
+            pattern -- not returned, since the caller already holds the list.
+        label: Identifies the source in warning text (e.g. "Run 'baseline'"),
+            keyed-word argument so call sites read clearly at the call site.
+
+    Returns:
+        (measurements, passed, incomplete):
+        - measurements: one `MeasurementResult` per criterion that could be
+          resolved to a numeric statistic (regardless of severity).
+        - passed: False if any critical criterion failed; None if no critical
+          criteria were evaluated (including when criteria_set is None); True
+          if at least one critical criterion was evaluated and none failed.
+        - incomplete: True only when a critical criterion could not be
+          evaluated and no critical criterion definitively failed.
+    """
+    measurements: List[MeasurementResult] = []
+    if criteria_set is None:
+        return measurements, None, False
+
+    critical_pass: List[bool] = []
+    critical_unevaluable = False
+    for wf in waveforms:
+        stats = wf.statistics or {}
+        for criteria in criteria_set.criteria_list:
+            if criteria.channel is not None and criteria.channel != wf.label:
+                continue
+            is_critical = (criteria.severity or "").lower() == "critical"
+            key = ComparisonAnalyzer._resolve_stat_key(criteria.measurement_name, stats)
+            value = stats.get(key) if key is not None else None
+            if value is None or not isinstance(value, (int, float)) or isinstance(value, bool):
+                warnings.append(f"{label}: criterion '{criteria.measurement_name}' on '{wf.label}' could not be evaluated (no numeric statistic)")
+                if is_critical:
+                    critical_unevaluable = True
+                continue
+            outcome = criteria.validate(float(value))
+            measurements.append(
+                MeasurementResult(
+                    name=criteria.measurement_name,
+                    value=float(value),
+                    unit=STAT_UNITS.get(key, ""),
+                    channel=wf.label,
+                    passed=outcome.passed,
+                    criteria_min=criteria.min_value,
+                    criteria_max=criteria.max_value,
+                )
+            )
+            if outcome.passed is None:
+                warnings.append(f"{label}: criterion '{criteria.measurement_name}' on '{wf.label}' is not fully specified; not evaluated")
+                if is_critical:
+                    critical_unevaluable = True
+            elif is_critical:
+                critical_pass.append(outcome.passed)
+
+    if any(p is False for p in critical_pass):
+        return measurements, False, False
+    if critical_unevaluable:
+        return measurements, None, True
+    if critical_pass:
+        return measurements, True, False
+    return measurements, None, False

@@ -77,6 +77,7 @@ EXECUTE = [
     ("frequency_response_sweep.py", None),
     ("comparison_report.py", None),
     ("batch_report.py", None),
+    ("capture_pipeline.py", None),
     ("report_annotations.py", "reportlab"),
     ("report_annotations_advanced.py", "reportlab"),
     ("measurements.py", None),

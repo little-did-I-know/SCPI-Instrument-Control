@@ -50,6 +50,17 @@ def _from_loaded(loaded) -> WaveformData:
         sample_rate = float(loaded.sample_rate)
     else:
         sample_rate = WaveformLoader._rate_from_time(time_data)
+    # `loaded.channel` is still the ORIGINAL channel identifier here (before
+    # the str() stringification below) -- for a native scpi_control capture
+    # file that means an int matching `AcquisitionProvenance.channels`' int
+    # keys directly (see `scpi_control/provenance.py` and
+    # `scpi_control/waveform_io.py`'s `_channel_value`, which round-trips a
+    # digit-only channel value back to int on load). Mirrors
+    # `pipeline._to_report_waveform`'s identical extraction so the
+    # batch/comparison path renders "Probe Ratio"/"Coupling" the same way the
+    # single-run path already does, instead of always leaving them None.
+    channel_settings = loaded.provenance.channels.get(loaded.channel) if loaded.provenance is not None else None
+
     # Foreign HDF5 files can carry time/voltage datasets without a channel
     # attr; the old ours-branch fell back to "voltage" (line 319) — keep that.
     channel = str(loaded.channel) if loaded.channel is not None else ws.VOLTAGE
@@ -61,6 +72,8 @@ def _from_loaded(loaded) -> WaveformData:
         record_length=len(voltage),
         source_file=loaded.source_path,
         provenance=loaded.provenance,
+        probe_ratio=channel_settings.probe_ratio if channel_settings is not None else None,
+        coupling=channel_settings.coupling if channel_settings is not None else None,
     )
 
 

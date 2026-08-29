@@ -9,6 +9,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`scpi_control.pipeline`, a capture-to-report pipeline.** Previously
+  `DataCollector` (capture) and `report_generator` (analysis + reporting) had
+  never been wired together anywhere in the codebase -- turning a capture into
+  a report meant hand-writing the `WaveformData` conversion, `TestReport`/
+  `RunSet` construction, and criteria evaluation yourself, as
+  `examples/report_generation_example.py` and `examples/batch_report.py` do.
+  The new `run_capture_pipeline(collector, channels, output_dir, metadata,
+  ...)` entry point does this in one call: it captures via
+  `DataCollector.batch_capture()`, then routes automatically by how many
+  results come back -- exactly one (no timebase/voltage sweep, one trigger)
+  builds a single-run `TestReport` directly, two or more auto-constructs a
+  `Run`/`RunSet` and goes through the existing `ComparisonAnalyzer` ->
+  `build_comparison_report` path (`MODE_BATCH` or `MODE_COMPARISON`, caller's
+  choice) -- so a caller never has to decide which path applies. Generates
+  Markdown and/or PDF via the existing, unmodified generators and returns a
+  `PipelineResult` bundling the `TestReport`, the batch/comparison path's
+  `ComparisonResult`, and the generated file path(s), for both interactive
+  and programmatic use. A shared `evaluate_measurements` helper (extracted
+  from `ComparisonAnalyzer._apply_criteria`, behavior-preserving) applies an
+  optional `CriteriaSet` identically on both paths, so the single-run path
+  and `ComparisonAnalyzer` cannot drift apart on pass/fail semantics. Too few
+  successful captures to produce a report (a failed single capture, or a
+  batch dropping below the `RunSet` minimum of 2 surviving runs) raises a
+  single `PipelineCaptureError` from either path, rather than two different
+  exception types for the same underlying failure. See
+  `examples/capture_pipeline.py` for a runnable, mock-only demonstration of
+  both paths, including a deliberately failing measurement.
 - **Measurement uncertainty and unit-aware quantities**, opt-in via the new
   `uncertainty` extra (`pip install "SCPI-Instrument-Control[uncertainty]"`,
   adds `pint`/`uncertainties`). `WaveformAnalyzer.compute_statistical_quantity`
