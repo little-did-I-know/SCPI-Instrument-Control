@@ -118,6 +118,12 @@ usb = [
 experimental = [
     # Future experimental features will be added here
 ]
+mock = [
+    # Mock/synthetic-signal tooling (signal_synth, connection.mock, dut) ships
+    # in the core install already -- this extra exists so a user who only
+    # wants the mock tooling has a discoverable, intention-revealing install
+    # command, e.g. pip install "SCPI-Instrument-Control[mock]".
+]
 docs = [
     "mkdocs>=1.5.0",
     "mkdocs-material>=9.5.0",

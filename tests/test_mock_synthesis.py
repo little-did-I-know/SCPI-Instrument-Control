@@ -7,7 +7,7 @@ import pytest
 
 from scpi_control.connection import MockConnection
 from scpi_control.oscilloscope import Oscilloscope
-from scpi_control.signal_synth import SignalSpec
+from scpi_control.signal_synth import SignalSpec, SuperposedSignal, synthesize_combined
 
 LEGACY_IDN = "Siglent Technologies,SDS1104X-E,MOCK0001,1.0.0.0"
 MODERN_IDN = "Siglent Technologies,SDS824X HD,MOCK0002,3.8.12"
@@ -308,3 +308,140 @@ def test_a_ringing_trigger_aligned_kind_still_displays_stably():
     second = scope.get_waveform(1, provenance=False)
     scope.disconnect()
     np.testing.assert_array_equal(first.voltage, second.voltage)
+
+
+def test_superposed_signal_is_triggerable_via_its_primary_component():
+    """The primary (first) component alone drives trigger-crossing detection --
+    a noiseless periodic primary still gives a stable, repeatable capture even
+    with a second, unrelated component summed in, exactly like a plain
+    SignalSpec's own trigger-stability test above."""
+    signal = SuperposedSignal(
+        (
+            SignalSpec(kind="sine", frequency=1_000.0, amplitude=1.0, noise_rms=0.0),
+            SignalSpec(kind="dc", offset=0.1, noise_rms=0.0),
+        )
+    )
+    scope, _ = _scope(signals={1: signal})
+    scope.write("C1:TRLV 0.0")
+    first = scope.get_waveform(1, provenance=False)
+    second = scope.get_waveform(1, provenance=False)
+    scope.disconnect()
+    np.testing.assert_array_equal(first.voltage, second.voltage)
+
+
+def test_superposed_signal_free_runs_when_the_primary_is_unattainable():
+    """The mirror image of the trigger test above: an unattainable trigger
+    level on the primary component free-runs the combined signal, same as a
+    plain SignalSpec (test_unattainable_level_free_runs)."""
+    signal = SuperposedSignal(
+        (
+            SignalSpec(kind="sine", frequency=1_000.0, amplitude=1.0, noise_rms=0.0),
+            SignalSpec(kind="dc", offset=0.1, noise_rms=0.0),
+        )
+    )
+    scope, _ = _scope(signals={1: signal})
+    scope.write("C1:TRLV 5.0")
+    a = scope.get_waveform(1, provenance=False)
+    b = scope.get_waveform(1, provenance=False)
+    scope.disconnect()
+    assert not np.array_equal(a.voltage, b.voltage)
+
+
+def test_superposed_components_seed_independently_per_acquisition():
+    """Mirrors test_seeded_sequences_reproduce_across_connections: each
+    component's own seed must advance by the acquisition count independently,
+    so two connections built from the same SuperposedSignal reproduce the same
+    sequence, and consecutive acquisitions on one connection differ."""
+    signals = {
+        1: SuperposedSignal(
+            (
+                SignalSpec(kind="sine", frequency=1_000.0, amplitude=1.0, noise_rms=0.0, seed=11),
+                SignalSpec(kind="noise", amplitude=0.05, seed=21),
+            )
+        )
+    }
+    scope1, _ = _scope(signals=signals)
+    first_a = scope1.get_waveform(1, provenance=False)
+    second_a = scope1.get_waveform(1, provenance=False)
+    scope1.disconnect()
+    scope2, _ = _scope(signals=signals)
+    first_b = scope2.get_waveform(1, provenance=False)
+    second_b = scope2.get_waveform(1, provenance=False)
+    scope2.disconnect()
+    np.testing.assert_array_equal(first_a.voltage, first_b.voltage)
+    np.testing.assert_array_equal(second_a.voltage, second_b.voltage)
+    assert not np.array_equal(first_a.voltage, second_a.voltage)  # seed advances per acquisition
+
+
+def test_superposed_signal_dut_filters_the_summed_signal():
+    """A SuperposedSignal's dut is applied to the SUMMED signal (raw_volts'
+    combined branch), not to each component separately -- checked at
+    raw_volts's float64 precision (mirrors test_trigger_search_ignores_the_
+    impairments' style of importing internals directly), independently
+    reconstructing the expected sum-then-filter result via the public
+    synthesize_combined()/RCLowPass API rather than duplicating raw_volts'
+    own arithmetic."""
+    from scpi_control.connection.mock.synth import _trigger_crossing, raw_volts
+    from scpi_control.dut import RCLowPass
+
+    tone = SignalSpec(kind="sine", frequency=1_000.0, amplitude=1.0, noise_rms=0.0)
+    dc = SignalSpec(kind="dc", offset=0.3, noise_rms=0.0)
+    dut = RCLowPass(cutoff_hz=5_000.0)
+    signal = SuperposedSignal((tone, dc), dut=dut)
+
+    scope, conn = _scope(signals={1: signal})
+    scope.write("C1:TRLV 0.0")
+    actual = raw_volts(conn, 1)
+    scope.disconnect()
+
+    n = len(actual)
+    crossing = _trigger_crossing(tone, 0.0, True)  # primary component drives the trigger search
+    t0 = crossing - (n / conn.sample_rate) / 2.0
+    warmup = dut.warmup_samples(conn.sample_rate)
+    extended = synthesize_combined(signal, conn.sample_rate, n + warmup, t0=t0 - warmup / conn.sample_rate)
+    expected = dut.apply(extended, conn.sample_rate)[warmup:]
+
+    np.testing.assert_allclose(actual, expected, rtol=0, atol=1e-9)
+
+
+def test_superposed_signal_dut_visibly_smooths_a_square_component():
+    """Sanity check that the DUT branch above is actually exercised (not just
+    mathematically vacuous): with a DUT, a square-wave component's sharp edges
+    are visibly rounded, mirroring test_loopback_capture.py's
+    test_the_dut_visibly_rounds_a_square_wave."""
+    from scpi_control.connection.mock.synth import raw_volts
+    from scpi_control.dut import RCLowPass
+
+    components = (SignalSpec(kind="square", frequency=1_000.0, amplitude=1.0, noise_rms=0.0), SignalSpec(kind="dc", offset=0.3, noise_rms=0.0))
+    sharp_scope, sharp_conn = _scope(signals={1: SuperposedSignal(components)})
+    sharp_scope.write("C1:TRLV 0.0")
+    unfiltered = raw_volts(sharp_conn, 1)
+    sharp_scope.disconnect()
+
+    soft_scope, soft_conn = _scope(signals={1: SuperposedSignal(components, dut=RCLowPass(cutoff_hz=2_000.0))})
+    soft_scope.write("C1:TRLV 0.0")
+    filtered = raw_volts(soft_conn, 1)
+    soft_scope.disconnect()
+
+    assert np.max(np.abs(np.diff(filtered))) < np.max(np.abs(np.diff(unfiltered)))
+
+
+def test_spec_for_rejects_a_superposed_signal():
+    """spec_for()'s contract is a plain SignalSpec -- it was never taught about
+    SuperposedSignal, which raw_volts' own isinstance check keeps upstream of
+    every real call site. Calling spec_for() directly on a channel configured
+    with a SuperposedSignal must fail loudly (InvalidParameterError) rather
+    than silently handing back a SuperposedSignal where a SignalSpec was
+    promised."""
+    from scpi_control import exceptions
+    from scpi_control.connection.mock.synth import spec_for
+
+    signal = SuperposedSignal(
+        (
+            SignalSpec(kind="sine", frequency=1_000.0, amplitude=1.0),
+            SignalSpec(kind="dc", offset=0.1),
+        )
+    )
+    _, conn = _scope(signals={1: signal})
+    with pytest.raises(exceptions.InvalidParameterError):
+        spec_for(conn, 1)
