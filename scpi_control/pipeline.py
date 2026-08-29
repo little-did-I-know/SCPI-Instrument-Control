@@ -106,6 +106,31 @@ class PipelineCaptureError(RuntimeError):
     """Raised when too few captures succeeded to produce a report (either the sole attempt on the single-run path, or a batch dropping below the RunSet minimum of 2 surviving runs)."""
 
 
+def _entry_failed(entry: Dict[str, Any]) -> bool:
+    """True when a `batch_capture()` entry represents a failed capture.
+
+    Two distinct shapes both count: an explicit `"error"` key (a `SiglentError`
+    caught by `batch_capture`'s breaker), AND an entry with no usable
+    `"waveforms"` at all -- e.g. every requested channel was disabled, or
+    every per-channel acquisition raised and was swallowed inside
+    `capture_single` (see `automation.py`: `capture_single` logs and skips a
+    disabled or failing channel rather than raising, so `batch_capture` can
+    return `"waveforms": {}` with NO `"error"` key). Treating only the first
+    shape as a failure let an empty-but-error-free capture silently pass
+    through as if it were a real, if trivial, successful one."""
+    return "error" in entry or not entry.get("waveforms")
+
+
+def _entry_failure_reason(entry: Dict[str, Any]) -> str:
+    """Human-readable reason `_entry_failed(entry)` is True.
+
+    Prefers the real capture error text; falls back to a fixed explanation
+    when the entry simply produced no waveforms (no `"error"` key to quote)."""
+    if "error" in entry:
+        return entry["error"]
+    return "no channels returned waveform data"
+
+
 def _to_report_waveform(waveform: CapturedWaveformData) -> ReportWaveformData:
     """Convert a captured `scpi_control.waveform.WaveformData` into the
     report package's `WaveformData` subclass (see the type-conversion note
@@ -306,14 +331,27 @@ def _build_batch_report(
     per `run.files` entry; there is no in-memory path), so writing to disk is
     a genuine prerequisite here, not an incidental step.
 
-    Entries carrying an `"error"` key (a failed capture within the batch,
-    see `DataCollector.batch_capture`) are SKIPPED -- not included as if they
-    had succeeded, and not silently dropped either: each is logged as a
-    warning naming its index and the capture error, and `save_batch` still
-    writes whatever that entry's (empty) `"waveforms"` dict contains, i.e.
-    nothing, so no stray file is created for it. `RunSet.validate()` (called
-    below) then still enforces the >=2-runs structural minimum against
-    whatever survives.
+    Entries that `_entry_failed` identifies as failed -- carrying an
+    `"error"` key (a failed capture within the batch, see
+    `DataCollector.batch_capture`), OR simply producing no waveforms at all
+    with no `"error"` key (every requested channel was disabled or every
+    per-channel acquisition raised and was swallowed inside
+    `capture_single`) -- are SKIPPED: not included as if they had succeeded,
+    and not silently dropped either. Each is logged as a warning naming its
+    index and `_entry_failure_reason`, and `save_batch` still writes
+    whatever that entry's (empty) `"waveforms"` dict contains, i.e. nothing,
+    so no stray file is created for it. `RunSet.validate()` (called below)
+    then still enforces the >=2-runs structural minimum against whatever
+    survives.
+
+    An excluded empty-waveforms entry matters beyond just that one entry: if
+    it were included instead, `_build_batch_run` would build a `Run` with
+    `files=[]` (nothing to save), which `ComparisonAnalyzer._load_run` treats
+    as a successful load of zero waveforms -- and `_match_channels` computes
+    the matched set by intersecting every run's channels, so ONE phantom
+    empty run zeroes `matched_channels` (and therefore `deltas`/`aggregates`)
+    for the WHOLE comparison, silently, with no warning or exception. This is
+    the actual mechanism the `_entry_failed` exclusion below closes.
 
     Args:
         collector: The (connected) `DataCollector` that produced
@@ -360,9 +398,10 @@ def _build_batch_report(
     runs: List[Run] = []
     failures: List[str] = []
     for index, (entry, entry_files) in enumerate(zip(batch_results, saved_files)):
-        if "error" in entry:
-            logger.warning(f"Batch entry {index} excluded from the RunSet (capture failed): {entry['error']}")
-            failures.append(entry["error"])
+        if _entry_failed(entry):
+            reason = _entry_failure_reason(entry)
+            logger.warning(f"Batch entry {index} excluded from the RunSet (capture failed): {reason}")
+            failures.append(reason)
             continue
         runs.append(_build_batch_run(index, entry, entry_files))
 
@@ -540,11 +579,13 @@ def run_capture_pipeline(
             values.
         PipelineCaptureError: too few successful captures to produce a
             report -- either exactly one capture was attempted and it
-            failed (an `"error"` entry from `batch_capture()`, raised here
-            rather than silently building a zero-section `TestReport` from
-            an empty waveform dict, which would be a report that looks like
-            a real (if trivial) pass/fail result but actually reflects no
-            successful capture at all), or, on the batch/comparison path,
+            failed (an `"error"` entry from `batch_capture()`, OR an entry
+            with no `"error"` key but no usable waveforms either -- see
+            `_entry_failed` -- raised here rather than silently building a
+            zero-section `TestReport` from an empty waveform dict, which
+            would be a report that looks like a real (if trivial) pass/fail
+            result but actually reflects no successful capture at all), or,
+            on the batch/comparison path,
             too few runs survived capture errors to form a `RunSet` (see
             `_build_batch_report`). A `RuntimeError` subclass, so a single
             `except PipelineCaptureError:` (or `except RuntimeError:`)
@@ -569,8 +610,8 @@ def run_capture_pipeline(
     comparison: Optional[ComparisonResult] = None
     if len(batch_results) == 1:
         entry = batch_results[0]
-        if "error" in entry:
-            raise PipelineCaptureError(f"Capture failed, no report can be built: {entry['error']}")
+        if _entry_failed(entry):
+            raise PipelineCaptureError(f"Capture failed, no report can be built: {_entry_failure_reason(entry)}")
         report = _build_single_run_report(entry["waveforms"], metadata, criteria_set=criteria_set)
     else:
         comparison, report = _build_batch_report(
