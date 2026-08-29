@@ -102,6 +102,10 @@ from scpi_control.waveform import WaveformData as CapturedWaveformData
 logger = logging.getLogger(__name__)
 
 
+class PipelineCaptureError(RuntimeError):
+    """Raised when too few captures succeeded to produce a report (either the sole attempt on the single-run path, or a batch dropping below the RunSet minimum of 2 surviving runs)."""
+
+
 def _to_report_waveform(waveform: CapturedWaveformData) -> ReportWaveformData:
     """Convert a captured `scpi_control.waveform.WaveformData` into the
     report package's `WaveformData` subclass (see the type-conversion note
@@ -338,13 +342,16 @@ def _build_batch_report(
         useful to test against now.
 
     Raises:
-        ValueError: raised directly by this function -- fewer than 2 entries
-            survived AND at least one exclusion was due to an `"error"` key
-            -- naming the total entry count, how many failed, a sample of
-            the actual capture-error text, and how many runs would have
-            resulted; or via `RunSet.validate()` for any other structural
+        PipelineCaptureError: raised directly by this function -- fewer than
+            2 entries survived AND at least one exclusion was due to an
+            `"error"` key -- naming the total entry count, how many failed,
+            a sample of the actual capture-error text, and how many runs
+            would have resulted. A `RuntimeError` subclass, so a caller can
+            still catch it as `RuntimeError` if preferred.
+        ValueError: via `RunSet.validate()` for any other structural
             problem (e.g. duplicate labels, or too few entries with none of
-            them having failed).
+            them having failed) -- a genuinely different failure class from
+            a capture failure, not renamed here.
         ComparisonAnalysisError: via `ComparisonAnalyzer.analyze` -- e.g. a
             saved file could not be reloaded.
     """
@@ -368,7 +375,7 @@ def _build_batch_report(
     # thing a caller needs to see.
     if len(runs) < 2 and failures:
         sample = "; ".join(failures[:2])
-        raise ValueError(
+        raise PipelineCaptureError(
             f"Batch capture yielded too few successful runs to build a RunSet "
             f"(needs at least 2): {len(batch_results)} entries total, "
             f"{len(failures)} failed, {len(runs)} would survive. "
@@ -483,7 +490,12 @@ def run_capture_pipeline(
             file(s) -- both generators' `generate(report, output_path)`
             need a concrete destination path, so the single-run path also
             writes here even though it saves no raw capture files. Created
-            (with parents) if it does not already exist.
+            (with parents) if it does not already exist. Report filenames
+            are fixed (`_REPORT_BASENAME`, no per-call uniquification), so
+            reusing the same `output_dir` across two calls -- a single-run
+            call followed by a batch call, or any two calls in general --
+            silently overwrites the earlier call's report file; pass a
+            distinct `output_dir` per call to keep both.
         metadata: Report metadata (title, technician, test date, ...).
         timebase_scales: Optional sweep, passed through to `batch_capture()`.
             Leaving this (and `voltage_scales`) unset is what naturally
@@ -497,6 +509,10 @@ def run_capture_pipeline(
             both paths via the shared `evaluate_measurements` helper
             (Task 1) -- directly on the single-run path, and through
             `ComparisonAnalyzer.analyze` on the batch/comparison path.
+            Leaving this `None` (the default) is not an error: no
+            `MeasurementResult`s are produced and the report's
+            `overall_result` comes back `"INCONCLUSIVE"` rather than
+            `"PASS"`/`"FAIL"` (see `_build_single_run_report`'s docstring).
         report_format: One of `REPORT_FORMAT_MARKDOWN` ("markdown"),
             `REPORT_FORMAT_PDF` ("pdf"), or `REPORT_FORMAT_BOTH` ("both").
             A PDF request is skipped gracefully -- logged as a warning, no
@@ -520,15 +536,19 @@ def run_capture_pipeline(
         A `PipelineResult` -- see its own docstring for field details.
 
     Raises:
-        ValueError: `report_format` is not one of the three accepted
-            values; or, on the batch/comparison path, too few runs survived
-            capture errors to form a `RunSet` (see `_build_batch_report`).
-        RuntimeError: exactly one capture was attempted and it failed (an
-            `"error"` entry from `batch_capture()`) -- raised here rather
-            than silently building a zero-section `TestReport` from an
-            empty waveform dict, which would be a report that looks like a
-            real (if trivial) pass/fail result but actually reflects no
-            successful capture at all.
+        ValueError: `report_format` or `mode` is not one of the accepted
+            values.
+        PipelineCaptureError: too few successful captures to produce a
+            report -- either exactly one capture was attempted and it
+            failed (an `"error"` entry from `batch_capture()`, raised here
+            rather than silently building a zero-section `TestReport` from
+            an empty waveform dict, which would be a report that looks like
+            a real (if trivial) pass/fail result but actually reflects no
+            successful capture at all), or, on the batch/comparison path,
+            too few runs survived capture errors to form a `RunSet` (see
+            `_build_batch_report`). A `RuntimeError` subclass, so a single
+            `except PipelineCaptureError:` (or `except RuntimeError:`)
+            catches both cases.
         ComparisonAnalysisError: via `ComparisonAnalyzer.analyze`, on the
             batch/comparison path.
     """
@@ -550,7 +570,7 @@ def run_capture_pipeline(
     if len(batch_results) == 1:
         entry = batch_results[0]
         if "error" in entry:
-            raise RuntimeError(f"Capture failed, no report can be built: {entry['error']}")
+            raise PipelineCaptureError(f"Capture failed, no report can be built: {entry['error']}")
         report = _build_single_run_report(entry["waveforms"], metadata, criteria_set=criteria_set)
     else:
         comparison, report = _build_batch_report(
@@ -572,10 +592,11 @@ def run_capture_pipeline(
         if MarkdownReportGenerator().generate(report, md_path):
             report_paths[REPORT_FORMAT_MARKDOWN] = md_path
         else:
-            # generate() returns False only for an environmental I/O failure
-            # (see its own docstring) -- a programming error propagates
-            # instead. Logged, not raised: a Markdown failure should not
-            # prevent a PDF that was also requested from still being tried.
+            # generate() returns False for an environmental I/O failure OR a
+            # failed self.validate_report(report) check (see its own
+            # docstring/body) -- a programming error propagates instead.
+            # Logged, not raised: a Markdown failure should not prevent a
+            # PDF that was also requested from still being tried.
             logger.error(f"Markdown report generation failed writing to {md_path}; no file produced")
 
     if report_format in (REPORT_FORMAT_PDF, REPORT_FORMAT_BOTH):

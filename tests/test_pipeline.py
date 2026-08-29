@@ -27,6 +27,7 @@ from scpi_control.pipeline import (
     REPORT_FORMAT_BOTH,
     REPORT_FORMAT_MARKDOWN,
     REPORT_FORMAT_PDF,
+    PipelineCaptureError,
     PipelineResult,
     _build_batch_report,
     _build_single_run_report,
@@ -327,8 +328,9 @@ def test_batch_report_raises_when_too_few_runs_survive_errors(tmp_path):
     2 runs, got 0" -- that message has no link back to WHY, and the real
     cause (batch_capture() failures) otherwise lives only in logs a caller
     may not have visibility into. `_build_batch_report` must raise its own
-    actionable `ValueError` naming the total entry count, how many failed,
-    a sample of the actual failure text, and how many runs would survive."""
+    actionable `PipelineCaptureError` naming the total entry count, how many
+    failed, a sample of the actual failure text, and how many runs would
+    survive."""
     dc = _batch_collector()
     try:
         batch_results = dc.batch_capture([1, 2], triggers_per_config=3)
@@ -337,7 +339,7 @@ def test_batch_report_raises_when_too_few_runs_survive_errors(tmp_path):
             entry["error"] = "simulated capture timeout"
             entry["waveforms"] = {}
 
-        with pytest.raises(ValueError) as excinfo:
+        with pytest.raises(PipelineCaptureError) as excinfo:
             _build_batch_report(dc, batch_results, str(tmp_path / "allfail"), _metadata(), mode=MODE_BATCH)
     finally:
         dc.disconnect()
@@ -365,7 +367,7 @@ def test_batch_report_raises_names_partial_failures_too_few_to_reach_minimum(tmp
         batch_results[1]["error"] = "simulated capture timeout"
         batch_results[1]["waveforms"] = {}
 
-        with pytest.raises(ValueError) as excinfo:
+        with pytest.raises(PipelineCaptureError) as excinfo:
             _build_batch_report(dc, batch_results, str(tmp_path / "partial"), _metadata(), mode=MODE_BATCH)
     finally:
         dc.disconnect()
@@ -553,7 +555,51 @@ def test_run_capture_pipeline_single_capture_error_raises_instead_of_empty_repor
     monkeypatch.setattr(dc, "batch_capture", _failing_batch_capture)
 
     try:
-        with pytest.raises(RuntimeError, match="simulated capture timeout"):
+        with pytest.raises(PipelineCaptureError, match="simulated capture timeout"):
             run_capture_pipeline(dc, [1, 2], str(tmp_path), _metadata())
     finally:
         dc.disconnect()
+
+
+def test_pipeline_capture_error_unifies_single_run_and_batch_failure_types(tmp_path, monkeypatch):
+    """The whole point of `PipelineCaptureError`: a single `except
+    PipelineCaptureError:` clause must catch BOTH conceptually-identical
+    "not enough successful captures to produce a report" failures -- the
+    single-run path's 1-of-1 capture failure and the batch path's
+    below-minimum-surviving-runs failure -- even though they are raised from
+    two different call sites. Before this fix these were different builtin
+    exception types (`RuntimeError` vs. `ValueError`) that could not share
+    one except clause."""
+    caught: list = []
+
+    # Single-run path: the sole capture attempt fails.
+    single_dc = _single_run_collector()
+
+    def _failing_batch_capture(channels, **kwargs):
+        return [{"waveforms": {}, "config": {}, "trigger_num": 0, "error": "simulated capture timeout"}]
+
+    monkeypatch.setattr(single_dc, "batch_capture", _failing_batch_capture)
+    try:
+        try:
+            run_capture_pipeline(single_dc, [1, 2], str(tmp_path / "single"), _metadata())
+        except PipelineCaptureError as exc:
+            caught.append(exc)
+    finally:
+        single_dc.disconnect()
+
+    # Batch path: every entry fails, dropping below the RunSet minimum.
+    batch_dc = _batch_collector()
+    try:
+        batch_results = batch_dc.batch_capture([1, 2], triggers_per_config=3)
+        for entry in batch_results:
+            entry["error"] = "simulated capture timeout"
+            entry["waveforms"] = {}
+        try:
+            _build_batch_report(batch_dc, batch_results, str(tmp_path / "batch"), _metadata(), mode=MODE_BATCH)
+        except PipelineCaptureError as exc:
+            caught.append(exc)
+    finally:
+        batch_dc.disconnect()
+
+    assert len(caught) == 2, "both raise sites must be catchable by the same except PipelineCaptureError clause"
+    assert all(isinstance(exc, RuntimeError) for exc in caught), "PipelineCaptureError must remain a RuntimeError subclass"
