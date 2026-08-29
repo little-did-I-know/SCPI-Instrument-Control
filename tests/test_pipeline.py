@@ -255,6 +255,51 @@ def _hand_built_runset(batch_results: list, saved_files: list, mode: str) -> Run
     return RunSet(runs=runs, mode=mode)
 
 
+def test_batch_report_waveforms_carry_probe_ratio_and_coupling_from_provenance(tmp_path):
+    """Regression test for review finding 3: the batch/comparison path
+    (`_build_batch_report` -> `ComparisonAnalyzer.analyze` ->
+    `WaveformLoader`) must populate `probe_ratio`/`coupling` on every loaded
+    waveform, exactly like `_to_report_waveform` already does for the
+    single-run path (see
+    `test_to_report_waveform_carries_probe_ratio_and_coupling_from_provenance`).
+    Before the `_from_loaded` fix in `waveform_loader.py`, these two fields
+    stayed `None` for every batch/comparison report regardless of what the
+    instrument was actually set to.
+
+    Rendering note: `build_comparison_report`'s own sections never populate
+    `TestSection.waveforms` (only `_build_single_run_report` does), and
+    `MarkdownReportGenerator._generate_waveform_info` never renders a
+    "Coupling" row at all (only "Probe Ratio") -- both confirmed empirically,
+    and both pre-existing, out-of-scope structural facts this fix does not
+    change. So a full `run_capture_pipeline` batch Markdown report does not
+    show a per-waveform info table at all today, regardless of this fix.
+    This test instead proves the fix at the layer it actually operates on --
+    the loaded `WaveformData` objects the batch path produces -- and renders
+    one of them through the SAME production renderer the single-run path
+    uses, to prove the populated field is render-compatible."""
+    dc = _connected_two_channel_collector()
+    try:
+        dc.scope.channel1.probe_ratio = 10.0
+        dc.scope.channel1.coupling = "AC"
+        dc.scope.channel2.probe_ratio = 10.0
+        dc.scope.channel2.coupling = "AC"
+        batch_results = dc.batch_capture([1, 2], triggers_per_config=2)
+        result, _report = _build_batch_report(dc, batch_results, str(tmp_path), _metadata())
+    finally:
+        dc.disconnect()
+
+    assert result.runset.runs, "the batch capture must have produced surviving runs to assert against"
+    for run in result.runset.runs:
+        assert run.waveforms, f"run {run.label!r} unexpectedly loaded no waveforms"
+        for wf in run.waveforms:
+            assert wf.probe_ratio == 10.0
+            assert wf.coupling == "AC"
+
+    rendered = MarkdownReportGenerator(include_plots=False)._generate_waveform_info(result.runset.runs[0].waveforms[0], tmp_path, "waveform")
+    assert "Probe Ratio" in rendered
+    assert "10.0:1" in rendered
+
+
 def test_batch_report_matches_hand_built_runset_in_mode_batch(tmp_path):
     """The actual equivalence proof: auto-constructing the RunSet from
     `batch_capture()` + `_build_batch_report` must produce the SAME
@@ -544,6 +589,61 @@ def test_run_capture_pipeline_single_capture_error_raises_instead_of_empty_repor
             run_capture_pipeline(dc, [1, 2], str(tmp_path), _metadata())
     finally:
         dc.disconnect()
+
+
+def test_run_capture_pipeline_single_empty_waveforms_raises_instead_of_empty_report(tmp_path, monkeypatch):
+    """Regression test for review findings 1+2: an exactly-one-result batch
+    whose sole entry has an EMPTY `"waveforms"` dict but NO `"error"` key
+    (e.g. every requested channel was disabled, or every per-channel
+    acquisition raised and was swallowed inside `capture_single` -- see
+    `automation.py`) must raise `PipelineCaptureError` too, not silently
+    build a zero-section `TestReport` that comes back "INCONCLUSIVE" and
+    looks like a trivial, if uninformative, real result."""
+    dc = _connected_two_channel_collector()
+
+    def _empty_batch_capture(channels, **kwargs):
+        return [{"waveforms": {}, "config": {}, "trigger_num": 0}]
+
+    monkeypatch.setattr(dc, "batch_capture", _empty_batch_capture)
+
+    try:
+        with pytest.raises(PipelineCaptureError, match="no channels returned waveform data"):
+            run_capture_pipeline(dc, [1, 2], str(tmp_path), _metadata())
+    finally:
+        dc.disconnect()
+
+
+def test_batch_report_excludes_empty_waveform_entry_without_error_key(tmp_path, caplog):
+    """Regression test for review findings 1+2's batch-path mechanism: an
+    entry with an empty `"waveforms"` dict and NO `"error"` key must be
+    excluded from the RunSet exactly like a real `"error"` entry -- not
+    included as a phantom zero-file `Run`.
+
+    This is the actual regression assertion, not just "doesn't crash": before
+    the fix, `ComparisonAnalyzer._match_channels` intersects every run's
+    channel set to compute `matched_channels`, so ONE phantom empty run
+    (whichever position it's in) would silently zero out `matched_channels`
+    -- and therefore `aggregates`/`deltas` -- for the WHOLE comparison, with
+    no warning or exception. Asserting `matched_channels`/`aggregates` are
+    NOT empty here is what would have caught that."""
+    dc = _connected_two_channel_collector()
+    try:
+        batch_results = dc.batch_capture([1, 2], triggers_per_config=3)
+        assert len(batch_results) == 3
+        # No "error" key -- just an entry that happened to capture nothing.
+        batch_results[1]["waveforms"] = {}
+
+        with caplog.at_level("WARNING", logger="scpi_control.pipeline"):
+            result, _report = _build_batch_report(dc, batch_results, str(tmp_path), _metadata(), mode=MODE_BATCH)
+    finally:
+        dc.disconnect()
+
+    assert [run.label for run in result.runset.runs] == ["capture_0000", "capture_0002"]
+    assert any("no channels returned waveform data" in msg for msg in caplog.messages)
+    assert result.matched_channels == ["1", "2"], "the two genuinely-captured runs still share channels"
+    assert result.aggregates, "a phantom empty run must not zero out aggregates for the surviving runs"
+    for channel_stats in result.aggregates.values():
+        assert channel_stats, "each matched channel should still have computed aggregate stats"
 
 
 def test_pipeline_capture_error_unifies_single_run_and_batch_failure_types(tmp_path, monkeypatch):
