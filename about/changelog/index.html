@@ -3430,7 +3430,18 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="[Unreleased]">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#730-2026-08-30" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [7.3.0] - 2026-08-30
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[7.3.0] - 2026-08-30">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -5468,7 +5479,18 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="[Unreleased]">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#730-2026-08-30" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [7.3.0] - 2026-08-30
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[7.3.0] - 2026-08-30">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -7424,6 +7446,7 @@
 <p>The format is based on <a href="https://keepachangelog.com/en/1.0.0/">Keep a Changelog</a>,
 and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semantic Versioning</a>.</p>
 <h2 id="unreleased">[Unreleased]<a class="headerlink" href="#unreleased" title="Permanent link">&para;</a></h2>
+<h2 id="730-2026-08-30">[7.3.0] - 2026-08-30<a class="headerlink" href="#730-2026-08-30" title="Permanent link">&para;</a></h2>
 <h3 id="added">Added<a class="headerlink" href="#added" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong><code>scpi_control.pipeline</code>, a capture-to-report pipeline.</strong> Previously
@@ -7518,6 +7541,40 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   script verifies the wrap-around numerically before writing each GIF, so
   every seamless kind loops with no visible phase jump; <code>dc</code> and <code>noise</code> have
   no cycle structure to align to and simply restart.</li>
+<li><strong>Waveform superposition for mock signal synthesis.</strong> New <code>SuperposedSignal</code>
+  dataclass (<code>scpi_control.signal_synth</code>) sums two or more independently-
+  synthesized <code>SignalSpec</code> components -- each keeping its own kind,
+  impairments, and seed -- into one waveform via <code>synthesize_combined()</code>/
+  <code>make_waveform_combined()</code>, mirroring <code>synthesize()</code>/<code>make_waveform()</code>.
+  Requires at least 2 components (<code>InvalidParameterError</code> otherwise).
+  <code>MockConnection.raw_volts</code> now accepts a <code>SuperposedSignal</code> wherever it
+  accepted a plain <code>SignalSpec</code>, with the DUT model (if any) applied to the
+  summed signal rather than to any one component -- <code>_render_with_dut()</code>/
+  <code>_bump_seed()</code> were extracted from the existing single-spec path so both
+  branches share the same DUT-warmup-and-apply logic instead of duplicating
+  it. <code>spec_for()</code> now raises <code>InvalidParameterError</code> if a <code>SuperposedSignal</code>
+  reaches it, instead of silently handing one back where a plain <code>SignalSpec</code>
+  was promised. Also new: a <code>mock</code> pip extra (<code>pip install
+  "SCPI-Instrument-Control[mock]"</code>) as a discoverability alias -- the
+  mock/synthetic-signal tooling already ships in the core install; this just
+  gives it a named, intention-revealing install command. Three new README
+  GIFs ("Combining signals on one channel"): sine + noise, a two-tone 50 Hz
+  beat, and square + spur, rendered by
+  <code>scripts/media/make_superposition_gallery_gifs.py</code>.</li>
+<li><strong>Clipping/saturation impairment for mock signal synthesis.</strong> <code>SignalSpec</code>
+  gains <code>clip_level</code> (volts, symmetric threshold, <code>0.0</code> = off) and
+  <code>clip_softness</code> (<code>0.0</code>-<code>1.0</code>), a kind-agnostic impairment -- like
+  <code>noise_rms</code>/<code>drift_amplitude</code> -- modeling a non-linear output stage (an
+  amplifier or probe front-end driven into its rails). Applied LAST in
+  <code>synthesize()</code>, after drift, glitches, and noise, so a noisy sample that
+  lands past the rail gets flattened too, the same way a real saturating
+  stage would clip noise riding on its input. <code>clip_softness=0.0</code> is an exact
+  hard clip (<code>np.clip</code>, flat-topped at &plusmn;<code>clip_level</code>); <code>clip_softness=1.0</code>
+  is pure <code>clip_level * tanh(v / clip_level)</code> soft saturation; values between
+  are the linear blend of those two curves' own outputs. Two new README GIFs
+  ("Clipping and saturation"): the same 1 kHz, 1.5 V sine hard-clipped and
+  soft-saturated at 1 V, rendered by
+  <code>scripts/media/make_clipping_gallery_gifs.py</code>.</li>
 </ul>
 <h3 id="fixed">Fixed<a class="headerlink" href="#fixed" title="Permanent link">&para;</a></h3>
 <ul>
