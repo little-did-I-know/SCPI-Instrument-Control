@@ -25,6 +25,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   whatever reaches this stage gets the same nonlinear coloring a real
   amplifier would give it, but before clipping, since a real non-linear gain
   stage's waveshaping happens upstream of a separate rail-limiting stage.
+  Normalized against `samples - offset`, not raw `samples`, so a nonzero
+  `offset` does not disturb the exact-harmonic guarantee.
   `synthesize_combined()` and `stream()` needed no changes -- both already
   dispatch through `synthesize()` per component/chunk.
 

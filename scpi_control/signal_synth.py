@@ -164,16 +164,23 @@ class SignalSpec:
             it runs BEFORE `clip_level`: a real non-linear gain stage's
             waveshaping happens upstream of a separate rail-limiting stage,
             so distortion is free to push samples further from zero and clip
-            is what actually enforces the rails on the result. "Pure harmonic
-            content" in the strict Fourier sense is only exact when `samples`
-            is a pure sinusoid ("sine"); on any other kind the same
-            waveshaper still applies to whatever `samples` holds, coloring
-            that kind's own harmonic content rather than producing a
-            textbook 2nd harmonic. Requires `amplitude != 0` (see
-            `_validate`): the waveshaper normalizes by `amplitude` before
-            applying T_2/T_3, so a zero amplitude would divide by zero --
-            this matters because e.g. `kind="dc"` legitimately ignores
-            `amplitude` entirely and callers routinely set it to 0 there.
+            is what actually enforces the rails on the result. Normalized
+            against `samples - offset`, NOT `samples` -- `offset` is a static
+            bias, not part of the oscillating carrier the Chebyshev identity
+            above is about, so a nonzero `offset` does not disturb the
+            "EXACTLY clean" guarantee (a naive normalization against raw
+            `samples` would leak `offset` into the fundamental and even into
+            the other harmonic's bin). "Pure harmonic content" in the strict
+            Fourier sense is only exact when `samples` is a pure sinusoid
+            plus offset ("sine", any `offset`); on any other kind (or with
+            drift/glitches/noise enabled) the same waveshaper still applies
+            to whatever `samples` holds, coloring that kind's own harmonic
+            content rather than producing a textbook 2nd harmonic. Requires
+            `amplitude != 0` (see `_validate`): the waveshaper normalizes by
+            `amplitude` before applying T_2/T_3, so a zero amplitude would
+            divide by zero -- this matters because e.g. `kind="dc"`
+            legitimately ignores `amplitude` entirely and callers routinely
+            set it to 0 there.
         distortion_h3: Fraction of `amplitude` added as 3rd-harmonic content
             via Chebyshev waveshaping (0 = off), using T_3(u) = 4*u**3 - 3*u
             for the same reason as `distortion_h2` -- see that entry for the
@@ -797,10 +804,28 @@ def synthesize(spec: SignalSpec, sample_rate: float, n_points: int, t0: float = 
         # applies to any kind's `samples`, not just periodic ones, though
         # "pure harmonic content" in the strict Fourier sense is only exact
         # for a pure sinusoid. See SignalSpec.distortion_h2/distortion_h3.
-        u = samples / spec.amplitude
-        t2 = 2.0 * u**2 - 1.0
-        t3 = 4.0 * u**3 - 3.0 * u
-        samples = samples + spec.amplitude * (spec.distortion_h2 * t2 + spec.distortion_h3 * t3)
+        #
+        # Normalized against (samples - offset), NOT samples: offset is a
+        # static bias baked into `samples` by the generator step above, not
+        # part of the oscillating carrier the Chebyshev identity is about. Left
+        # in, a nonzero offset shifts u away from cos(theta) and the "EXACTLY
+        # clean" guarantee above silently breaks -- verified numerically: a 2 V
+        # sine with offset=0.5 and distortion_h2=0.3 came out with a 2.6 V
+        # fundamental (not 2.0 V) and, with distortion_h3 alone, a spurious
+        # nonzero 2nd-harmonic bin that shouldn't exist at all. Subtracting
+        # spec.offset here (and it alone -- not drift/glitches/noise, which
+        # SHOULD get colored per the "whatever reaches this stage" reasoning
+        # above) restores the exact-harmonic guarantee for the common
+        # sine+offset case. Each term is guarded behind its own field so a
+        # single-harmonic call (the common case, and both gallery demos) does
+        # not pay for computing the unused one.
+        u = (samples - spec.offset) / spec.amplitude
+        correction = 0.0
+        if spec.distortion_h2 > 0:
+            correction = correction + spec.distortion_h2 * (2.0 * u**2 - 1.0)
+        if spec.distortion_h3 > 0:
+            correction = correction + spec.distortion_h3 * (4.0 * u**3 - 3.0 * u)
+        samples = samples + spec.amplitude * correction
     if spec.clip_level > 0:
         # LAST impairment, deliberately: a real saturating output stage clips
         # whatever reaches it, drift/glitches/noise included -- so noise near

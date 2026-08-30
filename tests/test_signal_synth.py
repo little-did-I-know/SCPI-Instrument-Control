@@ -429,6 +429,46 @@ def test_distortion_and_h2_and_h3_together_land_in_separate_bins_additively():
     assert mag[third_bin] == pytest.approx(h3 * amplitude, rel=1e-6)
 
 
+def test_distortion_h2_purity_is_unaffected_by_a_nonzero_offset():
+    """Regression test: the waveshaper normalizes against (samples - offset),
+    NOT raw samples -- offset is a static bias, not part of the oscillating
+    carrier the Chebyshev identity is about. Before that fix, a nonzero offset
+    leaked into the fundamental bin (2.6 V instead of 2.0 V for this exact
+    amplitude/offset/h2 combination, verified by hand) because normalizing
+    against the offset-shifted signal pushes u away from cos(theta)."""
+    rate, n, freq = 100_000.0, 100_000, 1_000.0
+    amplitude, offset, h2 = 2.0, 0.5, 0.3
+    spec = SignalSpec(kind="sine", frequency=freq, amplitude=amplitude, offset=offset, distortion_h2=h2, noise_rms=0.0)
+    v = synthesize(spec, rate, n)
+    mag = _bin_amplitudes(v, rate)
+    bin_hz = rate / n
+    fundamental_bin = int(freq / bin_hz)
+    second_bin = int(2 * freq / bin_hz)
+    third_bin = int(3 * freq / bin_hz)
+    assert np.mean(v) == pytest.approx(offset, abs=1e-6)
+    assert mag[fundamental_bin] == pytest.approx(amplitude, rel=1e-6)
+    assert mag[second_bin] == pytest.approx(h2 * amplitude, rel=1e-6)
+    assert mag[third_bin] < 1e-9
+
+
+def test_distortion_h3_alone_with_offset_does_not_leak_into_the_second_harmonic():
+    """Mirror of the h2 offset regression test above, for h3 -- this is the
+    sharper failure mode: before the fix, distortion_h3 ALONE (h2=0.0) with a
+    nonzero offset produced a spurious nonzero 2nd-harmonic bin that should
+    not exist at all, not just a magnitude error on a bin already in use."""
+    rate, n, freq = 100_000.0, 100_000, 1_000.0
+    amplitude, offset, h3 = 2.0, 0.5, 0.3
+    spec = SignalSpec(kind="sine", frequency=freq, amplitude=amplitude, offset=offset, distortion_h3=h3, noise_rms=0.0)
+    mag = _bin_amplitudes(synthesize(spec, rate, n), rate)
+    bin_hz = rate / n
+    fundamental_bin = int(freq / bin_hz)
+    second_bin = int(2 * freq / bin_hz)
+    third_bin = int(3 * freq / bin_hz)
+    assert mag[fundamental_bin] == pytest.approx(amplitude, rel=1e-6)
+    assert mag[second_bin] < 1e-9
+    assert mag[third_bin] == pytest.approx(h3 * amplitude, rel=1e-6)
+
+
 def test_distortion_is_applied_before_clip_not_after():
     # distortion_h2 pushes a 1.0 V sine well past a 1.0 V clip_level -- if
     # distortion ran AFTER clip, an already-flat-topped +/-1.0 signal fed
