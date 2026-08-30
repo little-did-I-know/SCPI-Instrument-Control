@@ -12,10 +12,17 @@ autoscale jitter). Frame count and chunk size are chosen per kind so the total
 time advanced across all frames is an exact integer number of that signal's
 own period (or, for "chirp", its sweep_time) -- so the last frame flows back
 into the first with no visible phase jump when the GIF loops (`loop=0`).
-`main()` verifies this numerically for every kind where it applies, and
-refuses to write a GIF (RuntimeError) if a "seamless" kind's wrap-around jump
-exceeds a tight tolerance. "dc" and "noise" have no cycle to align to and are
-exempt -- see SEAMLESS_TOLERANCE_V and the KINDS table below.
+`run_gallery()` (in gallery_common.py) verifies this numerically for every
+kind where it applies, and refuses to write a GIF (RuntimeError) if a
+"seamless" kind's wrap-around jump exceeds a tight tolerance. "dc" and
+"noise" have no cycle to align to and are exempt -- see
+gallery_common.SEAMLESS_TOLERANCE_V and the KINDS table below.
+
+The frame-rendering/GIF-writing pipeline this script uses is shared with its
+three sibling gallery scripts (make_superposition_gallery_gifs.py,
+make_clipping_gallery_gifs.py, make_distortion_gallery_gifs.py) via
+gallery_common.py, imported below. This script keeps its own KINDS table and
+build_kind() -- those are specific to per-kind signal rendering.
 
 Resolves its own repo root from __file__, so it can be run from anywhere:
   python scripts/media/make_signal_gallery_gifs.py
@@ -23,32 +30,24 @@ Resolves its own repo root from __file__, so it can be run from anywhere:
 
 from __future__ import annotations
 
-import os
 import sys
 from pathlib import Path
 from typing import Any, Dict
 
 import numpy as np
-from matplotlib.backends.backend_agg import FigureCanvasAgg
-from matplotlib.figure import Figure
 from PIL import Image
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
-DEST_DIR = REPO_ROOT / "docs" / "images"
-SIZE_BUDGET_KB = 450
+# Sibling-module import: gallery_common.py has the render pipeline (frame
+# drawing, seamless-loop check, palettized GIF writing, main() body) shared
+# across all four make_*_gallery_gifs.py scripts. Both live directly in
+# scripts/media/ with no package __init__.py, so the directory is put on
+# sys.path explicitly rather than relying on the interpreter having added it
+# only because this file happened to be the one invoked directly.
+_MEDIA_DIR = Path(__file__).resolve().parent
+if str(_MEDIA_DIR) not in sys.path:
+    sys.path.insert(0, str(_MEDIA_DIR))
 
-FIG_SIZE_IN = (3.4, 1.9)  # inches
-DPI = 100  # -> 340x190 px frames
-PALETTE_COLORS = 48  # a single line + grid on white needs far fewer colours than the code-editor GIFs
-
-# How close the buffer just after the LAST frame's chunk must land to the
-# FIRST frame's buffer, in volts, for a "seamless" kind (see KINDS below).
-# Tight: everything at play here (SignalSpec generators, t0 bookkeeping in
-# stream()/synthesize()) is deterministic float64 arithmetic with no jitter
-# or impairments enabled, so a genuinely aligned loop reproduces to within a
-# few ULPs, not merely "close". A few micro-volts already means the frame
-# math is wrong, not that the tolerance was too strict.
-SEAMLESS_TOLERANCE_V = 1e-6
+from gallery_common import _prime_buffer, render_frame, run_gallery  # noqa: E402
 
 # One entry per scpi_control.signal_synth._GENERATORS kind. Kept as a plain
 # literal list of dicts (no loops, no computed fields, no SignalSpec(...)
@@ -202,43 +201,6 @@ KINDS = [
 ]
 
 
-def _prime_buffer(gen, window_samples: int) -> np.ndarray:
-    """Fill the rolling buffer with whole stream() chunks before rendering starts."""
-    chunks = [next(gen)]
-    total = chunks[0].size
-    while total < window_samples:
-        chunk = next(gen)
-        chunks.append(chunk)
-        total += chunk.size
-    buffer = np.concatenate(chunks)
-    if buffer.size != window_samples:
-        raise RuntimeError(f"buffer priming landed on {buffer.size} samples, expected exactly {window_samples} -- window_samples must be a multiple of chunk_size")
-    return buffer
-
-
-def render_frame(t_ms: np.ndarray, voltage: np.ndarray, entry: Dict[str, Any], style) -> Image.Image:
-    """Render one rolling-buffer frame to an in-memory RGB image."""
-    fig = Figure(figsize=FIG_SIZE_IN, dpi=DPI)
-    fig.patch.set_facecolor(style.background_color)
-    canvas = FigureCanvasAgg(fig)
-    ax = fig.add_subplot(111)
-
-    ax.plot(t_ms, voltage, color=style.waveform_color, linewidth=style.waveform_linewidth)
-    style.apply_to_axes(ax)
-
-    ax.set_xlim(t_ms[0], t_ms[-1])
-    ax.set_ylim(*entry["ylim"])
-    ax.set_xlabel("Time (ms)", fontsize=style.label_fontsize)
-    ax.set_ylabel("Voltage (V)", fontsize=style.label_fontsize)
-    ax.set_title(entry["kind"], fontsize=style.title_fontsize)
-    fig.tight_layout()
-
-    canvas.draw()
-    w, h = canvas.get_width_height()
-    img = Image.frombuffer("RGBA", (w, h), canvas.buffer_rgba(), "raw", "RGBA", 0, 1)
-    return img.convert("RGB")
-
-
 def build_kind(entry: Dict[str, Any], style) -> tuple[list[Image.Image], np.ndarray, np.ndarray]:
     """Stream `entry`'s signal and render its frames.
 
@@ -270,55 +232,8 @@ def build_kind(entry: Dict[str, Any], style) -> tuple[list[Image.Image], np.ndar
     return frames, first_buffer, buffer
 
 
-def _check_seamless(entry: Dict[str, Any], first_buffer: np.ndarray, post_loop_buffer: np.ndarray) -> float:
-    """Empirically verify the wrap-around jump, in volts. Raises if too large."""
-    max_diff = float(np.max(np.abs(post_loop_buffer - first_buffer)))
-    if max_diff > SEAMLESS_TOLERANCE_V:
-        raise RuntimeError(
-            f"{entry['kind']!r} is marked seam_checked but the buffer after "
-            f"{entry['n_frames']} frames differs from the first frame by up to "
-            f"{max_diff:.3e} V (tolerance {SEAMLESS_TOLERANCE_V:.0e} V) -- the "
-            "loop would show a visible jump; check sample_rate/chunk_size/n_frames"
-        )
-    return max_diff
-
-
-def _write_gif(dest: Path, frames: list[Image.Image], durations: list[int]) -> float:
-    palettised = [f.convert("P", palette=Image.ADAPTIVE, colors=PALETTE_COLORS) for f in frames]
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    tmp = dest.with_name(dest.stem + ".tmp.gif")
-    try:
-        palettised[0].save(tmp, save_all=True, append_images=palettised[1:], duration=durations, loop=0, optimize=True, disposal=2)
-        size_kb = tmp.stat().st_size / 1024
-        if size_kb > SIZE_BUDGET_KB:
-            raise RuntimeError(f"{dest.name} is {size_kb:.0f} KB, over the {SIZE_BUDGET_KB} KB budget -- reduce frame count, dimensions, or palette depth")
-        os.replace(tmp, dest)
-    except BaseException:
-        tmp.unlink(missing_ok=True)
-        raise
-    return size_kb
-
-
 def main() -> None:
-    # Local import for the same reason as build_kind's.
-    from scpi_control.report_generator.models.plot_style import PlotStyle
-
-    style = PlotStyle()
-    if not KINDS:
-        raise RuntimeError("KINDS is empty -- nothing to render")
-
-    for entry in KINDS:
-        frames, first_buffer, post_loop_buffer = build_kind(entry, style)
-        seam_note = ""
-        if entry["seam_checked"]:
-            max_diff = _check_seamless(entry, first_buffer, post_loop_buffer)
-            seam_note = f", seam {max_diff:.2e} V"
-
-        dest = DEST_DIR / f"signal-{entry['kind']}.gif"
-        durations = [entry["frame_ms"]] * len(frames)
-        size_kb = _write_gif(dest, frames, durations)
-        w, h = frames[0].size
-        print(f"wrote {dest} ({size_kb:.0f} KB, {len(frames)} frames, {w}x{h}{seam_note})")
+    run_gallery(KINDS, build_kind, "signal")
 
 
 if __name__ == "__main__":
