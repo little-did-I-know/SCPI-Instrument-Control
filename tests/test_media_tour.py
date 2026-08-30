@@ -15,6 +15,7 @@ ANNOTATION_GENERATOR = REPO_ROOT / "scripts" / "media" / "make_annotation_gif.py
 GALLERY_GENERATOR = REPO_ROOT / "scripts" / "media" / "make_signal_gallery_gifs.py"
 SUPERPOSITION_GALLERY_GENERATOR = REPO_ROOT / "scripts" / "media" / "make_superposition_gallery_gifs.py"
 CLIPPING_GALLERY_GENERATOR = REPO_ROOT / "scripts" / "media" / "make_clipping_gallery_gifs.py"
+DISTORTION_GALLERY_GENERATOR = REPO_ROOT / "scripts" / "media" / "make_distortion_gallery_gifs.py"
 SMOKE = REPO_ROOT / "tests" / "test_examples_smoke.py"
 
 
@@ -248,3 +249,42 @@ def test_readme_clipping_gallery_matches_the_generator_exactly():
     assert len(referenced) == len(demo_names), f"README references {len(referenced)} clipping-*.gif images but DEMOS has {len(demo_names)} entries"
     assert set(referenced) == demo_names, f"README's clipping gallery images {sorted(set(referenced))} don't match DEMOS {sorted(demo_names)}"
     assert len(referenced) == len(set(referenced)), f"README references a clipping-*.gif image more than once: {referenced}"
+
+
+def _distortion_demos():
+    return _table(DISTORTION_GALLERY_GENERATOR, "DEMOS")
+
+
+def _distortion_demo_names():
+    return {entry["name"] for entry in _distortion_demos()}
+
+
+def test_distortion_demos_table_is_not_empty():
+    assert _distortion_demos(), "parsed no DEMOS entries -- the table shape changed"
+
+
+def test_distortion_demos_have_no_duplicate_or_missing_names():
+    entries = _distortion_demos()
+    names = [entry["name"] for entry in entries]
+    assert len(names) == len(set(names)), f"DEMOS has duplicate demo names: {names}"
+    assert all(names), "DEMOS has an entry with an empty/falsy name"
+
+
+def test_readme_distortion_gallery_matches_the_generator_exactly():
+    """The README's distortion gallery must embed exactly the GIFs the script writes.
+
+    Regex over the README rather than a fixed count, mirroring
+    test_readme_signal_gallery_matches_the_generator_exactly,
+    test_readme_superposition_gallery_matches_the_generator_exactly, and
+    test_readme_clipping_gallery_matches_the_generator_exactly: this fails the
+    moment someone adds a demo to DEMOS without adding its <img> (or vice
+    versa), or typos a filename, rather than silently shipping a stale gallery.
+    """
+    readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
+    referenced = re.findall(r"docs/images/distortion-([a-z0-9_]+)\.gif", readme)
+
+    demo_names = _distortion_demo_names()
+    assert referenced, "README has no docs/images/distortion-*.gif references -- was the gallery section removed?"
+    assert len(referenced) == len(demo_names), f"README references {len(referenced)} distortion-*.gif images but DEMOS has {len(demo_names)} entries"
+    assert set(referenced) == demo_names, f"README's distortion gallery images {sorted(set(referenced))} don't match DEMOS {sorted(demo_names)}"
+    assert len(referenced) == len(set(referenced)), f"README references a distortion-*.gif image more than once: {referenced}"

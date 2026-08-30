@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Harmonic distortion for mock signal synthesis.** `SignalSpec` gains
+  `distortion_h2` and `distortion_h3` (fraction of `amplitude`, `0.0` = off),
+  a kind-agnostic impairment -- like `noise_rms`/`clip_level` -- modeling a
+  non-linear gain stage's harmonic coloration. Implemented via Chebyshev
+  waveshaping (`T_2(u) = 2u**2 - 1`, `T_3(u) = 4u**3 - 3u`), deliberately not
+  a naive `u**2`/`u**3` polynomial: the identity `T_n(cos(theta)) =
+  cos(n*theta)` means a pure sinusoid fed through `T_2`/`T_3` comes out as
+  EXACTLY `distortion_h2`/`distortion_h3` fraction of clean 2nd/3rd-harmonic
+  content with no cross-leakage into DC or into each other, whereas a naive
+  `sin(theta)**2` term drags a DC offset along with it
+  (`sin(theta)**2 == 0.5*(1 - cos(2*theta))`) -- proven numerically via FFT
+  bin analysis in `tests/test_signal_synth.py`. Applied in `synthesize()`
+  between `noise_rms` and `clip_level`: after drift/glitches/noise, so
+  whatever reaches this stage gets the same nonlinear coloring a real
+  amplifier would give it, but before clipping, since a real non-linear gain
+  stage's waveshaping happens upstream of a separate rail-limiting stage.
+  Normalized against `samples - offset`, not raw `samples`, so a nonzero
+  `offset` does not disturb the exact-harmonic guarantee.
+  `synthesize_combined()` and `stream()` needed no changes -- both already
+  dispatch through `synthesize()` per component/chunk.
+
 ## [7.3.0] - 2026-08-30
 
 ### Added
