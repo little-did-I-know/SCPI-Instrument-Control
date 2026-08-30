@@ -73,6 +73,8 @@ def test_the_new_fields_are_appended_and_do_not_move_the_existing_ones():
         "jitter_seed",
         "clip_level",
         "clip_softness",
+        "distortion_h2",
+        "distortion_h3",
     ]
 
 

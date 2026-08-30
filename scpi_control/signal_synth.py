@@ -145,6 +145,45 @@ class SignalSpec:
             parameterization: `clip_level * ((1 - clip_softness) * hard +
             clip_softness * soft)`. Must be in [0, 1]; only used when
             clip_level > 0.
+        distortion_h2: Fraction of `amplitude` added as 2nd-harmonic content
+            via Chebyshev waveshaping (0 = off). Uses the CHEBYSHEV
+            polynomial T_2(u) = 2*u**2 - 1, not a naive u**2 term, because of
+            the identity T_n(cos(theta)) = cos(n*theta): fed a pure sinusoid
+            u = sin(theta), T_2 produces EXACTLY distortion_h2 fraction of
+            clean 2nd-harmonic content with no leakage into DC or the 3rd
+            harmonic. A naive u**2 polynomial does not have that property --
+            sin(theta)**2 == 0.5*(1 - cos(2*theta)) -- so a "2nd harmonic"
+            built that way would drag a DC offset along with it, a
+            measurable-but-wrong artifact this module works hard to avoid
+            elsewhere (see `_multitone`'s coherent harmonic series, built the
+            same way for the same reason: THD analysis needs a signal with a
+            known-correct answer). It is KIND-AGNOSTIC and applied to
+            `samples` as they stand after drift/glitches/noise, same as
+            `clip_level` -- so those impairments' contribution gets the same
+            nonlinear coloring a real amplifier stage would give them -- but
+            it runs BEFORE `clip_level`: a real non-linear gain stage's
+            waveshaping happens upstream of a separate rail-limiting stage,
+            so distortion is free to push samples further from zero and clip
+            is what actually enforces the rails on the result. "Pure harmonic
+            content" in the strict Fourier sense is only exact when `samples`
+            is a pure sinusoid ("sine"); on any other kind the same
+            waveshaper still applies to whatever `samples` holds, coloring
+            that kind's own harmonic content rather than producing a
+            textbook 2nd harmonic. Requires `amplitude != 0` (see
+            `_validate`): the waveshaper normalizes by `amplitude` before
+            applying T_2/T_3, so a zero amplitude would divide by zero --
+            this matters because e.g. `kind="dc"` legitimately ignores
+            `amplitude` entirely and callers routinely set it to 0 there.
+        distortion_h3: Fraction of `amplitude` added as 3rd-harmonic content
+            via Chebyshev waveshaping (0 = off), using T_3(u) = 4*u**3 - 3*u
+            for the same reason as `distortion_h2` -- see that entry for the
+            full derivation and the naive-polynomial cross-leakage this
+            avoids. `distortion_h2` and `distortion_h3` are independent and
+            additive: T_2 and T_3 applied to the same pure sinusoid land in
+            different, non-overlapping FFT bins (2*frequency and
+            3*frequency respectively, with nothing at DC or at each other's
+            bin), so enabling both together colors the signal with both
+            harmonics and no cross-talk between them.
     """
 
     kind: str = "sine"
@@ -190,6 +229,10 @@ class SignalSpec:
     # don't-reorder-positional-construction reason as every field above it.
     clip_level: float = 0.0  # volts, symmetric clipping/saturation threshold (0 = off); kind-agnostic, applied LAST -- see the docstring above
     clip_softness: float = 0.0  # 0 = hard clip, blends toward tanh-based soft saturation as it approaches 1.0; only used when clip_level > 0
+    # Appended after clip_softness -- the current last field -- for the same
+    # don't-reorder-positional-construction reason as every field above it.
+    distortion_h2: float = 0.0  # fraction of amplitude, 2nd-harmonic (even) content added via Chebyshev waveshaping (0 = off); see the docstring above
+    distortion_h3: float = 0.0  # fraction of amplitude, 3rd-harmonic (odd) content added via Chebyshev waveshaping (0 = off); see the docstring above
 
 
 @dataclass(frozen=True)
@@ -501,6 +544,20 @@ def _validate(spec: SignalSpec, sample_rate: float, n_points: int) -> None:
         raise exceptions.InvalidParameterError(f"clip_level must be non-negative: {spec.clip_level}")
     if not 0.0 <= spec.clip_softness <= 1.0:
         raise exceptions.InvalidParameterError(f"clip_softness must be between 0 and 1: {spec.clip_softness}")
+    if not np.isfinite(spec.distortion_h2) or spec.distortion_h2 < 0:
+        raise exceptions.InvalidParameterError(f"distortion_h2 must be a non-negative, finite number: {spec.distortion_h2}")
+    if not np.isfinite(spec.distortion_h3) or spec.distortion_h3 < 0:
+        raise exceptions.InvalidParameterError(f"distortion_h3 must be a non-negative, finite number: {spec.distortion_h3}")
+    if spec.amplitude == 0 and (spec.distortion_h2 > 0 or spec.distortion_h3 > 0):
+        # The waveshaper below normalizes samples by `amplitude` before applying
+        # T_2/T_3, so amplitude=0 would divide by zero. amplitude=0 is otherwise
+        # a legitimate value -- e.g. "dc" ignores `amplitude` entirely (see
+        # `_dc`), so callers routinely set it to 0 there -- so this is only an
+        # error once distortion is actually requested alongside it.
+        raise exceptions.InvalidParameterError(
+            f"amplitude must be nonzero to apply harmonic distortion (distortion_h2/distortion_h3 "
+            f"normalize against it): amplitude={spec.amplitude}, distortion_h2={spec.distortion_h2}, distortion_h3={spec.distortion_h3}"
+        )
 
 
 def _impairment_rng(seed: Optional[int], stream_index: int) -> np.random.Generator:
@@ -722,6 +779,28 @@ def synthesize(spec: SignalSpec, sample_rate: float, n_points: int, t0: float = 
             np.add.at(samples, positions, signs * spec.glitch_amplitude)
     if spec.noise_rms > 0:
         samples = samples + rng.normal(0.0, spec.noise_rms, n_points)
+    if spec.distortion_h2 > 0 or spec.distortion_h3 > 0:
+        # Chebyshev waveshaping, deliberately NOT a naive u**2/u**3 polynomial:
+        # T_n(cos(theta)) == cos(n*theta), so feeding a pure sinusoid through
+        # T_2/T_3 yields EXACTLY distortion_h2/distortion_h3 fraction of clean
+        # 2nd/3rd harmonic with no cross-leakage into DC or into each other --
+        # sin(theta)**2, by contrast, is 0.5*(1 - cos(2*theta)), so a naive
+        # square term would drag a DC offset along with the "2nd harmonic" it
+        # was meant to add. Applied to `samples` as they stand after
+        # drift/glitches/noise -- kind-agnostic, same as clip_level below, so
+        # whatever reaches this stage gets the same nonlinear coloring a real
+        # amplifier stage would give it -- but deliberately BEFORE clip_level:
+        # a real non-linear gain stage's waveshaping happens upstream of a
+        # separate rail-limiting stage, so this is free to push samples
+        # further from zero and clip is what actually enforces the rails on
+        # the result. Kind-agnostic in the same sense clip_level is: it
+        # applies to any kind's `samples`, not just periodic ones, though
+        # "pure harmonic content" in the strict Fourier sense is only exact
+        # for a pure sinusoid. See SignalSpec.distortion_h2/distortion_h3.
+        u = samples / spec.amplitude
+        t2 = 2.0 * u**2 - 1.0
+        t3 = 4.0 * u**3 - 3.0 * u
+        samples = samples + spec.amplitude * (spec.distortion_h2 * t2 + spec.distortion_h3 * t3)
     if spec.clip_level > 0:
         # LAST impairment, deliberately: a real saturating output stage clips
         # whatever reaches it, drift/glitches/noise included -- so noise near

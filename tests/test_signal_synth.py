@@ -2,6 +2,7 @@
 
 import itertools
 import time
+from dataclasses import replace
 
 import numpy as np
 import pytest
@@ -325,3 +326,145 @@ def test_clipping_raises_thd_via_odd_harmonic_distortion():
     assert thd_clean is not None
     assert thd_clipped is not None
     assert thd_clipped > thd_clean * 10, f"expected clipping to measurably raise THD: clean={thd_clean!r}%, clipped={thd_clipped!r}%"
+
+
+def _bin_amplitudes(samples, rate):
+    """Single-sided amplitude per FFT bin. Only valid for an integer number of
+    cycles in the buffer -- every caller below arranges that -- otherwise leakage
+    spreads a tone across neighbouring bins and the ratios stop being exact.
+    Mirrors tests/test_signal_kinds.py's identically-named helper."""
+    return np.abs(np.fft.rfft(samples)) * 2.0 / len(samples)
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"distortion_h2": -0.1},
+        {"distortion_h3": -0.1},
+        {"distortion_h2": float("nan")},
+        {"distortion_h2": float("inf")},
+        {"distortion_h3": float("nan")},
+        {"distortion_h3": float("inf")},
+    ],
+)
+def test_negative_or_non_finite_distortion_is_rejected(kwargs):
+    with pytest.raises(exceptions.InvalidParameterError):
+        synthesize(SignalSpec(kind="sine", frequency=1_000.0, **kwargs), 1_000_000.0, 1_000)
+
+
+def test_distortion_with_zero_amplitude_raises_h2():
+    # kind="dc" legitimately runs with amplitude=0 (see _dc, which ignores
+    # amplitude entirely) -- the guard has to trigger specifically when
+    # distortion is ALSO requested, since the waveshaper normalizes by
+    # amplitude and would divide by zero.
+    with pytest.raises(exceptions.InvalidParameterError):
+        synthesize(SignalSpec(kind="dc", amplitude=0.0, distortion_h2=0.1), 1_000.0, 100)
+
+
+def test_distortion_with_zero_amplitude_raises_h3():
+    with pytest.raises(exceptions.InvalidParameterError):
+        synthesize(SignalSpec(kind="dc", amplitude=0.0, distortion_h3=0.1), 1_000.0, 100)
+
+
+def test_zero_amplitude_without_distortion_is_still_fine():
+    # The amplitude==0 guard must not fire when distortion is off -- this is
+    # the ordinary, legitimate "dc" use case it must not break.
+    v = synthesize(SignalSpec(kind="dc", amplitude=0.0, offset=0.3), 1_000.0, 100)
+    np.testing.assert_allclose(v, 0.3)
+
+
+def test_distortion_h2_alone_produces_a_pure_second_harmonic():
+    """The claim the docstring makes about Chebyshev vs. a naive polynomial,
+    proven numerically: a pure sinusoid distorted by T_2 alone must show up as
+    an isolated 2nd-harmonic bin, with the fundamental unchanged and no
+    leakage into DC or the 3rd harmonic. A naive u**2 polynomial would leak
+    into DC (sin(theta)**2 == 0.5*(1 - cos(2*theta))), which is exactly what
+    this test would catch."""
+    rate, n, freq = 100_000.0, 100_000, 1_000.0  # 1 s buffer -> 1 Hz bins, 1000 whole cycles
+    amplitude = 2.0
+    h2 = 0.3
+    spec = SignalSpec(kind="sine", frequency=freq, amplitude=amplitude, distortion_h2=h2, noise_rms=0.0)
+    mag = _bin_amplitudes(synthesize(spec, rate, n), rate)
+    bin_hz = rate / n
+    dc_bin = 0
+    fundamental_bin = int(freq / bin_hz)
+    second_bin = int(2 * freq / bin_hz)
+    third_bin = int(3 * freq / bin_hz)
+    assert mag[fundamental_bin] == pytest.approx(amplitude, rel=1e-6)
+    assert mag[second_bin] == pytest.approx(h2 * amplitude, rel=1e-6)
+    assert mag[dc_bin] < 1e-9
+    assert mag[third_bin] < 1e-9
+
+
+def test_distortion_h3_alone_produces_a_pure_third_harmonic():
+    """Mirror of the h2 test above, for T_3 -- see that test's docstring."""
+    rate, n, freq = 100_000.0, 100_000, 1_000.0
+    amplitude = 2.0
+    h3 = 0.3
+    spec = SignalSpec(kind="sine", frequency=freq, amplitude=amplitude, distortion_h3=h3, noise_rms=0.0)
+    mag = _bin_amplitudes(synthesize(spec, rate, n), rate)
+    bin_hz = rate / n
+    dc_bin = 0
+    fundamental_bin = int(freq / bin_hz)
+    second_bin = int(2 * freq / bin_hz)
+    third_bin = int(3 * freq / bin_hz)
+    assert mag[fundamental_bin] == pytest.approx(amplitude, rel=1e-6)
+    assert mag[third_bin] == pytest.approx(h3 * amplitude, rel=1e-6)
+    assert mag[dc_bin] < 1e-9
+    assert mag[second_bin] < 1e-9
+
+
+def test_distortion_and_h2_and_h3_together_land_in_separate_bins_additively():
+    rate, n, freq = 100_000.0, 100_000, 1_000.0
+    amplitude = 2.0
+    h2, h3 = 0.2, 0.15
+    spec = SignalSpec(kind="sine", frequency=freq, amplitude=amplitude, distortion_h2=h2, distortion_h3=h3, noise_rms=0.0)
+    mag = _bin_amplitudes(synthesize(spec, rate, n), rate)
+    bin_hz = rate / n
+    fundamental_bin = int(freq / bin_hz)
+    second_bin = int(2 * freq / bin_hz)
+    third_bin = int(3 * freq / bin_hz)
+    assert mag[fundamental_bin] == pytest.approx(amplitude, rel=1e-6)
+    assert mag[second_bin] == pytest.approx(h2 * amplitude, rel=1e-6)
+    assert mag[third_bin] == pytest.approx(h3 * amplitude, rel=1e-6)
+
+
+def test_distortion_is_applied_before_clip_not_after():
+    # distortion_h2 pushes a 1.0 V sine well past a 1.0 V clip_level -- if
+    # distortion ran AFTER clip, an already-flat-topped +/-1.0 signal fed
+    # through the waveshaper would land somewhere else entirely (the
+    # waveshaper is not idempotent on a clipped square-ish wave); if it runs
+    # BEFORE clip (the documented order), the final output must respect the
+    # clip bound exactly, with genuine flat-topping as evidence clipping fired.
+    spec = SignalSpec(kind="sine", frequency=100.0, amplitude=1.0, distortion_h2=0.9, clip_level=1.0, clip_softness=0.0, seed=1)
+    v = synthesize(spec, sample_rate=1_000_000.0, n_points=100_000)
+    assert np.max(np.abs(v)) == pytest.approx(1.0, abs=1e-9)
+    at_rail = np.isclose(v, 1.0, atol=1e-9) | np.isclose(v, -1.0, atol=1e-9)
+    assert at_rail.sum() > 10, "expected genuine clipping evidence -- distortion must be pushing samples past clip_level for clip to have anything to do"
+
+
+def test_distortion_default_off_is_bit_identical_to_fields_absent():
+    base = dict(kind="sine", frequency=1_000.0, amplitude=1.0, noise_rms=0.05, drift_amplitude=0.1, seed=7)
+    without_fields = synthesize(SignalSpec(**base), 1_000_000.0, 5_000)
+    with_fields_off = synthesize(SignalSpec(distortion_h2=0.0, distortion_h3=0.0, **base), 1_000_000.0, 5_000)
+    np.testing.assert_array_equal(without_fields, with_fields_off)
+
+
+def test_superposed_signal_with_distortion_needs_no_special_casing():
+    """synthesize_combined() dispatches each component through synthesize()
+    unmodified, so a distorted component should need zero code changes to work
+    -- verify that combining a distorted component with a plain one gives
+    exactly the elementwise sum of synthesizing each independently, and that
+    the distortion itself actually took effect (not silently a no-op)."""
+    distorted = SignalSpec(kind="sine", frequency=1_000.0, amplitude=1.0, distortion_h2=0.25, distortion_h3=0.1, seed=3)
+    plain_dc = SignalSpec(kind="dc", offset=0.2)
+    signal = SuperposedSignal((distorted, plain_dc))
+
+    combined = synthesize_combined(signal, 1_000_000.0, 10_000)
+    expected = synthesize(distorted, 1_000_000.0, 10_000) + synthesize(plain_dc, 1_000_000.0, 10_000)
+    np.testing.assert_array_equal(combined, expected)
+
+    undistorted_component = replace(distorted, distortion_h2=0.0, distortion_h3=0.0)
+    undistorted_signal = SuperposedSignal((undistorted_component, plain_dc))
+    undistorted_combined = synthesize_combined(undistorted_signal, 1_000_000.0, 10_000)
+    assert not np.allclose(combined, undistorted_combined), "distortion had no measurable effect inside a SuperposedSignal"
