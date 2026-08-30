@@ -215,6 +215,38 @@ only `clip_softness` differs. Clipping is a memoryless, per-sample
 nonlinearity, so it does not change the signal's period; both loops are
 seamless the same way the galleries above are.
 
+## Harmonic distortion
+
+`SignalSpec.distortion_h2`/`distortion_h3` model the harmonic coloration a
+non-linear gain stage adds — kind-agnostic, like `noise_rms`/`clip_level`, and
+applied to whatever reaches this stage after drift, glitches, and noise. Built
+on Chebyshev waveshaping (`T_2(u) = 2u**2 - 1`, `T_3(u) = 4u**3 - 3u`) rather
+than a naive `u**2`/`u**3` polynomial, so a pure sinusoid gets *exactly* the
+requested fraction of clean 2nd/3rd-harmonic content, with no cross-leakage
+into DC or into each other — proven numerically via FFT-bin analysis in
+`tests/test_signal_synth.py`. It runs BEFORE `clip_level`, the same
+physically-motivated ordering the clipping section above describes: a real
+non-linear gain stage's waveshaping happens upstream of a separate
+rail-limiting stage, so distortion is free to push samples further from zero
+and clipping is what actually enforces the rails on the result.
+
+<p align="center">
+  <!-- Same main-pinned form as the sections above; see that section's comment
+       about main-pinned URLs 404ing until merge. -->
+  <table align="center">
+    <tr>
+      <td align="center"><img src="https://raw.githubusercontent.com/little-did-I-know/SCPI-Instrument-Control/main/docs/images/distortion-second_harmonic.gif" alt="Scrolling trace of a synthesized 1 kHz sine wave with 2nd-harmonic distortion added via Chebyshev waveshaping, showing an asymmetric waveform with the top and bottom half-cycles no longer mirror images of each other" width="320"><br><sub><b>2nd harmonic</b></sub></td>
+      <td align="center"><img src="https://raw.githubusercontent.com/little-did-I-know/SCPI-Instrument-Control/main/docs/images/distortion-third_harmonic.gif" alt="Scrolling trace of the same 1 kHz sine wave with 3rd-harmonic distortion added via Chebyshev waveshaping instead, showing a symmetric but visibly steepened, more angular waveform" width="320"><br><sub><b>3rd harmonic</b></sub></td>
+    </tr>
+  </table>
+</p>
+
+Both demos distort the same 1 kHz, 1.0 V-amplitude sine at a 0.35 fraction —
+only which field (`distortion_h2` or `distortion_h3`) is nonzero differs.
+Chebyshev waveshaping is a memoryless, per-sample nonlinearity, so it does not
+change the signal's period; both loops are seamless the same way the
+galleries above are.
+
 ## What you get
 
 |  | |
