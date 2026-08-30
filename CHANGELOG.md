@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.3.0] - 2026-08-30
+
 ### Added
 
 - **`scpi_control.pipeline`, a capture-to-report pipeline.** Previously
@@ -101,6 +103,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   script verifies the wrap-around numerically before writing each GIF, so
   every seamless kind loops with no visible phase jump; `dc` and `noise` have
   no cycle structure to align to and simply restart.
+- **Waveform superposition for mock signal synthesis.** New `SuperposedSignal`
+  dataclass (`scpi_control.signal_synth`) sums two or more independently-
+  synthesized `SignalSpec` components -- each keeping its own kind,
+  impairments, and seed -- into one waveform via `synthesize_combined()`/
+  `make_waveform_combined()`, mirroring `synthesize()`/`make_waveform()`.
+  Requires at least 2 components (`InvalidParameterError` otherwise).
+  `MockConnection.raw_volts` now accepts a `SuperposedSignal` wherever it
+  accepted a plain `SignalSpec`, with the DUT model (if any) applied to the
+  summed signal rather than to any one component -- `_render_with_dut()`/
+  `_bump_seed()` were extracted from the existing single-spec path so both
+  branches share the same DUT-warmup-and-apply logic instead of duplicating
+  it. `spec_for()` now raises `InvalidParameterError` if a `SuperposedSignal`
+  reaches it, instead of silently handing one back where a plain `SignalSpec`
+  was promised. Also new: a `mock` pip extra (`pip install
+  "SCPI-Instrument-Control[mock]"`) as a discoverability alias -- the
+  mock/synthetic-signal tooling already ships in the core install; this just
+  gives it a named, intention-revealing install command. Three new README
+  GIFs ("Combining signals on one channel"): sine + noise, a two-tone 50 Hz
+  beat, and square + spur, rendered by
+  `scripts/media/make_superposition_gallery_gifs.py`.
+- **Clipping/saturation impairment for mock signal synthesis.** `SignalSpec`
+  gains `clip_level` (volts, symmetric threshold, `0.0` = off) and
+  `clip_softness` (`0.0`-`1.0`), a kind-agnostic impairment -- like
+  `noise_rms`/`drift_amplitude` -- modeling a non-linear output stage (an
+  amplifier or probe front-end driven into its rails). Applied LAST in
+  `synthesize()`, after drift, glitches, and noise, so a noisy sample that
+  lands past the rail gets flattened too, the same way a real saturating
+  stage would clip noise riding on its input. `clip_softness=0.0` is an exact
+  hard clip (`np.clip`, flat-topped at +/-`clip_level`); `clip_softness=1.0`
+  is pure `clip_level * tanh(v / clip_level)` soft saturation; values between
+  are the linear blend of those two curves' own outputs. Two new README GIFs
+  ("Clipping and saturation"): the same 1 kHz, 1.5 V sine hard-clipped and
+  soft-saturated at 1 V, rendered by
+  `scripts/media/make_clipping_gallery_gifs.py`.
 
 ### Fixed
 
