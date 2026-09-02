@@ -12,8 +12,6 @@ import dataclasses
 import logging
 from unittest.mock import Mock
 
-import pytest
-
 from scpi_control.models import MODEL_REGISTRY
 from scpi_control.trigger import Trigger
 from tests.dialect_helpers import make_dialect_scope

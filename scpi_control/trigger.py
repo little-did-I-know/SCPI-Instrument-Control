@@ -224,14 +224,19 @@ class Trigger:
             return
         if channel in cap.unreliable_trigger_sources:
             logger.warning(
-                f"{cap.model_name} is known to silently not honor trigger source "
-                f"{channel!r} (no error is queued). Read scope.trigger.source back "
-                f"to confirm what actually took effect."
+                f"{cap.model_name} is known to silently not honor trigger source " f"{channel!r} (no error is queued). Read scope.trigger.source back " f"to confirm what actually took effect."
             )
             return
         if cap.warns_on_disabled_trigger_channel and channel.startswith("C"):
-            ch = self._scope.get_channel(int(channel[1:]))
-            if ch is not None and not ch.enabled:
+            # Channel.enabled issues a live query(); this check is advisory
+            # only (never load-bearing), so a query failure here must not
+            # block the actual trigger-source write below.
+            try:
+                ch = self._scope.get_channel(int(channel[1:]))
+                disabled = ch is not None and not ch.enabled
+            except Exception:
+                return
+            if disabled:
                 logger.warning(
                     f"{cap.model_name} silently coerces trigger source {channel!r} "
                     f"to LINE while that channel is disabled (no error is queued). "

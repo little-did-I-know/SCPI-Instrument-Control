@@ -13,9 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   sources.** `ModelCapability` gains two fields --
   `unreliable_trigger_sources: FrozenSet[str]` and
   `warns_on_disabled_trigger_channel: bool` -- populated for the SDS824X HD
-  (modern dialect): it silently lands `EX`/`EX5` on `LINE` with no error
-  queued, and silently coerces a disabled channel's selection to `LINE` the
-  same way. `Trigger.source`'s setter now logs a `logging.WARNING` before
+  (modern dialect): it silently coerces `EX` to `LINE`, and `EX5` is never
+  honored at all, with no error queued in either case; it also silently
+  coerces a disabled channel's selection to `LINE` the same way.
+  `Trigger.source`'s setter now logs a `logging.WARNING` before
   writing when the connected model is known to do this -- it never raises
   and never changes what gets sent to the instrument, so
   `scope.trigger.source` still must be read back to confirm what took. Every
