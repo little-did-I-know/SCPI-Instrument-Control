@@ -4,6 +4,7 @@ import logging
 from typing import TYPE_CHECKING, Optional, Union
 
 from scpi_control import exceptions
+from scpi_control.models import ModelCapability
 from scpi_control.scpi_commands import (
     _MODE_ALIASES,
     _PUBLIC_TRIGGER_SOURCES,
@@ -174,8 +175,15 @@ class Trigger:
 
         Warning:
             A scope may silently COERCE this rather than reject it, so a write
-            that raises nothing is not proof the source took. Measured on an
-            SDS824X HD (modern) 2026-08-04, with no error queued in any case:
+            that raises nothing is not proof the source took. For models with
+            measured quirks (see ``ModelCapability.unreliable_trigger_sources``
+            and ``.warns_on_disabled_trigger_channel``), this setter logs a
+            warning before writing. For everything else -- including any
+            model nobody has measured yet -- no warning fires, and
+            ``scope.trigger.source`` must be read back to confirm what took.
+
+            Measured on an SDS824X HD (modern) 2026-08-04, with no error
+            queued in any case:
 
             - Selecting a channel that is switched OFF lands on ``LINE``. Turn
               the channel on first (``scope.channel2.enable()``).
@@ -186,10 +194,10 @@ class Trigger:
 
             ``scope.capabilities.trigger_sources`` reports what the DRIVER can
             send for the dialect, not what the attached model physically has.
-            When it matters, read ``scope.trigger.source`` back and compare.
         """
         channel = self._normalize_source(channel)
         channel = normalize_token(channel, parameter="trigger source", valid=_PUBLIC_TRIGGER_SOURCES, dialect=self._dialect)
+        self._warn_if_unreliable_source(channel)
 
         if not is_flat_trigger(self._dialect):
             self._scope.write(self._cmd("set_trigger_source", src=channel_token(self._dialect, channel)))
@@ -202,6 +210,33 @@ class Trigger:
             wire_type = trigger_type_to_wire(self._dialect, current_type)
             self._scope.write(self._cmd("set_trigger_select", type=wire_type, src=channel))
         logger.info(f"Trigger source set to {channel}")
+
+    def _warn_if_unreliable_source(self, channel: str) -> None:
+        """Log a warning if `channel` is known to be silently coerced.
+
+        Guarded by isinstance rather than getattr-with-default: a plain
+        Mock() (used throughout tests/dialect_helpers.py) auto-vivifies any
+        attribute access, so a missing-attribute default would never trigger
+        -- only a real ModelCapability instance carries meaningful flags.
+        """
+        cap = getattr(self._scope, "model_capability", None)
+        if not isinstance(cap, ModelCapability):
+            return
+        if channel in cap.unreliable_trigger_sources:
+            logger.warning(
+                f"{cap.model_name} is known to silently not honor trigger source "
+                f"{channel!r} (no error is queued). Read scope.trigger.source back "
+                f"to confirm what actually took effect."
+            )
+            return
+        if cap.warns_on_disabled_trigger_channel and channel.startswith("C"):
+            ch = self._scope.get_channel(int(channel[1:]))
+            if ch is not None and not ch.enabled:
+                logger.warning(
+                    f"{cap.model_name} silently coerces trigger source {channel!r} "
+                    f"to LINE while that channel is disabled (no error is queued). "
+                    f"Enable the channel first, or read scope.trigger.source back."
+                )
 
     def set_source(self, channel: Union[int, str]) -> None:
         """Convenience wrapper to set trigger source."""

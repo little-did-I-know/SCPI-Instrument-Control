@@ -177,7 +177,12 @@ scope.trigger.source = "EX5"   # 5V external input (if available)
     the current source is `LINE`. Other modern-dialect scopes, such as the
     SDS2000X+, do have a working external input.
 
-    Read the value back if your measurement depends on it:
+    On a model with this quirk measured and recorded (currently just the
+    SDS824X HD), `scope.trigger.source = "EX"` logs a `logging.WARNING`
+    instead of writing silently — it does not raise and does not change what
+    gets sent to the instrument. Any model that hasn't been measured for this
+    quirk still writes with no warning, so read the value back if your
+    measurement depends on it:
 
     ```python
     scope.trigger.source = "EX"
