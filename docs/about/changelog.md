@@ -9,6 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`Trigger.source` warns instead of silently coercing known-bad trigger
+  sources.** `ModelCapability` gains two fields --
+  `unreliable_trigger_sources: FrozenSet[str]` and
+  `warns_on_disabled_trigger_channel: bool` -- populated for the SDS824X HD
+  (modern dialect): it silently coerces `EX` to `LINE`, and `EX5` is never
+  honored at all, with no error queued in either case; it also silently
+  coerces a disabled channel's selection to `LINE` the same way.
+  `Trigger.source`'s setter now logs a `logging.WARNING` before
+  writing when the connected model is known to do this -- it never raises
+  and never changes what gets sent to the instrument, so
+  `scope.trigger.source` still must be read back to confirm what took. Every
+  other model, including any not yet measured for this quirk, gets no
+  warning. The check is guarded by `isinstance(cap, ModelCapability)` so the
+  plain `unittest.mock.Mock()` scopes used throughout the trigger test suite
+  are unaffected.
+
 - **Harmonic distortion for mock signal synthesis.** `SignalSpec` gains
   `distortion_h2` and `distortion_h3` (fraction of `amplitude`, `0.0` = off),
   a kind-agnostic impairment -- like `noise_rms`/`clip_level` -- modeling a

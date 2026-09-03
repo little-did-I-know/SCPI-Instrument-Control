@@ -3,7 +3,7 @@
 import logging
 import re
 from dataclasses import dataclass
-from typing import List, Optional
+from typing import FrozenSet, List, Optional
 
 from scpi_control import exceptions
 
@@ -33,6 +33,8 @@ class ModelCapability:
     vendor: str = "siglent"  # Instrument vendor: "siglent", "tektronix", or "lecroy"
     horiz_divisions: int = 14  # Screen grid width in divisions (Siglent scopes use 14)
     vert_divisions: int = 8  # Screen grid height in divisions
+    unreliable_trigger_sources: FrozenSet[str] = frozenset()  # Sources this model is known to silently coerce away regardless of channel state (e.g. no EX input)
+    warns_on_disabled_trigger_channel: bool = False  # True if selecting a disabled channel as trigger source is known to silently coerce to LINE on this model
 
     def __str__(self) -> str:
         """String representation of model capability."""
@@ -83,6 +85,11 @@ MODEL_REGISTRY = {
         supported_decode_types=["I2C", "SPI", "UART", "CAN", "LIN", "I2S"],
         scpi_variant="hd_series",
         dialect="modern",
+        # Measured on firmware 3.8.12.1.1.3.6, 2026-08-04 -- see trigger.py's
+        # Trigger.source setter docstring and scpi_commands.supported_trigger_sources
+        # for the full writeup. No error is queued in any of these cases.
+        unreliable_trigger_sources=frozenset({"EX", "EX5"}),
+        warns_on_disabled_trigger_channel=True,
     ),  # 1 GSa/s  # 100 Mpts
     "SDS804X HD": ModelCapability(
         model_name="SDS804X HD",
