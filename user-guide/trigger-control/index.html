@@ -4753,7 +4753,12 @@ external input), and <code>EX5</code> never takes at all — it is a no-op when 
 current source is a channel, and lands on the highest enabled channel when
 the current source is <code>LINE</code>. Other modern-dialect scopes, such as the
 SDS2000X+, do have a working external input.</p>
-<p>Read the value back if your measurement depends on it:</p>
+<p>On a model with this quirk measured and recorded (currently just the
+SDS824X HD), <code>scope.trigger.source = "EX"</code> logs a <code>logging.WARNING</code>
+instead of writing silently — it does not raise and does not change what
+gets sent to the instrument. Any model that hasn't been measured for this
+quirk still writes with no warning, so read the value back if your
+measurement depends on it:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="n">scope</span><span class="o">.</span><span class="n">trigger</span><span class="o">.</span><span class="n">source</span> <span class="o">=</span> <span class="s2">"EX"</span>
 </span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="k">if</span> <span class="n">scope</span><span class="o">.</span><span class="n">trigger</span><span class="o">.</span><span class="n">source</span> <span class="o">!=</span> <span class="s2">"EX"</span><span class="p">:</span>
 </span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>    <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">"this scope has no usable external trigger input"</span><span class="p">)</span>
