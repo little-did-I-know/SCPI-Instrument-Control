@@ -59,6 +59,34 @@ def test_voltage_scale_parsing_accepts_units(response):
 
 
 @pytest.mark.parametrize(
+    "query,expected",
+    [
+        ("C1:VDIV?", 1.0),
+        ("C1:OFST?", 1.0),
+        ("TDIV?", 1.0),
+        ("SARA?", 1.0),
+    ],
+)
+def test_legacy_dialect_accepts_bare_nr3_without_units(query, expected):
+    # Real SDS1104X-E hardware (legacy dialect) has been observed returning a
+    # bare NR3 numeric value with no unit suffix at all for these queries
+    # (GitHub issue #177), contradicting the documented unit-suffixed format.
+    # The mock's default dialect is legacy, modeling an SDS1104X-E.
+    connection = MockConnection(custom_responses={query: "1.00E+00"})
+    with Oscilloscope("mock", connection=connection) as scope:
+        waveform = scope.waveform
+
+        parser = {
+            "C1:VDIV?": lambda: waveform._get_voltage_scale("C1"),
+            "C1:OFST?": lambda: waveform._get_voltage_offset("C1"),
+            "TDIV?": waveform._get_timebase,
+            "SARA?": waveform._get_sample_rate,
+        }[query]
+
+        assert parser() == pytest.approx(expected)
+
+
+@pytest.mark.parametrize(
     "query,expected_exception",
     [
         ("C1:VDIV?", "voltage scale"),
@@ -68,7 +96,9 @@ def test_voltage_scale_parsing_accepts_units(response):
     ],
 )
 def test_value_parsing_requires_units(query, expected_exception):
-    connection = MockConnection(custom_responses={query: "1.00E+00"})
+    # A genuinely unparseable response (neither unit-suffixed nor a valid
+    # bare float) must still raise, even for bare-NR3-tolerant dialects.
+    connection = MockConnection(custom_responses={query: "ERROR"})
     with Oscilloscope("mock", connection=connection) as scope:
         waveform = scope.waveform
 

@@ -639,8 +639,12 @@ FLAT_TRIGGER_DIALECTS = frozenset({"legacy", "lecroy"})
 # Dialects whose numeric queries return a bare NR3 value with no unit suffix.
 # LeCroy joins because CHDR OFF also suppresses the trailing unit token on
 # LeCroy responses -- e.g. C1:VDIV? returns "200E-3", not "200E-3 V" (MAUI
-# p.7-46) -- unlike Siglent legacy, which keeps the unit.
-BARE_NR3_DIALECTS = frozenset({"modern", "tektronix", "lecroy"})
+# p.7-46). Legacy Siglent's documented format is unit-suffixed (RC01020-E01C
+# p.139/142) and the primary unit-suffix check in _parse_value_with_units
+# still tries that first, but real SDS1104X-E hardware has been observed
+# returning a bare NR3 with no unit for C1:VDIV? (GitHub issue #177), so
+# legacy now also gets the bare-NR3 fallback like the other three dialects.
+BARE_NR3_DIALECTS = frozenset({"modern", "tektronix", "lecroy", "legacy"})
 
 
 def is_flat_trigger(dialect: str) -> bool:
