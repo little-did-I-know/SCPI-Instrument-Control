@@ -168,7 +168,7 @@ class TestDialectHelpers:
 
     def test_bare_nr3_dialects(self):
         assert "modern" in BARE_NR3_DIALECTS
-        assert "legacy" not in BARE_NR3_DIALECTS
+        assert "legacy" in BARE_NR3_DIALECTS
 
     def test_valid_public_token_unsupported_on_dialect_raises(self):
         # STOP is the :TRIGger:STOP command on modern, not a trigger-mode token;

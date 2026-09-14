@@ -309,9 +309,11 @@ class Waveform:
         # all: modern Siglent (:CHANnel:SCALe?, :CHANnel:OFFSet?,
         # :TIMebase:SCALe?, :ACQuire:SRATe? -- guide pp.46,56,58,476),
         # Tektronix (HEADer OFF strips the echo, leaving a bare NR3), and
-        # LeCroy (CHDR OFF). Legacy Siglent always echoes a unit and keeps
-        # the strict check above (audit-pinned, see
-        # test_value_parsing_requires_units).
+        # LeCroy (CHDR OFF). Legacy Siglent's manual-documented format
+        # normally carries the unit and gets caught by the primary check
+        # above first, but real SDS1104X-E hardware has been observed
+        # returning a bare NR3 with no unit for C1:VDIV? (GitHub issue
+        # #177), so legacy is now included in this fallback too.
         if self._dialect in BARE_NR3_DIALECTS:
             try:
                 value = float(cleaned)

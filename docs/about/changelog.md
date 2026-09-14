@@ -46,6 +46,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `synthesize_combined()` and `stream()` needed no changes -- both already
   dispatch through `synthesize()` per component/chunk.
 
+### Fixed
+
+- **`get_waveform()` raised `CommandError: Invalid voltage scale response`
+  on a real SDS1104X-E.** The legacy Siglent dialect's documented format for
+  `C1:VDIV?`/`C1:OFST?`/`TDIV?`/`SARA?` is unit-suffixed (RC01020-E01C
+  p.139/142), so `legacy` was deliberately excluded from
+  `BARE_NR3_DIALECTS`. A real SDS1104X-E has now been observed returning a
+  bare NR3 value with no unit suffix at all for `C1:VDIV?` (e.g. `"1.00E+00"`
+  instead of `"1.00E+00V"`) (GitHub issue #177). `legacy` is now included in
+  `BARE_NR3_DIALECTS` alongside `modern`/`tektronix`/`lecroy`, so
+  `_parse_value_with_units` falls back to parsing a bare float for legacy too
+  when the primary unit-suffix check doesn't match, while the documented
+  unit-suffixed format still parses via that primary check first.
+
 ## [7.3.0] - 2026-08-30
 
 ### Added
