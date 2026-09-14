@@ -178,9 +178,12 @@ class Trigger:
             that raises nothing is not proof the source took. For models with
             measured quirks (see ``ModelCapability.unreliable_trigger_sources``
             and ``.warns_on_disabled_trigger_channel``), this setter logs a
-            warning before writing. For everything else -- including any
-            model nobody has measured yet -- no warning fires, and
-            ``scope.trigger.source`` must be read back to confirm what took.
+            warning before writing. A channel number beyond the connected
+            model's ``num_channels`` also warns unconditionally -- that's a
+            fact from the model's own channel count, not a measured quirk.
+            For everything else -- including any model nobody has measured
+            yet -- no warning fires, and ``scope.trigger.source`` must be
+            read back to confirm what took.
 
             Measured on an SDS824X HD (modern) 2026-08-04, with no error
             queued in any case:
@@ -227,12 +230,30 @@ class Trigger:
                 f"{cap.model_name} is known to silently not honor trigger source " f"{channel!r} (no error is queued). Read scope.trigger.source back " f"to confirm what actually took effect."
             )
             return
-        if cap.warns_on_disabled_trigger_channel and channel.startswith("C"):
+        channel_num = int(channel[1:]) if channel.startswith("C") else None
+        if channel_num is not None and channel_num > cap.num_channels:
+            # A fact from the model's own channel count, not a measured
+            # hardware quirk -- applies to every model regardless of
+            # warns_on_disabled_trigger_channel, and needs no live query.
+            # Unlike the measured quirks above, how this specific model
+            # responds to an out-of-range source hasn't been measured -- it
+            # may reject the write with a SCPI error instead of accepting
+            # it, so this doesn't claim "no error is queued".
+            logger.warning(
+                f"{cap.model_name} has only {cap.num_channels} channel(s); trigger source "
+                f"{channel!r} does not exist on this model. The instrument may reject the "
+                f"write or silently ignore it -- read scope.trigger.source back, or check "
+                f"for a queued error, to confirm what happened."
+            )
+            return
+        if channel_num is not None and cap.warns_on_disabled_trigger_channel and logger.isEnabledFor(logging.WARNING):
             # Channel.enabled issues a live query(); this check is advisory
-            # only (never load-bearing), so a query failure here must not
-            # block the actual trigger-source write below.
+            # only (never load-bearing) and costs a round-trip, so it's
+            # skipped entirely when this logger wouldn't emit the warning
+            # anyway. A query failure here must still not block the actual
+            # trigger-source write below.
             try:
-                ch = self._scope.get_channel(int(channel[1:]))
+                ch = self._scope.get_channel(channel_num)
                 disabled = ch is not None and not ch.enabled
             except Exception:
                 return
