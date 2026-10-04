@@ -7546,7 +7546,8 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 </ul>
 <h3 id="fixed">Fixed<a class="headerlink" href="#fixed" title="Permanent link">&para;</a></h3>
 <ul>
-<li><strong><code>get_waveform()</code> raised <code>CommandError: Invalid voltage scale response</code>
+<li>
+<p><strong><code>get_waveform()</code> raised <code>CommandError: Invalid voltage scale response</code>
   on a real SDS1104X-E.</strong> The legacy Siglent dialect's documented format for
   <code>C1:VDIV?</code>/<code>C1:OFST?</code>/<code>TDIV?</code>/<code>SARA?</code> is unit-suffixed (RC01020-E01C
   p.139/142), so <code>legacy</code> was deliberately excluded from
@@ -7556,7 +7557,25 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   <code>BARE_NR3_DIALECTS</code> alongside <code>modern</code>/<code>tektronix</code>/<code>lecroy</code>, so
   <code>_parse_value_with_units</code> falls back to parsing a bare float for legacy too
   when the primary unit-suffix check doesn't match, while the documented
-  unit-suffixed format still parses via that primary check first.</li>
+  unit-suffixed format still parses via that primary check first.</p>
+</li>
+<li>
+<p><strong><code>Trigger.source</code>'s disabled-channel warning missed nonexistent
+  channels, and cost a hardware round-trip even when suppressed.</strong>
+  <code>_warn_if_unreliable_source</code> computed <code>disabled = ch is not None and not
+  ch.enabled</code>, so a channel number beyond the connected model's
+  <code>num_channels</code> (<code>get_channel()</code> returns <code>None</code>) evaluated to
+  <code>disabled=False</code> and stayed silent -- currently dormant since the only
+  model with <code>warns_on_disabled_trigger_channel</code> set (SDS824X HD) is
+  4-channel, matching <code>C1</code>-<code>C4</code> exactly, but latent for any future
+  narrower model with the same flag. A new check now warns whenever the
+  selected channel number exceeds <code>cap.num_channels</code>, independent of that
+  flag -- it's a fact from the model's own channel count, not a measured
+  quirk, so it needs no live query and applies to every model. Separately,
+  the existing disabled-channel check (which does call <code>Channel.enabled</code>,
+  a live query) is now skipped entirely when this logger's level is above
+  <code>WARNING</code>, so silencing the warning also skips its round-trip cost.</p>
+</li>
 </ul>
 <h2 id="730-2026-08-30">[7.3.0] - 2026-08-30<a class="headerlink" href="#730-2026-08-30" title="Permanent link">&para;</a></h2>
 <h3 id="added_1">Added<a class="headerlink" href="#added_1" title="Permanent link">&para;</a></h3>

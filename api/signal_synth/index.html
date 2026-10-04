@@ -4194,7 +4194,7 @@ the identity T_n(cos(theta)) = cos(n*theta): fed a pure sinusoid
 u = sin(theta), T_2 produces EXACTLY distortion_h2 fraction of
 clean 2<sup>nd</sup>-harmonic content with no leakage into DC or the 3<sup>rd</sup>
 harmonic. A naive u**2 polynomial does not have that property --
-sin(theta)**2 == 0.5*(1 - cos(2*theta)) -- so a "2<sup>nd</sup> harmonic"
+sin(theta)*<em>2 == 0.5</em>(1 - cos(2*theta)) -- so a "2<sup>nd</sup> harmonic"
 built that way would drag a DC offset along with it, a
 measurable-but-wrong artifact this module works hard to avoid
 elsewhere (see <code>_multitone</code>'s coherent harmonic series, built the
@@ -4844,9 +4844,9 @@ filter's lead-in).</p>
 <p>Each component is synthesized independently -- via synthesize(), so it
 keeps its own full impairments (noise, drift, glitches, jitter, seed) -- and
 the results are summed elementwise. No state is shared between components.
-A bad component parameter is caught by synthesize()'s own <em>validate(), the
+A bad component parameter is caught by synthesize()'s own _validate(), the
 same way it always is; the SuperposedSignal itself was already validated at
-construction (SuperposedSignal.__post_init_</em>).</p>
+construction (SuperposedSignal.<strong>post_init</strong>).</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
