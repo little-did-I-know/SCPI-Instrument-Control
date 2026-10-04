@@ -60,6 +60,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   when the primary unit-suffix check doesn't match, while the documented
   unit-suffixed format still parses via that primary check first.
 
+- **`Trigger.source`'s disabled-channel warning missed nonexistent
+  channels, and cost a hardware round-trip even when suppressed.**
+  `_warn_if_unreliable_source` computed `disabled = ch is not None and not
+  ch.enabled`, so a channel number beyond the connected model's
+  `num_channels` (`get_channel()` returns `None`) evaluated to
+  `disabled=False` and stayed silent -- currently dormant since the only
+  model with `warns_on_disabled_trigger_channel` set (SDS824X HD) is
+  4-channel, matching `C1`-`C4` exactly, but latent for any future
+  narrower model with the same flag. A new check now warns whenever the
+  selected channel number exceeds `cap.num_channels`, independent of that
+  flag -- it's a fact from the model's own channel count, not a measured
+  quirk, so it needs no live query and applies to every model. Separately,
+  the existing disabled-channel check (which does call `Channel.enabled`,
+  a live query) is now skipped entirely when this logger's level is above
+  `WARNING`, so silencing the warning also skips its round-trip cost.
+
 ## [7.3.0] - 2026-08-30
 
 ### Added
