@@ -95,3 +95,6 @@ webapp/app/dist-admin/
 
 # pytest-testmon impact-selection database (local dev only)
 .testmondata*
+
+# Stray report output from manual runs
+/test_report.pdf

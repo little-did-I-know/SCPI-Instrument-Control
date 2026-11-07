@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+
+- Stray `test_report.pdf` removed from the repository root and added to
+  `.gitignore` (leftover output of a manual PDF-save run, never referenced).
+
 ### Added
 
 - **Harmonic distortion for mock signal synthesis.** `SignalSpec` gains
