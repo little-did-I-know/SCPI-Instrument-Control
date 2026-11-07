@@ -34,7 +34,12 @@ pipeline with an empty bench.
 
 ```bash
 pip install SCPI-Instrument-Control
+scpi demo
 ```
+
+`scpi demo` starts a virtual scope, captures a synthesized signal, and prints
+its Vpp, frequency and an ASCII plot. Add `-o demo.png` to save a plot, or
+`-o demo.npz` to save the capture. The same thing from Python:
 
 ```python
 from scpi_control.connection import MockConnection
@@ -417,10 +422,18 @@ profile for their vendor with a logged warning.
 
 | Command | Does |
 |---|---|
+| `scpi demo` | Mock scope with a synthesized signal; no hardware needed |
+| `scpi discover` | List SCPI instruments on the LAN |
+| `scpi idn <host>` | Print the instrument's `*IDN?` reply |
+| `scpi screenshot <host> -o scope.png` | Save the scope display (PNG needs Pillow; `.bmp` needs nothing) |
+| `scpi capture <host> --channels 1,2 -o run.npz` | Save channel waveforms (`.npz`, `.csv`, `.mat`, `.h5`) |
 | `siglent-gui` | Launch the desktop application |
 | `scpi-web` | Serve the browser lab gateway |
 | `scpi-extract` | Inspect or export a saved waveform file |
 | `siglent-report-generator` | Launch the standalone report generator |
+
+Host-taking `scpi` commands accept `--mock` to run against the built-in mock
+instrument, and `python -m scpi_control` is equivalent to `scpi`.
 
 ## Documentation
 

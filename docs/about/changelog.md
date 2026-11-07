@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`scpi` command-line tool.** One entry point (`scpi = "scpi_control.cli:main"`,
+  also `python -m scpi_control`) with subcommands `demo` (mock scope with a
+  synthesized signal, prints Vpp/frequency and an ASCII plot, optional
+  `-o` to save a capture or PNG plot), `discover` (LAN scan, wraps
+  `scpi_control.server.discovery`), `idn <host>`, `screenshot <host>` (PNG
+  via Pillow, or raw BMP) and `capture <host> --channels 1,2 -o out.npz|csv`.
+  Host-taking commands accept `--mock`. Errors print `error: ...` to stderr
+  with a nonzero exit status (2 for bad arguments, 1 for runtime failures)
+  and never a traceback. Heavy imports are lazy, so the CLI works without
+  the optional extras.
+
 - **`Trigger.source` warns instead of silently coercing known-bad trigger
   sources.** `ModelCapability` gains two fields --
   `unreliable_trigger_sources: FrozenSet[str]` and
