@@ -156,6 +156,7 @@ nav:
       - Waveform I/O: api/waveform_io.md
       - Comparison & Batch Reports: api/comparison.md
       - Provenance: api/provenance.md
+      - SCPI CLI: api/cli.md
       - SCPI Extract (CLI): api/scpi_extract.md
       - Measurement: api/measurement.md
       - Analysis: api/analysis.md

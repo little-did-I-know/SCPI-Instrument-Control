@@ -38,6 +38,16 @@ First, install the library:
     Everything for desktop use — the web gateway and USB support are
     separate extras (`[web]`, `[usb]`).
 
+## Try It Without Hardware
+
+```bash
+scpi demo
+```
+
+This runs a virtual scope with a synthesized signal and prints its Vpp,
+frequency and an ASCII plot. See the [CLI reference](../api/cli.md) for
+`scpi discover`, `scpi idn`, `scpi screenshot` and `scpi capture`.
+
 ## Your First Script
 
 Here's a simple script to connect and capture a waveform:
