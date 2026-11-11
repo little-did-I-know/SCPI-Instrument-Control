@@ -137,6 +137,13 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
         python-version: ["3.9", "3.10", "3.11", "3.12", "3.13", "3.14"]
+        exclude:
+          # ubuntu-latest moved to 26.04, which has no Python 3.9 x64 build
+          - os: ubuntu-latest
+            python-version: "3.9"
+        include:
+          - os: ubuntu-22.04
+            python-version: "3.9"
 
     steps:
       - uses: actions/checkout@v7
@@ -188,11 +195,19 @@ jobs:
 
   test:
     name: Test Suite (Python ${{ matrix.python-version }})
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         python-version: ["3.9", "3.10", "3.11", "3.12", "3.13", "3.14"]
+        os: [ubuntu-latest]
+        exclude:
+          # ubuntu-latest moved to 26.04, which has no Python 3.9 x64 build
+          - os: ubuntu-latest
+            python-version: "3.9"
+        include:
+          - os: ubuntu-22.04
+            python-version: "3.9"
     steps:
       - uses: actions/checkout@v7
 
